@@ -6,60 +6,56 @@ Receives events from Claude Code hooks and stores them for the dashboard.
 """
 
 import json
-import sqlite3
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-
 from notify import notify
-
-DB_PATH = Path(__file__).parent / "data.db"
-
-
-def init_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS projects (
-            id INTEGER PRIMARY KEY,
-            path TEXT UNIQUE,
-            active_session_id TEXT
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY,
-            session_id TEXT,
-            project_id INTEGER,
-            event_type TEXT,
-            tool_name TEXT,
-            data JSON,
-            timestamp TEXT
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sessions (
-            session_id TEXT PRIMARY KEY,
-            project_id INTEGER,
-            name TEXT,
-            git_branch TEXT,
-            message_count INTEGER,
-            status TEXT,
-            current_tool TEXT,
-            last_updated TEXT
-        )
-    ''')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(last_updated)')
-    conn.commit()
-    return conn
+from dotenv import load_dotenv
+from db import (
+    init_db, log, save_hook,
+    get_or_create_project, set_project_active_session,
+    upsert_session, update_session_metadata, get_stale_session_ids, delete_sessions_cascade,
+    create_prompt
+)
 
 
-def get_project_id(conn: sqlite3.Connection, path: str) -> int:
-    cursor = conn.execute('INSERT OR IGNORE INTO projects (path) VALUES (?)', (path,))
-    if cursor.lastrowid:
-        return cursor.lastrowid
-    row = conn.execute('SELECT id FROM projects WHERE path = ?', (path,)).fetchone()
-    return row[0]
+# Load environment variables
+for env_file in [".env", ".env.local"]:
+    load_dotenv(Path(__file__).parent / env_file, override=True)
+
+DEBOUNCE_DIR = Path(__file__).parent / "debounce"
+
+
+def start_debounced_worker(session_id: str) -> None:
+    """Start a debounced worker for a session."""
+    DEBOUNCE_DIR.mkdir(exist_ok=True)
+
+    marker_file = DEBOUNCE_DIR / f"{session_id}.marker"
+    now = datetime.now().isoformat()
+
+    # Read existing marker to preserve start timestamp
+    start_timestamp = now
+    if marker_file.exists():
+        try:
+            data = json.loads(marker_file.read_text())
+            start_timestamp = data.get('start', now)
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Write marker with start and latest timestamps
+    marker_file.write_text(json.dumps({
+        'start': start_timestamp,
+        'latest': now
+    }))
+
+    # Spawn worker
+    subprocess.Popen(
+        [sys.executable, Path(__file__).parent / "worker.py", session_id, now],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
 
 
 def get_session_index_entry(project_path: str, session_id: str) -> dict | None:
@@ -83,24 +79,7 @@ def get_session_index_entry(project_path: str, session_id: str) -> dict | None:
     return None
 
 
-def clean_sessions(conn: sqlite3.Connection, project_id: int, current_session_id: str) -> None:
-    """Remove stale sessions that only have a SessionStart event."""
-    # Find sessions in 'started' status for this project, excluding current session
-    stale_sessions = conn.execute('''
-        SELECT s.session_id FROM sessions s
-        WHERE s.project_id = ?
-          AND s.session_id != ?
-          AND s.status = 'started'
-          AND (SELECT COUNT(*) FROM events e WHERE e.session_id = s.session_id) = 1
-          AND (SELECT event_type FROM events e WHERE e.session_id = s.session_id LIMIT 1) = 'SessionStart'
-    ''', (project_id, current_session_id)).fetchall()
-
-    for (session_id,) in stale_sessions:
-        conn.execute('DELETE FROM events WHERE session_id = ?', (session_id,))
-        conn.execute('DELETE FROM sessions WHERE session_id = ?', (session_id,))
-
-
-def update_session(conn: sqlite3.Connection, project_path: str, session_id: str) -> None:
+def update_session_from_index(conn, project_path: str, session_id: str) -> None:
     """Update session metadata from Claude's sessions-index.json."""
     entry = get_session_index_entry(project_path, session_id)
     if not entry:
@@ -110,105 +89,105 @@ def update_session(conn: sqlite3.Connection, project_path: str, session_id: str)
     git_branch = entry.get('gitBranch')
     message_count = entry.get('messageCount')
 
-    conn.execute('''
-        UPDATE sessions SET name = ?, git_branch = ?, message_count = ? WHERE session_id = ?
-    ''', (name[:200] if name else None, git_branch, message_count, session_id))
+    update_session_metadata(conn, session_id, name, git_branch, message_count)
+
+
+def clean_sessions(conn, project_id: int, current_session_id: str) -> None:
+    """Remove stale sessions in 'started' status for this project and related data."""
+    session_ids = get_stale_session_ids(conn, project_id, current_session_id)
+    delete_sessions_cascade(conn, session_ids)
 
 
 def main() -> None:
+    conn = None
     try:
-        event = json.load(sys.stdin)
-    except json.JSONDecodeError:
+        try:
+            event = json.load(sys.stdin)
+        except json.JSONDecodeError:
+            print(json.dumps({"continue": True}))
+            return
+
+        conn = init_db()
+
+        session_id = event.get('session_id', 'unknown')
+        project_path = event.get('cwd', '')
+        hook_type = event.get('hook_event_name', '')
+
+        log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event)
+        save_hook(conn, session_id, hook_type, event)
+
+        project_id = get_or_create_project(conn, project_path)
+
+        # Determine session status
+        status = None
+
+        if hook_type == 'SessionStart':
+            status = 'started'
+        elif hook_type == 'UserPromptSubmit':
+            status = 'active'
+        elif hook_type == 'PreToolUse':
+            status = 'active'
+        elif hook_type == 'PostToolUse':
+            status = 'active'
+        elif hook_type == 'Stop':
+            status = 'done'
+        elif hook_type == 'SessionEnd':
+            status = 'ended'
+        elif hook_type == 'Notification':
+            notification_type = event.get('notification_type', '')
+            if notification_type == 'permission_prompt':
+                status = 'permission_needed'
+            elif notification_type == 'idle_prompt':
+                status = 'idle'
+
+        # Update session if we have a status
+        transcript_path = event.get('transcript_path', '')
+        if status:
+            upsert_session(conn, session_id, project_id, status, transcript_path)
+
+        # Update project's active session
+        if hook_type == 'SessionStart':
+            set_project_active_session(conn, project_id, session_id)
+            clean_sessions(conn, project_id, session_id)
+            # Create prompt on session start
+            create_prompt(conn, session_id)
+            log(conn, "Created prompt", session_id=session_id)
+        elif hook_type == 'SessionEnd':
+            set_project_active_session(conn, project_id, None)
+
+        # Update session metadata
+        if hook_type in ('SessionStart', 'UserPromptSubmit'):
+            update_session_from_index(conn, project_path, session_id)
+
+        # Create prompt on user prompt submit
+        if hook_type == 'UserPromptSubmit':
+            prompt_text = event.get('prompt', '')
+            create_prompt(conn, session_id, prompt_text)
+            log(conn, "Created prompt", session_id=session_id, prompt_length=len(prompt_text))
+
+        conn.commit()
+        conn.close()
+
+        # Send notification if permission is needed
+        if status == 'permission_needed':
+            project_name = Path(project_path).name if project_path else 'Unknown'
+            notify(project_name, "Permission Request")
+
+        # Start debounced worker for session processing
+        start_debounced_worker(session_id)
+
         print(json.dumps({"continue": True}))
-        return
 
-    conn = init_db()
-
-    session_id = event.get('session_id', 'unknown')
-    project_path = event.get('cwd', '')
-    hook_type = event.get('hook_event_name', '')
-    tool_name = event.get('tool_name', '')
-
-    project_id = get_project_id(conn, project_path)
-
-    # Store event
-    conn.execute('''
-        INSERT INTO events (session_id, project_id, event_type, tool_name, data, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (
-        session_id,
-        project_id,
-        hook_type,
-        tool_name,
-        json.dumps(event),
-        datetime.now().isoformat()
-    ))
-
-    # Determine session status and current tool
-    status = None
-    current_tool = None
-
-    if hook_type == 'SessionStart':
-        status = 'started'
-    elif hook_type == 'UserPromptSubmit':
-        status = 'active'
-    elif hook_type == 'PreToolUse':
-        status = 'active'
-        current_tool = tool_name
-    elif hook_type == 'PostToolUse':
-        status = 'active'
-        current_tool = None
-    elif hook_type == 'Stop':
-        status = 'done'
-        current_tool = None
-    elif hook_type == 'SessionEnd':
-        status = 'ended'
-        current_tool = None
-    elif hook_type == 'Notification':
-        notification_type = event.get('notification_type', '')
-        if notification_type == 'permission_prompt':
-            status = 'permission_needed'
-        elif notification_type == 'idle_prompt':
-            status = 'idle'
-
-    # Update session if we have a status
-    if status:
-        conn.execute('''
-            INSERT INTO sessions (session_id, project_id, status, current_tool, last_updated)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET
-                project_id = excluded.project_id,
-                status = excluded.status,
-                current_tool = COALESCE(excluded.current_tool, sessions.current_tool),
-                last_updated = excluded.last_updated
-        ''', (
-            session_id,
-            project_id,
-            status,
-            current_tool,
-            datetime.now().isoformat()
-        ))
-
-    # Update project's active session
-    if hook_type == 'SessionStart':
-        conn.execute('UPDATE projects SET active_session_id = ? WHERE id = ?', (session_id, project_id))
-        clean_sessions(conn, project_id, session_id)
-    elif hook_type == 'SessionEnd':
-        conn.execute('UPDATE projects SET active_session_id = NULL WHERE id = ?', (project_id,))
-
-    # Update session metadata
-    if hook_type in ('SessionStart', 'UserPromptSubmit'):
-        update_session(conn, project_path, session_id)
-
-    conn.commit()
-    conn.close()
-
-    # Send notification if permission is needed
-    if status == 'permission_needed':
-        project_name = Path(project_path).name if project_path else 'Unknown'
-        notify(project_name, "Permission Request")
-
-    print(json.dumps({"continue": True}))
+    except Exception as e:
+        # Log error to database if connection exists
+        if conn:
+            try:
+                log(conn, "Monitor error", error=str(e), error_type=type(e).__name__)
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+        raise RuntimeError("Claude Dashboard Error") from e
 
 
 if __name__ == "__main__":
