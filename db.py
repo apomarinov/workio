@@ -60,7 +60,6 @@ def init_db() -> sqlite3.Connection:
             id INTEGER PRIMARY KEY,
             session_id TEXT,
             prompt TEXT,
-            summary TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -72,7 +71,6 @@ def init_db() -> sqlite3.Connection:
             is_user BOOLEAN DEFAULT 0,
             thinking BOOLEAN DEFAULT 0,
             body TEXT,
-            summary TEXT,
             created_at TEXT
         )
     ''')
@@ -202,8 +200,8 @@ def delete_sessions_cascade(conn: sqlite3.Connection, session_ids: list[str]) ->
 def create_prompt(conn: sqlite3.Connection, session_id: str, prompt_text: str | None = None) -> int:
     """Create a new prompt for a session."""
     cursor = conn.execute('''
-        INSERT INTO prompts (session_id, prompt, summary)
-        VALUES (?, ?, NULL)
+        INSERT INTO prompts (session_id, prompt)
+        VALUES (?, ?)
     ''', (session_id, prompt_text))
     return cursor.lastrowid
 
@@ -231,8 +229,8 @@ def message_exists(conn: sqlite3.Connection, uuid: str) -> bool:
 def create_message(conn: sqlite3.Connection, prompt_id: int, uuid: str, created_at: str, body: str, is_thinking: bool, is_user: bool) -> int:
     """Create a new message."""
     cursor = conn.execute('''
-        INSERT INTO messages (prompt_id, uuid, created_at, body, summary, thinking, is_user)
-        VALUES (?, ?, ?, ?, NULL, ?, ?)
+        INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user)
+        VALUES (?, ?, ?, ?, ?, ?)
     ''', (prompt_id, uuid, created_at, body, is_thinking, is_user))
     return cursor.lastrowid
 
