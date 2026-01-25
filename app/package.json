@@ -8,7 +8,8 @@
     "dev:client": "vite",
     "build": "npm run check && vite build",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
-    "check": "biome check src server && tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "check": "biome check src server && npm run typecheck",
     "lint:fix": "biome check --write src server"
   },
   "keywords": [],
