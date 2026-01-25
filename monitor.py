@@ -70,6 +70,22 @@ def start_cleanup_worker() -> None:
     )
 
 
+def start_socket_worker(session_id: str, event: str, data: dict) -> None:
+    """Start a socket worker to emit an event."""
+    subprocess.Popen(
+        [
+            sys.executable,
+            Path(__file__).parent / "socket_worker.py",
+            session_id,
+            event,
+            json.dumps(data)
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+
+
 def get_session_index_entry(project_path: str, session_id: str) -> dict | None:
     """Get session entry from Claude's sessions-index.json."""
     encoded_path = project_path.replace('/', '-')
@@ -129,6 +145,13 @@ def main() -> None:
 
         log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=os.environ.get('CLAUDE_TERMINAL_ID'))
         save_hook(conn, session_id, hook_type, event)
+
+        # Emit hook event to connected clients
+        start_socket_worker(session_id, "hook", {
+            "session_id": session_id,
+            "hook_type": hook_type,
+            "project_path": project_path,
+        })
 
         # Update project path if session already exists
         update_project_path_by_session(conn, session_id, project_path)

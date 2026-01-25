@@ -47,6 +47,16 @@ fastify.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
+// Emit to Socket.IO clients
+fastify.post('/api/emit', async (request, reply) => {
+  const { event, data } = request.body as { event: string; data: unknown }
+  if (!event) {
+    return reply.status(400).send({ error: 'event is required' })
+  }
+  io.emit(event, data)
+  return { ok: true }
+})
+
 // Terminal routes
 await fastify.register(terminalRoutes)
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTerminals } from './hooks/useTerminals'
+import { useSocket } from './hooks/useSocket'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
 import { Toaster } from '@/components/ui/sonner'
@@ -7,6 +8,14 @@ import { Toaster } from '@/components/ui/sonner'
 function App() {
   const { terminals, loading, createTerminal, deleteTerminal } = useTerminals()
   const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
+  const { subscribe } = useSocket()
+
+  // Test: subscribe to hook events
+  useEffect(() => {
+    return subscribe('hook', (data) => {
+      console.log('[App] Hook event:', data)
+    })
+  }, [subscribe])
 
   // Auto-select first terminal when terminals load
   useEffect(() => {
