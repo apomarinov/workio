@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSessions } from './hooks/useSessions'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
+import { Toaster } from '@/components/ui/sonner'
 
 function App() {
   const { sessions, loading, createSession, deleteSession } = useSessions()
@@ -40,36 +41,44 @@ function App() {
 
   // Show home page if no sessions
   if (sessions.length === 0) {
-    return <HomePage onCreateSession={handleCreateSession} />
+    return (
+      <>
+        <HomePage onCreateSession={handleCreateSession} />
+        <Toaster />
+      </>
+    )
   }
 
   const activeSession = sessions.find(s => s.id === activeSessionId)
 
   return (
-    <div className="h-full flex bg-zinc-950">
-      <Sidebar
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={setActiveSessionId}
-        onDeleteSession={handleDeleteSession}
-        onCreateSession={handleCreateSession}
-      />
-      <div className="flex-1 flex flex-col">
-        {activeSession ? (
-          <div className="flex-1 flex items-center justify-center text-zinc-400">
-            <div className="text-center">
-              <p className="text-lg mb-2">Terminal Placeholder</p>
-              <p className="text-sm">Session: {activeSession.name || activeSession.path}</p>
-              <p className="text-xs mt-1">ID: {activeSession.id}</p>
+    <>
+      <div className="h-full flex bg-zinc-950">
+        <Sidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={setActiveSessionId}
+          onDeleteSession={handleDeleteSession}
+          onCreateSession={handleCreateSession}
+        />
+        <div className="flex-1 flex flex-col">
+          {activeSession ? (
+            <div className="flex-1 flex items-center justify-center text-zinc-400">
+              <div className="text-center">
+                <p className="text-lg mb-2">Terminal Placeholder</p>
+                <p className="text-sm">Session: {activeSession.name || activeSession.path}</p>
+                <p className="text-xs mt-1">ID: {activeSession.id}</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-zinc-500">
-            Select a session
-          </div>
-        )}
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-zinc-500">
+              Select a session
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+      <Toaster />
+    </>
   )
 }
 

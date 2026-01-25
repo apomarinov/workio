@@ -24,10 +24,16 @@ export function useSessions() {
   }, [fetchSessions])
 
   const createSession = useCallback(async (cwd: string, name?: string) => {
+    // Check if session with this path already exists
+    const existingSession = sessions.find(s => s.path === cwd)
+    if (existingSession) {
+      throw new Error(`A session for "${cwd}" already exists`)
+    }
+
     const session = await api.createSession(cwd, name)
     setSessions(prev => [session, ...prev])
     return session
-  }, [])
+  }, [sessions])
 
   const updateSession = useCallback(async (id: number, updates: { name?: string }) => {
     const updated = await api.updateSession(id, updates)
