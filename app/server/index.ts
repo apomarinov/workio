@@ -1,16 +1,12 @@
-import dotenv from 'dotenv'
-dotenv.config({ path: '.env' })
-dotenv.config({ path: '.env.local', override: true })
+import { env } from './env'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import sessionRoutes from './routes/sessions.js'
-import { getActiveClaudeSessions } from './db.js'
+import terminalRoutes from './routes/terminals'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const SERVER_PORT = parseInt(process.env.SERVER_PORT || '5176')
 
 const fastify = Fastify({
   logger: true,
@@ -20,7 +16,7 @@ const fastify = Fastify({
 await fastify.register(fastifyWebsocket)
 
 // In production, serve built static files
-if (process.env.NODE_ENV === 'production') {
+if (env.NODE_ENV === 'production') {
   await fastify.register(fastifyStatic, {
     root: path.join(__dirname, '../dist'),
     prefix: '/',
@@ -32,13 +28,8 @@ fastify.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
-// Session routes
-await fastify.register(sessionRoutes)
-
-// Claude sessions (read-only)
-fastify.get('/api/claude-sessions', async () => {
-  return getActiveClaudeSessions()
-})
+// Terminal routes
+await fastify.register(terminalRoutes)
 
 // Placeholder for WebSocket (Phase 4)
 fastify.get('/ws', { websocket: true }, (socket) => {
@@ -51,7 +42,7 @@ fastify.get('/ws', { websocket: true }, (socket) => {
 // Start server
 const start = async () => {
   try {
-    await fastify.listen({ port: SERVER_PORT, host: '0.0.0.0' })
+    await fastify.listen({ port: env.SERVER_PORT, host: '0.0.0.0' })
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)

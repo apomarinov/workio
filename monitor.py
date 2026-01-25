@@ -14,7 +14,7 @@ from notify import notify
 from dotenv import load_dotenv
 from db import (
     init_db, log, save_hook,
-    upsert_project, set_project_active_session, update_project_path_by_session,
+    upsert_project, update_project_path_by_session,
     upsert_session, update_session_metadata, update_session_name_if_empty,
     get_stale_session_ids, delete_sessions_cascade,
     create_prompt
@@ -161,15 +161,11 @@ def main() -> None:
         if status:
             upsert_session(conn, session_id, project_id, status, transcript_path)
 
-        # Update project's active session
         if hook_type == 'SessionStart':
-            set_project_active_session(conn, project_id, session_id)
             clean_sessions(conn, project_id, session_id)
             # Create prompt on session start
             create_prompt(conn, session_id)
             log(conn, "Created prompt", session_id=session_id)
-        elif hook_type == 'SessionEnd':
-            set_project_active_session(conn, project_id, None)
 
         # Update session metadata
         if hook_type in ('SessionStart', 'UserPromptSubmit'):

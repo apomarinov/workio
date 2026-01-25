@@ -3,13 +3,12 @@ import { FolderOpen, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import { ActiveClaudeSessions } from './ActiveClaudeSessions'
 
 interface HomePageProps {
-  onCreateSession: (cwd: string, name?: string) => Promise<void>
+  onCreateTerminal: (cwd: string, name?: string) => Promise<void>
 }
 
-export function HomePage({ onCreateSession }: HomePageProps) {
+export function HomePage({ onCreateTerminal }: HomePageProps) {
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -20,27 +19,21 @@ export function HomePage({ onCreateSession }: HomePageProps) {
 
     setCreating(true)
     try {
-      await onCreateSession(cwd.trim(), name.trim() || undefined)
+      await onCreateTerminal(cwd.trim(), name.trim() || undefined)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create session')
+      toast.error(err instanceof Error ? err.message : 'Failed to create terminal')
     } finally {
       setCreating(false)
     }
-  }
-
-  const handleSelectPath = (path: string) => {
-    setCwd(path)
   }
 
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">Terminal Sessions</h1>
-          <p className="text-muted-foreground">Create your first session to get started</p>
+          <h1 className="text-3xl font-bold mb-2">Terminals</h1>
+          <p className="text-muted-foreground">Create your first terminal to get started</p>
         </div>
-
-        <ActiveClaudeSessions onSelectPath={handleSelectPath} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -62,7 +55,7 @@ export function HomePage({ onCreateSession }: HomePageProps) {
 
           <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
-              Session Name (optional)
+              Terminal Name (optional)
             </label>
             <Input
               id="name"
@@ -79,7 +72,7 @@ export function HomePage({ onCreateSession }: HomePageProps) {
             className="w-full cursor-pointer"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {creating ? 'Creating...' : 'Create Session'}
+            {creating ? 'Creating...' : 'Create Terminal'}
           </Button>
         </form>
       </div>

@@ -88,33 +88,6 @@ class TestMonitorMain:
                                 ("test-session", "Hello, world!")).fetchone()
         assert prompt is not None
 
-    def test_session_end_clears_active_session(self, db_conn, temp_dir, capsys):
-        """Test that SessionEnd clears the active session."""
-        db_path = temp_dir / "test.db"
-
-        # Setup
-        db_conn.execute('INSERT INTO projects (id, path, active_session_id) VALUES (1, "/test/project", "test-session")')
-        db_conn.execute('INSERT INTO sessions (session_id, project_id, status) VALUES (?, ?, ?)',
-                       ("test-session", 1, "active"))
-        db_conn.commit()
-
-        event = {
-            "session_id": "test-session",
-            "cwd": "/test/project",
-            "hook_event_name": "SessionEnd",
-            "transcript_path": ""
-        }
-
-        with patch('sys.stdin', io.StringIO(json.dumps(event))), \
-             patch('db.DB_PATH', db_path), \
-             patch('monitor.start_debounced_worker'):
-            from monitor import main
-            main()
-
-        # Check active session was cleared
-        project = db_conn.execute('SELECT active_session_id FROM projects WHERE id = 1').fetchone()
-        assert project['active_session_id'] is None
-
     def test_hook_event_saved(self, db_conn, temp_dir, capsys):
         """Test that hook events are saved to hooks table."""
         db_path = temp_dir / "test.db"

@@ -1,30 +1,17 @@
 import Database from 'better-sqlite3'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { env } from './env'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-// Use the existing data.db from parent directory
-const DB_PATH = path.join(__dirname, '../../data.db')
-
-const db = new Database(DB_PATH)
+const db = new Database(env.DB_PATH)
 
 // Enable WAL mode and busy timeout (matching Python config)
 db.pragma('journal_mode = WAL')
 db.pragma('busy_timeout = 5000')
 
-// Drop old table if it has TEXT id (migration)
-const tableInfo = db.prepare("PRAGMA table_info(terminal_sessions)").all() as { name: string; type: string }[]
-const idCol = tableInfo.find(c => c.name === 'id')
-if (idCol && idCol.type === 'TEXT') {
-  db.exec('DROP TABLE terminal_sessions')
-}
-
-// Initialize terminal_sessions table
+// Initialize terminals table
 db.exec(`
-  CREATE TABLE IF NOT EXISTS terminal_sessions (
+  CREATE TABLE IF NOT EXISTS terminals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER UNIQUE,
+    cwd TEXT NOT NULL,
     name TEXT,
     pid INTEGER,
     status TEXT DEFAULT 'running',
@@ -34,38 +21,26 @@ db.exec(`
 `)
 
 db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_terminal_sessions_status
-  ON terminal_sessions(status)
+  CREATE INDEX IF NOT EXISTS idx_terminals_status
+  ON terminals(status)
 `)
 
+console.log('[db] Database initialized')
+
 // Types
-export interface TerminalSession {
+export interface Terminal {
   id: number
-  project_id: number
+  cwd: string
   name: string | null
   pid: number | null
   status: 'running' | 'stopped'
   created_at: string
   updated_at: string
-  path?: string // joined from projects
 }
 
 export interface Project {
   id: number
   path: string
-  active_session_id: string | null
-}
-
-export interface ClaudeSession {
-  session_id: string
-  project_id: number
-  name: string | null
-  git_branch: string | null
-  message_count: number | null
-  status: string
-  created_at: string
-  updated_at: string
-  path?: string // joined from projects
 }
 
 // Project queries
@@ -78,55 +53,30 @@ export function getProjectById(id: number): Project | undefined {
   return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined
 }
 
-// Claude session queries
+// Terminal queries
 
-export function getActiveClaudeSessions(): ClaudeSession[] {
+export function getAllTerminals(): Terminal[] {
   return db.prepare(`
-    SELECT s.*, p.path
-    FROM sessions s
-    JOIN projects p ON s.project_id = p.id
-    ORDER BY s.updated_at DESC
-  `).all() as ClaudeSession[]
+    SELECT * FROM terminals
+    ORDER BY created_at DESC
+  `).all() as Terminal[]
 }
 
-// Terminal session queries
-
-export function getSessionByProjectId(projectId: number): TerminalSession | undefined {
+export function getTerminalById(id: number): Terminal | undefined {
   return db.prepare(`
-    SELECT ts.*, p.path
-    FROM terminal_sessions ts
-    JOIN projects p ON ts.project_id = p.id
-    WHERE ts.project_id = ?
-  `).get(projectId) as TerminalSession | undefined
+    SELECT * FROM terminals WHERE id = ?
+  `).get(id) as Terminal | undefined
 }
 
-export function getAllSessions(): TerminalSession[] {
-  return db.prepare(`
-    SELECT ts.*, p.path
-    FROM terminal_sessions ts
-    JOIN projects p ON ts.project_id = p.id
-    ORDER BY ts.created_at DESC
-  `).all() as TerminalSession[]
-}
-
-export function getSessionById(id: number): TerminalSession | undefined {
-  return db.prepare(`
-    SELECT ts.*, p.path
-    FROM terminal_sessions ts
-    JOIN projects p ON ts.project_id = p.id
-    WHERE ts.id = ?
-  `).get(id) as TerminalSession | undefined
-}
-
-export function createSession(projectId: number, name: string | null): TerminalSession {
+export function createTerminal(cwd: string, name: string | null): Terminal {
   const result = db.prepare(`
-    INSERT INTO terminal_sessions (project_id, name)
+    INSERT INTO terminals (cwd, name)
     VALUES (?, ?)
-  `).run(projectId, name)
-  return getSessionById(result.lastInsertRowid as number)!
+  `).run(cwd, name)
+  return getTerminalById(result.lastInsertRowid as number)!
 }
 
-export function updateSession(id: number, updates: { name?: string; pid?: number | null; status?: string }): TerminalSession | undefined {
+export function updateTerminal(id: number, updates: { name?: string; pid?: number | null; status?: string }): Terminal | undefined {
   const setClauses: string[] = []
   const values: (string | number | null)[] = []
 
@@ -144,18 +94,18 @@ export function updateSession(id: number, updates: { name?: string; pid?: number
   }
 
   if (setClauses.length === 0) {
-    return getSessionById(id)
+    return getTerminalById(id)
   }
 
   setClauses.push('updated_at = CURRENT_TIMESTAMP')
   values.push(id)
 
-  db.prepare(`UPDATE terminal_sessions SET ${setClauses.join(', ')} WHERE id = ?`).run(...values)
-  return getSessionById(id)
+  db.prepare(`UPDATE terminals SET ${setClauses.join(', ')} WHERE id = ?`).run(...values)
+  return getTerminalById(id)
 }
 
-export function deleteSession(id: number): boolean {
-  const result = db.prepare('DELETE FROM terminal_sessions WHERE id = ?').run(id)
+export function deleteTerminal(id: number): boolean {
+  const result = db.prepare('DELETE FROM terminals WHERE id = ?').run(id)
   return result.changes > 0
 }
 

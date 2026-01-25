@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import { Trash2, Terminal } from 'lucide-react'
+import { Trash2, Terminal as TerminalIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmModal } from './ConfirmModal'
-import type { TerminalSession } from '../types'
+import type { Terminal } from '../types'
 
-interface SessionItemProps {
-  session: TerminalSession
+interface TerminalItemProps {
+  terminal: Terminal
   isActive: boolean
   onSelect: () => void
   onDelete: () => void
 }
 
-export function SessionItem({ session, isActive, onSelect, onDelete }: SessionItemProps) {
+export function TerminalItem({ terminal, isActive, onSelect, onDelete }: TerminalItemProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const displayName = session.name || session.path?.split('/').pop() || 'Untitled'
+  const displayName = terminal.name || terminal.cwd.split('/').pop() || 'Untitled'
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -35,11 +35,11 @@ export function SessionItem({ session, isActive, onSelect, onDelete }: SessionIt
             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
         }`}
       >
-        <Terminal className="w-4 h-4 flex-shrink-0" />
+        <TerminalIcon className="w-4 h-4 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{displayName}</p>
-          {session.path && session.name && (
-            <p className="text-xs text-muted-foreground truncate">{session.path}</p>
+          {terminal.name && (
+            <p className="text-xs text-muted-foreground truncate">{terminal.cwd}</p>
           )}
         </div>
         <Button
@@ -54,7 +54,7 @@ export function SessionItem({ session, isActive, onSelect, onDelete }: SessionIt
 
       <ConfirmModal
         open={showDeleteModal}
-        title="Delete Session"
+        title="Delete Terminal"
         message={`Are you sure you want to delete "${displayName}"?`}
         confirmLabel="Delete"
         variant="danger"

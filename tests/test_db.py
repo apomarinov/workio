@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db import (
     log, save_hook,
-    upsert_project, set_project_active_session,
+    upsert_project,
     upsert_session, update_session_metadata, get_session,
     get_stale_session_ids, delete_sessions_cascade,
     create_prompt, get_latest_prompt, update_prompt_text,
@@ -87,26 +87,6 @@ class TestProjects:
         id2 = upsert_project(db_conn, "/path/two")
 
         assert id1 != id2
-
-    def test_set_project_active_session(self, db_conn):
-        """Test setting active session for a project."""
-        project_id = upsert_project(db_conn, "/test/path")
-        set_project_active_session(db_conn, project_id, "session-123")
-        db_conn.commit()
-
-        row = db_conn.execute('SELECT active_session_id FROM projects WHERE id = ?', (project_id,)).fetchone()
-        assert row['active_session_id'] == "session-123"
-
-    def test_set_project_active_session_to_none(self, db_conn):
-        """Test clearing active session."""
-        project_id = upsert_project(db_conn, "/test/path")
-        set_project_active_session(db_conn, project_id, "session-123")
-        set_project_active_session(db_conn, project_id, None)
-        db_conn.commit()
-
-        row = db_conn.execute('SELECT active_session_id FROM projects WHERE id = ?', (project_id,)).fetchone()
-        assert row['active_session_id'] is None
-
 
 class TestSessions:
     """Tests for session functions."""

@@ -1,34 +1,34 @@
 import { useState, useEffect } from 'react'
-import { useSessions } from './hooks/useSessions'
+import { useTerminals } from './hooks/useTerminals'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
 import { Toaster } from '@/components/ui/sonner'
 
 function App() {
-  const { sessions, loading, createSession, deleteSession } = useSessions()
-  const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
+  const { terminals, loading, createTerminal, deleteTerminal } = useTerminals()
+  const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
 
-  // Auto-select first session when sessions load
+  // Auto-select first terminal when terminals load
   useEffect(() => {
-    if (sessions.length > 0 && activeSessionId === null) {
-      setActiveSessionId(sessions[0].id)
+    if (terminals.length > 0 && activeTerminalId === null) {
+      setActiveTerminalId(terminals[0].id)
     }
-  }, [sessions, activeSessionId])
+  }, [terminals, activeTerminalId])
 
-  // Clear active session if it was deleted
+  // Clear active terminal if it was deleted
   useEffect(() => {
-    if (activeSessionId && !sessions.find(s => s.id === activeSessionId)) {
-      setActiveSessionId(sessions.length > 0 ? sessions[0].id : null)
+    if (activeTerminalId && !terminals.find(t => t.id === activeTerminalId)) {
+      setActiveTerminalId(terminals.length > 0 ? terminals[0].id : null)
     }
-  }, [sessions, activeSessionId])
+  }, [terminals, activeTerminalId])
 
-  const handleCreateSession = async (cwd: string, name?: string) => {
-    const session = await createSession(cwd, name)
-    setActiveSessionId(session.id)
+  const handleCreateTerminal = async (cwd: string, name?: string) => {
+    const terminal = await createTerminal(cwd, name)
+    setActiveTerminalId(terminal.id)
   }
 
-  const handleDeleteSession = async (id: number) => {
-    await deleteSession(id)
+  const handleDeleteTerminal = async (id: number) => {
+    await deleteTerminal(id)
   }
 
   if (loading) {
@@ -39,40 +39,40 @@ function App() {
     )
   }
 
-  // Show home page if no sessions
-  if (sessions.length === 0) {
+  // Show home page if no terminals
+  if (terminals.length === 0) {
     return (
       <>
-        <HomePage onCreateSession={handleCreateSession} />
+        <HomePage onCreateTerminal={handleCreateTerminal} />
         <Toaster />
       </>
     )
   }
 
-  const activeSession = sessions.find(s => s.id === activeSessionId)
+  const activeTerminal = terminals.find(t => t.id === activeTerminalId)
 
   return (
     <>
       <div className="h-full flex bg-zinc-950">
         <Sidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={setActiveSessionId}
-          onDeleteSession={handleDeleteSession}
-          onCreateSession={handleCreateSession}
+          terminals={terminals}
+          activeTerminalId={activeTerminalId}
+          onSelectTerminal={setActiveTerminalId}
+          onDeleteTerminal={handleDeleteTerminal}
+          onCreateTerminal={handleCreateTerminal}
         />
         <div className="flex-1 flex flex-col">
-          {activeSession ? (
+          {activeTerminal ? (
             <div className="flex-1 flex items-center justify-center text-zinc-400">
               <div className="text-center">
                 <p className="text-lg mb-2">Terminal Placeholder</p>
-                <p className="text-sm">Session: {activeSession.name || activeSession.path}</p>
-                <p className="text-xs mt-1">ID: {activeSession.id}</p>
+                <p className="text-sm">Terminal: {activeTerminal.name || activeTerminal.cwd}</p>
+                <p className="text-xs mt-1">ID: {activeTerminal.id}</p>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-zinc-500">
-              Select a session
+              Select a terminal
             </div>
           )}
         </div>

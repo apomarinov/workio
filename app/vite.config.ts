@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  // Load env from root project directory
+  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
   const clientPort = parseInt(env.CLIENT_PORT || '5175')
   const serverPort = parseInt(env.SERVER_PORT || '5176')
 

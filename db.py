@@ -30,8 +30,7 @@ def init_db() -> sqlite3.Connection:
     conn.execute('''
         CREATE TABLE IF NOT EXISTS projects (
             id INTEGER PRIMARY KEY,
-            path TEXT UNIQUE,
-            active_session_id TEXT
+            path TEXT UNIQUE
         )
     ''')
     conn.execute('''
@@ -129,11 +128,6 @@ def upsert_project(conn: sqlite3.Connection, path: str) -> int:
         return row['id']
     cursor = conn.execute('INSERT INTO projects (path) VALUES (?)', (path,))
     return cursor.lastrowid
-
-
-def set_project_active_session(conn: sqlite3.Connection, project_id: int, session_id: str | None) -> None:
-    """Set the active session for a project."""
-    conn.execute('UPDATE projects SET active_session_id = ? WHERE id = ?', (session_id, project_id))
 
 
 def update_project_path_by_session(conn: sqlite3.Connection, session_id: str, path: str) -> bool:

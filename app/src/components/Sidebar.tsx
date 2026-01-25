@@ -1,46 +1,30 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Plus, FolderOpen, MessageSquare, GitBranch, Folder } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
-import { SessionItem } from './SessionItem'
-import { getClaudeSessions } from '../lib/api'
-import type { TerminalSession, ClaudeSession } from '../types'
+import { TerminalItem } from './TerminalItem'
+import type { Terminal } from '../types'
 
 interface SidebarProps {
-  sessions: TerminalSession[]
-  activeSessionId: number | null
-  onSelectSession: (id: number) => void
-  onDeleteSession: (id: number) => void
-  onCreateSession: (cwd: string, name?: string) => Promise<void>
+  terminals: Terminal[]
+  activeTerminalId: number | null
+  onSelectTerminal: (id: number) => void
+  onDeleteTerminal: (id: number) => void
+  onCreateTerminal: (cwd: string, name?: string) => Promise<void>
 }
 
 export function Sidebar({
-  sessions,
-  activeSessionId,
-  onSelectSession,
-  onDeleteSession,
-  onCreateSession,
+  terminals,
+  activeTerminalId,
+  onSelectTerminal,
+  onDeleteTerminal,
+  onCreateTerminal,
 }: SidebarProps) {
   const [showForm, setShowForm] = useState(false)
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
-  const [claudeSessions, setClaudeSessions] = useState<ClaudeSession[]>([])
-
-  useEffect(() => {
-    getClaudeSessions()
-      .then(setClaudeSessions)
-      .catch(console.error)
-  }, [])
-
-  // Filter out Claude sessions that already have a terminal session with the same path
-  const terminalPaths = useMemo(() => new Set(sessions.map(s => s.path)), [sessions])
-  const filteredClaudeSessions = useMemo(
-    () => claudeSessions.filter(cs => cs.path && !terminalPaths.has(cs.path)),
-    [claudeSessions, terminalPaths]
-  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,12 +32,12 @@ export function Sidebar({
 
     setCreating(true)
     try {
-      await onCreateSession(cwd.trim(), name.trim() || undefined)
+      await onCreateTerminal(cwd.trim(), name.trim() || undefined)
       setCwd('')
       setName('')
       setShowForm(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create session')
+      toast.error(err instanceof Error ? err.message : 'Failed to create terminal')
     } finally {
       setCreating(false)
     }
@@ -62,64 +46,20 @@ export function Sidebar({
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="p-4 border-b border-sidebar-border">
-        <h2 className="text-sm font-semibold text-sidebar-foreground">Sessions</h2>
+        <h2 className="text-sm font-semibold text-sidebar-foreground">Terminals</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {sessions.map((session) => (
-          <SessionItem
-            key={session.id}
-            session={session}
-            isActive={session.id === activeSessionId}
-            onSelect={() => onSelectSession(session.id)}
-            onDelete={() => onDeleteSession(session.id)}
+        {terminals.map((terminal) => (
+          <TerminalItem
+            key={terminal.id}
+            terminal={terminal}
+            isActive={terminal.id === activeTerminalId}
+            onSelect={() => onSelectTerminal(terminal.id)}
+            onDelete={() => onDeleteTerminal(terminal.id)}
           />
         ))}
 
-        {filteredClaudeSessions.length > 0 && (
-          <>
-            <div className="pt-3 pb-1 px-2">
-              <span className="text-xs font-medium text-muted-foreground">Other Active Sessions</span>
-            </div>
-            {filteredClaudeSessions.map((session) => (
-              <Popover key={session.session_id}>
-                <PopoverTrigger asChild>
-                  <div className="flex items-start gap-2 p-2 rounded-md cursor-pointer hover:bg-sidebar-accent transition-colors">
-                    <MessageSquare className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-sidebar-foreground">
-                        {session.name || 'Unnamed session'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1 truncate">
-                          <Folder className="w-3 h-3" />
-                          {session.path}
-                        </span>
-                        {session.git_branch && (
-                          <span className="flex items-center gap-1 flex-shrink-0">
-                            <GitBranch className="w-3 h-3" />
-                            {session.git_branch}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent side="right" align="start" className="w-48 p-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full justify-start text-sm"
-                    onClick={() => onCreateSession(session.path || '', session.name || undefined)}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Terminal
-                  </Button>
-                </PopoverContent>
-              </Popover>
-            ))}
-          </>
-        )}
       </div>
 
       <div className="p-2 border-t border-sidebar-border">
@@ -169,7 +109,7 @@ export function Sidebar({
             className="w-full justify-center"
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Session
+            New Terminal
           </Button>
         )}
       </div>
