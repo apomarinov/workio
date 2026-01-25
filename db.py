@@ -122,8 +122,8 @@ def save_hook(conn: sqlite3.Connection, session_id: str, hook_type: str, payload
 
 # Projects
 
-def get_or_create_project(conn: sqlite3.Connection, path: str) -> int:
-    """Get project ID by path, creating if it doesn't exist."""
+def upsert_project(conn: sqlite3.Connection, path: str) -> int:
+    """Upsert project by path, returning project ID."""
     row = conn.execute('SELECT id FROM projects WHERE path = ?', (path,)).fetchone()
     if row:
         return row['id']
@@ -134,6 +134,18 @@ def get_or_create_project(conn: sqlite3.Connection, path: str) -> int:
 def set_project_active_session(conn: sqlite3.Connection, project_id: int, session_id: str | None) -> None:
     """Set the active session for a project."""
     conn.execute('UPDATE projects SET active_session_id = ? WHERE id = ?', (session_id, project_id))
+
+
+def update_project_path_by_session(conn: sqlite3.Connection, session_id: str, path: str) -> bool:
+    """Update the project path for an existing session. Returns True if updated."""
+    row = conn.execute(
+        'SELECT project_id FROM sessions WHERE session_id = ?',
+        (session_id,)
+    ).fetchone()
+    if row:
+        conn.execute('UPDATE projects SET path = ? WHERE id = ?', (path, row['project_id']))
+        return True
+    return False
 
 
 # Sessions

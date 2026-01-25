@@ -177,7 +177,7 @@ class TestMonitorMain:
 
         with patch('sys.stdin', io.StringIO(json.dumps(event))), \
              patch('db.DB_PATH', db_path), \
-             patch('monitor.get_or_create_project', side_effect=raise_error):
+             patch('monitor.upsert_project', side_effect=raise_error):
 
             with pytest.raises(RuntimeError, match="Claude Dashboard Error"):
                 from monitor import main

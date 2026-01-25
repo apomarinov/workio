@@ -14,7 +14,7 @@ from notify import notify
 from dotenv import load_dotenv
 from db import (
     init_db, log, save_hook,
-    get_or_create_project, set_project_active_session,
+    upsert_project, set_project_active_session, update_project_path_by_session,
     upsert_session, update_session_metadata, update_session_name_if_empty,
     get_stale_session_ids, delete_sessions_cascade,
     create_prompt
@@ -129,7 +129,10 @@ def main() -> None:
         log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event)
         save_hook(conn, session_id, hook_type, event)
 
-        project_id = get_or_create_project(conn, project_path)
+        # Update project path if session already exists
+        update_project_path_by_session(conn, session_id, project_path)
+
+        project_id = upsert_project(conn, project_path)
 
         # Determine session status
         status = None

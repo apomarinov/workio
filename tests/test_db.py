@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db import (
     log, save_hook,
-    get_or_create_project, set_project_active_session,
+    upsert_project, set_project_active_session,
     upsert_session, update_session_metadata, get_session,
     get_stale_session_ids, delete_sessions_cascade,
     create_prompt, get_latest_prompt, update_prompt_text,
@@ -65,32 +65,32 @@ class TestHooks:
 class TestProjects:
     """Tests for project functions."""
 
-    def test_get_or_create_project_creates_new(self, db_conn):
+    def test_upsert_project_creates_new(self, db_conn):
         """Test creating a new project."""
-        project_id = get_or_create_project(db_conn, "/test/path")
+        project_id = upsert_project(db_conn, "/test/path")
 
         assert project_id == 1
 
         row = db_conn.execute('SELECT * FROM projects WHERE id = ?', (project_id,)).fetchone()
         assert row['path'] == "/test/path"
 
-    def test_get_or_create_project_returns_existing(self, db_conn):
+    def test_upsert_project_returns_existing(self, db_conn):
         """Test that it returns existing project ID."""
-        id1 = get_or_create_project(db_conn, "/test/path")
-        id2 = get_or_create_project(db_conn, "/test/path")
+        id1 = upsert_project(db_conn, "/test/path")
+        id2 = upsert_project(db_conn, "/test/path")
 
         assert id1 == id2
 
-    def test_get_or_create_project_different_paths(self, db_conn):
+    def test_upsert_project_different_paths(self, db_conn):
         """Test that different paths get different IDs."""
-        id1 = get_or_create_project(db_conn, "/path/one")
-        id2 = get_or_create_project(db_conn, "/path/two")
+        id1 = upsert_project(db_conn, "/path/one")
+        id2 = upsert_project(db_conn, "/path/two")
 
         assert id1 != id2
 
     def test_set_project_active_session(self, db_conn):
         """Test setting active session for a project."""
-        project_id = get_or_create_project(db_conn, "/test/path")
+        project_id = upsert_project(db_conn, "/test/path")
         set_project_active_session(db_conn, project_id, "session-123")
         db_conn.commit()
 
@@ -99,7 +99,7 @@ class TestProjects:
 
     def test_set_project_active_session_to_none(self, db_conn):
         """Test clearing active session."""
-        project_id = get_or_create_project(db_conn, "/test/path")
+        project_id = upsert_project(db_conn, "/test/path")
         set_project_active_session(db_conn, project_id, "session-123")
         set_project_active_session(db_conn, project_id, None)
         db_conn.commit()
