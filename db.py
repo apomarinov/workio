@@ -90,6 +90,12 @@ def init_db() -> sqlite3.Connection:
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS cleans (
+            id INTEGER PRIMARY KEY,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at)')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_hooks_type ON hooks(hook_type)')
     conn.commit()

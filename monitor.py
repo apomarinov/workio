@@ -58,6 +58,16 @@ def start_debounced_worker(session_id: str) -> None:
     )
 
 
+def start_cleanup_worker() -> None:
+    """Start the cleanup worker."""
+    subprocess.Popen(
+        [sys.executable, Path(__file__).parent / "cleanup_worker.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+
+
 def get_session_index_entry(project_path: str, session_id: str) -> dict | None:
     """Get session entry from Claude's sessions-index.json."""
     encoded_path = project_path.replace('/', '-')
@@ -175,6 +185,9 @@ def main() -> None:
 
         # Start debounced worker for session processing
         start_debounced_worker(session_id)
+
+        # Start cleanup worker
+        start_cleanup_worker()
 
         print(json.dumps({"continue": True}))
 
