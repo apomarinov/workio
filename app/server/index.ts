@@ -1,9 +1,9 @@
 import { env } from './env'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
-import fastifyWebsocket from '@fastify/websocket'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { Server as SocketIOServer } from 'socket.io'
 import terminalRoutes from './routes/terminals'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -15,8 +15,24 @@ const fastify = Fastify({
   logger: true,
 })
 
-// Register plugins
-await fastify.register(fastifyWebsocket)
+// Setup Socket.IO
+const io = new SocketIOServer(fastify.server, {
+  cors: {
+    origin: env.NODE_ENV === 'production' ? false : `http://localhost:${env.CLIENT_PORT}`,
+    methods: ['GET', 'POST'],
+  },
+})
+
+io.on('connection', (socket) => {
+  fastify.log.info(`Client connected: ${socket.id}`)
+
+  socket.on('disconnect', () => {
+    fastify.log.info(`Client disconnected: ${socket.id}`)
+  })
+})
+
+// Export io for use in other modules
+export { io }
 
 // In production, serve built static files
 if (env.NODE_ENV === 'production') {
@@ -33,14 +49,6 @@ fastify.get('/api/health', async () => {
 
 // Terminal routes
 await fastify.register(terminalRoutes)
-
-// Placeholder for WebSocket (Phase 4)
-fastify.get('/ws', { websocket: true }, (socket) => {
-  socket.on('message', (message) => {
-    fastify.log.info(`Received: ${message}`)
-  })
-  socket.send(JSON.stringify({ type: 'connected' }))
-})
 
 // Start server
 const start = async () => {
