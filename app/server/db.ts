@@ -1,5 +1,8 @@
 import Database from 'better-sqlite3'
+import type { Project, Terminal } from '../src/types'
 import { env } from './env'
+
+export type { Terminal, Project }
 
 const db = new Database(env.DB_PATH)
 
@@ -27,56 +30,53 @@ db.exec(`
 
 console.log('[db] Database initialized')
 
-// Types
-export interface Terminal {
-  id: number
-  cwd: string
-  name: string | null
-  pid: number | null
-  status: 'running' | 'stopped'
-  created_at: string
-  updated_at: string
-}
-
-export interface Project {
-  id: number
-  path: string
-}
-
 // Project queries
 
 export function getProjectByPath(cwd: string): Project | undefined {
-  return db.prepare('SELECT * FROM projects WHERE path = ?').get(cwd) as Project | undefined
+  return db.prepare('SELECT * FROM projects WHERE path = ?').get(cwd) as
+    | Project
+    | undefined
 }
 
 export function getProjectById(id: number): Project | undefined {
-  return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined
+  return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as
+    | Project
+    | undefined
 }
 
 // Terminal queries
 
 export function getAllTerminals(): Terminal[] {
-  return db.prepare(`
+  return db
+    .prepare(`
     SELECT * FROM terminals
     ORDER BY created_at DESC
-  `).all() as Terminal[]
+  `)
+    .all() as Terminal[]
 }
 
 export function getTerminalById(id: number): Terminal | undefined {
-  return db.prepare(`
+  return db
+    .prepare(`
     SELECT * FROM terminals WHERE id = ?
-  `).get(id) as Terminal | undefined
+  `)
+    .get(id) as Terminal | undefined
 }
 
 export function createTerminal(cwd: string, name: string | null): Terminal {
-  const result = db.prepare(`
+  const result = db
+    .prepare(`
     INSERT INTO terminals (cwd, name)
     VALUES (?, ?)
-  `).run(cwd, name)
+  `)
+    .run(cwd, name)
   return getTerminalById(result.lastInsertRowid as number)!
 }
 
-export function updateTerminal(id: number, updates: { name?: string; pid?: number | null; status?: string }): Terminal | undefined {
+export function updateTerminal(
+  id: number,
+  updates: { name?: string; pid?: number | null; status?: string },
+): Terminal | undefined {
   const setClauses: string[] = []
   const values: (string | number | null)[] = []
 
@@ -100,7 +100,9 @@ export function updateTerminal(id: number, updates: { name?: string; pid?: numbe
   setClauses.push('updated_at = CURRENT_TIMESTAMP')
   values.push(id)
 
-  db.prepare(`UPDATE terminals SET ${setClauses.join(', ')} WHERE id = ?`).run(...values)
+  db.prepare(`UPDATE terminals SET ${setClauses.join(', ')} WHERE id = ?`).run(
+    ...values,
+  )
   return getTerminalById(id)
 }
 

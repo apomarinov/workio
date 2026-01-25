@@ -1,6 +1,6 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import { z } from 'zod'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -14,7 +14,9 @@ const envSchema = z.object({
   DB_NAME: z.string().default('data.db'),
   SERVER_PORT: z.coerce.number().default(5176),
   CLIENT_PORT: z.coerce.number().default(5175),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
 })
 
 const parsed = envSchema.safeParse(process.env)

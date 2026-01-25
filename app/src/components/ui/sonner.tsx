@@ -16,7 +16,8 @@ function Toaster({ ...props }: ToasterProps) {
             'group-[.toast]:bg-zinc-50 group-[.toast]:text-zinc-900',
           cancelButton:
             'group-[.toast]:bg-zinc-800 group-[.toast]:text-zinc-400',
-          error: 'group-[.toaster]:bg-red-950 group-[.toaster]:border-red-900 group-[.toaster]:text-red-50',
+          error:
+            'group-[.toaster]:bg-red-950 group-[.toaster]:border-red-900 group-[.toaster]:text-red-50',
         },
       }}
       {...props}

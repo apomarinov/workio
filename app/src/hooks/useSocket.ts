@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react'
-import { io, Socket } from 'socket.io-client'
+import { useCallback, useEffect, useRef } from 'react'
+import { io, type Socket } from 'socket.io-client'
 
 const SOCKET_URL = import.meta.env.DEV
   ? 'http://localhost:5176'
@@ -53,13 +53,16 @@ export function useSocket() {
     }
   }, [])
 
-  const subscribe = useCallback(<T>(event: string, handler: (data: T) => void) => {
-    const s = socketRef.current
-    s.on(event, handler)
-    return () => {
-      s.off(event, handler)
-    }
-  }, [])
+  const subscribe = useCallback(
+    <T>(event: string, handler: (data: T) => void) => {
+      const s = socketRef.current
+      s.on(event, handler)
+      return () => {
+        s.off(event, handler)
+      }
+    },
+    [],
+  )
 
   const emit = useCallback(<T>(event: string, data?: T) => {
     socketRef.current.emit(event, data)

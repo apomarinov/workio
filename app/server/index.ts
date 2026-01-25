@@ -1,9 +1,9 @@
-import { env } from './env'
-import Fastify from 'fastify'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import fastifyStatic from '@fastify/static'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
+import { env } from './env'
 import terminalRoutes from './routes/terminals'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -18,7 +18,10 @@ const fastify = Fastify({
 // Setup Socket.IO
 const io = new SocketIOServer(fastify.server, {
   cors: {
-    origin: env.NODE_ENV === 'production' ? false : `http://localhost:${env.CLIENT_PORT}`,
+    origin:
+      env.NODE_ENV === 'production'
+        ? false
+        : `http://localhost:${env.CLIENT_PORT}`,
     methods: ['GET', 'POST'],
   },
 })

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
-import { useTerminals } from './hooks/useTerminals'
-import { useSocket } from './hooks/useSocket'
+import { useEffect, useState } from 'react'
+import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
-import { Toaster } from '@/components/ui/sonner'
+import { useSocket } from './hooks/useSocket'
+import { useTerminals } from './hooks/useTerminals'
+import type { HookEvent } from './types'
 
 function App() {
   const { terminals, loading, createTerminal, deleteTerminal } = useTerminals()
@@ -12,7 +13,7 @@ function App() {
 
   // Test: subscribe to hook events
   useEffect(() => {
-    return subscribe('hook', (data) => {
+    return subscribe<HookEvent>('hook', (data) => {
       console.log('[App] Hook event:', data)
     })
   }, [subscribe])
@@ -26,7 +27,7 @@ function App() {
 
   // Clear active terminal if it was deleted
   useEffect(() => {
-    if (activeTerminalId && !terminals.find(t => t.id === activeTerminalId)) {
+    if (activeTerminalId && !terminals.find((t) => t.id === activeTerminalId)) {
       setActiveTerminalId(terminals.length > 0 ? terminals[0].id : null)
     }
   }, [terminals, activeTerminalId])
@@ -58,7 +59,7 @@ function App() {
     )
   }
 
-  const activeTerminal = terminals.find(t => t.id === activeTerminalId)
+  const activeTerminal = terminals.find((t) => t.id === activeTerminalId)
 
   return (
     <>
@@ -75,7 +76,9 @@ function App() {
             <div className="flex-1 flex items-center justify-center text-zinc-400">
               <div className="text-center">
                 <p className="text-lg mb-2">Terminal Placeholder</p>
-                <p className="text-sm">Terminal: {activeTerminal.name || activeTerminal.cwd}</p>
+                <p className="text-sm">
+                  Terminal: {activeTerminal.name || activeTerminal.cwd}
+                </p>
                 <p className="text-xs mt-1">ID: {activeTerminal.id}</p>
               </div>
             </div>

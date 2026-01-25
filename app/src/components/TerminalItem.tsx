@@ -1,8 +1,8 @@
+import { Terminal as TerminalIcon, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Trash2, Terminal as TerminalIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ConfirmModal } from './ConfirmModal'
 import type { Terminal } from '../types'
+import { ConfirmModal } from './ConfirmModal'
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -11,9 +11,15 @@ interface TerminalItemProps {
   onDelete: () => void
 }
 
-export function TerminalItem({ terminal, isActive, onSelect, onDelete }: TerminalItemProps) {
+export function TerminalItem({
+  terminal,
+  isActive,
+  onSelect,
+  onDelete,
+}: TerminalItemProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const displayName = terminal.name || terminal.cwd.split('/').pop() || 'Untitled'
+  const displayName =
+    terminal.name || terminal.cwd.split('/').pop() || 'Untitled'
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -39,7 +45,9 @@ export function TerminalItem({ terminal, isActive, onSelect, onDelete }: Termina
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{displayName}</p>
           {terminal.name && (
-            <p className="text-xs text-muted-foreground truncate">{terminal.cwd}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {terminal.cwd}
+            </p>
           )}
         </div>
         <Button

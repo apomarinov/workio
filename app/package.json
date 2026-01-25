@@ -6,14 +6,17 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
-    "build": "vite build",
-    "start": "NODE_ENV=production node --import tsx server/index.ts"
+    "build": "npm run check && vite build",
+    "start": "NODE_ENV=production node --import tsx server/index.ts",
+    "check": "biome check src server && tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "lint:fix": "biome check --write src server"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@biomejs/biome": "^2.3.12",
     "@fastify/static": "^9.0.0",
     "@fastify/websocket": "^11.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",

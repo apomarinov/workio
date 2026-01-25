@@ -1,10 +1,10 @@
+import { FolderOpen, Plus } from 'lucide-react'
 import { useState } from 'react'
-import { Plus, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import { TerminalItem } from './TerminalItem'
 import type { Terminal } from '../types'
+import { TerminalItem } from './TerminalItem'
 
 interface SidebarProps {
   terminals: Terminal[]
@@ -37,7 +37,9 @@ export function Sidebar({
       setName('')
       setShowForm(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create terminal')
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to create terminal',
+      )
     } finally {
       setCreating(false)
     }
@@ -46,7 +48,9 @@ export function Sidebar({
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col">
       <div className="p-4 border-b border-sidebar-border">
-        <h2 className="text-sm font-semibold text-sidebar-foreground">Terminals</h2>
+        <h2 className="text-sm font-semibold text-sidebar-foreground">
+          Terminals
+        </h2>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -59,7 +63,6 @@ export function Sidebar({
             onDelete={() => onDeleteTerminal(terminal.id)}
           />
         ))}
-
       </div>
 
       <div className="p-2 border-t border-sidebar-border">

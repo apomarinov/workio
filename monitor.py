@@ -131,13 +131,15 @@ def clean_sessions(conn, project_id: int, current_session_id: str) -> None:
 def main() -> None:
     conn = None
     try:
+        conn = init_db()
+
         try:
             event = json.load(sys.stdin)
         except json.JSONDecodeError:
+            log(conn, "Invalid Hook Event", error=str(e), error_type=type(e).__name__)
             print(json.dumps({"continue": True}))
             return
 
-        conn = init_db()
 
         session_id = event.get('session_id', 'unknown')
         project_path = event.get('cwd', '')

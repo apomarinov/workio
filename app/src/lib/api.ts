@@ -8,7 +8,10 @@ export async function getTerminals(): Promise<Terminal[]> {
   return res.json()
 }
 
-export async function createTerminal(cwd: string, name?: string): Promise<Terminal> {
+export async function createTerminal(
+  cwd: string,
+  name?: string,
+): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -21,7 +24,10 @@ export async function createTerminal(cwd: string, name?: string): Promise<Termin
   return res.json()
 }
 
-export async function updateTerminal(id: number, updates: { name?: string }): Promise<Terminal> {
+export async function updateTerminal(
+  id: number,
+  updates: { name?: string },
+): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
