@@ -158,6 +158,14 @@ def update_session_metadata(conn: sqlite3.Connection, session_id: str, name: str
     ''', (name[:200] if name else None, git_branch, message_count, session_id))
 
 
+def update_session_name_if_empty(conn: sqlite3.Connection, session_id: str, name: str) -> None:
+    """Update session name only if the current name is empty."""
+    conn.execute('''
+        UPDATE sessions SET name = ?
+        WHERE session_id = ? AND (name IS NULL OR name = '')
+    ''', (name[:200], session_id))
+
+
 def get_session(conn: sqlite3.Connection, session_id: str) -> sqlite3.Row | None:
     """Get a session by ID."""
     return conn.execute(

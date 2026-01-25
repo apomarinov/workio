@@ -39,18 +39,26 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 fi
 
+# Check for Claude CLI
+echo " - Checking for Claude CLI..."
+if ! command -v claude &> /dev/null; then
+    echo "Error: Claude CLI is required but not installed."
+    echo "Install it from https://docs.anthropic.com/en/docs/claude-code"
+    exit 1
+fi
+
 echo ""
 echo " - Installing Python dependencies..."
 python3 -m pip install python-dotenv requests
 
-echo ""
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo " - Checking for terminal-notifier..."
-    if ! command -v terminal-notifier &> /dev/null; then
-        echo " - Installing terminal-notifier..."
-        brew install terminal-notifier
-    fi
-fi
+# echo ""
+# if [[ "$OSTYPE" == "darwin"* ]]; then
+#     echo " - Checking for terminal-notifier..."
+#     if ! command -v terminal-notifier &> /dev/null; then
+#         echo " - Installing terminal-notifier..."
+#         brew install terminal-notifier
+#     fi
+# fi
 
 # echo ""
 # echo " - Checking for Ollama..."
@@ -69,6 +77,17 @@ fi
 # echo ""
 # echo " - Pulling default model..."
 # ollama pull qwen2:1.5b
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo ""
+echo " - Making scripts executable..."
+chmod +x "$SCRIPT_DIR/monitor.py"
+chmod +x "$SCRIPT_DIR/setup_hooks.py"
+
+echo ""
+echo " - Setting up Claude hooks..."
+python3 "$SCRIPT_DIR/setup_hooks.py"
 
 echo ""
 echo " - Setup complete!"

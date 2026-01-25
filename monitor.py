@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 from db import (
     init_db, log, save_hook,
     get_or_create_project, set_project_active_session,
-    upsert_session, update_session_metadata, get_stale_session_ids, delete_sessions_cascade,
+    upsert_session, update_session_metadata, update_session_name_if_empty,
+    get_stale_session_ids, delete_sessions_cascade,
     create_prompt
 )
 
@@ -93,12 +94,14 @@ def update_session_from_index(conn, project_path: str, session_id: str) -> None:
     """Update session metadata from Claude's sessions-index.json."""
     entry = get_session_index_entry(project_path, session_id)
     if not entry:
+        log(conn, "No session entry found in index", session_id=session_id, project_path=project_path)
         return
 
     name = entry.get('customTitle') or entry.get('firstPrompt')
     git_branch = entry.get('gitBranch')
     message_count = entry.get('messageCount')
 
+    log(conn, "Updating session metadata from index", session_id=session_id, project_path=project_path, name=name, git_branch=git_branch, message_count=message_count)
     update_session_metadata(conn, session_id, name, git_branch, message_count)
 
 
@@ -173,6 +176,7 @@ def main() -> None:
         if hook_type == 'UserPromptSubmit':
             prompt_text = event.get('prompt', '')
             create_prompt(conn, session_id, prompt_text)
+            update_session_name_if_empty(conn, session_id, prompt_text)
             log(conn, "Created prompt", session_id=session_id, prompt_length=len(prompt_text))
 
         conn.commit()

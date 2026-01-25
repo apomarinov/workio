@@ -17,6 +17,7 @@ def detect_terminal():
 
 
 def notify(title, message):
+    return; # TODO: call app server endpoint to notify
     if sys.platform == "darwin":
         if shutil.which("terminal-notifier"):
             subprocess.run([
