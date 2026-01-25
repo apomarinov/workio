@@ -143,6 +143,13 @@ def update_project_path_by_session(conn: sqlite3.Connection, session_id: str, pa
         (session_id,)
     ).fetchone()
     if row:
+        # Check if path already exists in another project
+        existing = conn.execute(
+            'SELECT id FROM projects WHERE path = ? AND id != ?',
+            (path, row['project_id'])
+        ).fetchone()
+        if existing:
+            return False
         conn.execute('UPDATE projects SET path = ? WHERE id = ?', (path, row['project_id']))
         return True
     return False
