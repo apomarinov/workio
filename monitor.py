@@ -6,6 +6,7 @@ Receives events from Claude Code hooks and stores them for the dashboard.
 """
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -126,7 +127,7 @@ def main() -> None:
         project_path = event.get('cwd', '')
         hook_type = event.get('hook_event_name', '')
 
-        log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event)
+        log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=os.environ.get('CLAUDE_TERMINAL_ID'))
         save_hook(conn, session_id, hook_type, event)
 
         # Update project path if session already exists
@@ -158,8 +159,10 @@ def main() -> None:
 
         # Update session if we have a status
         transcript_path = event.get('transcript_path', '')
+        terminal_id_str = os.environ.get('CLAUDE_TERMINAL_ID')
+        terminal_id = int(terminal_id_str) if terminal_id_str else None
         if status:
-            upsert_session(conn, session_id, project_id, status, transcript_path)
+            upsert_session(conn, session_id, project_id, status, transcript_path, terminal_id)
 
         if hook_type == 'SessionStart':
             clean_sessions(conn, project_id, session_id)

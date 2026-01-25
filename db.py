@@ -37,6 +37,7 @@ def init_db() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
             project_id INTEGER,
+            terminal_id INTEGER,
             name TEXT,
             git_branch TEXT,
             message_count INTEGER,
@@ -151,16 +152,17 @@ def update_project_path_by_session(conn: sqlite3.Connection, session_id: str, pa
 
 # Sessions
 
-def upsert_session(conn: sqlite3.Connection, session_id: str, project_id: int, status: str, transcript_path: str) -> None:
+def upsert_session(conn: sqlite3.Connection, session_id: str, project_id: int, status: str, transcript_path: str, terminal_id: int | None = None) -> None:
     """Insert or update a session."""
     conn.execute('''
-        INSERT INTO sessions (session_id, project_id, status, transcript_path)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO sessions (session_id, project_id, terminal_id, status, transcript_path)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
             project_id = excluded.project_id,
+            terminal_id = COALESCE(excluded.terminal_id, sessions.terminal_id),
             status = excluded.status,
             transcript_path = excluded.transcript_path
-    ''', (session_id, project_id, status, transcript_path))
+    ''', (session_id, project_id, terminal_id, status, transcript_path))
 
 
 def update_session_metadata(conn: sqlite3.Connection, session_id: str, name: str | None, git_branch: str | None, message_count: int | None) -> None:
