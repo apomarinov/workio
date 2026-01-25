@@ -6,6 +6,7 @@ import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import sessionRoutes from './routes/sessions.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SERVER_PORT = parseInt(process.env.SERVER_PORT || '5176')
@@ -30,10 +31,8 @@ fastify.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
-// Placeholder for session routes (Phase 2)
-fastify.get('/api/sessions', async () => {
-  return []
-})
+// Session routes
+await fastify.register(sessionRoutes)
 
 // Placeholder for WebSocket (Phase 4)
 fastify.get('/ws', { websocket: true }, (socket) => {

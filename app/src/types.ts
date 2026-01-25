@@ -1,5 +1,5 @@
-export interface Session {
-  id: string
+export interface TerminalSession {
+  id: number
   project_id: number
   name: string | null
   pid: number | null
@@ -13,5 +13,5 @@ export interface Session {
 export interface Project {
   id: number
   path: string
-  active_session_id: string | null
+  active_session_id: string | null  // UUID from claude sessions table
 }
