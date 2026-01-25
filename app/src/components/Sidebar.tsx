@@ -68,10 +68,8 @@ export function Sidebar({
               <input
                 type="text"
                 value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
                 placeholder="Project path"
-                className="w-full pl-8 pr-2 py-1.5 text-sm bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                autoFocus
+                className="w-full pl-8 pr-2 py-1.5 text-sm bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500 opacity-50 cursor-not-allowed"
               />
             </div>
             <input

@@ -1,4 +1,4 @@
-import type { TerminalSession } from '../types'
+import type { TerminalSession, ClaudeSession } from '../types'
 
 const API_BASE = '/api'
 
@@ -36,4 +36,10 @@ export async function deleteSession(id: number): Promise<void> {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete session')
+}
+
+export async function getClaudeSessions(): Promise<ClaudeSession[]> {
+  const res = await fetch(`${API_BASE}/claude-sessions`)
+  if (!res.ok) throw new Error('Failed to fetch Claude sessions')
+  return res.json()
 }

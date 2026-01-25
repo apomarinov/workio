@@ -56,6 +56,18 @@ export interface Project {
   active_session_id: string | null
 }
 
+export interface ClaudeSession {
+  session_id: string
+  project_id: number
+  name: string | null
+  git_branch: string | null
+  message_count: number | null
+  status: string
+  created_at: string
+  updated_at: string
+  path?: string // joined from projects
+}
+
 // Project queries
 
 export function getProjectByPath(cwd: string): Project | undefined {
@@ -64,6 +76,17 @@ export function getProjectByPath(cwd: string): Project | undefined {
 
 export function getProjectById(id: number): Project | undefined {
   return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined
+}
+
+// Claude session queries
+
+export function getActiveClaudeSessions(): ClaudeSession[] {
+  return db.prepare(`
+    SELECT s.*, p.path
+    FROM sessions s
+    JOIN projects p ON s.project_id = p.id
+    ORDER BY s.updated_at DESC
+  `).all() as ClaudeSession[]
 }
 
 // Terminal session queries

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FolderOpen, Plus } from 'lucide-react'
+import { ActiveClaudeSessions } from './ActiveClaudeSessions'
 
 interface HomePageProps {
   onCreateSession: (cwd: string, name?: string) => Promise<void>
@@ -26,6 +27,10 @@ export function HomePage({ onCreateSession }: HomePageProps) {
     }
   }
 
+  const handleSelectPath = (path: string) => {
+    setCwd(path)
+  }
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-zinc-950">
       <div className="w-full max-w-md p-8">
@@ -33,6 +38,8 @@ export function HomePage({ onCreateSession }: HomePageProps) {
           <h1 className="text-3xl font-bold text-white mb-2">Terminal Sessions</h1>
           <p className="text-zinc-400">Create your first session to get started</p>
         </div>
+
+        <ActiveClaudeSessions onSelectPath={handleSelectPath} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -43,6 +50,7 @@ export function HomePage({ onCreateSession }: HomePageProps) {
               <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
               <input
                 id="cwd"
+                disabled={true}
                 type="text"
                 value={cwd}
                 onChange={(e) => setCwd(e.target.value)}

@@ -15,3 +15,15 @@ export interface Project {
   path: string
   active_session_id: string | null  // UUID from claude sessions table
 }
+
+export interface ClaudeSession {
+  session_id: string
+  project_id: number
+  name: string | null
+  git_branch: string | null
+  message_count: number | null
+  status: string
+  created_at: string
+  updated_at: string
+  path?: string
+}
