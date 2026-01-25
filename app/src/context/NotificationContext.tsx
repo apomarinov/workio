@@ -9,10 +9,21 @@ import { NotificationPrompt } from '../components/NotificationPrompt'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
 
+type AudioType = 'permission' | 'done'
+
+const audioFiles: Record<AudioType, string> = {
+  permission: '/audio/permissions.mp3',
+  done: '/audio/done.mp3',
+}
+
+interface SendNotificationOptions extends NotificationOptions {
+  audio?: AudioType
+}
+
 interface NotificationContextValue {
   sendNotification: (
     title: string,
-    options?: NotificationOptions,
+    options?: SendNotificationOptions,
   ) => Notification | null
 }
 
@@ -40,7 +51,9 @@ export function NotificationProvider({
         .then((status) => {
           status.onchange = () => setPermission(Notification.permission)
         })
-        .catch(() => {})
+        .catch(() => {
+          console.error('Failed to query notifications permission')
+        })
     }
   }, [permission])
 
@@ -55,7 +68,7 @@ export function NotificationProvider({
   }, [permission])
 
   const sendNotification = useCallback(
-    (title: string, options?: NotificationOptions) => {
+    (title: string, options?: SendNotificationOptions) => {
       if (permission === 'default') {
         setPromptOpen(true)
         return null
@@ -65,9 +78,19 @@ export function NotificationProvider({
         return null
       }
 
+      const { audio, ...notificationOptions } = options || {}
+
+      if (audio) {
+        const audioElement = new Audio(audioFiles[audio])
+        audioElement.volume = 0.5
+        audioElement.play().catch(() => {
+          console.error(`Failed to play audio: ${audioFiles[audio]}`)
+        })
+      }
+
       return new Notification(title, {
         icon: '/favicon.svg',
-        ...options,
+        ...notificationOptions,
       })
     },
     [permission],

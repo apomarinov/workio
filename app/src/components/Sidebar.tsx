@@ -108,7 +108,9 @@ export function Sidebar({
         ) : (
           <Button
             variant="ghost"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setShowForm(true)
+            }}
             className="w-full justify-center"
           >
             <Plus className="w-4 h-4 mr-2" />
