@@ -8,6 +8,9 @@ import terminalRoutes from './routes/terminals'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// In production, use CLIENT_PORT since we serve both UI and API
+const port = env.NODE_ENV === 'production' ? env.CLIENT_PORT : env.SERVER_PORT
+
 const fastify = Fastify({
   logger: true,
 })
@@ -42,7 +45,7 @@ fastify.get('/ws', { websocket: true }, (socket) => {
 // Start server
 const start = async () => {
   try {
-    await fastify.listen({ port: env.SERVER_PORT, host: '0.0.0.0' })
+    await fastify.listen({ port, host: '0.0.0.0' })
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)
