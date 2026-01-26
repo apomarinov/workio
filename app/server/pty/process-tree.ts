@@ -60,40 +60,6 @@ function getProcessArgs(pid: number): string | null {
   }
 }
 
-// Get all processes listening on TCP ports
-function getListeningPids(): Map<number, number> {
-  const pidToPort = new Map<number, number>()
-  try {
-    // lsof -iTCP -sTCP:LISTEN -P -n gives us processes listening on TCP ports
-    const output = execSync('lsof -iTCP -sTCP:LISTEN -P -n', {
-      encoding: 'utf8',
-      timeout: 2000,
-    })
-
-    const lines = output.trim().split('\n').slice(1) // Skip header
-
-    for (const line of lines) {
-      try {
-        const parts = line.split(/\s+/)
-        if (parts.length >= 9) {
-          const pid = Number.parseInt(parts[1], 10)
-          const nameCol = parts[8]
-          const portMatch = nameCol.match(/:(\d+)$/)
-          const port = portMatch ? Number.parseInt(portMatch[1], 10) : 0
-          if (pid && port) {
-            pidToPort.set(pid, port)
-          }
-        }
-      } catch {
-        // Skip malformed lines
-      }
-    }
-  } catch {
-    // lsof failed, return empty
-  }
-  return pidToPort
-}
-
 // Processes to ignore - shells, multiplexers, and shell helpers
 const IGNORE_PROCESSES = new Set([
   // Shells
@@ -299,9 +265,6 @@ export function getChildProcesses(
       }
     }
 
-    // Get listening ports
-    const listeningPids = getListeningPids()
-
     // Build results
     const results: ActiveProcess[] = []
     const seen = new Set<string>()
@@ -314,11 +277,9 @@ export function getChildProcesses(
       const command = getProcessArgs(pid) || name
       if (shouldIgnoreProcess(command)) continue
 
-      const port = listeningPids.get(pid)
-      const key = `${command}:${port ?? 'none'}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        results.push({ pid, name, command, port, terminalId, source: 'direct' })
+      if (!seen.has(command)) {
+        seen.add(command)
+        results.push({ pid, name, command, terminalId, source: 'direct' })
       }
     }
 

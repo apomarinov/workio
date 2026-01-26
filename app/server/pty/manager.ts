@@ -18,7 +18,6 @@ export interface PtySession {
   pty: IPty
   buffer: string[]
   timeoutId: NodeJS.Timeout | null
-  processPollingId: NodeJS.Timeout | null
   terminalId: number
   cols: number
   rows: number
@@ -32,6 +31,56 @@ export interface PtySession {
 
 // In-memory map of active PTY sessions
 const sessions = new Map<number, PtySession>()
+
+// Global process polling
+let globalProcessPollingId: NodeJS.Timeout | null = null
+
+function startGlobalProcessPolling() {
+  if (globalProcessPollingId) return
+
+  globalProcessPollingId = setInterval(() => {
+    const allProcesses: ActiveProcess[] = []
+
+    for (const [terminalId, session] of sessions) {
+      if (!session.pty.pid) continue
+
+      try {
+        // Check direct child processes
+        const procs = getChildProcesses(session.pty.pid, terminalId)
+        for (const p of procs) {
+          allProcesses.push(p)
+        }
+
+        // Check Zellij session (terminal-<ID>)
+        const zellijProcs = getZellijSessionProcesses(
+          `terminal-${terminalId}`,
+          terminalId,
+        )
+        for (const p of zellijProcs.filter((p) => !p.isIdle)) {
+          allProcesses.push({
+            pid: 0,
+            name: p.command.split(' ')[0] || '',
+            command: p.command,
+            terminalId: p.terminalId,
+            source: 'zellij',
+          })
+        }
+      } catch {
+        // Ignore errors for this terminal
+      }
+    }
+
+    // Emit combined list to clients
+    getIO()?.emit('processes', allProcesses)
+  }, 3000)
+}
+
+function stopGlobalProcessPolling() {
+  if (globalProcessPollingId && sessions.size === 0) {
+    clearInterval(globalProcessPollingId)
+    globalProcessPollingId = null
+  }
+}
 
 export function getSession(terminalId: number): PtySession | undefined {
   return sessions.get(terminalId)
@@ -121,7 +170,6 @@ export function createSession(
     pty: ptyProcess,
     buffer: [],
     timeoutId: null,
-    processPollingId: null,
     terminalId,
     cols,
     rows,
@@ -178,11 +226,8 @@ export function createSession(
 
   // Handle PTY exit
   ptyProcess.onExit(({ exitCode }) => {
-    // Clear process polling
-    if (session.processPollingId) {
-      clearInterval(session.processPollingId)
-    }
     sessions.delete(terminalId)
+    stopGlobalProcessPolling()
     updateTerminal(terminalId, {
       pid: null,
       status: 'stopped',
@@ -196,50 +241,8 @@ export function createSession(
 
   sessions.set(terminalId, session)
 
-  // Start polling for active processes every 3 seconds
-  session.processPollingId = setInterval(() => {
-    if (!session.pty.pid) return
-    try {
-      const allProcesses: ActiveProcess[] = []
-
-      // Check direct child processes
-      const procs = getChildProcesses(session.pty.pid, terminalId)
-      for (const p of procs) {
-        allProcesses.push(p)
-        const portInfo = p.port ? ` :${p.port}` : ''
-        console.log(
-          `[pty:${terminalId}] Process: tid=${p.terminalId} src=${p.source} cmd="${p.command}"${portInfo}`,
-        )
-      }
-
-      // Check Zellij session (terminal-<ID>)
-      const zellijProcs = getZellijSessionProcesses(
-        `terminal-${terminalId}`,
-        terminalId,
-      )
-      for (const p of zellijProcs.filter((p) => !p.isIdle)) {
-        allProcesses.push({
-          pid: 0, // Unknown from Zellij
-          name: p.command.split(' ')[0] || '',
-          command: p.command,
-          terminalId: p.terminalId,
-          source: 'zellij',
-        })
-        console.log(
-          `[pty:${terminalId}] Process: tid=${p.terminalId} src=zellij cmd="${p.command}"`,
-        )
-      }
-
-      if (allProcesses.length === 0) {
-        console.log(`[pty:${terminalId}] Active processes: (none)`)
-      }
-
-      // Emit to clients
-      getIO()?.emit('processes', allProcesses)
-    } catch {
-      // Ignore polling errors
-    }
-  }, 3000)
+  // Start global process polling if not already running
+  startGlobalProcessPolling()
 
   // Inject shell integration after a brief delay to let shell initialize
   setTimeout(() => {
@@ -336,11 +339,6 @@ export function destroySession(terminalId: number): boolean {
     clearTimeout(session.timeoutId)
   }
 
-  // Clear process polling
-  if (session.processPollingId) {
-    clearInterval(session.processPollingId)
-  }
-
   // Kill PTY process and all child processes
   try {
     const pid = session.pty.pid
@@ -370,6 +368,7 @@ export function destroySession(terminalId: number): boolean {
   updateTerminal(terminalId, { pid: null, status: 'stopped', active_cmd: null })
 
   sessions.delete(terminalId)
+  stopGlobalProcessPolling()
   return true
 }
 

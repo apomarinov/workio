@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   ChevronDown,
   ChevronRight,
@@ -9,6 +10,7 @@ import {
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '../context/TerminalContext'
+import { useProcesses } from '../hooks/useProcesses'
 import { useTerminals } from '../hooks/useTerminals'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
@@ -35,11 +37,17 @@ export function TerminalItem({
 }: TerminalItemProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminals()
+  const allProcesses = useProcesses()
+  const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [processesExpanded, setProcessesExpanded] = useState(true)
+  const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
+  const [otherSessionsExpanded, setOtherSessionsExpanded] = useState(true)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0 || otherSessions.length > 0
+  const hasProcesses = processes.length > 0
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -77,7 +85,7 @@ export function TerminalItem({
               : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
           } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
-          {hasSessions && (
+          {(hasSessions || hasProcesses) && (
             <Button
               variant="ghost"
               size="icon"
@@ -94,7 +102,9 @@ export function TerminalItem({
           {terminal.orphaned ? (
             <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
           ) : (
-            <TerminalIcon className="w-4 h-4 flex-shrink-0" />
+            <TerminalIcon
+              className={`w-4 h-4 flex-shrink-0 ${hasProcesses ? 'text-green-500' : ''}`}
+            />
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{displayName}</p>
@@ -131,19 +141,76 @@ export function TerminalItem({
           </div>
         </div>
 
-        {hasSessions && sessionsExpanded && (
+        {(hasProcesses || hasSessions) && sessionsExpanded && (
           <div className="ml-7 mt-1 space-y-0.5">
-            {sessions.map((session) => (
-              <SessionItem key={session.session_id} session={session} />
-            ))}
+            {hasProcesses && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setProcessesExpanded(!processesExpanded)}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                >
+                  {processesExpanded ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                  Processes ({processes.length})
+                </button>
+                {processesExpanded &&
+                  processes.map((process) => (
+                    <div
+                      key={`${process.pid}-${process.command}`}
+                      className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                    >
+                      <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                      <span className="text-xs truncate">
+                        {process.command}
+                      </span>
+                    </div>
+                  ))}
+              </>
+            )}
+            {sessions.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                >
+                  {sessionsListExpanded ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                  Sessions ({sessions.length})
+                </button>
+                {sessionsListExpanded &&
+                  sessions.map((session) => (
+                    <SessionItem key={session.session_id} session={session} />
+                  ))}
+              </>
+            )}
             {otherSessions.length > 0 && (
               <>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
-                  Other
-                </p>
-                {otherSessions.map((session) => (
-                  <SessionItem key={session.session_id} session={session} />
-                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOtherSessionsExpanded(!otherSessionsExpanded)
+                  }
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                >
+                  {otherSessionsExpanded ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                  Other ({otherSessions.length})
+                </button>
+                {otherSessionsExpanded &&
+                  otherSessions.map((session) => (
+                    <SessionItem key={session.session_id} session={session} />
+                  ))}
               </>
             )}
           </div>
