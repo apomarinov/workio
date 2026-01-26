@@ -1,4 +1,4 @@
-import type { Settings, Terminal } from '../types'
+import type { SessionWithProject, Settings, Terminal } from '../types'
 
 const API_BASE = '/api'
 
@@ -63,5 +63,11 @@ export async function updateSettings(
     const data = await res.json()
     throw new Error(data.error || 'Failed to update settings')
   }
+  return res.json()
+}
+
+export async function getClaudeSessions(): Promise<SessionWithProject[]> {
+  const res = await fetch(`${API_BASE}/sessions`)
+  if (!res.ok) throw new Error('Failed to fetch sessions')
   return res.json()
 }

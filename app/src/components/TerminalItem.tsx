@@ -1,30 +1,50 @@
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   Pencil,
-  Terminal as TerminalIcon,
+  TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useTerminals } from '../hooks/useTerminals'
-import type { Terminal } from '../types'
+import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
+import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
 
 interface TerminalItemProps {
   terminal: Terminal
   hideFolder?: boolean
+  sessions?: SessionWithProject[]
+  otherSessions?: SessionWithProject[]
+  sessionsExpanded?: boolean
+  onToggleSessions?: () => void
 }
 
-export function TerminalItem({ terminal, hideFolder }: TerminalItemProps) {
+export function TerminalItem({
+  terminal,
+  hideFolder,
+  sessions = [],
+  otherSessions = [],
+  sessionsExpanded = true,
+  onToggleSessions,
+}: TerminalItemProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminals()
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
+  const hasSessions = sessions.length > 0 || otherSessions.length > 0
+
+  const handleChevronClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onToggleSessions?.()
+  }
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -48,51 +68,85 @@ export function TerminalItem({ terminal, hideFolder }: TerminalItemProps) {
 
   return (
     <>
-      <div
-        onClick={() => selectTerminal(terminal.id)}
-        className={`group flex items-center gap-3 min-h-14 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-          } ${terminal.orphaned ? 'opacity-60' : ''}`}
-      >
-        {terminal.orphaned ? (
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
-        ) : (
-          <TerminalIcon className="w-4 h-4 flex-shrink-0" />
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{displayName}</p>
-          {terminal.orphaned ? (
-            <p className="text-xs truncate text-yellow-500">Path not found</p>
-          ) : (
-            !hideFolder &&
-            terminal.name && (
-              <TruncatedPath
-                path={terminal.cwd}
-                className="text-xs text-muted-foreground"
-              />
-            )
+      <div>
+        <div
+          onClick={() => selectTerminal(terminal.id)}
+          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            } ${terminal.orphaned ? 'opacity-60' : ''}`}
+        >
+          {hasSessions && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleChevronClick}
+              className="h-6 w-6 flex-shrink-0"
+            >
+              {sessionsExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </Button>
           )}
+          {terminal.orphaned ? (
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
+          ) : (
+            <TerminalIcon className="w-4 h-4 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{displayName}</p>
+            {terminal.orphaned ? (
+              <p className="text-xs truncate text-yellow-500">Path not found</p>
+            ) : (
+              !hideFolder &&
+              terminal.name && (
+                <TruncatedPath
+                  path={terminal.cwd}
+                  className="text-xs text-muted-foreground"
+                />
+              )
+            )}
+          </div>
+          <div className="h-7 invisible pointer-events-none"></div>
+          <div className="hidden group-hover:flex">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleEditClick}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteClick}
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
-        <div className="h-7 invisible pointer-events-none"></div>
-        <div className="hidden group-hover:flex">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleEditClick}
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDeleteClick}
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
+
+        {hasSessions && sessionsExpanded && (
+          <div className="ml-7 mt-1 space-y-0.5">
+            {sessions.map((session) => (
+              <SessionItem key={session.session_id} session={session} />
+            ))}
+            {otherSessions.length > 0 && (
+              <>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
+                  Other
+                </p>
+                {otherSessions.map((session) => (
+                  <SessionItem key={session.session_id} session={session} />
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <EditTerminalModal

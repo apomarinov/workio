@@ -29,6 +29,10 @@ export interface Session {
   updated_at: string
 }
 
+export interface SessionWithProject extends Session {
+  project_path: string
+}
+
 export interface Prompt {
   id: number
   session_id: string

@@ -8,7 +8,7 @@ import { useTerminals } from '../hooks/useTerminals'
 
 export function HomePage() {
   const { createTerminal } = useTerminals()
-  const { settings } = useSettings()
+  const { settings, updateSettings } = useSettings()
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [shell, setShell] = useState('')
@@ -22,11 +22,13 @@ export function HomePage() {
 
     setCreating(true)
     try {
-      await createTerminal(
-        cwd.trim(),
-        name.trim() || undefined,
-        shell.trim() || undefined,
-      )
+      const shellValue = shell.trim() || undefined
+      await createTerminal(cwd.trim(), name.trim() || undefined, shellValue)
+
+      // Save shell to settings as default if provided
+      if (shellValue) {
+        await updateSettings({ default_shell: shellValue })
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to create terminal',

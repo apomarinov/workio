@@ -15,10 +15,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useTerminalContext } from '../context/TerminalContext'
+import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import type { Terminal } from '../types'
+import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
+import { SessionGroup } from './SessionGroup'
 import { SettingsModal } from './SettingsModal'
 import { TerminalItem } from './TerminalItem'
 
@@ -30,6 +32,7 @@ interface SidebarProps {
 
 export function Sidebar({ width }: SidebarProps) {
   const { terminals, selectTerminal } = useTerminalContext()
+  const { sessions } = useClaudeSessions()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
@@ -40,6 +43,11 @@ export function Sidebar({ width }: SidebarProps) {
   const [expandedFoldersArray, setExpandedFoldersArray] = useLocalStorage<
     string[]
   >('sidebar-expanded-folders', [])
+  const [expandedSessionGroups, setExpandedSessionGroups] = useLocalStorage<
+    string[]
+  >('sidebar-expanded-session-groups', [])
+  const [expandedTerminalSessions, setExpandedTerminalSessions] =
+    useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
 
   const expandedFolders = useMemo(
     () => new Set(expandedFoldersArray),
@@ -56,6 +64,45 @@ export function Sidebar({ width }: SidebarProps) {
     return groups
   }, [terminals])
 
+  // Compute session assignments:
+  // - sessionsForTerminal: sessions with terminal_id matching an existing terminal
+  // - otherSessionsForTerminal: sessions with project_path matching terminal cwd but no valid terminal_id
+  // - orphanSessionGroups: sessions with no matching terminal, grouped by project_path
+  const { sessionsForTerminal, otherSessionsForTerminal, orphanSessionGroups } =
+    useMemo(() => {
+      const terminalIds = new Set(terminals.map((t) => t.id))
+      const terminalCwds = new Set(terminals.map((t) => t.cwd))
+      const sessionsForTerminal = new Map<number, SessionWithProject[]>()
+      const otherSessionsForTerminal = new Map<string, SessionWithProject[]>()
+      const orphanGroups = new Map<string, SessionWithProject[]>()
+
+      for (const session of sessions) {
+        if (session.terminal_id && terminalIds.has(session.terminal_id)) {
+          // Session has a terminal_id that matches an existing terminal
+          const existing = sessionsForTerminal.get(session.terminal_id) || []
+          existing.push(session)
+          sessionsForTerminal.set(session.terminal_id, existing)
+        } else if (terminalCwds.has(session.project_path)) {
+          // Session has no valid terminal_id but project_path matches a terminal cwd
+          const existing =
+            otherSessionsForTerminal.get(session.project_path) || []
+          existing.push(session)
+          otherSessionsForTerminal.set(session.project_path, existing)
+        } else {
+          // Orphan session - group by project_path
+          const existing = orphanGroups.get(session.project_path) || []
+          existing.push(session)
+          orphanGroups.set(session.project_path, existing)
+        }
+      }
+
+      return {
+        sessionsForTerminal,
+        otherSessionsForTerminal,
+        orphanSessionGroups: orphanGroups,
+      }
+    }, [sessions, terminals])
+
   const allFolders = useMemo(
     () => Array.from(groupedTerminals.keys()),
     [groupedTerminals],
@@ -67,6 +114,34 @@ export function Sidebar({ width }: SidebarProps) {
         return prev.filter((f) => f !== cwd)
       }
       return [...prev, cwd]
+    })
+  }
+
+  const toggleSessionGroup = (path: string) => {
+    setExpandedSessionGroups((prev) => {
+      if (prev.includes(path)) {
+        return prev.filter((p) => p !== path)
+      }
+      return [...prev, path]
+    })
+  }
+
+  const expandedSessionGroupsSet = useMemo(
+    () => new Set(expandedSessionGroups),
+    [expandedSessionGroups],
+  )
+
+  const expandedTerminalSessionsSet = useMemo(
+    () => new Set(expandedTerminalSessions),
+    [expandedTerminalSessions],
+  )
+
+  const toggleTerminalSessions = (terminalId: number) => {
+    setExpandedTerminalSessions((prev) => {
+      if (prev.includes(terminalId)) {
+        return prev.filter((id) => id !== terminalId)
+      }
+      return [...prev, terminalId]
     })
   }
 
@@ -104,9 +179,8 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('folder')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'folder' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                  }`}
               >
                 <Folder className="w-4 h-4" />
                 By Folder
@@ -116,9 +190,8 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('all')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'all' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                  }`}
               >
                 <TerminalIcon className="w-4 h-4" />
                 All
@@ -166,19 +239,53 @@ export function Sidebar({ width }: SidebarProps) {
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {groupingMode === 'folder'
           ? Array.from(groupedTerminals.entries()).map(
-              ([folderCwd, folderTerminals]) => (
-                <FolderGroup
-                  key={folderCwd}
-                  cwd={folderCwd}
-                  terminals={folderTerminals}
-                  expanded={expandedFolders.has(folderCwd)}
-                  onToggle={() => toggleFolder(folderCwd)}
+            ([folderCwd, folderTerminals]) => (
+              <FolderGroup
+                key={folderCwd}
+                cwd={folderCwd}
+                terminals={folderTerminals}
+                expanded={expandedFolders.has(folderCwd)}
+                onToggle={() => toggleFolder(folderCwd)}
+                sessionsForTerminal={sessionsForTerminal}
+                otherSessionsForCwd={
+                  otherSessionsForTerminal.get(folderCwd) || []
+                }
+                expandedTerminalSessions={expandedTerminalSessionsSet}
+                onToggleTerminalSessions={toggleTerminalSessions}
+              />
+            ),
+          )
+          : terminals.map((terminal) => (
+            <TerminalItem
+              key={terminal.id}
+              terminal={terminal}
+              sessions={sessionsForTerminal.get(terminal.id) || []}
+              otherSessions={otherSessionsForTerminal.get(terminal.cwd) || []}
+              sessionsExpanded={expandedTerminalSessionsSet.has(terminal.id)}
+              onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+            />
+          ))}
+
+        {/* Orphan sessions - grouped by project path */}
+        {orphanSessionGroups.size > 0 && (
+          <>
+            <div className="border-t border-sidebar-border my-2" />
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1">
+              Other Sessions
+            </p>
+            {Array.from(orphanSessionGroups.entries()).map(
+              ([projectPath, groupSessions]) => (
+                <SessionGroup
+                  key={projectPath}
+                  projectPath={projectPath}
+                  sessions={groupSessions}
+                  expanded={expandedSessionGroupsSet.has(projectPath)}
+                  onToggle={() => toggleSessionGroup(projectPath)}
                 />
               ),
-            )
-          : terminals.map((terminal) => (
-              <TerminalItem key={terminal.id} terminal={terminal} />
-            ))}
+            )}
+          </>
+        )}
       </div>
 
       <CreateTerminalModal

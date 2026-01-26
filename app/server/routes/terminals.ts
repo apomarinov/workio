@@ -73,7 +73,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       try {
         fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK)
       } catch {
-        return reply.status(403).send({ error: 'Permission denied: cannot access directory' })
+        return reply
+          .status(403)
+          .send({ error: 'Permission denied: cannot access directory' })
       }
 
       const terminal = createTerminal(cwd, name || null, shell || null)

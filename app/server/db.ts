@@ -1,8 +1,12 @@
 import Database from 'better-sqlite3'
-import type { Project, Settings, Terminal } from '../src/types'
+import type { Project, Session, Settings, Terminal } from '../src/types'
 import { env } from './env'
 
-export type { Terminal, Project, Settings }
+export type { Terminal, Project, Session, Settings }
+
+export interface SessionWithProject extends Session {
+  project_path: string
+}
 
 const db = new Database(env.DB_PATH)
 
@@ -53,6 +57,19 @@ export function getProjectById(id: number): Project | undefined {
   return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as
     | Project
     | undefined
+}
+
+// Session queries
+
+export function getAllSessions(): SessionWithProject[] {
+  return db
+    .prepare(`
+      SELECT s.*, p.path as project_path
+      FROM sessions s
+      JOIN projects p ON s.project_id = p.id
+      ORDER BY s.updated_at DESC
+    `)
+    .all() as SessionWithProject[]
 }
 
 // Terminal queries

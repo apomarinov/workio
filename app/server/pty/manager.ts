@@ -201,7 +201,7 @@ export function createSession(
       ptyProcess.write(
         `source "${integrationScript}"; printf '\\033c\\x1b[1;1H'\n`,
       )
-      ptyProcess.write('clear\n');
+      ptyProcess.write('clear\n')
     }
   }, 100)
 

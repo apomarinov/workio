@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
+import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
 import { handleUpgrade } from './ws/terminal'
@@ -65,6 +66,7 @@ fastify.post('/api/emit', async (request, reply) => {
 // Routes
 await fastify.register(terminalRoutes)
 await fastify.register(settingsRoutes)
+await fastify.register(sessionRoutes)
 
 // Start server
 const start = async () => {
