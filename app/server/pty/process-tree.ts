@@ -89,8 +89,11 @@ const IGNORE_PROCESSES = new Set([
   'gitstatusd-linux-x86_64',
 ])
 
+const IGNORE_PARTIAL = ['bash']
+
 // Check if process should be ignored (handles full paths like /bin/zsh)
 function shouldIgnoreProcess(name: string): boolean {
+  if (IGNORE_PARTIAL.some((partial) => name.includes(partial))) return true
   if (IGNORE_PROCESSES.has(name)) return true
   // Check basename for full paths
   const basename = name.split('/').pop() || name
@@ -209,12 +212,13 @@ export function getZellijSessionProcesses(
             encoding: 'utf8',
             timeout: 500,
           }).trim()
-          results.push({ command: cmdArgs, isIdle: false, terminalId })
-        } catch {
-          results.push({ command: '', isIdle: true, terminalId })
+          // Skip ignored processes
+          if (!shouldIgnoreProcess(cmdArgs)) {
+            results.push({ command: cmdArgs, isIdle: false, terminalId })
+          }
+        } catch (error) {
+          console.error('Error getting Zellij session processes', error)
         }
-      } else {
-        results.push({ command: '', isIdle: true, terminalId })
       }
     }
 
