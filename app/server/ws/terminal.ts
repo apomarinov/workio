@@ -57,6 +57,10 @@ type ServerMessage = OutputMessage | ExitMessage | ErrorMessage | ReadyMessage
 // Track which terminal each WebSocket is connected to
 const wsTerminalMap = new WeakMap<WebSocket, number>()
 
+// Debounce resize events to prevent shell redraw spam during drag
+const resizeTimers = new Map<number, ReturnType<typeof setTimeout>>()
+const RESIZE_DEBOUNCE_MS = 500
+
 // Create WebSocket server (noServer mode - we handle upgrades manually)
 const wss = new WebSocketServer({ noServer: true })
 
@@ -151,7 +155,20 @@ wss.on('connection', (ws: WebSocket) => {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
         }
-        resizeSession(terminalId, message.cols, message.rows)
+        // Debounce resize to prevent shell redraw spam during drag
+        const tid = terminalId
+        const existingTimer = resizeTimers.get(tid)
+        if (existingTimer) {
+          clearTimeout(existingTimer)
+        }
+        const { cols, rows } = message
+        resizeTimers.set(
+          tid,
+          setTimeout(() => {
+            resizeTimers.delete(tid)
+            resizeSession(tid, cols, rows)
+          }, RESIZE_DEBOUNCE_MS),
+        )
         break
       }
     }

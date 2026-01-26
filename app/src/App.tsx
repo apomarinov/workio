@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
-import { Group, Panel, Separator } from 'react-resizable-panels'
+import {
+  Group,
+  Panel,
+  Separator,
+  useDefaultLayout,
+} from 'react-resizable-panels'
 import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
@@ -13,6 +18,11 @@ function AppContent() {
   const { terminals, loading, activeTerminal } = useTerminalContext()
   const { subscribe } = useSocket()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
+
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: 'main-layout',
+    storage: localStorage,
+  })
 
   const handleSidebarResize = (size: PanelSize) => {
     setSidebarWidth(size.inPixels)
@@ -45,7 +55,12 @@ function AppContent() {
 
   return (
     <>
-      <Group orientation="horizontal" className="h-full bg-zinc-950">
+      <Group
+        orientation="horizontal"
+        className="h-full bg-zinc-950"
+        defaultLayout={defaultLayout}
+        onLayoutChanged={onLayoutChanged}
+      >
         <Panel
           id="sidebar"
           defaultSize="250px"
