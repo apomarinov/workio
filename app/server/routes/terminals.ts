@@ -7,6 +7,7 @@ import {
   getTerminalById,
   updateTerminal,
 } from '../db'
+import { destroySession } from '../pty/manager'
 
 interface CreateTerminalBody {
   cwd: string
@@ -106,7 +107,11 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Terminal not found' })
       }
 
-      // TODO: Kill PTY process if running (Phase 3)
+      // Kill PTY session if running
+      const killed = destroySession(id)
+      if (killed) {
+        fastify.log.info(`[terminals] Killed PTY session for terminal ${id}`)
+      }
 
       deleteTerminal(id)
       return reply.status(204).send()

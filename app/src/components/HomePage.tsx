@@ -97,7 +97,7 @@ export function HomePage() {
           <Button
             type="submit"
             disabled={creating || !cwd.trim()}
-            className="w-full cursor-pointer"
+            className="w-full cursor-pointer mt-2"
           >
             <Plus className="w-4 h-4 mr-2" />
             {creating ? 'Creating...' : 'Create Terminal'}

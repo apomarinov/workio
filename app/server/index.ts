@@ -6,6 +6,7 @@ import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
+import { handleUpgrade } from './ws/terminal'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -69,6 +70,20 @@ await fastify.register(settingsRoutes)
 const start = async () => {
   try {
     await fastify.listen({ port, host: '0.0.0.0' })
+
+    // Handle WebSocket upgrades for terminal PTY
+    // Use prependListener to run before Socket.IO's handler
+    fastify.server.prependListener('upgrade', (request, socket, head) => {
+      const url = new URL(request.url || '', `http://${request.headers.host}`)
+      if (url.pathname === '/ws/terminal') {
+        handleUpgrade(request, socket, head)
+      }
+      // For other paths (like /socket.io/), let Socket.IO handle it
+    })
+
+    fastify.log.info(
+      '[ws] Terminal WebSocket handler registered at /ws/terminal',
+    )
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)

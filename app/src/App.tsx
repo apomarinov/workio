@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
+import { Terminal } from './components/Terminal'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
@@ -39,23 +40,7 @@ function AppContent() {
     <>
       <div className="h-full flex bg-zinc-950">
         <Sidebar />
-        <div className="flex-1 flex flex-col">
-          {activeTerminal ? (
-            <div className="flex-1 flex items-center justify-center text-zinc-400">
-              <div className="text-center">
-                <p className="text-lg mb-2">Terminal Placeholder</p>
-                <p className="text-sm">
-                  Terminal: {activeTerminal.name || activeTerminal.cwd}
-                </p>
-                <p className="text-xs mt-1">ID: {activeTerminal.id}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-zinc-500">
-              Select a terminal
-            </div>
-          )}
-        </div>
+        <Terminal key={activeTerminal?.id ?? 'none'} terminalId={activeTerminal?.id ?? null} />
       </div>
       <Toaster />
     </>
