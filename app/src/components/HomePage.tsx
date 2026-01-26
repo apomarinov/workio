@@ -3,14 +3,18 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { useSettings } from '../hooks/useSettings'
 import { useTerminals } from '../hooks/useTerminals'
 
 export function HomePage() {
   const { createTerminal } = useTerminals()
+  const { settings } = useSettings()
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [shell, setShell] = useState('')
   const [creating, setCreating] = useState(false)
+
+  const defaultShell = settings?.default_shell ?? '/bin/bash'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,7 +88,7 @@ export function HomePage() {
                 type="text"
                 value={shell}
                 onChange={(e) => setShell(e.target.value)}
-                placeholder="/bin/bash"
+                placeholder={defaultShell}
                 className="pl-10"
               />
             </div>

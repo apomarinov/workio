@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
+import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -60,8 +61,9 @@ fastify.post('/api/emit', async (request, reply) => {
   return { ok: true }
 })
 
-// Terminal routes
+// Routes
 await fastify.register(terminalRoutes)
+await fastify.register(settingsRoutes)
 
 // Start server
 const start = async () => {

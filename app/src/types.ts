@@ -58,3 +58,8 @@ export interface HookEvent {
   hook_type: string
   project_path: string
 }
+
+export interface Settings {
+  id: number
+  default_shell: string
+}

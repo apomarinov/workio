@@ -1,8 +1,8 @@
 import Database from 'better-sqlite3'
-import type { Project, Terminal } from '../src/types'
+import type { Project, Settings, Terminal } from '../src/types'
 import { env } from './env'
 
-export type { Terminal, Project }
+export type { Terminal, Project, Settings }
 
 const db = new Database(env.DB_PATH)
 
@@ -27,6 +27,14 @@ db.exec(`
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_terminals_status
   ON terminals(status)
+`)
+
+// Initialize settings table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    default_shell TEXT NOT NULL DEFAULT '/bin/bash'
+  )
 `)
 
 console.log('[db] Database initialized')
@@ -114,6 +122,30 @@ export function updateTerminal(
 export function deleteTerminal(id: number): boolean {
   const result = db.prepare('DELETE FROM terminals WHERE id = ?').run(id)
   return result.changes > 0
+}
+
+// Settings queries
+
+export function getSettings(): Settings {
+  let settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as
+    | Settings
+    | undefined
+  if (!settings) {
+    db.prepare(
+      "INSERT INTO settings (id, default_shell) VALUES (1, '/bin/bash')",
+    ).run()
+    settings = db
+      .prepare('SELECT * FROM settings WHERE id = 1')
+      .get() as Settings
+  }
+  return settings
+}
+
+export function updateSettings(defaultShell: string): Settings {
+  db.prepare('UPDATE settings SET default_shell = ? WHERE id = 1').run(
+    defaultShell,
+  )
+  return getSettings()
 }
 
 export default db
