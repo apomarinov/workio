@@ -71,10 +71,11 @@ export function TerminalItem({
       <div>
         <div
           onClick={() => selectTerminal(terminal.id)}
-          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+            isActive
               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
               : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-            } ${terminal.orphaned ? 'opacity-60' : ''}`}
+          } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
           {hasSessions && (
             <Button

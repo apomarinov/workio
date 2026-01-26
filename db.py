@@ -13,6 +13,7 @@ for env_file in [".env", ".env.local"]:
     load_dotenv(Path(__file__).parent / env_file, override=True)
 
 DB_PATH = Path(__file__).parent / os.environ.get("DB_NAME", "data.db")
+SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
 def get_db() -> sqlite3.Connection:
@@ -25,82 +26,17 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db() -> sqlite3.Connection:
-    """Initialize the database and return a connection."""
+    """Initialize the database by running schema.sql and return a connection."""
     conn = get_db()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS projects (
-            id INTEGER PRIMARY KEY,
-            path TEXT UNIQUE
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sessions (
-            session_id TEXT PRIMARY KEY,
-            project_id INTEGER,
-            terminal_id INTEGER,
-            name TEXT,
-            git_branch TEXT,
-            message_count INTEGER,
-            status TEXT,
-            transcript_path TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TRIGGER IF NOT EXISTS sessions_updated_at
-        AFTER UPDATE ON sessions
-        FOR EACH ROW
-        BEGIN
-            UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE session_id = OLD.session_id;
-        END
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS prompts (
-            id INTEGER PRIMARY KEY,
-            session_id TEXT,
-            prompt TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY,
-            prompt_id INTEGER,
-            uuid TEXT UNIQUE,
-            is_user BOOLEAN DEFAULT 0,
-            thinking BOOLEAN DEFAULT 0,
-            body TEXT,
-            created_at TEXT
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY,
-            data JSON,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS hooks (
-            id INTEGER PRIMARY KEY,
-            session_id TEXT,
-            hook_type TEXT,
-            payload JSON,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS cleans (
-            id INTEGER PRIMARY KEY,
-            type TEXT DEFAULT 'data',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_cleans_type ON cleans(type)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at)')
-    conn.execute('CREATE INDEX IF NOT EXISTS idx_hooks_type ON hooks(hook_type)')
-    conn.commit()
+
+    # Read and execute schema.sql
+    if SCHEMA_PATH.exists():
+        schema_sql = SCHEMA_PATH.read_text()
+        conn.executescript(schema_sql)
+        conn.commit()
+    else:
+        raise FileNotFoundError(f"Schema file not found: {SCHEMA_PATH}")
+
     return conn
 
 

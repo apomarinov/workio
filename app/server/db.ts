@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import type { Project, Session, Settings, Terminal } from '../src/types'
 import { env } from './env'
@@ -8,42 +11,24 @@ export interface SessionWithProject extends Session {
   project_path: string
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const SCHEMA_PATH = path.join(__dirname, '../../schema.sql')
+
 const db = new Database(env.DB_PATH)
 
 // Enable WAL mode and busy timeout (matching Python config)
 db.pragma('journal_mode = WAL')
 db.pragma('busy_timeout = 5000')
 
-// Initialize terminals table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS terminals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cwd TEXT NOT NULL,
-    name TEXT,
-    shell TEXT,
-    pid INTEGER,
-    status TEXT DEFAULT 'running',
-    active_cmd TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
-`)
-
-db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_terminals_status
-  ON terminals(status)
-`)
-
-// Initialize settings table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    default_shell TEXT NOT NULL DEFAULT '/bin/bash',
-    font_size INTEGER
-  )
-`)
-
-console.log('[db] Database initialized')
+// Initialize database from schema.sql
+if (fs.existsSync(SCHEMA_PATH)) {
+  const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8')
+  db.exec(schema)
+  console.log('[db] Database initialized from schema.sql')
+} else {
+  console.error('[db] Schema file not found:', SCHEMA_PATH)
+  process.exit(1)
+}
 
 // Project queries
 
