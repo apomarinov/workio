@@ -71,3 +71,10 @@ export async function getClaudeSessions(): Promise<SessionWithProject[]> {
   if (!res.ok) throw new Error('Failed to fetch sessions')
   return res.json()
 }
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error('Failed to delete session')
+}

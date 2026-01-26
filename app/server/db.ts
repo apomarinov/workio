@@ -57,6 +57,27 @@ export function getAllSessions(): SessionWithProject[] {
     .all() as SessionWithProject[]
 }
 
+export function deleteSession(sessionId: string): boolean {
+  // Delete in order: messages (via prompts), prompts, hooks, then session
+  const promptIds = db
+    .prepare('SELECT id FROM prompts WHERE session_id = ?')
+    .all(sessionId) as { id: number }[]
+
+  if (promptIds.length > 0) {
+    const ids = promptIds.map((p) => p.id)
+    db.prepare(
+      `DELETE FROM messages WHERE prompt_id IN (${ids.map(() => '?').join(',')})`,
+    ).run(...ids)
+  }
+
+  db.prepare('DELETE FROM prompts WHERE session_id = ?').run(sessionId)
+  db.prepare('DELETE FROM hooks WHERE session_id = ?').run(sessionId)
+  const result = db
+    .prepare('DELETE FROM sessions WHERE session_id = ?')
+    .run(sessionId)
+  return result.changes > 0
+}
+
 // Terminal queries
 
 export function getAllTerminals(): Terminal[] {
