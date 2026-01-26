@@ -3,12 +3,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { IPty } from 'node-pty'
 import * as pty from 'node-pty'
+import type { ActiveProcess } from '../../shared/types'
 import { getSettings, getTerminalById, updateTerminal } from '../db'
+import { getIO } from '../io'
 import { type CommandEvent, createOscParser } from './osc-parser'
-import {
-  getChildProcesses,
-  getZellijSessionProcesses,
-} from './process-tree'
+import { getChildProcesses, getZellijSessionProcesses } from './process-tree'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -201,33 +200,42 @@ export function createSession(
   session.processPollingId = setInterval(() => {
     if (!session.pty.pid) return
     try {
-      const parts: string[] = []
+      const allProcesses: ActiveProcess[] = []
 
       // Check direct child processes
-      const procs = getChildProcesses(session.pty.pid)
-      const directDesc = procs
-        .map((p) => (p.port ? `${p.command} :${p.port}` : p.command))
-        .join(', ')
-      if (directDesc) {
-        parts.push(directDesc)
+      const procs = getChildProcesses(session.pty.pid, terminalId)
+      for (const p of procs) {
+        allProcesses.push(p)
+        const portInfo = p.port ? ` :${p.port}` : ''
+        console.log(
+          `[pty:${terminalId}] Process: tid=${p.terminalId} src=${p.source} cmd="${p.command}"${portInfo}`,
+        )
       }
 
       // Check Zellij session (terminal-<ID>)
-      const zellijProcs = getZellijSessionProcesses(`terminal-${terminalId}`)
-      if (zellijProcs.length > 0) {
-        const zellijDesc = zellijProcs
-          .filter((p) => !p.isIdle)
-          .map((p) => p.command)
-          .join(', ')
-        if (zellijDesc) {
-          parts.push(`[zellij: ${zellijDesc}]`)
-        }
+      const zellijProcs = getZellijSessionProcesses(
+        `terminal-${terminalId}`,
+        terminalId,
+      )
+      for (const p of zellijProcs.filter((p) => !p.isIdle)) {
+        allProcesses.push({
+          pid: 0, // Unknown from Zellij
+          name: p.command.split(' ')[0] || '',
+          command: p.command,
+          terminalId: p.terminalId,
+          source: 'zellij',
+        })
+        console.log(
+          `[pty:${terminalId}] Process: tid=${p.terminalId} src=zellij cmd="${p.command}"`,
+        )
       }
 
-      const desc = parts.join(' | ')
+      if (allProcesses.length === 0) {
+        console.log(`[pty:${terminalId}] Active processes: (none)`)
+      }
 
-      // Always log
-      console.log(`[pty:${terminalId}] Active processes: ${desc || '(none)'}`)
+      // Emit to clients
+      getIO()?.emit('processes', allProcesses)
     } catch {
       // Ignore polling errors
     }

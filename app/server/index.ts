@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
+import { setIO } from './io'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
@@ -28,6 +29,7 @@ const io = new SocketIOServer(fastify.server, {
     methods: ['GET', 'POST'],
   },
 })
+setIO(io)
 
 io.on('connection', (socket) => {
   fastify.log.info(`Client connected: ${socket.id}`)

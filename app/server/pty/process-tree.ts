@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
+import type { ActiveProcess } from '../../shared/types'
 
 export function getChildPids(pid: number): number[] {
   try {
@@ -45,14 +46,6 @@ export function getProcessComm(pid: number): string | null {
   } catch {
     return null
   }
-}
-
-
-export interface ActiveProcess {
-  pid: number
-  name: string
-  command: string // Full command with args
-  port?: number // Only set if listening on a port
 }
 
 // Get full command line with arguments
@@ -185,6 +178,7 @@ function getProcessesOnTty(tty: string): Map<number, string> {
 export interface ZellijPaneProcess {
   command: string
   isIdle: boolean
+  terminalId?: number
 }
 
 // Find Zellij server PID for a given session name
@@ -226,6 +220,7 @@ function findZellijServerForSession(sessionName: string): number | null {
 // Get running commands in all panes of a Zellij session
 export function getZellijSessionProcesses(
   sessionName: string,
+  terminalId?: number,
 ): ZellijPaneProcess[] {
   try {
     const serverPid = findZellijServerForSession(sessionName)
@@ -245,12 +240,12 @@ export function getZellijSessionProcesses(
             encoding: 'utf8',
             timeout: 500,
           }).trim()
-          results.push({ command: cmdArgs, isIdle: false })
+          results.push({ command: cmdArgs, isIdle: false, terminalId })
         } catch {
-          results.push({ command: '', isIdle: true })
+          results.push({ command: '', isIdle: true, terminalId })
         }
       } else {
-        results.push({ command: '', isIdle: true })
+        results.push({ command: '', isIdle: true, terminalId })
       }
     }
 
@@ -267,12 +262,18 @@ export function hasZellijSession(terminalId: number): boolean {
   return findZellijServerForSession(sessionName) !== null
 }
 
-export function getChildProcesses(shellPid: number): ActiveProcess[] {
+export function getChildProcesses(
+  shellPid: number,
+  terminalId?: number,
+): ActiveProcess[] {
   try {
     const pidToName = new Map<number, string>()
 
     // Method 1: Get all descendants of our shell (follows through multiplexers)
-    const collectDescendants = (pid: number, visited = new Set<number>()): void => {
+    const collectDescendants = (
+      pid: number,
+      visited = new Set<number>(),
+    ): void => {
       if (visited.has(pid)) return
       visited.add(pid)
       for (const childPid of getChildPids(pid)) {
@@ -317,7 +318,7 @@ export function getChildProcesses(shellPid: number): ActiveProcess[] {
       const key = `${command}:${port ?? 'none'}`
       if (!seen.has(key)) {
         seen.add(key)
-        results.push({ pid, name, command, port })
+        results.push({ pid, name, command, port, terminalId, source: 'direct' })
       }
     }
 
