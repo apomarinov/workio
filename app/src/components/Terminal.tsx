@@ -50,6 +50,17 @@ export function Terminal({ terminalId }: TerminalProps) {
     onReady: handleReady,
   })
 
+  // Delay showing status bar to avoid flash on quick connections
+  const [showStatus, setShowStatus] = useState(false)
+  useEffect(() => {
+    if (status === 'connected') {
+      setShowStatus(false)
+      return
+    }
+    const timer = setTimeout(() => setShowStatus(true), 500)
+    return () => clearTimeout(timer)
+  }, [status])
+
   // Store socket functions in refs to avoid useEffect dependency issues
   const sendInputRef = useRef(sendInput)
   const sendResizeRef = useRef(sendResize)
@@ -180,6 +191,7 @@ export function Terminal({ terminalId }: TerminalProps) {
           Select a terminal from the sidebar
         </div>
       ) : (
+        showStatus &&
         status !== 'connected' && (
           <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
             <span

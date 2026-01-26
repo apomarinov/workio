@@ -1,7 +1,12 @@
 import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { IPty } from 'node-pty'
 import * as pty from 'node-pty'
 import { getSettings, getTerminalById, updateTerminal } from '../db'
+import { type CommandEvent, createOscParser } from './osc-parser'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const MAX_BUFFER_LINES = 5000
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
@@ -15,6 +20,9 @@ export interface PtySession {
   rows: number
   onData: ((data: string) => void) | null
   onExit: ((code: number) => void) | null
+  onCommandEvent: ((event: CommandEvent) => void) | null
+  currentCommand: string | null
+  isIdle: boolean
 }
 
 // In-memory map of active PTY sessions
@@ -30,6 +38,7 @@ export function createSession(
   rows: number,
   onData: (data: string) => void,
   onExit: (code: number) => void,
+  onCommandEvent?: (event: CommandEvent) => void,
 ): PtySession | null {
   // Check if session already exists
   const existing = sessions.get(terminalId)
@@ -111,24 +120,62 @@ export function createSession(
     rows,
     onData,
     onExit,
+    onCommandEvent: onCommandEvent || null,
+    currentCommand: null,
+    isIdle: true,
   }
 
-  // Handle PTY data - use session.onData so it can be updated on reconnect
+  // Create OSC parser to intercept command events
+  const oscParser = createOscParser(
+    (data) => {
+      // Add to buffer
+      session.buffer.push(data)
+      // Trim buffer if too large
+      if (session.buffer.length > MAX_BUFFER_LINES) {
+        session.buffer = session.buffer.slice(-MAX_BUFFER_LINES)
+      }
+      // Call current callback (may have been updated on reconnect)
+      session.onData?.(data)
+    },
+    (event) => {
+      // Update session state and database
+      switch (event.type) {
+        case 'prompt':
+          session.isIdle = true
+          session.currentCommand = null
+          updateTerminal(terminalId, { active_cmd: null })
+          console.log(`[pty:${terminalId}] Shell idle (waiting for input)`)
+          break
+        case 'command_start':
+          session.isIdle = false
+          session.currentCommand = event.command || null
+          updateTerminal(terminalId, { active_cmd: event.command || null })
+          console.log(`[pty:${terminalId}] Command started: ${event.command}`)
+          break
+        case 'command_end':
+          console.log(
+            `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
+          )
+          break
+      }
+      // Forward event to callback
+      session.onCommandEvent?.(event)
+    },
+  )
+
+  // Handle PTY data through OSC parser
   ptyProcess.onData((data) => {
-    // Add to buffer
-    session.buffer.push(data)
-    // Trim buffer if too large
-    if (session.buffer.length > MAX_BUFFER_LINES) {
-      session.buffer = session.buffer.slice(-MAX_BUFFER_LINES)
-    }
-    // Call current callback (may have been updated on reconnect)
-    session.onData?.(data)
+    oscParser(data)
   })
 
   // Handle PTY exit
   ptyProcess.onExit(({ exitCode }) => {
     sessions.delete(terminalId)
-    updateTerminal(terminalId, { pid: null, status: 'stopped' })
+    updateTerminal(terminalId, {
+      pid: null,
+      status: 'stopped',
+      active_cmd: null,
+    })
     session.onExit?.(exitCode)
   })
 
@@ -136,6 +183,27 @@ export function createSession(
   updateTerminal(terminalId, { pid: ptyProcess.pid, status: 'running' })
 
   sessions.set(terminalId, session)
+
+  // Inject shell integration after a brief delay to let shell initialize
+  setTimeout(() => {
+    const shellName = path.basename(shell)
+    let integrationScript: string | null = null
+
+    if (shellName === 'zsh') {
+      integrationScript = path.join(__dirname, 'shell-integration', 'zsh.sh')
+    } else if (shellName === 'bash') {
+      integrationScript = path.join(__dirname, 'shell-integration', 'bash.sh')
+    }
+
+    if (integrationScript && fs.existsSync(integrationScript)) {
+      // Source the integration silently, then reset and position cursor at top
+      ptyProcess.write(
+        `source "${integrationScript}"; printf '\\033c\\x1b[1;1H'\n`,
+      )
+      ptyProcess.write('clear\n');
+    }
+  }, 100)
+
   return session
 }
 
@@ -237,7 +305,7 @@ export function destroySession(terminalId: number): boolean {
   }
 
   // Update database
-  updateTerminal(terminalId, { pid: null, status: 'stopped' })
+  updateTerminal(terminalId, { pid: null, status: 'stopped', active_cmd: null })
 
   sessions.delete(terminalId)
   return true
@@ -252,6 +320,7 @@ export function attachSession(
   terminalId: number,
   onData: (data: string) => void,
   onExit: (code: number) => void,
+  onCommandEvent?: (event: CommandEvent) => void,
 ): boolean {
   const session = sessions.get(terminalId)
   if (!session) {
@@ -259,5 +328,11 @@ export function attachSession(
   }
   session.onData = onData
   session.onExit = onExit
+  if (onCommandEvent) {
+    session.onCommandEvent = onCommandEvent
+  }
   return true
 }
+
+// Export CommandEvent type for consumers
+export type { CommandEvent }

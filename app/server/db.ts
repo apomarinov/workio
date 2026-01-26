@@ -19,6 +19,7 @@ db.exec(`
     shell TEXT,
     pid INTEGER,
     status TEXT DEFAULT 'running',
+    active_cmd TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   )
@@ -89,7 +90,12 @@ export function createTerminal(
 
 export function updateTerminal(
   id: number,
-  updates: { name?: string; pid?: number | null; status?: string },
+  updates: {
+    name?: string
+    pid?: number | null
+    status?: string
+    active_cmd?: string | null
+  },
 ): Terminal | undefined {
   const setClauses: string[] = []
   const values: (string | number | null)[] = []
@@ -105,6 +111,10 @@ export function updateTerminal(
   if (updates.status !== undefined) {
     setClauses.push('status = ?')
     values.push(updates.status)
+  }
+  if (updates.active_cmd !== undefined) {
+    setClauses.push('active_cmd = ?')
+    values.push(updates.active_cmd)
   }
 
   if (setClauses.length === 0) {

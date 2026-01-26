@@ -50,10 +50,11 @@ export function TerminalItem({ terminal, hideFolder }: TerminalItemProps) {
     <>
       <div
         onClick={() => selectTerminal(terminal.id)}
-        className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-          } ${terminal.orphaned ? 'opacity-60' : ''}`}
+        className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+          isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+        } ${terminal.orphaned ? 'opacity-60' : ''}`}
       >
         {terminal.orphaned ? (
           <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
@@ -74,7 +75,7 @@ export function TerminalItem({ terminal, hideFolder }: TerminalItemProps) {
             )
           )}
         </div>
-        <div className='h-7 invisible pointer-events-none'></div>
+        <div className="h-7 invisible pointer-events-none"></div>
         <div className="hidden group-hover:flex">
           <Button
             variant="ghost"

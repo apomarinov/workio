@@ -5,6 +5,7 @@ export interface Terminal {
   shell: string | null
   pid: number | null
   status: 'running' | 'stopped'
+  active_cmd: string | null
   orphaned?: boolean
   created_at: string
   updated_at: string
