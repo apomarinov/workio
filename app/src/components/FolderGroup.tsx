@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
 import type { Terminal } from '../types'
 import { TerminalItem } from './TerminalItem'
+import { TruncatedPath } from './TruncatedPath'
 
 interface FolderGroupProps {
   cwd: string
@@ -15,8 +16,6 @@ export function FolderGroup({
   expanded,
   onToggle,
 }: FolderGroupProps) {
-  const folderName = cwd.split('/').pop() || cwd
-
   return (
     <div>
       <div
@@ -29,17 +28,15 @@ export function FolderGroup({
           <ChevronRight className="w-4 h-4 flex-shrink-0" />
         )}
         <Folder className="w-4 h-4 flex-shrink-0" />
-        <span className="text-sm font-medium truncate flex-1">
-          {folderName}
-        </span>
-        <span className="text-xs text-muted-foreground">
+        <TruncatedPath path={cwd} className="text-sm font-medium flex-1" />
+        <span className="text-xs text-muted-foreground flex-shrink-0">
           {terminals.length}
         </span>
       </div>
       {expanded && (
         <div className="ml-4 space-y-1 mt-1">
           {terminals.map((terminal) => (
-            <TerminalItem key={terminal.id} terminal={terminal} />
+            <TerminalItem key={terminal.id} terminal={terminal} hideFolder />
           ))}
         </div>
       )}

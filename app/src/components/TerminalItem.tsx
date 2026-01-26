@@ -11,19 +11,21 @@ import { useTerminals } from '../hooks/useTerminals'
 import type { Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
+import { TruncatedPath } from './TruncatedPath'
 
 interface TerminalItemProps {
   terminal: Terminal
+  hideFolder?: boolean
 }
 
-export function TerminalItem({ terminal }: TerminalItemProps) {
+export function TerminalItem({ terminal, hideFolder }: TerminalItemProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminals()
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const displayName =
-    terminal.name || terminal.cwd.split('/').pop() || 'Untitled'
+    terminal.name || terminal.cwd || 'Untitled'
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -49,11 +51,10 @@ export function TerminalItem({ terminal }: TerminalItemProps) {
     <>
       <div
         onClick={() => selectTerminal(terminal.id)}
-        className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-          isActive
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-        } ${terminal.orphaned ? 'opacity-60' : ''}`}
+        className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          } ${terminal.orphaned ? 'opacity-60' : ''}`}
       >
         {terminal.orphaned ? (
           <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
@@ -62,12 +63,16 @@ export function TerminalItem({ terminal }: TerminalItemProps) {
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{displayName}</p>
-          {(terminal.name || terminal.orphaned) && (
-            <p
-              className={`text-xs truncate ${terminal.orphaned ? 'text-yellow-500' : 'text-muted-foreground'}`}
-            >
-              {terminal.orphaned ? 'Path not found' : terminal.cwd}
-            </p>
+          {terminal.orphaned ? (
+            <p className="text-xs truncate text-yellow-500">Path not found</p>
+          ) : (
+            !hideFolder &&
+            terminal.name && (
+              <TruncatedPath
+                path={terminal.cwd}
+                className="text-xs text-muted-foreground"
+              />
+            )
           )}
         </div>
         <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
