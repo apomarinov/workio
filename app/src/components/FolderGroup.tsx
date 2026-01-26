@@ -37,7 +37,7 @@ export function FolderGroup({
         </span>
       </div>
       {expanded && (
-        <div className="ml-4 space-y-1">
+        <div className="ml-4 space-y-1 mt-1">
           {terminals.map((terminal) => (
             <TerminalItem key={terminal.id} terminal={terminal} />
           ))}

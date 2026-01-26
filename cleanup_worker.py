@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
 """
-Cleanup worker for removing old data from the database.
-Runs at most once per week.
+Cleanup worker for removing old data from the database and stale files.
 """
 
-from db import get_db
+import time
+from pathlib import Path
+
+from db import init_db
+
+DEBOUNCE_DIR = Path(__file__).parent / "debounce"
+LOCKS_DIR = Path(__file__).parent / "locks"
+
+# Cleanup intervals
+DATA_CLEANUP_INTERVAL = '-7 days'
+LOCKS_CLEANUP_INTERVAL = '-1 hours'
+LOCKS_FILE_MAX_AGE = 3600  # 1 hour in seconds
 
 
-def has_recent_cleanup(conn) -> bool:
-    """Check if there's a cleanup in the last week."""
+def has_recent_cleanup(conn, cleanup_type: str, interval: str) -> bool:
+    """Check if there's a cleanup of this type within the interval."""
     result = conn.execute('''
         SELECT id FROM cleans
-        WHERE created_at > datetime('now', '-7 days')
+        WHERE type = ? AND created_at > datetime('now', ?)
         LIMIT 1
-    ''').fetchone()
+    ''', (cleanup_type, interval)).fetchone()
     return result is not None
 
 
-def record_cleanup(conn) -> None:
-    """Record a cleanup."""
-    conn.execute('INSERT INTO cleans DEFAULT VALUES')
+def record_cleanup(conn, cleanup_type: str) -> None:
+    """Record a cleanup of a specific type."""
+    conn.execute('INSERT INTO cleans (type) VALUES (?)', (cleanup_type,))
     conn.commit()
 
 
@@ -92,25 +102,59 @@ def delete_orphan_projects(conn) -> int:
     return cursor.rowcount
 
 
-def run_cleanup() -> None:
-    """Run the cleanup process."""
-    conn = get_db()
+def cleanup_stale_files(directory: Path, max_age: int) -> int:
+    """Delete files older than max_age seconds. Returns count deleted."""
+    if not directory.exists():
+        return 0
 
-    # Check if we've already cleaned up recently
-    if has_recent_cleanup(conn):
-        conn.close()
+    deleted = 0
+    now = time.time()
+
+    for f in directory.iterdir():
+        if f.is_file():
+            try:
+                if now - f.stat().st_mtime > max_age:
+                    f.unlink()
+                    deleted += 1
+            except (OSError, FileNotFoundError):
+                pass
+
+    return deleted
+
+
+def run_data_cleanup(conn) -> None:
+    """Run database data cleanup (weekly)."""
+    if has_recent_cleanup(conn, 'data', DATA_CLEANUP_INTERVAL):
         return
 
-    # Record this cleanup
-    record_cleanup(conn)
+    record_cleanup(conn, 'data')
 
-    # Run cleanup tasks
     delete_old_messages(conn)
     delete_old_logs_and_hooks(conn)
     delete_old_session_data(conn)
     delete_orphan_projects(conn)
 
     conn.commit()
+
+
+def run_locks_cleanup(conn) -> None:
+    """Run locks/debounce file cleanup (hourly)."""
+    if has_recent_cleanup(conn, 'locks', LOCKS_CLEANUP_INTERVAL):
+        return
+
+    record_cleanup(conn, 'locks')
+
+    cleanup_stale_files(DEBOUNCE_DIR, LOCKS_FILE_MAX_AGE)
+    cleanup_stale_files(LOCKS_DIR, LOCKS_FILE_MAX_AGE)
+
+
+def run_cleanup() -> None:
+    """Run all cleanup processes."""
+    conn = get_db()
+
+    run_data_cleanup(conn)
+    run_locks_cleanup(conn)
+
     conn.close()
 
 
