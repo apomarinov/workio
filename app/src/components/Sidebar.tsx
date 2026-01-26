@@ -78,12 +78,6 @@ export function Sidebar() {
 
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col">
-      <div className="p-4 border-b border-sidebar-border">
-        <h2 className="text-sm font-semibold text-sidebar-foreground">
-          Terminals
-        </h2>
-      </div>
-
       <div className="px-2 py-1 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-1">
           <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
@@ -103,9 +97,8 @@ export function Sidebar() {
                   setGroupingMode('folder')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'folder' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                  }`}
               >
                 <Folder className="w-4 h-4" />
                 By Folder
@@ -115,9 +108,8 @@ export function Sidebar() {
                   setGroupingMode('all')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'all' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                  }`}
               >
                 <TerminalIcon className="w-4 h-4" />
                 All
@@ -154,19 +146,19 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {groupingMode === 'folder'
           ? Array.from(groupedTerminals.entries()).map(
-              ([folderCwd, folderTerminals]) => (
-                <FolderGroup
-                  key={folderCwd}
-                  cwd={folderCwd}
-                  terminals={folderTerminals}
-                  expanded={expandedFolders.has(folderCwd)}
-                  onToggle={() => toggleFolder(folderCwd)}
-                />
-              ),
-            )
+            ([folderCwd, folderTerminals]) => (
+              <FolderGroup
+                key={folderCwd}
+                cwd={folderCwd}
+                terminals={folderTerminals}
+                expanded={expandedFolders.has(folderCwd)}
+                onToggle={() => toggleFolder(folderCwd)}
+              />
+            ),
+          )
           : terminals.map((terminal) => (
-              <TerminalItem key={terminal.id} terminal={terminal} />
-            ))}
+            <TerminalItem key={terminal.id} terminal={terminal} />
+          ))}
       </div>
 
       <div className="p-2 border-t border-sidebar-border">

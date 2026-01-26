@@ -33,7 +33,8 @@ db.exec(`
 db.exec(`
   CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    default_shell TEXT NOT NULL DEFAULT '/bin/bash'
+    default_shell TEXT NOT NULL DEFAULT '/bin/bash',
+    font_size INTEGER
   )
 `)
 
@@ -141,10 +142,27 @@ export function getSettings(): Settings {
   return settings
 }
 
-export function updateSettings(defaultShell: string): Settings {
-  db.prepare('UPDATE settings SET default_shell = ? WHERE id = 1').run(
-    defaultShell,
-  )
+export function updateSettings(updates: {
+  default_shell?: string
+  font_size?: number | null
+}): Settings {
+  const setClauses: string[] = []
+  const values: (string | number | null)[] = []
+
+  if (updates.default_shell !== undefined) {
+    setClauses.push('default_shell = ?')
+    values.push(updates.default_shell)
+  }
+  if (updates.font_size !== undefined) {
+    setClauses.push('font_size = ?')
+    values.push(updates.font_size)
+  }
+
+  if (setClauses.length > 0) {
+    db.prepare(`UPDATE settings SET ${setClauses.join(', ')} WHERE id = 1`).run(
+      ...values,
+    )
+  }
   return getSettings()
 }
 

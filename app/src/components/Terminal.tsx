@@ -4,6 +4,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DEFAULT_FONT_SIZE } from '../constants'
+import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
 
 interface TerminalProps {
@@ -15,6 +17,9 @@ export function Terminal({ terminalId }: TerminalProps) {
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const [dimensions, setDimensions] = useState({ cols: 80, rows: 24 })
+  const { settings } = useSettings()
+
+  const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
 
   const handleData = useCallback((data: string) => {
     terminalRef.current?.write(data)
@@ -55,7 +60,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
     const terminal = new XTerm({
       cursorBlink: true,
-      fontSize: 14,
+      fontSize,
       fontFamily:
         '"MesloLGS NF", "Hack Nerd Font", "FiraCode Nerd Font", "JetBrainsMono Nerd Font", Menlo, Monaco, "Courier New", monospace',
       theme: {
@@ -110,8 +115,8 @@ export function Terminal({ terminalId }: TerminalProps) {
     requestAnimationFrame(() => {
       fitAddon.fit()
       // Add extra row and column for better coverage
-      const cols = terminal.cols + 1
-      const rows = terminal.rows + 1
+      const cols = terminal.cols
+      const rows = terminal.rows
       terminal.resize(cols, rows)
       setDimensions({ cols, rows })
     })
@@ -126,8 +131,8 @@ export function Terminal({ terminalId }: TerminalProps) {
       if (fitAddonRef.current && terminalRef.current) {
         fitAddonRef.current.fit()
         // Add extra row and column for better coverage
-        const cols = terminalRef.current.cols + 1
-        const rows = terminalRef.current.rows + 1
+        const cols = terminalRef.current.cols
+        const rows = terminalRef.current.rows
         terminalRef.current.resize(cols, rows)
         setDimensions({ cols, rows })
         sendResizeRef.current(cols, rows)
@@ -150,6 +155,17 @@ export function Terminal({ terminalId }: TerminalProps) {
     }
   }, [terminalId])
 
+  // Update font size when settings change
+  useEffect(() => {
+    if (terminalRef.current && fitAddonRef.current) {
+      terminalRef.current.options.fontSize = fontSize
+      fitAddonRef.current.fit()
+      const { cols, rows } = terminalRef.current
+      setDimensions({ cols, rows })
+      sendResizeRef.current(cols, rows)
+    }
+  }, [fontSize])
+
   return (
     <div className="flex-1 flex flex-col bg-[#1a1a1a]">
       {terminalId === null ? (
@@ -162,10 +178,10 @@ export function Terminal({ terminalId }: TerminalProps) {
             <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
               <span
                 className={`w-2 h-2 rounded-full ${status === 'connecting'
-                    ? 'bg-yellow-400 animate-pulse'
-                    : status === 'error'
-                      ? 'bg-red-400'
-                      : 'bg-gray-400'
+                  ? 'bg-yellow-400 animate-pulse'
+                  : status === 'error'
+                    ? 'bg-red-400'
+                    : 'bg-gray-400'
                   }`}
               />
               {status === 'connecting' && 'Connecting...'}

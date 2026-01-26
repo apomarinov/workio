@@ -62,4 +62,5 @@ export interface HookEvent {
 export interface Settings {
   id: number
   default_shell: string
+  font_size: number | null
 }
