@@ -1,10 +1,10 @@
 import { Bot, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
-import { cn } from '@/lib/utils'
 
 interface SessionItemProps {
   session: SessionWithProject
@@ -36,7 +36,10 @@ export function SessionItem({ session }: SessionItemProps) {
   return (
     <>
       <div className="group flex items-center gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default">
-        <Bot className={cn("w-3.5 h-3.5 flex-shrink-0", statusColor)} aria-label={session.status} />
+        <Bot
+          className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+          aria-label={session.status}
+        />
         <span className="text-xs truncate flex-1">{displayName}</span>
         <div className="hidden group-hover:flex">
           <Button

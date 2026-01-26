@@ -148,18 +148,6 @@ def main() -> None:
         log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=os.environ.get('CLAUDE_TERMINAL_ID'))
         save_hook(conn, session_id, hook_type, event)
 
-        # Emit hook event to connected clients
-        start_socket_worker(session_id, "hook", {
-            "session_id": session_id,
-            "hook_type": hook_type,
-            "project_path": project_path,
-        })
-
-        # Update project path if session already exists
-        update_project_path_by_session(conn, session_id, project_path)
-
-        project_id = upsert_project(conn, project_path)
-
         # Determine session status
         status = None
 
@@ -181,6 +169,22 @@ def main() -> None:
                 status = 'permission_needed'
             elif notification_type == 'idle_prompt':
                 status = 'idle'
+
+        # Emit hook event to connected clients
+        terminal_id_str = os.environ.get('CLAUDE_TERMINAL_ID')
+        terminal_id = int(terminal_id_str) if terminal_id_str else None
+        start_socket_worker(session_id, "hook", {
+            "session_id": session_id,
+            "hook_type": hook_type,
+            "status": status,
+            "project_path": project_path,
+            "terminal_id": terminal_id,
+        })
+
+        # Update project path if session already exists
+        update_project_path_by_session(conn, session_id, project_path)
+
+        project_id = upsert_project(conn, project_path)
 
         # Update session if we have a status
         transcript_path = event.get('transcript_path', '')
@@ -213,6 +217,10 @@ def main() -> None:
         if status == 'permission_needed':
             project_name = Path(project_path).name if project_path else 'Unknown'
             notify(project_name, "Permission Request")
+
+        # Emit session_update for non-tool events (before printing continue)
+        if hook_type not in ('PreToolUse', 'PostToolUse'):
+            start_socket_worker(session_id, "session_update", {})
 
         # Start debounced worker for session processing
         start_debounced_worker(session_id)

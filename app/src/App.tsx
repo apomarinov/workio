@@ -11,12 +11,15 @@ import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
+import { useBrowserNotification } from './hooks/useBrowserNotification'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
 
 function AppContent() {
-  const { terminals, loading, activeTerminal } = useTerminalContext()
+  const { terminals, loading, activeTerminal, selectTerminal } =
+    useTerminalContext()
   const { subscribe } = useSocket()
+  const { notify } = useBrowserNotification()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
@@ -28,12 +31,44 @@ function AppContent() {
     setSidebarWidth(size.inPixels)
   }
 
-  // Test: subscribe to hook events
+  // Subscribe to hook events for notifications
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
-      console.log('[App] Hook event:', data)
+      const terminal = terminals.find((t) => t.id === data.terminal_id)
+      const terminalName = terminal?.name || terminal?.cwd || data.project_path || 'Claude'
+
+      if (data.status === 'permission_needed') {
+        // Play notification sound
+        const audio = new Audio('/audio/permissions.mp3')
+        audio.volume = 0.5
+        audio.play().catch(() => { })
+
+        // Show browser notification
+        notify(`Permission Required`, {
+          body: `${terminalName} needs permissions`,
+          onClick: () => {
+            if (data.terminal_id) {
+              selectTerminal(data.terminal_id)
+            }
+          },
+        })
+      } else if (data.hook_type === 'Stop') {
+        // Play done sound
+        const audio = new Audio('/audio/done.mp3')
+        audio.play().catch(() => { })
+
+        // Show browser notification
+        notify(`Session Complete`, {
+          body: `${terminalName} has finished`,
+          onClick: () => {
+            if (data.terminal_id) {
+              selectTerminal(data.terminal_id)
+            }
+          },
+        })
+      }
     })
-  }, [subscribe])
+  }, [subscribe, notify, terminals, selectTerminal])
 
   if (loading) {
     return (

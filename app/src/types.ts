@@ -61,7 +61,9 @@ export interface Hook {
 export interface HookEvent {
   session_id: string
   hook_type: string
+  status: string | null
   project_path: string
+  terminal_id: number | null
 }
 
 export interface Settings {

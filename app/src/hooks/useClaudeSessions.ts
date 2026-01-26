@@ -1,13 +1,38 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import * as api from '../lib/api'
 import type { SessionWithProject } from '../types'
+import { useSocket } from './useSocket'
 
 export function useClaudeSessions() {
+  const { subscribe } = useSocket()
   const { data, error, isLoading, mutate } = useSWR<SessionWithProject[]>(
     '/api/sessions',
     api.getClaudeSessions,
   )
+
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return subscribe('session_update', () => {
+      // Debounce refetch by 2 seconds
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+      debounceRef.current = setTimeout(() => {
+        mutate()
+      }, 2000)
+    })
+  }, [subscribe, mutate])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [])
 
   const deleteSession = useCallback(
     async (sessionId: string) => {
