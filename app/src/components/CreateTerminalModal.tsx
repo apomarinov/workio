@@ -61,13 +61,13 @@ export function CreateTerminalModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Terminal</DialogTitle>
+          <DialogTitle>New Terminal</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="cwd" className="text-sm font-medium">
-              Project Path <span className="text-red-500">*</span>
+              Path <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -85,7 +85,7 @@ export function CreateTerminalModal({
 
           <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
-              Terminal Name
+              Name
             </label>
             <Input
               id="name"
@@ -119,7 +119,7 @@ export function CreateTerminalModal({
             className="w-full mt-2"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {creating ? 'Creating...' : 'Create Terminal'}
+            {creating ? 'Creating...' : 'Create'}
           </Button>
         </form>
       </DialogContent>

@@ -20,6 +20,12 @@ export function Terminal({ terminalId }: TerminalProps) {
   const { settings } = useSettings()
 
   const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
+  const fontSizeRef = useRef(fontSize)
+
+  // Keep fontSizeRef in sync for initialization
+  useEffect(() => {
+    fontSizeRef.current = fontSize
+  }, [fontSize])
 
   const handleData = useCallback((data: string) => {
     terminalRef.current?.write(data)
@@ -60,7 +66,8 @@ export function Terminal({ terminalId }: TerminalProps) {
 
     const terminal = new XTerm({
       cursorBlink: true,
-      fontSize,
+      fontSize: fontSizeRef.current,
+      macOptionIsMeta: true,
       fontFamily:
         '"MesloLGS NF", "Hack Nerd Font", "FiraCode Nerd Font", "JetBrainsMono Nerd Font", Menlo, Monaco, "Courier New", monospace',
       theme: {
@@ -173,23 +180,22 @@ export function Terminal({ terminalId }: TerminalProps) {
           Select a terminal from the sidebar
         </div>
       ) : (
-        <>
-          {status !== 'connected' && (
-            <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${status === 'connecting'
+        status !== 'connected' && (
+          <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                status === 'connecting'
                   ? 'bg-yellow-400 animate-pulse'
                   : status === 'error'
                     ? 'bg-red-400'
                     : 'bg-gray-400'
-                  }`}
-              />
-              {status === 'connecting' && 'Connecting...'}
-              {status === 'disconnected' && 'Disconnected - Reconnecting...'}
-              {status === 'error' && 'Connection error'}
-            </div>
-          )}
-        </>
+              }`}
+            />
+            {status === 'connecting' && 'Connecting...'}
+            {status === 'disconnected' && 'Disconnected - Reconnecting...'}
+            {status === 'error' && 'Connection error'}
+          </div>
+        )
       )}
       <div
         ref={containerRef}

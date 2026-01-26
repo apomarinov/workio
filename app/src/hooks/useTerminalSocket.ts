@@ -83,7 +83,10 @@ export function useTerminalSocket({
       ws.onerror = null
       ws.onmessage = null
       // Only close if not already closing/closed
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
         ws.close()
       }
     }
@@ -167,7 +170,7 @@ export function useTerminalSocket({
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
 

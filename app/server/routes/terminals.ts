@@ -1,5 +1,18 @@
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
+
+// Expand ~ to home directory
+function expandPath(p: string): string {
+  if (p.startsWith('~/')) {
+    return path.join(os.homedir(), p.slice(2))
+  }
+  if (p === '~') {
+    return os.homedir()
+  }
+  return p
+}
 import {
   createTerminal,
   deleteTerminal,
@@ -37,11 +50,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateTerminalBody }>(
     '/api/terminals',
     async (request, reply) => {
-      const { cwd, name, shell } = request.body
+      const { cwd: rawCwd, name, shell } = request.body
 
-      if (!cwd) {
+      if (!rawCwd) {
         return reply.status(400).send({ error: 'cwd is required' })
       }
+
+      // Expand ~ to home directory
+      const cwd = expandPath(rawCwd.trim())
 
       if (!fs.existsSync(cwd)) {
         return reply.status(400).send({ error: 'Directory does not exist' })

@@ -40,7 +40,10 @@ function AppContent() {
     <>
       <div className="h-full flex bg-zinc-950">
         <Sidebar />
-        <Terminal key={activeTerminal?.id ?? 'none'} terminalId={activeTerminal?.id ?? null} />
+        <Terminal
+          key={activeTerminal?.id ?? 'none'}
+          terminalId={activeTerminal?.id ?? null}
+        />
       </div>
       <Toaster />
     </>

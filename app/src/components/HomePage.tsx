@@ -49,7 +49,7 @@ export function HomePage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="cwd" className="text-sm font-medium">
-              Project Path <span className="text-red-500">*</span>
+              Path <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -66,7 +66,7 @@ export function HomePage() {
 
           <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
-              Terminal Name
+              Name
             </label>
             <Input
               id="name"
@@ -100,7 +100,7 @@ export function HomePage() {
             className="w-full cursor-pointer mt-2"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {creating ? 'Creating...' : 'Create Terminal'}
+            {creating ? 'Creating...' : 'Create'}
           </Button>
         </form>
       </div>

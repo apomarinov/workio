@@ -97,8 +97,9 @@ export function Sidebar() {
                   setGroupingMode('folder')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'folder' ? 'bg-accent' : ''
+                }`}
               >
                 <Folder className="w-4 h-4" />
                 By Folder
@@ -108,8 +109,9 @@ export function Sidebar() {
                   setGroupingMode('all')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'all' ? 'bg-accent' : ''
+                }`}
               >
                 <TerminalIcon className="w-4 h-4" />
                 All
@@ -132,44 +134,44 @@ export function Sidebar() {
             </Button>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => setShowSettingsModal(true)}
-          title="Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setShowCreateModal(true)}
+            title="New Terminal"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setShowSettingsModal(true)}
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {groupingMode === 'folder'
           ? Array.from(groupedTerminals.entries()).map(
-            ([folderCwd, folderTerminals]) => (
-              <FolderGroup
-                key={folderCwd}
-                cwd={folderCwd}
-                terminals={folderTerminals}
-                expanded={expandedFolders.has(folderCwd)}
-                onToggle={() => toggleFolder(folderCwd)}
-              />
-            ),
-          )
+              ([folderCwd, folderTerminals]) => (
+                <FolderGroup
+                  key={folderCwd}
+                  cwd={folderCwd}
+                  terminals={folderTerminals}
+                  expanded={expandedFolders.has(folderCwd)}
+                  onToggle={() => toggleFolder(folderCwd)}
+                />
+              ),
+            )
           : terminals.map((terminal) => (
-            <TerminalItem key={terminal.id} terminal={terminal} />
-          ))}
-      </div>
-
-      <div className="p-2 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          onClick={() => setShowCreateModal(true)}
-          className="w-full justify-center"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Terminal
-        </Button>
+              <TerminalItem key={terminal.id} terminal={terminal} />
+            ))}
       </div>
 
       <CreateTerminalModal
