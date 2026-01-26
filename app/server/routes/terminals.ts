@@ -24,7 +24,11 @@ interface TerminalParams {
 export default async function terminalRoutes(fastify: FastifyInstance) {
   // List all terminals
   fastify.get('/api/terminals', async () => {
-    return getAllTerminals()
+    const terminals = getAllTerminals()
+    return terminals.map((terminal) => ({
+      ...terminal,
+      orphaned: !fs.existsSync(terminal.cwd),
+    }))
   })
 
   // Create terminal

@@ -1,4 +1,9 @@
-import { Pencil, Terminal as TerminalIcon, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Pencil,
+  Terminal as TerminalIcon,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -48,14 +53,20 @@ export function TerminalItem({ terminal }: TerminalItemProps) {
           isActive
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-        }`}
+        } ${terminal.orphaned ? 'opacity-60' : ''}`}
       >
-        <TerminalIcon className="w-4 h-4 flex-shrink-0" />
+        {terminal.orphaned ? (
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
+        ) : (
+          <TerminalIcon className="w-4 h-4 flex-shrink-0" />
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{displayName}</p>
-          {terminal.name && (
-            <p className="text-xs text-muted-foreground truncate">
-              {terminal.cwd}
+          {(terminal.name || terminal.orphaned) && (
+            <p
+              className={`text-xs truncate ${terminal.orphaned ? 'text-yellow-500' : 'text-muted-foreground'}`}
+            >
+              {terminal.orphaned ? 'Path not found' : terminal.cwd}
             </p>
           )}
         </div>

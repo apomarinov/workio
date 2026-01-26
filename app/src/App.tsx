@@ -2,10 +2,7 @@ import { useEffect } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
-import {
-  TerminalProvider,
-  useTerminalContext,
-} from './context/TerminalContext'
+import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
 

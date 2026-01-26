@@ -86,7 +86,10 @@ export function Sidebar() {
 
     setCreating(true)
     try {
-      const terminal = await createTerminal(cwd.trim(), name.trim() || undefined)
+      const terminal = await createTerminal(
+        cwd.trim(),
+        name.trim() || undefined,
+      )
       selectTerminal(terminal.id)
       setCwd('')
       setName('')

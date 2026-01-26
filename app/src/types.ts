@@ -4,6 +4,7 @@ export interface Terminal {
   name: string | null
   pid: number | null
   status: 'running' | 'stopped'
+  orphaned?: boolean
   created_at: string
   updated_at: string
 }
