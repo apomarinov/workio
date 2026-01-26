@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import type { FastifyInstance } from 'fastify'
 import {
   createTerminal,
@@ -34,6 +35,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       if (!cwd) {
         return reply.status(400).send({ error: 'cwd is required' })
+      }
+
+      if (!fs.existsSync(cwd)) {
+        return reply.status(400).send({ error: 'Directory does not exist' })
+      }
+
+      const stat = fs.statSync(cwd)
+      if (!stat.isDirectory()) {
+        return reply.status(400).send({ error: 'Path is not a directory' })
       }
 
       const terminal = createTerminal(cwd, name || null)

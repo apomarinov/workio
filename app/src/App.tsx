@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
+import {
+  TerminalProvider,
+  useTerminalContext,
+} from './context/TerminalContext'
 import { useSocket } from './hooks/useSocket'
-import { useTerminals } from './hooks/useTerminals'
 import type { HookEvent } from './types'
 
-function App() {
-  const { terminals, loading, createTerminal, deleteTerminal } = useTerminals()
-  const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
+function AppContent() {
+  const { terminals, loading, activeTerminal } = useTerminalContext()
   const { subscribe } = useSocket()
 
   // Test: subscribe to hook events
@@ -17,29 +19,6 @@ function App() {
       console.log('[App] Hook event:', data)
     })
   }, [subscribe])
-
-  // Auto-select first terminal when terminals load
-  useEffect(() => {
-    if (terminals.length > 0 && activeTerminalId === null) {
-      setActiveTerminalId(terminals[0].id)
-    }
-  }, [terminals, activeTerminalId])
-
-  // Clear active terminal if it was deleted
-  useEffect(() => {
-    if (activeTerminalId && !terminals.find((t) => t.id === activeTerminalId)) {
-      setActiveTerminalId(terminals.length > 0 ? terminals[0].id : null)
-    }
-  }, [terminals, activeTerminalId])
-
-  const handleCreateTerminal = async (cwd: string, name?: string) => {
-    const terminal = await createTerminal(cwd, name)
-    setActiveTerminalId(terminal.id)
-  }
-
-  const handleDeleteTerminal = async (id: number) => {
-    await deleteTerminal(id)
-  }
 
   if (loading) {
     return (
@@ -53,24 +32,16 @@ function App() {
   if (terminals.length === 0) {
     return (
       <>
-        <HomePage onCreateTerminal={handleCreateTerminal} />
+        <HomePage />
         <Toaster />
       </>
     )
   }
 
-  const activeTerminal = terminals.find((t) => t.id === activeTerminalId)
-
   return (
     <>
       <div className="h-full flex bg-zinc-950">
-        <Sidebar
-          terminals={terminals}
-          activeTerminalId={activeTerminalId}
-          onSelectTerminal={setActiveTerminalId}
-          onDeleteTerminal={handleDeleteTerminal}
-          onCreateTerminal={handleCreateTerminal}
-        />
+        <Sidebar />
         <div className="flex-1 flex flex-col">
           {activeTerminal ? (
             <div className="flex-1 flex items-center justify-center text-zinc-400">
@@ -91,6 +62,14 @@ function App() {
       </div>
       <Toaster />
     </>
+  )
+}
+
+function App() {
+  return (
+    <TerminalProvider>
+      <AppContent />
+    </TerminalProvider>
   )
 }
 

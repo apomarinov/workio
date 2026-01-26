@@ -16,32 +16,23 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
+import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useTerminals } from '../hooks/useTerminals'
 import type { Terminal } from '../types'
 import { FolderGroup } from './FolderGroup'
 import { TerminalItem } from './TerminalItem'
 
 type GroupingMode = 'all' | 'folder'
 
-interface SidebarProps {
-  terminals: Terminal[]
-  activeTerminalId: number | null
-  onSelectTerminal: (id: number) => void
-  onDeleteTerminal: (id: number) => void
-  onCreateTerminal: (cwd: string, name?: string) => Promise<void>
-}
-
-export function Sidebar({
-  terminals,
-  activeTerminalId,
-  onSelectTerminal,
-  onDeleteTerminal,
-  onCreateTerminal,
-}: SidebarProps) {
+export function Sidebar() {
+  const { terminals, selectTerminal } = useTerminalContext()
+  const { createTerminal } = useTerminals()
   const [showForm, setShowForm] = useState(false)
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
     'sidebar-grouping',
     'all',
@@ -95,7 +86,8 @@ export function Sidebar({
 
     setCreating(true)
     try {
-      await onCreateTerminal(cwd.trim(), name.trim() || undefined)
+      const terminal = await createTerminal(cwd.trim(), name.trim() || undefined)
+      selectTerminal(terminal.id)
       setCwd('')
       setName('')
       setShowForm(false)
@@ -117,7 +109,7 @@ export function Sidebar({
       </div>
 
       <div className="px-2 py-1 border-b border-sidebar-border flex items-center gap-1">
-        <Popover>
+        <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
@@ -130,8 +122,11 @@ export function Sidebar({
           </PopoverTrigger>
           <PopoverContent className="w-40 p-1" align="start">
             <button
-              onClick={() => setGroupingMode('folder')}
-              className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent ${
+              onClick={() => {
+                setGroupingMode('folder')
+                setGroupingOpen(false)
+              }}
+              className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
                 groupingMode === 'folder' ? 'bg-accent' : ''
               }`}
             >
@@ -139,8 +134,11 @@ export function Sidebar({
               By Folder
             </button>
             <button
-              onClick={() => setGroupingMode('all')}
-              className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent ${
+              onClick={() => {
+                setGroupingMode('all')
+                setGroupingOpen(false)
+              }}
+              className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
                 groupingMode === 'all' ? 'bg-accent' : ''
               }`}
             >
@@ -174,22 +172,13 @@ export function Sidebar({
                   key={folderCwd}
                   cwd={folderCwd}
                   terminals={folderTerminals}
-                  activeTerminalId={activeTerminalId}
                   expanded={expandedFolders.has(folderCwd)}
                   onToggle={() => toggleFolder(folderCwd)}
-                  onSelectTerminal={onSelectTerminal}
-                  onDeleteTerminal={onDeleteTerminal}
                 />
               ),
             )
           : terminals.map((terminal) => (
-              <TerminalItem
-                key={terminal.id}
-                terminal={terminal}
-                isActive={terminal.id === activeTerminalId}
-                onSelect={() => onSelectTerminal(terminal.id)}
-                onDelete={() => onDeleteTerminal(terminal.id)}
-              />
+              <TerminalItem key={terminal.id} terminal={terminal} />
             ))}
       </div>
 

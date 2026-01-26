@@ -5,21 +5,15 @@ import { TerminalItem } from './TerminalItem'
 interface FolderGroupProps {
   cwd: string
   terminals: Terminal[]
-  activeTerminalId: number | null
   expanded: boolean
   onToggle: () => void
-  onSelectTerminal: (id: number) => void
-  onDeleteTerminal: (id: number) => void
 }
 
 export function FolderGroup({
   cwd,
   terminals,
-  activeTerminalId,
   expanded,
   onToggle,
-  onSelectTerminal,
-  onDeleteTerminal,
 }: FolderGroupProps) {
   const folderName = cwd.split('/').pop() || cwd
 
@@ -45,13 +39,7 @@ export function FolderGroup({
       {expanded && (
         <div className="ml-4 space-y-1">
           {terminals.map((terminal) => (
-            <TerminalItem
-              key={terminal.id}
-              terminal={terminal}
-              isActive={terminal.id === activeTerminalId}
-              onSelect={() => onSelectTerminal(terminal.id)}
-              onDelete={() => onDeleteTerminal(terminal.id)}
-            />
+            <TerminalItem key={terminal.id} terminal={terminal} />
           ))}
         </div>
       )}

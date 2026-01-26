@@ -3,12 +3,10 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { useTerminals } from '../hooks/useTerminals'
 
-interface HomePageProps {
-  onCreateTerminal: (cwd: string, name?: string) => Promise<void>
-}
-
-export function HomePage({ onCreateTerminal }: HomePageProps) {
+export function HomePage() {
+  const { createTerminal } = useTerminals()
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -19,7 +17,7 @@ export function HomePage({ onCreateTerminal }: HomePageProps) {
 
     setCreating(true)
     try {
-      await onCreateTerminal(cwd.trim(), name.trim() || undefined)
+      await createTerminal(cwd.trim(), name.trim() || undefined)
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to create terminal',
