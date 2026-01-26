@@ -1,11 +1,27 @@
 import { FolderOpen, Plus, TerminalSquare } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
 import { useTerminals } from '../hooks/useTerminals'
 
-export function HomePage() {
+interface CreateTerminalModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onCreated?: (terminalId: number) => void
+}
+
+export function CreateTerminalModal({
+  open,
+  onOpenChange,
+  onCreated,
+}: CreateTerminalModalProps) {
   const { createTerminal } = useTerminals()
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
@@ -18,11 +34,16 @@ export function HomePage() {
 
     setCreating(true)
     try {
-      await createTerminal(
+      const terminal = await createTerminal(
         cwd.trim(),
         name.trim() || undefined,
         shell.trim() || undefined,
       )
+      setCwd('')
+      setName('')
+      setShell('')
+      onOpenChange(false)
+      onCreated?.(terminal.id)
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to create terminal',
@@ -33,14 +54,11 @@ export function HomePage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">Terminals</h1>
-          <p className="text-muted-foreground">
-            Create your first terminal to get started
-          </p>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Terminal</DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -56,6 +74,7 @@ export function HomePage() {
                 onChange={(e) => setCwd(e.target.value)}
                 placeholder="/path/to/project"
                 className="pl-10"
+                autoFocus
               />
             </div>
           </div>
@@ -93,13 +112,13 @@ export function HomePage() {
           <Button
             type="submit"
             disabled={creating || !cwd.trim()}
-            className="w-full cursor-pointer"
+            className="w-full mt-2"
           >
             <Plus className="w-4 h-4 mr-2" />
             {creating ? 'Creating...' : 'Create Terminal'}
           </Button>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

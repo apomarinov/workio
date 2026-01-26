@@ -16,6 +16,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cwd TEXT NOT NULL,
     name TEXT,
+    shell TEXT,
     pid INTEGER,
     status TEXT DEFAULT 'running',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -63,13 +64,17 @@ export function getTerminalById(id: number): Terminal | undefined {
     .get(id) as Terminal | undefined
 }
 
-export function createTerminal(cwd: string, name: string | null): Terminal {
+export function createTerminal(
+  cwd: string,
+  name: string | null,
+  shell: string | null = null,
+): Terminal {
   const result = db
     .prepare(`
-    INSERT INTO terminals (cwd, name)
-    VALUES (?, ?)
+    INSERT INTO terminals (cwd, name, shell)
+    VALUES (?, ?, ?)
   `)
-    .run(cwd, name)
+    .run(cwd, name, shell)
   return getTerminalById(result.lastInsertRowid as number)!
 }
 

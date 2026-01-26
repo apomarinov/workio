@@ -2,6 +2,7 @@ export interface Terminal {
   id: number
   cwd: string
   name: string | null
+  shell: string | null
   pid: number | null
   status: 'running' | 'stopped'
   orphaned?: boolean

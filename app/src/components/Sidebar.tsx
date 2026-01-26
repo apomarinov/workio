@@ -2,24 +2,21 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Folder,
-  FolderOpen,
   LayoutList,
   Plus,
   Terminal as TerminalIcon,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { toast } from '@/components/ui/sonner'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { useTerminals } from '../hooks/useTerminals'
 import type { Terminal } from '../types'
+import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
 import { TerminalItem } from './TerminalItem'
 
@@ -27,11 +24,7 @@ type GroupingMode = 'all' | 'folder'
 
 export function Sidebar() {
   const { terminals, selectTerminal } = useTerminalContext()
-  const { createTerminal } = useTerminals()
-  const [showForm, setShowForm] = useState(false)
-  const [cwd, setCwd] = useState('')
-  const [name, setName] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
     'sidebar-grouping',
@@ -79,29 +72,6 @@ export function Sidebar() {
   }
 
   const allExpanded = allFolders.every((f) => expandedFolders.has(f))
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!cwd.trim()) return
-
-    setCreating(true)
-    try {
-      const terminal = await createTerminal(
-        cwd.trim(),
-        name.trim() || undefined,
-      )
-      selectTerminal(terminal.id)
-      setCwd('')
-      setName('')
-      setShowForm(false)
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to create terminal',
-      )
-    } finally {
-      setCreating(false)
-    }
-  }
 
   return (
     <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -186,58 +156,21 @@ export function Sidebar() {
       </div>
 
       <div className="p-2 border-t border-sidebar-border">
-        {showForm ? (
-          <form onSubmit={handleSubmit} className="space-y-2">
-            <div className="relative">
-              <FolderOpen className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="text"
-                value={cwd}
-                placeholder="/project/path"
-                className="pl-8 h-8 text-sm"
-                onChange={(e) => setCwd(e.target.value)}
-              />
-            </div>
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Name (optional)"
-              className="h-8 text-sm"
-            />
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowForm(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={creating || !cwd.trim()}
-                className="flex-1"
-              >
-                {creating ? '...' : 'Create'}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowForm(true)
-            }}
-            className="w-full justify-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Terminal
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          onClick={() => setShowCreateModal(true)}
+          className="w-full justify-center"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Terminal
+        </Button>
       </div>
+
+      <CreateTerminalModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        onCreated={selectTerminal}
+      />
     </div>
   )
 }

@@ -11,11 +11,12 @@ export async function getTerminals(): Promise<Terminal[]> {
 export async function createTerminal(
   cwd: string,
   name?: string,
+  shell?: string,
 ): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cwd, name }),
+    body: JSON.stringify({ cwd, name, shell }),
   })
   if (!res.ok) {
     const data = await res.json()

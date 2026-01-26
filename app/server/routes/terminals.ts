@@ -11,6 +11,7 @@ import {
 interface CreateTerminalBody {
   cwd: string
   name?: string
+  shell?: string
 }
 
 interface UpdateTerminalBody {
@@ -35,7 +36,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateTerminalBody }>(
     '/api/terminals',
     async (request, reply) => {
-      const { cwd, name } = request.body
+      const { cwd, name, shell } = request.body
 
       if (!cwd) {
         return reply.status(400).send({ error: 'cwd is required' })
@@ -50,7 +51,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Path is not a directory' })
       }
 
-      const terminal = createTerminal(cwd, name || null)
+      const terminal = createTerminal(cwd, name || null, shell || null)
       return reply.status(201).send(terminal)
     },
   )
