@@ -104,6 +104,7 @@ export function createSession(
         ...process.env,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
+        CLAUDE_TERMINAL_ID: String(terminalId),
       } as Record<string, string>,
     })
   } catch (err) {

@@ -69,6 +69,13 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Path is not a directory' })
       }
 
+      // Check read and execute permissions (needed to cd into and list directory)
+      try {
+        fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK)
+      } catch {
+        return reply.status(403).send({ error: 'Permission denied: cannot access directory' })
+      }
+
       const terminal = createTerminal(cwd, name || null, shell || null)
       return reply.status(201).send(terminal)
     },

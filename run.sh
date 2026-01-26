@@ -51,6 +51,30 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
+# Load and use nvm to switch to correct Node version if available
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    source "$NVM_DIR/nvm.sh"
+    echo "Using nvm to switch to correct Node version..."
+    cd "$SCRIPT_DIR/app"
+    nvm use
+    cd "$SCRIPT_DIR"
+fi
+
+# Check Node.js version matches .nvmrc
+NVMRC_FILE="$SCRIPT_DIR/app/.nvmrc"
+if [[ -f "$NVMRC_FILE" ]]; then
+    REQUIRED_NODE_VERSION=$(cat "$NVMRC_FILE" | tr -d '[:space:]')
+    CURRENT_NODE_VERSION=$(node -v | sed 's/^v//')
+    if [[ "$CURRENT_NODE_VERSION" != "$REQUIRED_NODE_VERSION" ]]; then
+        echo "Error: Node.js version mismatch."
+        echo "  Required: $REQUIRED_NODE_VERSION (from app/.nvmrc)"
+        echo "  Current:  $CURRENT_NODE_VERSION"
+        echo "  Run 'nvm use' or 'nvm install $REQUIRED_NODE_VERSION' to switch versions."
+        exit 1
+    fi
+fi
+
 # Install Python dependencies if needed
 if ! python3 -c "import dotenv" 2>/dev/null; then
     echo "Installing Python dependencies..."
