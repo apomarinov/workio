@@ -82,6 +82,7 @@ const IGNORE_PROCESSES = new Set([
   'su',
   // Shell helpers/plugins
   'gitstatusd',
+  'fzf',
   'gitstatusd-darwin-arm64',
   'gitstatusd-linux-x86_64',
 ])

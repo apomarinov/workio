@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ActiveProcess } from '../../shared/types'
+import type { ActiveProcess, ProcessesPayload } from '../../shared/types'
 import { useSocket } from './useSocket'
 
 export function useProcesses() {
@@ -7,8 +7,17 @@ export function useProcesses() {
   const [processes, setProcesses] = useState<ActiveProcess[]>([])
 
   useEffect(() => {
-    return subscribe<ActiveProcess[]>('processes', (data) => {
-      setProcesses(data)
+    return subscribe<ProcessesPayload>('processes', (data) => {
+      if (data.terminalId !== undefined) {
+        // Partial update: replace only processes for this terminal
+        setProcesses((prev) => [
+          ...prev.filter((p) => p.terminalId !== data.terminalId),
+          ...data.processes,
+        ])
+      } else {
+        // Full update: replace all processes
+        setProcesses(data.processes)
+      }
     })
   }, [subscribe])
 

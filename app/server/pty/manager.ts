@@ -35,44 +35,63 @@ const sessions = new Map<number, PtySession>()
 // Global process polling
 let globalProcessPollingId: NodeJS.Timeout | null = null
 
-function startGlobalProcessPolling() {
-  if (globalProcessPollingId) return
+function getProcessesForTerminal(
+  terminalId: number,
+  session: PtySession,
+): ActiveProcess[] {
+  const processes: ActiveProcess[] = []
+  if (!session.pty.pid) return processes
 
-  globalProcessPollingId = setInterval(() => {
-    const allProcesses: ActiveProcess[] = []
-
-    for (const [terminalId, session] of sessions) {
-      if (!session.pty.pid) continue
-
-      try {
-        // Check direct child processes
-        const procs = getChildProcesses(session.pty.pid, terminalId)
-        for (const p of procs) {
-          allProcesses.push(p)
-        }
-
-        // Check Zellij session (terminal-<ID>)
-        const zellijProcs = getZellijSessionProcesses(
-          `terminal-${terminalId}`,
-          terminalId,
-        )
-        for (const p of zellijProcs.filter((p) => !p.isIdle)) {
-          allProcesses.push({
-            pid: 0,
-            name: p.command.split(' ')[0] || '',
-            command: p.command,
-            terminalId: p.terminalId,
-            source: 'zellij',
-          })
-        }
-      } catch {
-        // Ignore errors for this terminal
-      }
+  try {
+    // Check direct child processes
+    const procs = getChildProcesses(session.pty.pid, terminalId)
+    for (const p of procs) {
+      processes.push(p)
     }
 
-    // Emit combined list to clients
-    getIO()?.emit('processes', allProcesses)
-  }, 3000)
+    // Check Zellij session (terminal-<ID>)
+    const zellijProcs = getZellijSessionProcesses(
+      `terminal-${terminalId}`,
+      terminalId,
+    )
+    for (const p of zellijProcs.filter((p) => !p.isIdle)) {
+      processes.push({
+        pid: 0,
+        name: p.command.split(' ')[0] || '',
+        command: p.command,
+        terminalId: p.terminalId,
+        source: 'zellij',
+      })
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return processes
+}
+
+function scanAndEmitProcessesForTerminal(terminalId: number) {
+  const session = sessions.get(terminalId)
+  if (!session) return
+
+  const processes = getProcessesForTerminal(terminalId, session)
+  getIO()?.emit('processes', { terminalId, processes })
+}
+
+function scanAndEmitAllProcesses() {
+  const allProcesses: ActiveProcess[] = []
+
+  for (const [terminalId, session] of sessions) {
+    const procs = getProcessesForTerminal(terminalId, session)
+    allProcesses.push(...procs)
+  }
+
+  getIO()?.emit('processes', { processes: allProcesses })
+}
+
+function startGlobalProcessPolling() {
+  if (globalProcessPollingId) return
+  globalProcessPollingId = setInterval(scanAndEmitAllProcesses, 3000)
 }
 
 function stopGlobalProcessPolling() {
@@ -207,11 +226,15 @@ export function createSession(
           session.currentCommand = event.command || null
           updateTerminal(terminalId, { active_cmd: event.command || null })
           console.log(`[pty:${terminalId}] Command started: ${event.command}`)
+          // Scan for new processes after a brief delay
+          setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
           break
         case 'command_end':
           console.log(
             `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
           )
+          // Scan for process changes after a brief delay
+          setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
           break
       }
       // Forward event to callback

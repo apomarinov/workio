@@ -5,3 +5,8 @@ export interface ActiveProcess {
   terminalId?: number
   source?: 'direct' | 'zellij'
 }
+
+export interface ProcessesPayload {
+  terminalId?: number
+  processes: ActiveProcess[]
+}

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
+import { cn } from '@/lib/utils'
 
 interface SessionItemProps {
   session: SessionWithProject
@@ -14,12 +15,12 @@ export function SessionItem({ session }: SessionItemProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const displayName = session.name || 'Untitled'
   const statusColor = {
-    started: 'bg-blue-500',
-    active: 'bg-green-500',
-    done: 'bg-gray-500',
-    ended: 'bg-gray-500',
-    permission_needed: 'bg-yellow-500',
-    idle: 'bg-gray-400',
+    started: 'text-green-500',
+    active: 'text-[#D97757]',
+    done: 'text-gray-500',
+    ended: 'text-gray-500',
+    permission_needed: 'text-yellow-500',
+    idle: 'text-gray-400',
   }[session.status]
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -35,7 +36,7 @@ export function SessionItem({ session }: SessionItemProps) {
   return (
     <>
       <div className="group flex items-center gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default">
-        <Bot className="w-3.5 h-3.5 flex-shrink-0" />
+        <Bot className={cn("w-3.5 h-3.5 flex-shrink-0", statusColor)} aria-label={session.status} />
         <span className="text-xs truncate flex-1">{displayName}</span>
         <div className="hidden group-hover:flex">
           <Button
@@ -47,10 +48,6 @@ export function SessionItem({ session }: SessionItemProps) {
             <Trash2 className="w-3 h-3" />
           </Button>
         </div>
-        <span
-          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColor} group-hover:hidden`}
-          title={session.status}
-        />
       </div>
 
       <ConfirmModal
