@@ -24,7 +24,11 @@ import { TerminalItem } from './TerminalItem'
 
 type GroupingMode = 'all' | 'folder'
 
-export function Sidebar() {
+interface SidebarProps {
+  width?: number
+}
+
+export function Sidebar({ width }: SidebarProps) {
   const { terminals, selectTerminal } = useTerminalContext()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -77,7 +81,10 @@ export function Sidebar() {
   const allExpanded = allFolders.every((f) => expandedFolders.has(f))
 
   return (
-    <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col">
+    <div
+      className="h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden"
+      style={width ? { width: `${width}px` } : undefined}
+    >
       <div className="px-2 py-1 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-1">
           <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>

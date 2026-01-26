@@ -174,7 +174,7 @@ export function Terminal({ terminalId }: TerminalProps) {
   }, [fontSize])
 
   return (
-    <div className="flex-1 flex flex-col bg-[#1a1a1a]">
+    <div className="h-full flex flex-col bg-[#1a1a1a]">
       {terminalId === null ? (
         <div className="flex-1 flex items-center justify-center text-gray-500">
           Select a terminal from the sidebar

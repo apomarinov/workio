@@ -13,6 +13,7 @@ function expandPath(p: string): string {
   }
   return p
 }
+
 import {
   createTerminal,
   deleteTerminal,

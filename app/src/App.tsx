@@ -1,4 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import type { PanelSize } from 'react-resizable-panels'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
 import { Sidebar } from './components/Sidebar'
@@ -10,6 +12,11 @@ import type { HookEvent } from './types'
 function AppContent() {
   const { terminals, loading, activeTerminal } = useTerminalContext()
   const { subscribe } = useSocket()
+  const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
+
+  const handleSidebarResize = (size: PanelSize) => {
+    setSidebarWidth(size.inPixels)
+  }
 
   // Test: subscribe to hook events
   useEffect(() => {
@@ -38,13 +45,24 @@ function AppContent() {
 
   return (
     <>
-      <div className="h-full flex bg-zinc-950">
-        <Sidebar />
-        <Terminal
-          key={activeTerminal?.id ?? 'none'}
-          terminalId={activeTerminal?.id ?? null}
-        />
-      </div>
+      <Group orientation="horizontal" className="h-full bg-zinc-950">
+        <Panel
+          id="sidebar"
+          defaultSize="250px"
+          minSize="150px"
+          maxSize="50%"
+          onResize={handleSidebarResize}
+        >
+          <Sidebar width={sidebarWidth} />
+        </Panel>
+        <Separator className="panel-resize-handle" />
+        <Panel id="main">
+          <Terminal
+            key={activeTerminal?.id ?? 'none'}
+            terminalId={activeTerminal?.id ?? null}
+          />
+        </Panel>
+      </Group>
       <Toaster />
     </>
   )
