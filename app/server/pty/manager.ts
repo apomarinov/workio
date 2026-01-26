@@ -5,6 +5,10 @@ import type { IPty } from 'node-pty'
 import * as pty from 'node-pty'
 import { getSettings, getTerminalById, updateTerminal } from '../db'
 import { type CommandEvent, createOscParser } from './osc-parser'
+import {
+  getChildProcesses,
+  getZellijSessionProcesses,
+} from './process-tree'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -15,6 +19,7 @@ export interface PtySession {
   pty: IPty
   buffer: string[]
   timeoutId: NodeJS.Timeout | null
+  processPollingId: NodeJS.Timeout | null
   terminalId: number
   cols: number
   rows: number
@@ -23,6 +28,7 @@ export interface PtySession {
   onCommandEvent: ((event: CommandEvent) => void) | null
   currentCommand: string | null
   isIdle: boolean
+  lastActiveProcesses: string // For change detection
 }
 
 // In-memory map of active PTY sessions
@@ -116,6 +122,7 @@ export function createSession(
     pty: ptyProcess,
     buffer: [],
     timeoutId: null,
+    processPollingId: null,
     terminalId,
     cols,
     rows,
@@ -124,6 +131,7 @@ export function createSession(
     onCommandEvent: onCommandEvent || null,
     currentCommand: null,
     isIdle: true,
+    lastActiveProcesses: '',
   }
 
   // Create OSC parser to intercept command events
@@ -171,6 +179,10 @@ export function createSession(
 
   // Handle PTY exit
   ptyProcess.onExit(({ exitCode }) => {
+    // Clear process polling
+    if (session.processPollingId) {
+      clearInterval(session.processPollingId)
+    }
     sessions.delete(terminalId)
     updateTerminal(terminalId, {
       pid: null,
@@ -184,6 +196,42 @@ export function createSession(
   updateTerminal(terminalId, { pid: ptyProcess.pid, status: 'running' })
 
   sessions.set(terminalId, session)
+
+  // Start polling for active processes every 3 seconds
+  session.processPollingId = setInterval(() => {
+    if (!session.pty.pid) return
+    try {
+      const parts: string[] = []
+
+      // Check direct child processes
+      const procs = getChildProcesses(session.pty.pid)
+      const directDesc = procs
+        .map((p) => (p.port ? `${p.command} :${p.port}` : p.command))
+        .join(', ')
+      if (directDesc) {
+        parts.push(directDesc)
+      }
+
+      // Check Zellij session (terminal-<ID>)
+      const zellijProcs = getZellijSessionProcesses(`terminal-${terminalId}`)
+      if (zellijProcs.length > 0) {
+        const zellijDesc = zellijProcs
+          .filter((p) => !p.isIdle)
+          .map((p) => p.command)
+          .join(', ')
+        if (zellijDesc) {
+          parts.push(`[zellij: ${zellijDesc}]`)
+        }
+      }
+
+      const desc = parts.join(' | ')
+
+      // Always log
+      console.log(`[pty:${terminalId}] Active processes: ${desc || '(none)'}`)
+    } catch {
+      // Ignore polling errors
+    }
+  }, 3000)
 
   // Inject shell integration after a brief delay to let shell initialize
   setTimeout(() => {
@@ -278,6 +326,11 @@ export function destroySession(terminalId: number): boolean {
   // Clear timeout
   if (session.timeoutId) {
     clearTimeout(session.timeoutId)
+  }
+
+  // Clear process polling
+  if (session.processPollingId) {
+    clearInterval(session.processPollingId)
   }
 
   // Kill PTY process and all child processes
