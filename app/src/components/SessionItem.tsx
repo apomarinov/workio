@@ -17,7 +17,7 @@ interface SessionItemProps {
 
 export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   const { deleteSession } = useClaudeSessions()
-  const { activeSessionId, selectSession } = useSessionContext()
+  const { activeSessionId, selectSession, clearSession } = useSessionContext()
   const { settings } = useSettings()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
@@ -52,8 +52,13 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false)
+    if (activeSessionId === session.session_id) {
+      clearSession()
+    }
     deleteSession(session.session_id)
   }
+
+  const showUserMessage = session.latest_user_message && session.latest_user_message !== displayName;
 
   return (
     <>
@@ -67,7 +72,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
       >
         <div className="flex items-start gap-1 mt-0.5 relative">
           {session.latest_agent_message && (
-            <div className="absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[50%]"></div>
+            <div className={cn("absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[50%]", !showUserMessage && 'h-[35%]')}></div>
           )}
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
@@ -119,7 +124,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           >
             {displayName}
           </span>
-          {showGitBranch && session.project_path && false && (
+          {showGitBranch && session.project_path && !session.git_branch && (
             <span
               className={cn(
                 'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',

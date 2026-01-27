@@ -66,13 +66,13 @@ function ToolHeader({
     <div className="flex items-center gap-2 text-sm">
       <StatusDot status={status} />
       <Icon className="w-4 h-4 min-w-4 min-h-4 text-zinc-400" />
-      <span className="font-mono text-zinc-300 flex-1 truncate">{label}</span>
+      <span className="font-mono text-zinc-300 flex-1">{label}</span>
       {meta && <span className="text-xs text-zinc-500">{meta}</span>}
       {onExpand && (
         <button
           type="button"
           onClick={onExpand}
-          className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="p-1 cursor-pointer hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
           title="Expand to fullscreen"
         >
           <Maximize2 className="w-3.5 h-3.5" />
@@ -139,7 +139,7 @@ function ToolMetadata({ tool }: { tool: ToolData }) {
       return (
         <div className="flex items-center gap-4 text-sm text-zinc-400 mt-1">
           <span className="font-mono">{t.input.file_path}</span>
-          <span className="text-green-400">+{t.lines_added}</span>
+          <span className="text-green-400 mr-1">+{t.lines_added}</span>
           <span className="text-red-400">-{t.lines_removed}</span>
         </div>
       )
@@ -325,14 +325,16 @@ function FullscreenToolDialog({
 function CollapsibleOutput({
   output,
   truncated,
+  status,
 }: {
   output: string
   truncated: boolean
+  status?: 'success' | 'error'
 }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
 
-  const expanded = isExpanded ?? settings?.show_tool_output ?? false
+  const expanded = isExpanded ?? (status === 'error' ? true : settings?.show_tool_output ?? false)
   const hasOutput = output && output.trim().length > 0
 
   if (!hasOutput) return null
@@ -342,7 +344,7 @@ function CollapsibleOutput({
       <button
         type="button"
         onClick={() => setIsExpanded(!expanded)}
-        className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+        className="flex cursor-pointer items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
       >
         {expanded ? (
           <ChevronDown className="w-3 h-3" />
@@ -370,7 +372,7 @@ function BashToolDisplay({
 }) {
   const command =
     tool.input.command.length > 500
-      ? `${tool.input.command.slice(0, 60)}...`
+      ? `${tool.input.command.slice(0, 500)}...`
       : tool.input.command
 
   return (
@@ -385,6 +387,7 @@ function BashToolDisplay({
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        status={tool.status}
       />
     </div>
   )
@@ -399,7 +402,7 @@ function EditToolDisplay({
 }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
-  const expanded = isExpanded ?? settings?.show_tool_output ?? false
+  const expanded = isExpanded ?? (tool.status === 'error' ? true : settings?.show_tool_output ?? false)
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
   return (
@@ -410,7 +413,7 @@ function EditToolDisplay({
         status={tool.status}
         meta={
           <>
-            <span className="text-green-400">+{tool.lines_added}</span>
+            <span className="text-green-400 mr-1">+{tool.lines_added}</span>
             <span className="text-red-400">-{tool.lines_removed}</span>
           </>
         }
@@ -429,7 +432,7 @@ function EditToolDisplay({
             <button
               type="button"
               onClick={() => setIsExpanded(!expanded)}
-              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+              className="flex cursor-pointer items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
             >
               {expanded ? (
                 <ChevronDown className="w-3 h-3" />
@@ -475,6 +478,7 @@ function ReadToolDisplay({
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        status={tool.status}
       />
     </div>
   )
@@ -503,6 +507,7 @@ function WriteToolDisplay({
       <CollapsibleOutput
         output={tool.content}
         truncated={tool.content_truncated}
+        status={tool.status}
       />
     </div>
   )
@@ -533,6 +538,7 @@ function GrepToolDisplay({
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        status={tool.status}
       />
     </div>
   )
@@ -557,6 +563,7 @@ function TaskToolDisplay({
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        status={tool.status}
       />
     </div>
   )
@@ -616,6 +623,7 @@ function GenericToolDisplay({
         <CollapsibleOutput
           output={tool.output}
           truncated={tool.output_truncated || false}
+          status={tool.status}
         />
       )}
     </div>
@@ -659,8 +667,8 @@ export function ToolCallDisplay({ tool }: ToolCallDisplayProps) {
         'Task',
         'TodoWrite',
       ].includes(tool.name) && (
-        <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
-      )}
+          <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
+        )}
 
       <FullscreenToolDialog
         tool={tool}
