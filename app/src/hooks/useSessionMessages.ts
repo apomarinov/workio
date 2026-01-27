@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import * as api from '../lib/api'
 import type { SessionMessage, SessionMessagesResponse } from '../types'
@@ -36,29 +36,27 @@ export function useSessionMessages(sessionId: string | null) {
     }
   }, [data])
 
-  // Subscribe to real-time updates
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
-
+  // Subscribe to real-time updates via session_update event
   useEffect(() => {
     if (!sessionId) return
 
-    return subscribe('hook', () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-      debounceRef.current = setTimeout(() => {
-        mutate()
-      }, 500)
-    })
-  }, [subscribe, mutate, sessionId])
+    return subscribe(
+      'session_update',
+      (data: { session_id: string; messages: SessionMessage[] }) => {
+        if (data.session_id !== sessionId) return
+        if (!data.messages || data.messages.length === 0) return
 
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-    }
-  }, [])
+        // Prepend new messages (they're newest, allMessages is newest-first)
+        setAllMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id))
+          const newMessages = data.messages.filter((m) => !existingIds.has(m.id))
+          return [...newMessages, ...prev]
+        })
+        setOffset((prev) => prev + data.messages.length)
+      },
+    )
+  }, [subscribe, sessionId])
+
 
   // Load more messages (older messages)
   const loadMore = useCallback(async () => {

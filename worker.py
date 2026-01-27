@@ -21,26 +21,27 @@ DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 DEBOUNCE_SECONDS = int(os.environ.get("DEBOUNCE_SECONDS", 2))
 
 
-def process_transcript(conn, session_id: str, transcript_path: str) -> None:
-    """Process transcript file and store messages."""
+def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict]:
+    """Process transcript file and store messages. Returns list of new messages."""
     if not transcript_path:
         log(conn, "No transcript path provided", session_id=session_id)
-        return
+        return []
 
     transcript_file = Path(transcript_path)
     if not transcript_file.exists():
         log(conn, "Transcript file not found", session_id=session_id, path=transcript_path)
-        return
+        return []
 
     # Get the latest prompt for this session
     prompt_row = get_latest_prompt(conn, session_id)
 
     if not prompt_row:
         log(conn, "No prompt found for session", session_id=session_id)
-        return
+        return []
 
     prompt_id = prompt_row['id']
-    messages_added = 0
+    prompt_text = prompt_row['prompt']
+    new_messages = []
 
     with open(transcript_file, 'r') as f:
         for line in f:
@@ -94,10 +95,19 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> None:
 
             # Store message if we have body
             if body:
-                create_message(conn, prompt_id, uuid, timestamp, body, is_thinking, is_user)
-                messages_added += 1
+                msg_id = create_message(conn, prompt_id, uuid, timestamp, body, is_thinking, is_user)
+                new_messages.append({
+                    'id': msg_id,
+                    'prompt_id': prompt_id,
+                    'uuid': uuid,
+                    'is_user': is_user,
+                    'thinking': is_thinking,
+                    'body': body,
+                    'created_at': timestamp,
+                    'prompt_text': prompt_text if is_user else None,
+                })
 
-    log(conn, "Processed transcript", session_id=session_id, messages_added=messages_added)
+    log(conn, "Processed transcript", session_id=session_id, messages_added=len(new_messages))
 
     # If latest prompt has no prompt text, set it to newest user message
     latest_prompt = get_latest_prompt(conn, session_id)
@@ -108,6 +118,8 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> None:
         if user_msg:
             update_prompt_text(conn, latest_prompt['id'], user_msg['body'])
             log(conn, "Set prompt from user message", session_id=session_id)
+
+    return new_messages
 
 
 def process_session(session_id: str, timestamp: str) -> None:
@@ -197,9 +209,9 @@ def process_session(session_id: str, timestamp: str) -> None:
             session = get_session(conn, session_id)
 
             if session and session['transcript_path']:
-                process_transcript(conn, session_id, session['transcript_path'])
+                new_messages = process_transcript(conn, session_id, session['transcript_path'])
                 # Fire session_update event to notify frontend of new messages
-                emit_event("session_update", {"session_id": session_id})
+                emit_event("session_update", {"session_id": session_id, "messages": new_messages})
             else:
                 log(conn, "No transcript path in session", session_id=session_id)
 
