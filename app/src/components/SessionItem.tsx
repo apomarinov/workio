@@ -57,9 +57,9 @@ export function SessionItem({ session }: SessionItemProps) {
       >
         <div className="flex items-center gap-1">
           {session.status === 'permission_needed' && (
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse" />
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
-          {session.status === 'active' && (
+          {['active', 'permission_needed'].includes(session.status) && (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150" className="w-3.5 h-3.5">
               <path
                 fill="none"
@@ -81,7 +81,7 @@ export function SessionItem({ session }: SessionItemProps) {
               </path>
             </svg>
           )}
-          {session.status !== 'active' && (
+          {!['active', 'permission_needed'].includes(session.status) && (
             <Bot
               className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
               aria-label={session.status}
