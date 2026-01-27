@@ -30,7 +30,7 @@ export function SessionItem({ session }: SessionItemProps) {
   const statusColor = {
     started: 'text-green-500',
     active: 'text-[#D97757]',
-    done: 'text-green-500',
+    done: 'text-gray-500',
     ended: 'text-gray-500',
     permission_needed: 'text-[#D97757]',
     idle: 'text-gray-400',

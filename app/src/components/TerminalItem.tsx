@@ -3,11 +3,12 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  GitBranch,
   Pencil,
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useProcesses } from '../hooks/useProcesses'
@@ -49,6 +50,17 @@ export function TerminalItem({
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0 || otherSessions.length > 0
   const hasProcesses = processes.length > 0
+
+  // Get git branch from the most recent active session (only show when not in folder mode)
+  const gitBranch = useMemo(() => {
+    if (hideFolder) return null
+    const allSessions = [...sessions, ...otherSessions]
+    const activeSessions = allSessions.filter(
+      (s) => s.status === 'active' || s.status === 'permission_needed'
+    )
+    const session = activeSessions[0] || allSessions[0]
+    return session?.git_branch || null
+  }, [hideFolder, sessions, otherSessions])
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -101,15 +113,20 @@ export function TerminalItem({
           ) : (
             <div className={cn("h-6 w-6 flex-shrink-0", !hideFolder ? 'hidden' : '')} />
           )}
-          {terminal.orphaned ? (
-            <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
-          ) : (
-            <TerminalIcon
-              className={`w-4 h-4 flex-shrink-0 ${hasProcesses ? 'text-green-500' : ''}`}
-            />
-          )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{displayName}</p>
+            <div className="flex items-center gap-2">
+              {terminal.orphaned ? (
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
+              ) : (
+                <TerminalIcon
+                  className={`w-4 h-4 flex-shrink-0 ${hasProcesses ? 'text-green-500' : ''}`}
+                />
+              )}
+              <TruncatedPath
+                path={displayName}
+                className="text-sm font-medium truncate"
+              />
+            </div>
             {terminal.orphaned ? (
               <p className="text-xs truncate text-yellow-500">Path not found</p>
             ) : (
@@ -120,6 +137,12 @@ export function TerminalItem({
                   className="text-xs text-muted-foreground"
                 />
               )
+            )}
+            {gitBranch && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <GitBranch className="w-3 h-3" />
+                {gitBranch}
+              </span>
             )}
           </div>
           <div className="h-7 invisible pointer-events-none"></div>
@@ -207,7 +230,7 @@ export function TerminalItem({
                   ) : (
                     <ChevronRight className="w-3 h-3" />
                   )}
-                  Other Sessions ({otherSessions.length})
+                  Other Claude Sessions ({otherSessions.length})
                 </button>
                 {otherSessionsExpanded &&
                   otherSessions.map((session) => (

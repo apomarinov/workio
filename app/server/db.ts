@@ -52,6 +52,7 @@ export function getAllSessions(): SessionWithProject[] {
       SELECT s.*, p.path as project_path
       FROM sessions s
       JOIN projects p ON s.project_id = p.id
+      WHERE s.status != 'ended'
       ORDER BY s.updated_at DESC
     `)
     .all() as SessionWithProject[]

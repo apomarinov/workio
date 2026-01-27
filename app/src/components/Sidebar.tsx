@@ -271,7 +271,7 @@ export function Sidebar({ width }: SidebarProps) {
           <>
             <div className="border-t border-sidebar-border my-2" />
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1">
-              Other Sessions
+              Other Claude Sessions
             </p>
             {Array.from(orphanSessionGroups.entries()).map(
               ([projectPath, groupSessions]) => (
