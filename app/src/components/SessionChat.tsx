@@ -44,7 +44,9 @@ export function SessionChat() {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef<number>(0)
+  const prevMessageCountRef = useRef<number>(0)
   const isInitialLoadRef = useRef(true)
+  const isNearBottomRef = useRef(true)
 
   const session = sessions.find((s) => s.session_id === activeSessionId)
 
@@ -110,7 +112,18 @@ export function SessionChat() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on session change
   useEffect(() => {
     isInitialLoadRef.current = true
+    isNearBottomRef.current = true
   }, [activeSessionId])
+
+  // Track if user is near bottom of scroll container
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const threshold = 100
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    isNearBottomRef.current = distanceFromBottom < threshold
+  }, [])
 
   // Handle scroll position
   useEffect(() => {
@@ -126,7 +139,15 @@ export function SessionChat() {
         const scrollDiff = newScrollHeight - prevScrollHeightRef.current
         scrollContainerRef.current.scrollTop += scrollDiff
         prevScrollHeightRef.current = 0
+      } else if (
+        messages.length > prevMessageCountRef.current &&
+        isNearBottomRef.current
+      ) {
+        // Auto-scroll to bottom for new messages if user is near bottom
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight
       }
+      prevMessageCountRef.current = messages.length
     }
   }, [loading, messages.length])
 
@@ -157,6 +178,7 @@ export function SessionChat() {
         {/* Messages */}
         <div
           ref={scrollContainerRef}
+          onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-4 py-4"
         >
           {/* Sentinel for infinite scroll (at top for loading older messages) */}

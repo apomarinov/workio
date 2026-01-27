@@ -82,7 +82,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {session.latest_agent_message && (
             <div
               className={cn(
-                'absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[50%]',
+                'absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[calc(50%+5px)]',
                 !showUserMessage && 'h-[35%]',
               )}
             ></div>
@@ -122,11 +122,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {!['active', 'permission_needed', 'done'].includes(
             session.status,
           ) && (
-            <Bot
-              className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-              aria-label={session.status}
-            />
-          )}
+              <Bot
+                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                aria-label={session.status}
+              />
+            )}
         </div>
         <div className="flex-1 min-w-0">
           <span
