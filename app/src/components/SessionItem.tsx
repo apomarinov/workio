@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, ChevronRight, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bot, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -8,9 +8,10 @@ import { ConfirmModal } from './ConfirmModal'
 
 interface SessionItemProps {
   session: SessionWithProject
+  showGitBranch?: boolean
 }
 
-export function SessionItem({ session }: SessionItemProps) {
+export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   const { deleteSession } = useClaudeSessions()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
@@ -51,7 +52,7 @@ export function SessionItem({ session }: SessionItemProps) {
     <>
       <div
         className={cn(
-          'group flex items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default',
+          'group flex items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer relative',
           isFlashing && 'animate-flash',
         )}
       >
@@ -92,10 +93,18 @@ export function SessionItem({ session }: SessionItemProps) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-xs truncate block">{displayName}</span>
+          <span style={{
+            lineHeight: showGitBranch ? '1' : undefined
+          }} className={cn("text-xs truncate block", showGitBranch && 'text-md')}>{displayName}</span>
+          {showGitBranch && session.git_branch && (
+            <span className={cn("flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground", showGitBranch && 'text-sm')}>
+              <GitBranch className={cn('w-2.5 h-2.5', showGitBranch && 'w-3 h-3 my-1 mr-1')} />
+              {session.git_branch}
+            </span>
+          )}
           {session.latest_user_message && (
             <p className="text-xs text-muted-foreground truncate mt-0.5 flex gap-1 items-center">
-              <ChevronRight className='w-3' /> {session.latest_user_message}
+              <ChevronRight className='min-w-3 min-h-3 w-3 h-3' /> {session.latest_user_message}
             </p>
           )}
           {session.latest_agent_message && (
@@ -104,7 +113,7 @@ export function SessionItem({ session }: SessionItemProps) {
             </p>
           )}
         </div>
-        <div className="hidden group-hover:flex">
+        <div className="absolute invisible group-hover:visible top-1 right-1">
           <Button
             variant="ghost"
             size="icon"

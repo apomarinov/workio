@@ -59,7 +59,6 @@ export function getAllSessions(): SessionWithProject[] {
         ) as latest_agent_message
       FROM sessions s
       JOIN projects p ON s.project_id = p.id
-      WHERE s.status != 'ended'
       ORDER BY s.updated_at DESC
     `)
     .all() as SessionWithProject[]

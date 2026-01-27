@@ -1,4 +1,5 @@
 import {
+  Bot,
   ChevronsDownUp,
   ChevronsUpDown,
   Folder,
@@ -21,10 +22,11 @@ import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
 import { SessionGroup } from './SessionGroup'
+import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
 import { TerminalItem } from './TerminalItem'
 
-type GroupingMode = 'all' | 'folder'
+type GroupingMode = 'all' | 'folder' | 'sessions'
 
 interface SidebarProps {
   width?: number
@@ -183,7 +185,18 @@ export function Sidebar({ width }: SidebarProps) {
                   }`}
               >
                 <TerminalIcon className="w-4 h-4" />
-                All
+                Terminals
+              </button>
+              <button
+                onClick={() => {
+                  setGroupingMode('sessions')
+                  setGroupingOpen(false)
+                }}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                  }`}
+              >
+                <Bot className="w-4 h-4" />
+                Sessions
               </button>
               <button
                 onClick={() => {
@@ -194,7 +207,7 @@ export function Sidebar({ width }: SidebarProps) {
                   }`}
               >
                 <Folder className="w-4 h-4" />
-                By Folder
+                Folders
               </button>
             </PopoverContent>
           </Popover>
@@ -237,8 +250,12 @@ export function Sidebar({ width }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
-        {groupingMode === 'folder'
-          ? Array.from(groupedTerminals.entries()).map(
+        {groupingMode === 'sessions' ? (
+          sessions.map((session) => (
+            <SessionItem key={session.session_id} session={session} showGitBranch />
+          ))
+        ) : groupingMode === 'folder' ? (
+          Array.from(groupedTerminals.entries()).map(
             ([folderCwd, folderTerminals]) => (
               <FolderGroup
                 key={folderCwd}
@@ -255,7 +272,8 @@ export function Sidebar({ width }: SidebarProps) {
               />
             ),
           )
-          : terminals.map((terminal) => (
+        ) : (
+          terminals.map((terminal) => (
             <TerminalItem
               key={terminal.id}
               terminal={terminal}
@@ -264,10 +282,11 @@ export function Sidebar({ width }: SidebarProps) {
               sessionsExpanded={expandedTerminalSessionsSet.has(terminal.id)}
               onToggleSessions={() => toggleTerminalSessions(terminal.id)}
             />
-          ))}
+          ))
+        )}
 
-        {/* Orphan sessions - grouped by project path */}
-        {orphanSessionGroups.size > 0 && (
+        {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
+        {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (
           <>
             <div className="border-t border-sidebar-border my-2" />
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1">
