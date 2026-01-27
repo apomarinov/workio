@@ -1,4 +1,4 @@
-import { TerminalSquare, Type } from 'lucide-react'
+import { Brain, TerminalSquare, Type } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { Switch } from '@/components/ui/switch'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
 
@@ -22,12 +23,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings } = useSettings()
   const [defaultShell, setDefaultShell] = useState('')
   const [fontSize, setFontSize] = useState<string>('')
+  const [showThinking, setShowThinking] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (settings) {
       setDefaultShell(settings.default_shell)
       setFontSize(settings.font_size?.toString() ?? '')
+      setShowThinking(settings.show_thinking)
     }
   }, [settings])
 
@@ -41,6 +44,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       await updateSettings({
         default_shell: defaultShell.trim(),
         font_size: fontSizeValue,
+        show_thinking: showThinking,
       })
       toast.success('Settings saved')
       onOpenChange(false)
@@ -102,6 +106,20 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             <p className="text-xs text-muted-foreground">
               Font size in pixels (8-32). Default: {DEFAULT_FONT_SIZE}
             </p>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-muted-foreground" />
+              <label htmlFor="show_thinking" className="text-sm font-medium">
+                Show thinking by default
+              </label>
+            </div>
+            <Switch
+              id="show_thinking"
+              checked={showThinking}
+              onCheckedChange={setShowThinking}
+            />
           </div>
 
           <DialogFooter>

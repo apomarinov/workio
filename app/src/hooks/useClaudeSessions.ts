@@ -16,8 +16,8 @@ export function useClaudeSessions() {
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
       if (data.hook_type === 'UserPromptSubmit') {
-        mutate();
-        return;
+        mutate()
+        return
       }
       // Debounce refetch
       if (debounceRef.current) {

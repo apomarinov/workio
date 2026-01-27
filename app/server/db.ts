@@ -2,7 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import type { Project, SessionWithProject, Settings, Terminal } from '../src/types'
+import type {
+  Project,
+  SessionWithProject,
+  Settings,
+  Terminal,
+} from '../src/types'
 import { env } from './env'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -62,6 +67,67 @@ export function getAllSessions(): SessionWithProject[] {
       ORDER BY s.updated_at DESC
     `)
     .all() as SessionWithProject[]
+}
+
+export interface SessionMessage {
+  id: number
+  prompt_id: number
+  uuid: string
+  is_user: boolean
+  thinking: boolean
+  body: string
+  created_at: string
+  prompt_text: string | null
+}
+
+export interface SessionMessagesResult {
+  messages: SessionMessage[]
+  total: number
+  hasMore: boolean
+}
+
+export function getSessionMessages(
+  sessionId: string,
+  limit: number,
+  offset: number,
+): SessionMessagesResult {
+  const total = db
+    .prepare(
+      `
+      SELECT COUNT(*) as count
+      FROM messages m
+      JOIN prompts p ON m.prompt_id = p.id
+      WHERE p.session_id = ?
+    `,
+    )
+    .get(sessionId) as { count: number }
+
+  const messages = db
+    .prepare(
+      `
+      SELECT
+        m.id,
+        m.prompt_id,
+        m.uuid,
+        m.is_user,
+        m.thinking,
+        m.body,
+        m.created_at,
+        p.prompt as prompt_text
+      FROM messages m
+      JOIN prompts p ON m.prompt_id = p.id
+      WHERE p.session_id = ?
+      ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
+    `,
+    )
+    .all(sessionId, limit, offset) as SessionMessage[]
+
+  return {
+    messages,
+    total: total.count,
+    hasMore: offset + messages.length < total.count,
+  }
 }
 
 export function deleteSession(sessionId: string): boolean {
@@ -169,22 +235,27 @@ export function deleteTerminal(id: number): boolean {
 
 export function getSettings(): Settings {
   let settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as
-    | Settings
+    | (Omit<Settings, 'show_thinking'> & { show_thinking: number | null })
     | undefined
   if (!settings) {
     db.prepare(
-      "INSERT INTO settings (id, default_shell) VALUES (1, '/bin/bash')",
+      "INSERT INTO settings (id, default_shell, show_thinking) VALUES (1, '/bin/bash', 0)",
     ).run()
-    settings = db
-      .prepare('SELECT * FROM settings WHERE id = 1')
-      .get() as Settings
+    settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Omit<
+      Settings,
+      'show_thinking'
+    > & { show_thinking: number | null }
   }
-  return settings
+  return {
+    ...settings,
+    show_thinking: Boolean(settings.show_thinking),
+  }
 }
 
 export function updateSettings(updates: {
   default_shell?: string
   font_size?: number | null
+  show_thinking?: boolean
 }): Settings {
   const setClauses: string[] = []
   const values: (string | number | null)[] = []
@@ -196,6 +267,10 @@ export function updateSettings(updates: {
   if (updates.font_size !== undefined) {
     setClauses.push('font_size = ?')
     values.push(updates.font_size)
+  }
+  if (updates.show_thinking !== undefined) {
+    setClauses.push('show_thinking = ?')
+    values.push(updates.show_thinking ? 1 : 0)
   }
 
   if (setClauses.length > 0) {

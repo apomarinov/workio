@@ -92,10 +92,11 @@ export function TerminalItem({
       <div>
         <div
           onClick={() => selectTerminal(terminal.id)}
-          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-            } ${terminal.orphaned ? 'opacity-60' : ''}`}
+          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+            isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
           {hasSessions || hasProcesses ? (
             <Button
@@ -235,8 +236,12 @@ export function TerminalItem({
                   ) : (
                     <ChevronRight className="w-3 h-3" />
                   )}
-                  <span className='hidden @[230px]/sidebar:block'>Other Claude Sessions ({otherSessions.length})</span>
-                  <span className='@[230px]/sidebar:hidden'>Other Sessions ({otherSessions.length})</span>
+                  <span className="hidden @[230px]/sidebar:block">
+                    Other Claude Sessions ({otherSessions.length})
+                  </span>
+                  <span className="@[230px]/sidebar:hidden">
+                    Other Sessions ({otherSessions.length})
+                  </span>
                 </button>
                 {otherSessionsExpanded &&
                   otherSessions.map((session) => (

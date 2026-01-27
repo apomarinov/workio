@@ -1,7 +1,14 @@
-import { AlertTriangle, Bot, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Bot,
+  ChevronRight,
+  GitBranch,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useSessionContext } from '../context/SessionContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
@@ -13,9 +20,11 @@ interface SessionItemProps {
 
 export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   const { deleteSession } = useClaudeSessions()
+  const { activeSessionId, selectSession } = useSessionContext()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
   const displayName = session.name || 'Untitled'
+  const isSelected = activeSessionId === session.session_id
 
   useEffect(() => {
     const handleFlash = (e: CustomEvent<{ sessionId: string }>) => {
@@ -51,20 +60,24 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   return (
     <>
       <div
+        onClick={() => selectSession(session.session_id)}
         className={cn(
           'group flex items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer relative',
           isFlashing && 'animate-flash',
+          isSelected && 'bg-sidebar-accent/50',
         )}
       >
         <div className="flex items-start gap-1 mt-0.5 relative">
-          <div className='absolute top-[30%] left-[45%] border-l-[1px] border-b-[1px] w-[87%] h-[60%]'>
-
-          </div>
+          <div className="absolute top-[30%] left-[45%] border-l-[1px] border-b-[1px] w-[87%] h-[60%]"></div>
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
           {['active', 'permission_needed'].includes(session.status) && (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150" className="w-3.5 h-3.5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 300 150"
+              className="w-3.5 h-3.5"
+            >
               <path
                 fill="none"
                 stroke="#D97757"
@@ -93,18 +106,34 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <span style={{
-            lineHeight: showGitBranch ? '1' : undefined
-          }} className={cn("text-xs truncate block", showGitBranch && 'text-md')}>{displayName}</span>
+          <span
+            style={{
+              lineHeight: showGitBranch ? '' : undefined,
+            }}
+            className={cn('text-xs truncate block', showGitBranch && '')}
+          >
+            {displayName}
+          </span>
           {showGitBranch && session.git_branch && (
-            <span className={cn("flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground", showGitBranch && 'text-sm')}>
-              <GitBranch className={cn('w-2.5 h-2.5', showGitBranch && 'w-3 h-3 my-1 mr-1')} />
+            <span
+              className={cn(
+                'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
+                showGitBranch && '',
+              )}
+            >
+              <GitBranch
+                className={cn(
+                  'w-2.5 h-2.5',
+                  showGitBranch && '',
+                )}
+              />
               {session.git_branch}
             </span>
           )}
           {session.latest_user_message && (
             <p className="text-xs text-muted-foreground truncate mt-0.5 flex gap-1 items-center">
-              <ChevronRight className='min-w-3 min-h-3 w-3 h-3' /> {session.latest_user_message}
+              <ChevronRight className="min-w-3 min-h-3 w-3 h-3" />{' '}
+              {session.latest_user_message}
             </p>
           )}
           {session.latest_agent_message && (

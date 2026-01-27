@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS terminals (
 CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     default_shell TEXT NOT NULL DEFAULT '/bin/bash',
-    font_size INTEGER
+    font_size INTEGER,
+    show_thinking INTEGER DEFAULT 0
 );
 
 -- Indexes

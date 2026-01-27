@@ -162,8 +162,18 @@ export function Sidebar({ width }: SidebarProps) {
       className="h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden"
       style={width ? { width: `${width}px` } : undefined}
     >
-      <div className="px-2 py-1 border-b border-sidebar-border flex items-center justify-between">
+      <div className="px-4 py-4 border-b border-sidebar-border flex items-center justify-between">
+        <div className='text-sm flex items-center gap-2'>Terminals <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => setShowCreateModal(true)}
+          title="New Terminal"
+        >
+          <Plus className="w-4 h-4" />
+        </Button></div>
         <div className="flex items-center gap-1">
+
           <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -226,17 +236,6 @@ export function Sidebar({ width }: SidebarProps) {
               )}
             </Button>
           )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setShowCreateModal(true)}
-            title="New Terminal"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -250,40 +249,46 @@ export function Sidebar({ width }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
-        {groupingMode === 'sessions' ? (
-          sessions.map((session) => (
-            <SessionItem key={session.session_id} session={session} showGitBranch />
-          ))
-        ) : groupingMode === 'folder' ? (
-          Array.from(groupedTerminals.entries()).map(
-            ([folderCwd, folderTerminals]) => (
-              <FolderGroup
-                key={folderCwd}
-                cwd={folderCwd}
-                terminals={folderTerminals}
-                expanded={expandedFolders.has(folderCwd)}
-                onToggle={() => toggleFolder(folderCwd)}
-                sessionsForTerminal={sessionsForTerminal}
-                otherSessionsForCwd={
-                  otherSessionsForTerminal.get(folderCwd) || []
-                }
-                expandedTerminalSessions={expandedTerminalSessionsSet}
-                onToggleTerminalSessions={toggleTerminalSessions}
-              />
-            ),
-          )
-        ) : (
-          terminals.map((terminal) => (
-            <TerminalItem
-              key={terminal.id}
-              terminal={terminal}
-              sessions={sessionsForTerminal.get(terminal.id) || []}
-              otherSessions={otherSessionsForTerminal.get(terminal.cwd) || []}
-              sessionsExpanded={expandedTerminalSessionsSet.has(terminal.id)}
-              onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+        {groupingMode === 'sessions'
+          ? sessions.map((session) => (
+            <SessionItem
+              key={session.session_id}
+              session={session}
+              showGitBranch
             />
           ))
-        )}
+          : groupingMode === 'folder'
+            ? Array.from(groupedTerminals.entries()).map(
+              ([folderCwd, folderTerminals]) => (
+                <FolderGroup
+                  key={folderCwd}
+                  cwd={folderCwd}
+                  terminals={folderTerminals}
+                  expanded={expandedFolders.has(folderCwd)}
+                  onToggle={() => toggleFolder(folderCwd)}
+                  sessionsForTerminal={sessionsForTerminal}
+                  otherSessionsForCwd={
+                    otherSessionsForTerminal.get(folderCwd) || []
+                  }
+                  expandedTerminalSessions={expandedTerminalSessionsSet}
+                  onToggleTerminalSessions={toggleTerminalSessions}
+                />
+              ),
+            )
+            : terminals.map((terminal) => (
+              <TerminalItem
+                key={terminal.id}
+                terminal={terminal}
+                sessions={sessionsForTerminal.get(terminal.id) || []}
+                otherSessions={
+                  otherSessionsForTerminal.get(terminal.cwd) || []
+                }
+                sessionsExpanded={expandedTerminalSessionsSet.has(
+                  terminal.id,
+                )}
+                onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+              />
+            ))}
 
         {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
         {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (

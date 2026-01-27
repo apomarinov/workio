@@ -5,6 +5,7 @@ import { getSettings, updateSettings } from '../db'
 interface UpdateSettingsBody {
   default_shell?: string
   font_size?: number | null
+  show_thinking?: boolean
 }
 
 export default async function settingsRoutes(fastify: FastifyInstance) {
@@ -17,10 +18,14 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
   fastify.patch<{ Body: UpdateSettingsBody }>(
     '/api/settings',
     async (request, reply) => {
-      const { default_shell, font_size } = request.body
+      const { default_shell, font_size, show_thinking } = request.body
 
       // Validate at least one field is provided
-      if (default_shell === undefined && font_size === undefined) {
+      if (
+        default_shell === undefined &&
+        font_size === undefined &&
+        show_thinking === undefined
+      ) {
         return reply
           .status(400)
           .send({ error: 'At least one setting must be provided' })
@@ -46,7 +51,11 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
         }
       }
 
-      const settings = updateSettings({ default_shell, font_size })
+      const settings = updateSettings({
+        default_shell,
+        font_size,
+        show_thinking,
+      })
       return settings
     },
   )

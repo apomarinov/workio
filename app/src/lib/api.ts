@@ -1,4 +1,9 @@
-import type { SessionWithProject, Settings, Terminal } from '../types'
+import type {
+  SessionMessagesResponse,
+  SessionWithProject,
+  Settings,
+  Terminal,
+} from '../types'
 
 const API_BASE = '/api'
 
@@ -77,4 +82,16 @@ export async function deleteSession(sessionId: string): Promise<void> {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete session')
+}
+
+export async function getSessionMessages(
+  sessionId: string,
+  limit: number,
+  offset: number,
+): Promise<SessionMessagesResponse> {
+  const res = await fetch(
+    `${API_BASE}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
+  )
+  if (!res.ok) throw new Error('Failed to fetch session messages')
+  return res.json()
 }

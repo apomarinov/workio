@@ -8,8 +8,10 @@ import {
 } from 'react-resizable-panels'
 import { Toaster } from '@/components/ui/sonner'
 import { HomePage } from './components/HomePage'
+import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
+import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useBrowserNotification } from './hooks/useBrowserNotification'
 import { useSocket } from './hooks/useSocket'
@@ -18,6 +20,7 @@ import type { HookEvent } from './types'
 function AppContent() {
   const { terminals, loading, activeTerminal, selectTerminal } =
     useTerminalContext()
+  const { activeSessionId } = useSessionContext()
   const { subscribe } = useSocket()
   const { notify } = useBrowserNotification()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
@@ -120,10 +123,14 @@ function AppContent() {
         </Panel>
         <Separator className="panel-resize-handle" />
         <Panel id="main">
-          <Terminal
-            key={activeTerminal?.id ?? 'none'}
-            terminalId={activeTerminal?.id ?? null}
-          />
+          {activeSessionId ? (
+            <SessionChat />
+          ) : (
+            <Terminal
+              key={activeTerminal?.id ?? 'none'}
+              terminalId={activeTerminal?.id ?? null}
+            />
+          )}
         </Panel>
       </Group>
       <Toaster />
@@ -134,7 +141,9 @@ function AppContent() {
 function App() {
   return (
     <TerminalProvider>
-      <AppContent />
+      <SessionProvider>
+        <AppContent />
+      </SessionProvider>
     </TerminalProvider>
   )
 }

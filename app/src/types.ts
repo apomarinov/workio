@@ -52,6 +52,16 @@ export interface Message {
   created_at: string
 }
 
+export interface SessionMessage extends Message {
+  prompt_text: string | null
+}
+
+export interface SessionMessagesResponse {
+  messages: SessionMessage[]
+  total: number
+  hasMore: boolean
+}
+
 export interface Hook {
   id: number
   session_id: string
@@ -72,4 +82,5 @@ export interface Settings {
   id: number
   default_shell: string
   font_size: number | null
+  show_thinking: boolean
 }

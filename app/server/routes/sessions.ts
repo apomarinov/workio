@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { deleteSession, getAllSessions } from '../db'
+import { deleteSession, getAllSessions, getSessionMessages } from '../db'
 
 export default async function sessionRoutes(fastify: FastifyInstance) {
   // List all Claude sessions with project paths
@@ -19,4 +19,15 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
       return { ok: true }
     },
   )
+
+  // Get paginated messages for a session
+  fastify.get<{
+    Params: { id: string }
+    Querystring: { limit?: string; offset?: string }
+  }>('/api/sessions/:id/messages', async (request) => {
+    const { id } = request.params
+    const limit = Math.min(Number(request.query.limit) || 30, 100)
+    const offset = Number(request.query.offset) || 0
+    return getSessionMessages(id, limit, offset)
+  })
 }
