@@ -251,23 +251,29 @@ export function deleteTerminal(id: number): boolean {
 
 export function getSettings(): Settings {
   let settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as
-    | (Omit<Settings, 'show_thinking'> & {
+    | (Omit<Settings, 'show_thinking' | 'show_tool_output'> & {
         show_thinking: number | null
+        show_tool_output: number | null
         message_line_clamp: number | null
       })
     | undefined
   if (!settings) {
     db.prepare(
-      "INSERT INTO settings (id, default_shell, show_thinking, message_line_clamp) VALUES (1, '/bin/bash', 0, 5)",
+      "INSERT INTO settings (id, default_shell, show_thinking, show_tool_output, message_line_clamp) VALUES (1, '/bin/bash', 0, 0, 5)",
     ).run()
     settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Omit<
       Settings,
-      'show_thinking'
-    > & { show_thinking: number | null; message_line_clamp: number | null }
+      'show_thinking' | 'show_tool_output'
+    > & {
+      show_thinking: number | null
+      show_tool_output: number | null
+      message_line_clamp: number | null
+    }
   }
   return {
     ...settings,
     show_thinking: Boolean(settings.show_thinking),
+    show_tool_output: Boolean(settings.show_tool_output),
     message_line_clamp: settings.message_line_clamp ?? 5,
   }
 }
@@ -276,6 +282,7 @@ export function updateSettings(updates: {
   default_shell?: string
   font_size?: number | null
   show_thinking?: boolean
+  show_tool_output?: boolean
   message_line_clamp?: number
 }): Settings {
   const setClauses: string[] = []
@@ -292,6 +299,10 @@ export function updateSettings(updates: {
   if (updates.show_thinking !== undefined) {
     setClauses.push('show_thinking = ?')
     values.push(updates.show_thinking ? 1 : 0)
+  }
+  if (updates.show_tool_output !== undefined) {
+    setClauses.push('show_tool_output = ?')
+    values.push(updates.show_tool_output ? 1 : 0)
   }
   if (updates.message_line_clamp !== undefined) {
     setClauses.push('message_line_clamp = ?')

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useSettings } from '../hooks/useSettings'
 import type {
   BashTool,
   EditTool,
@@ -35,9 +36,9 @@ interface ToolCallDisplayProps {
 
 function StatusDot({ status }: { status: 'success' | 'error' }) {
   return status === 'success' ? (
-    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+    <CheckCircle2 className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-green-500" />
   ) : (
-    <XCircle className="w-3.5 h-3.5 text-red-500" />
+    <XCircle className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-red-500" />
   )
 }
 
@@ -55,7 +56,7 @@ function ToolHeader({
   return (
     <div className="flex items-center gap-2 text-sm">
       <StatusDot status={status} />
-      <Icon className="w-4 h-4 text-zinc-400" />
+      <Icon className="w-4 h-4 min-w-4 min-h-4 text-zinc-400" />
       <span className="font-mono text-zinc-300">{label}</span>
       {meta && <span className="text-xs text-zinc-500">{meta}</span>}
     </div>
@@ -65,13 +66,15 @@ function ToolHeader({
 function CollapsibleOutput({
   output,
   truncated,
-  defaultOpen = false,
 }: {
   output: string
   truncated: boolean
-  defaultOpen?: boolean
 }) {
-  const [expanded, setExpanded] = useState(defaultOpen)
+  const { settings } = useSettings()
+  const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
+
+  // Use local state if set, otherwise fall back to setting
+  const expanded = isExpanded ?? settings?.show_tool_output ?? false
   const hasOutput = output && output.trim().length > 0
 
   if (!hasOutput) return null
@@ -80,7 +83,7 @@ function CollapsibleOutput({
     <div className="mt-2">
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => setIsExpanded(!expanded)}
         className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
       >
         {expanded ? (
@@ -102,7 +105,7 @@ function CollapsibleOutput({
 
 function BashToolDisplay({ tool }: { tool: BashTool }) {
   const command =
-    tool.input.command.length > 60
+    tool.input.command.length > 500
       ? `${tool.input.command.slice(0, 60)}...`
       : tool.input.command
 
@@ -123,7 +126,9 @@ function BashToolDisplay({ tool }: { tool: BashTool }) {
 }
 
 function EditToolDisplay({ tool }: { tool: EditTool }) {
-  const [expanded, setExpanded] = useState(false)
+  const { settings } = useSettings()
+  const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
+  const expanded = isExpanded ?? settings?.show_tool_output ?? false
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
   return (
@@ -151,7 +156,7 @@ function EditToolDisplay({ tool }: { tool: EditTool }) {
           <div className="mt-2">
             <button
               type="button"
-              onClick={() => setExpanded(!expanded)}
+              onClick={() => setIsExpanded(!expanded)}
               className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
             >
               {expanded ? (

@@ -201,5 +201,6 @@ export interface Settings {
   default_shell: string
   font_size: number | null
   show_thinking: boolean
+  show_tool_output: boolean
   message_line_clamp: number
 }

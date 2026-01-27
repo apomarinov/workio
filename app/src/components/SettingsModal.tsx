@@ -1,4 +1,4 @@
-import { AlignLeft, Brain, TerminalSquare, Type } from 'lucide-react'
+import { AlignLeft, Brain, Code, TerminalSquare, Type } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +24,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [defaultShell, setDefaultShell] = useState('')
   const [fontSize, setFontSize] = useState<string>('')
   const [showThinking, setShowThinking] = useState(false)
+  const [showToolOutput, setShowToolOutput] = useState(false)
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [saving, setSaving] = useState(false)
 
@@ -32,6 +33,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       setDefaultShell(settings.default_shell)
       setFontSize(settings.font_size?.toString() ?? '')
       setShowThinking(settings.show_thinking)
+      setShowToolOutput(settings.show_tool_output)
       setMessageLineClamp(settings.message_line_clamp.toString())
     }
   }, [settings])
@@ -48,6 +50,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         default_shell: defaultShell.trim(),
         font_size: fontSizeValue,
         show_thinking: showThinking,
+        show_tool_output: showToolOutput,
         message_line_clamp: lineClampValue,
       })
       toast.success('Settings saved')
@@ -123,6 +126,20 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               id="show_thinking"
               checked={showThinking}
               onCheckedChange={setShowThinking}
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-2">
+              <Code className="w-4 h-4 text-muted-foreground" />
+              <label htmlFor="show_tool_output" className="text-sm font-medium">
+                Show tool output by default
+              </label>
+            </div>
+            <Switch
+              id="show_tool_output"
+              checked={showToolOutput}
+              onCheckedChange={setShowToolOutput}
             />
           </div>
 

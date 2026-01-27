@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS settings (
     default_shell TEXT NOT NULL DEFAULT '/bin/bash',
     font_size INTEGER,
     show_thinking INTEGER DEFAULT 0,
+    show_tool_output INTEGER DEFAULT 0,
     message_line_clamp INTEGER DEFAULT 5
 );
 
