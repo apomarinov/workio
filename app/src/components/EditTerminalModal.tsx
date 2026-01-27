@@ -31,7 +31,7 @@ export function EditTerminalModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <DialogContent>
+      <DialogContent className="bg-sidebar">
         <DialogHeader>
           <DialogTitle>Rename Terminal</DialogTitle>
         </DialogHeader>

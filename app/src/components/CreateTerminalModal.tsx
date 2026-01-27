@@ -59,7 +59,7 @@ export function CreateTerminalModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="bg-sidebar">
         <DialogHeader>
           <DialogTitle>New Terminal</DialogTitle>
         </DialogHeader>

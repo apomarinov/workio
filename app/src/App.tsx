@@ -38,8 +38,10 @@ function AppContent() {
 
   // Example: Change favicon based on session status
   useEffect(() => {
-    const hasPermissionNeeded = sessions.some(s => s.status === 'permission_needed')
-    const hasActive = sessions.some(s => s.status === 'active')
+    const hasPermissionNeeded = sessions.some(
+      (s) => s.status === 'permission_needed',
+    )
+    const hasActive = sessions.some((s) => s.status === 'active')
 
     if (hasPermissionNeeded) {
       setFavicon('/favicon-warning.svg')
@@ -72,7 +74,7 @@ function AppContent() {
         // Play notification sound
         const audio = new Audio('/audio/permissions.mp3')
         audio.volume = 0.5
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
 
         // Show browser notification
         notify(`⚠️ Permission Required`, {
@@ -91,7 +93,7 @@ function AppContent() {
       } else if (data.hook_type === 'Stop') {
         // Play done sound
         const audio = new Audio('/audio/done.mp3')
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
 
         // Show browser notification
         notify(`✅ Done`, {

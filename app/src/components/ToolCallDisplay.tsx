@@ -305,7 +305,7 @@ function FullscreenToolDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col sm:max-w-[95vw]">
+      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] bg-sidebar flex flex-col sm:max-w-[95vw]">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 font-mono text-sm">
             <StatusDot status={tool.status} />
@@ -334,7 +334,9 @@ function CollapsibleOutput({
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
 
-  const expanded = isExpanded ?? (status === 'error' ? true : settings?.show_tool_output ?? false)
+  const expanded =
+    isExpanded ??
+    (status === 'error' ? true : (settings?.show_tool_output ?? false))
   const hasOutput = output && output.trim().length > 0
 
   if (!hasOutput) return null
@@ -402,7 +404,9 @@ function EditToolDisplay({
 }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
-  const expanded = isExpanded ?? (tool.status === 'error' ? true : settings?.show_tool_output ?? false)
+  const expanded =
+    isExpanded ??
+    (tool.status === 'error' ? true : (settings?.show_tool_output ?? false))
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
   return (
@@ -667,8 +671,8 @@ export function ToolCallDisplay({ tool }: ToolCallDisplayProps) {
         'Task',
         'TodoWrite',
       ].includes(tool.name) && (
-          <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
-        )}
+        <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
+      )}
 
       <FullscreenToolDialog
         tool={tool}

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useSessionContext } from '@/context/SessionContext'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useProcesses } from '../hooks/useProcesses'
@@ -19,7 +20,6 @@ import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
-import { useSessionContext } from '@/context/SessionContext'
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -100,10 +100,11 @@ export function TerminalItem({
             selectTerminal(terminal.id)
             clearSession()
           }}
-          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-            } ${terminal.orphaned ? 'opacity-60' : ''}`}
+          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+            isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
           {hasSessions || hasProcesses ? (
             <Button

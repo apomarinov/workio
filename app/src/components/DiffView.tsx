@@ -15,11 +15,11 @@ export function DiffView({ diff }: DiffViewProps) {
           className={cn(
             'px-2 whitespace-pre',
             line.startsWith('+') &&
-            !line.startsWith('+++') &&
-            'bg-green-900/30 text-green-400',
+              !line.startsWith('+++') &&
+              'bg-green-900/30 text-green-400',
             line.startsWith('-') &&
-            !line.startsWith('---') &&
-            'bg-red-900/30 text-red-400',
+              !line.startsWith('---') &&
+              'bg-red-900/30 text-red-400',
             line.startsWith('@@') && 'text-blue-400',
             line.startsWith('+++') && 'text-zinc-500',
             line.startsWith('---') && 'text-zinc-500',

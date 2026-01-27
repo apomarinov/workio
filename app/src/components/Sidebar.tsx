@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -25,7 +26,6 @@ import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
 import { TerminalItem } from './TerminalItem'
-import { cn } from '@/lib/utils'
 
 type GroupingMode = 'all' | 'folder' | 'sessions'
 
@@ -51,8 +51,9 @@ export function Sidebar({ width }: SidebarProps) {
   >('sidebar-expanded-session-groups', [])
   const [expandedTerminalSessions, setExpandedTerminalSessions] =
     useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
-  const [expandedOtherSessions, setExpandedOtherSessions] =
-    useLocalStorage<number[]>('sidebar-expanded-other-sessions', [])
+  const [expandedOtherSessions, setExpandedOtherSessions] = useLocalStorage<
+    number[]
+  >('sidebar-expanded-other-sessions', [])
 
   const expandedFolders = useMemo(
     () => new Set(expandedFoldersArray),
@@ -210,8 +211,9 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('all')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'all' ? 'bg-accent' : ''
+                }`}
               >
                 <TerminalIcon className="w-4 h-4" />
                 Terminals
@@ -221,8 +223,9 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('sessions')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'sessions' ? 'bg-accent' : ''
+                }`}
               >
                 <Bot className="w-4 h-4" />
                 Sessions
@@ -232,8 +235,9 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('folder')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'folder' ? 'bg-accent' : ''
+                }`}
               >
                 <Folder className="w-4 h-4" />
                 Folders
@@ -270,55 +274,60 @@ export function Sidebar({ width }: SidebarProps) {
       <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
         {groupingMode === 'sessions'
           ? sessions.map((session) => (
-            <SessionItem
-              key={session.session_id}
-              session={session}
-              showGitBranch
-            />
-          ))
+              <SessionItem
+                key={session.session_id}
+                session={session}
+                showGitBranch
+              />
+            ))
           : groupingMode === 'folder'
             ? Array.from(groupedTerminals.entries()).map(
-              ([folderCwd, folderTerminals]) => (
-                <FolderGroup
-                  key={folderCwd}
-                  cwd={folderCwd}
-                  terminals={folderTerminals}
-                  expanded={expandedFolders.has(folderCwd)}
-                  onToggle={() => toggleFolder(folderCwd)}
-                  sessionsForTerminal={sessionsForTerminal}
-                  otherSessionsForCwd={
-                    otherSessionsForTerminal.get(folderCwd) || []
-                  }
-                  expandedTerminalSessions={expandedTerminalSessionsSet}
-                  onToggleTerminalSessions={toggleTerminalSessions}
-                  expandedOtherSessions={expandedOtherSessionsSet}
-                  onToggleOtherSessions={toggleOtherSessions}
-                />
-              ),
-            )
+                ([folderCwd, folderTerminals]) => (
+                  <FolderGroup
+                    key={folderCwd}
+                    cwd={folderCwd}
+                    terminals={folderTerminals}
+                    expanded={expandedFolders.has(folderCwd)}
+                    onToggle={() => toggleFolder(folderCwd)}
+                    sessionsForTerminal={sessionsForTerminal}
+                    otherSessionsForCwd={
+                      otherSessionsForTerminal.get(folderCwd) || []
+                    }
+                    expandedTerminalSessions={expandedTerminalSessionsSet}
+                    onToggleTerminalSessions={toggleTerminalSessions}
+                    expandedOtherSessions={expandedOtherSessionsSet}
+                    onToggleOtherSessions={toggleOtherSessions}
+                  />
+                ),
+              )
             : terminals.map((terminal) => (
-              <TerminalItem
-                key={terminal.id}
-                terminal={terminal}
-                sessions={sessionsForTerminal.get(terminal.id) || []}
-                otherSessions={
-                  otherSessionsForTerminal.get(terminal.cwd) || []
-                }
-                sessionsExpanded={expandedTerminalSessionsSet.has(
-                  terminal.id,
-                )}
-                onToggleSessions={() => toggleTerminalSessions(terminal.id)}
-                otherSessionsExpanded={expandedOtherSessionsSet.has(
-                  terminal.id,
-                )}
-                onToggleOtherSessions={() => toggleOtherSessions(terminal.id)}
-              />
-            ))}
+                <TerminalItem
+                  key={terminal.id}
+                  terminal={terminal}
+                  sessions={sessionsForTerminal.get(terminal.id) || []}
+                  otherSessions={
+                    otherSessionsForTerminal.get(terminal.cwd) || []
+                  }
+                  sessionsExpanded={expandedTerminalSessionsSet.has(
+                    terminal.id,
+                  )}
+                  onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+                  otherSessionsExpanded={expandedOtherSessionsSet.has(
+                    terminal.id,
+                  )}
+                  onToggleOtherSessions={() => toggleOtherSessions(terminal.id)}
+                />
+              ))}
 
         {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
         {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (
           <>
-            <div className={cn("border-t border-sidebar-border my-2", terminals.length === 0 && 'border-none')} />
+            <div
+              className={cn(
+                'border-t border-sidebar-border my-2',
+                terminals.length === 0 && 'border-none',
+              )}
+            />
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1">
               Other Claude Sessions
             </p>

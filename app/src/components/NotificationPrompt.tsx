@@ -22,7 +22,7 @@ export function NotificationPrompt({
 }: NotificationPromptProps) {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onDismiss()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-sidebar">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">

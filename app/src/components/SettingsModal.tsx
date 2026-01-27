@@ -66,7 +66,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="bg-sidebar">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>

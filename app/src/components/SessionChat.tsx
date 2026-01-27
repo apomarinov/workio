@@ -1,6 +1,5 @@
-import { Folder, Loader2, X } from 'lucide-react'
+import { Folder, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Button } from '@/components/ui/button'
 import { useSessionContext } from '../context/SessionContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useSessionMessages } from '../hooks/useSessionMessages'
@@ -35,7 +34,7 @@ function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
 }
 
 export function SessionChat() {
-  const { activeSessionId, clearSession } = useSessionContext()
+  const { activeSessionId } = useSessionContext()
   const { sessions } = useClaudeSessions()
   const { messages, loading, isLoadingMore, hasMore, loadMore } =
     useSessionMessages(activeSessionId)
@@ -113,8 +112,8 @@ export function SessionChat() {
               {session?.name || 'Session Chat'}
             </h2>
             {session?.project_path && (
-              <div className='flex gap-1 items-center'>
-                <Folder className='w-3 h-3' />
+              <div className="flex gap-1 items-center">
+                <Folder className="w-3 h-3" />
                 <p className="text-xs text-zinc-500 truncate">
                   {session.project_path}
                 </p>
