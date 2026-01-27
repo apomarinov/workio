@@ -13,16 +13,42 @@ import { Terminal } from './components/Terminal'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useBrowserNotification } from './hooks/useBrowserNotification'
+import { useClaudeSessions } from './hooks/useClaudeSessions'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
+
+function setFavicon(href: string) {
+  let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    document.head.appendChild(link)
+  }
+  link.href = href
+}
 
 function AppContent() {
   const { terminals, loading, activeTerminal, selectTerminal } =
     useTerminalContext()
   const { activeSessionId } = useSessionContext()
+  const { sessions } = useClaudeSessions()
   const { subscribe } = useSocket()
   const { notify } = useBrowserNotification()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
+
+  // Example: Change favicon based on session status
+  useEffect(() => {
+    const hasPermissionNeeded = sessions.some(s => s.status === 'permission_needed')
+    const hasActive = sessions.some(s => s.status === 'active')
+
+    if (hasPermissionNeeded) {
+      setFavicon('/favicon-warning.svg')
+    } else if (hasActive) {
+      setFavicon('/favicon-active.svg')
+    } else {
+      setFavicon('/favicon.svg')
+    }
+  }, [sessions])
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: 'main-layout',
@@ -46,7 +72,7 @@ function AppContent() {
         // Play notification sound
         const audio = new Audio('/audio/permissions.mp3')
         audio.volume = 0.5
-        audio.play().catch(() => {})
+        audio.play().catch(() => { })
 
         // Show browser notification
         notify(`⚠️ Permission Required`, {
@@ -65,7 +91,7 @@ function AppContent() {
       } else if (data.hook_type === 'Stop') {
         // Play done sound
         const audio = new Audio('/audio/done.mp3')
-        audio.play().catch(() => {})
+        audio.play().catch(() => { })
 
         // Show browser notification
         notify(`✅ Done`, {

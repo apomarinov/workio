@@ -320,7 +320,7 @@ export function Sidebar({ width }: SidebarProps) {
           <>
             <div className={cn("border-t border-sidebar-border my-2", terminals.length === 0 && 'border-none')} />
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1">
-              Claude Sessions
+              Other Claude Sessions
             </p>
             {Array.from(orphanSessionGroups.entries()).map(
               ([projectPath, groupSessions]) => (

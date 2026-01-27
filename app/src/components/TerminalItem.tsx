@@ -241,8 +241,11 @@ export function TerminalItem({
                   ) : (
                     <ChevronRight className="w-3 h-3" />
                   )}
-                  <span>
-                    Claude Sessions ({otherSessions.length})
+                  <span className="hidden @[230px]/sidebar:block">
+                    Other Claude Sessions ({otherSessions.length})
+                  </span>
+                  <span className="@[230px]/sidebar:hidden">
+                    Other Sessions ({otherSessions.length})
                   </span>
                 </button>
                 {otherSessionsExpanded &&
