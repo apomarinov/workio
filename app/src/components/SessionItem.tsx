@@ -51,11 +51,14 @@ export function SessionItem({ session }: SessionItemProps) {
     <>
       <div
         className={cn(
-          'group flex items-start gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default',
+          'group flex items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default',
           isFlashing && 'animate-flash',
         )}
       >
-        <div className="flex items-center gap-1 mt-0.5">
+        <div className="flex items-start gap-1 mt-0.5 relative">
+          <div className='absolute top-[30%] left-[45%] border-l-[1px] border-b-[1px] w-[87%] h-[60%]'>
+
+          </div>
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
@@ -96,8 +99,8 @@ export function SessionItem({ session }: SessionItemProps) {
             </p>
           )}
           {session.latest_agent_message && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
-              {session.latest_agent_message}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {session.latest_agent_message.slice(0, 300)}
             </p>
           )}
         </div>
