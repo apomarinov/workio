@@ -196,17 +196,16 @@ def process_session(session_id: str, timestamp: str) -> None:
             # Get transcript_path from session
             session = get_session(conn, session_id)
 
-
-            log(conn, "Debounced job completed", session_id=session_id)
-            conn.commit()
-            conn.close()
-            
             if session and session['transcript_path']:
                 process_transcript(conn, session_id, session['transcript_path'])
                 # Fire session_update event to notify frontend of new messages
                 emit_event("session_update", {"session_id": session_id})
             else:
                 log(conn, "No transcript path in session", session_id=session_id)
+
+            log(conn, "Debounced job completed", session_id=session_id)
+            conn.commit()
+            conn.close()
 
             # Clean up marker file only if no new events came in during processing
             try:

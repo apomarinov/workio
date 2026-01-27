@@ -91,12 +91,11 @@ def update_project_path_by_session(conn: sqlite3.Connection, session_id: str, pa
 # Sessions
 
 def upsert_session(conn: sqlite3.Connection, session_id: str, project_id: int, status: str, transcript_path: str, terminal_id: int | None = None) -> None:
-    """Insert or update a session."""
+    """Insert or update a session. Note: project_id is only set on insert, not updated."""
     conn.execute('''
         INSERT INTO sessions (session_id, project_id, terminal_id, status, transcript_path)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
-            project_id = excluded.project_id,
             terminal_id = COALESCE(excluded.terminal_id, sessions.terminal_id),
             status = excluded.status,
             transcript_path = excluded.transcript_path
@@ -125,6 +124,16 @@ def get_session(conn: sqlite3.Connection, session_id: str) -> sqlite3.Row | None
         'SELECT * FROM sessions WHERE session_id = ?',
         (session_id,)
     ).fetchone()
+
+
+def get_session_project_path(conn: sqlite3.Connection, session_id: str) -> str | None:
+    """Get the stored project path for a session."""
+    row = conn.execute('''
+        SELECT p.path FROM sessions s
+        JOIN projects p ON s.project_id = p.id
+        WHERE s.session_id = ?
+    ''', (session_id,)).fetchone()
+    return row['path'] if row else None
 
 
 def get_stale_session_ids(conn: sqlite3.Connection, project_id: int, current_session_id: str) -> list[str]:

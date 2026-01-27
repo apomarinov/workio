@@ -14,6 +14,7 @@ from db import (
     log, save_hook,
     upsert_project,
     upsert_session, update_session_metadata, get_session,
+    get_session_project_path,
     get_stale_session_ids, delete_sessions_cascade,
     create_prompt, get_latest_prompt, update_prompt_text,
     message_exists, create_message, get_latest_user_message
@@ -110,6 +111,58 @@ class TestSessions:
         row = db_conn.execute('SELECT * FROM sessions WHERE session_id = ?', ("session-1",)).fetchone()
         assert row['status'] == "active"
         assert row['transcript_path'] == "/new.jsonl"
+
+    def test_upsert_session_does_not_update_project_id(self, db_conn):
+        """Test that project_id is NOT updated when session already exists.
+
+        This is critical: when Claude changes cwd during a session, we should
+        NOT update the session's project_id. The project_path should remain
+        the original path from session creation.
+        """
+        # Create two projects with different paths
+        original_path = "/Users/apo/code/claude-dashboard"
+        new_path = "/Users/apo/code/claude-dashboard/app"
+
+        original_project_id = upsert_project(db_conn, original_path)
+        new_project_id = upsert_project(db_conn, new_path)
+        db_conn.commit()
+
+        # Verify they are different projects
+        assert original_project_id != new_project_id
+
+        # First hook: session created with original path
+        upsert_session(db_conn, "session-1", original_project_id, "started", "/transcript.jsonl")
+        db_conn.commit()
+
+        # Verify session has original project_id
+        row = db_conn.execute('SELECT project_id FROM sessions WHERE session_id = ?', ("session-1",)).fetchone()
+        assert row['project_id'] == original_project_id
+
+        # Second hook: same session but Claude changed to subdirectory
+        upsert_session(db_conn, "session-1", new_project_id, "active", "/transcript.jsonl")
+        db_conn.commit()
+
+        # Verify project_id was NOT updated - should still be original
+        row = db_conn.execute('SELECT project_id FROM sessions WHERE session_id = ?', ("session-1",)).fetchone()
+        assert row['project_id'] == original_project_id, "project_id should not change after session creation"
+
+        # Verify get_session_project_path returns the original path
+        stored_path = get_session_project_path(db_conn, "session-1")
+        assert stored_path == original_path, "Stored project path should be the original path"
+
+    def test_get_session_project_path(self, db_conn):
+        """Test getting the stored project path for a session."""
+        project_id = upsert_project(db_conn, "/my/project/path")
+        upsert_session(db_conn, "session-1", project_id, "active", "")
+        db_conn.commit()
+
+        path = get_session_project_path(db_conn, "session-1")
+        assert path == "/my/project/path"
+
+    def test_get_session_project_path_not_found(self, db_conn):
+        """Test getting project path for non-existent session."""
+        path = get_session_project_path(db_conn, "nonexistent")
+        assert path is None
 
     def test_update_session_metadata(self, db_conn):
         """Test updating session metadata."""

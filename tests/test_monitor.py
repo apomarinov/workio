@@ -217,3 +217,117 @@ class TestCleanSessions:
         # Check stale was removed
         assert db_conn.execute('SELECT * FROM sessions WHERE session_id = ?', ("stale",)).fetchone() is None
         assert db_conn.execute('SELECT * FROM sessions WHERE session_id = ?', ("current",)).fetchone() is not None
+
+
+class TestProjectPathStability:
+    """Tests for project path stability when cwd changes during a session.
+
+    When Claude Code changes working directory during a session (e.g., from
+    /Users/apo/code/claude-dashboard to /Users/apo/code/claude-dashboard/app),
+    the session's project_path should remain stable at the original path.
+    """
+
+    def test_cwd_change_does_not_create_new_project_for_session(self, db_conn, temp_dir):
+        """Test that changing cwd doesn't change the session's project.
+
+        Scenario:
+        1. SessionStart with cwd=/Users/apo/code/claude-dashboard
+        2. UserPromptSubmit with cwd=/Users/apo/code/claude-dashboard/app
+
+        Expected:
+        - Session's project_id stays the same (original project)
+        - No new project association for this session
+        """
+        from db import upsert_project, upsert_session, get_session_project_path
+
+        original_path = "/Users/apo/code/claude-dashboard"
+        subdir_path = "/Users/apo/code/claude-dashboard/app"
+
+        # Create two projects with different paths
+        original_project_id = upsert_project(db_conn, original_path)
+        subdir_project_id = upsert_project(db_conn, subdir_path)
+        db_conn.commit()
+
+        # Verify they are different projects
+        assert original_project_id != subdir_project_id
+
+        # First hook: session created with original path
+        upsert_session(db_conn, "test-session", original_project_id, "started", "/transcript.jsonl")
+        db_conn.commit()
+
+        # Verify session has original project_id
+        session = db_conn.execute('SELECT project_id FROM sessions WHERE session_id = ?',
+                                 ("test-session",)).fetchone()
+        assert session['project_id'] == original_project_id
+
+        # Second hook: same session but with subdirectory project_id (simulating cwd change)
+        upsert_session(db_conn, "test-session", subdir_project_id, "active", "/transcript.jsonl")
+        db_conn.commit()
+
+        # Verify project_id was NOT updated - should still be original
+        session = db_conn.execute('SELECT project_id FROM sessions WHERE session_id = ?',
+                                 ("test-session",)).fetchone()
+        assert session['project_id'] == original_project_id, \
+            f"Session project_id should remain {original_project_id}, but got {session['project_id']}"
+
+        # Verify get_session_project_path returns the original path
+        stored_path = get_session_project_path(db_conn, "test-session")
+        assert stored_path == original_path, \
+            f"Stored project path should be '{original_path}', but got '{stored_path}'"
+
+    def test_session_index_lookup_uses_stored_path(self, db_conn, temp_dir):
+        """Test that session index lookup uses the stored project path, not current cwd.
+
+        When Claude changes cwd, the session index file is still at the original
+        project path. We should use the stored path, not the current cwd.
+        """
+        from db import upsert_project, upsert_session, get_session_project_path
+        from monitor import get_session_index_entry
+
+        original_path = "/test/original/project"
+        subdir_path = "/test/original/project/subdir"
+
+        # Create a mock sessions-index.json at the original path location
+        claude_dir = temp_dir / ".claude" / "projects" / original_path.replace('/', '-')
+        claude_dir.mkdir(parents=True)
+        index_file = claude_dir / "sessions-index.json"
+        index_file.write_text(json.dumps({
+            "entries": [
+                {
+                    "sessionId": "test-session",
+                    "customTitle": "Test Session Title",
+                    "gitBranch": "main",
+                    "messageCount": 5
+                }
+            ]
+        }))
+
+        # Verify index can be found with original path
+        with patch.object(Path, 'home', return_value=temp_dir):
+            entry = get_session_index_entry(original_path, "test-session")
+            assert entry is not None
+            assert entry['customTitle'] == "Test Session Title"
+
+            # Verify index CANNOT be found with subdir path (no index there)
+            entry_subdir = get_session_index_entry(subdir_path, "test-session")
+            assert entry_subdir is None, "Index should not be found at subdir path"
+
+        # Setup session with original path
+        project_id = upsert_project(db_conn, original_path)
+        upsert_session(db_conn, "test-session", project_id, "started", "")
+        db_conn.commit()
+
+        # Verify stored path is the original
+        stored_path = get_session_project_path(db_conn, "test-session")
+        assert stored_path == original_path
+
+        # When cwd changes to subdir, we should use stored_path for index lookup
+        # This simulates what monitor.py now does
+        current_cwd = subdir_path  # Claude changed cwd
+        lookup_path = stored_path or current_cwd  # Use stored path if available
+
+        with patch.object(Path, 'home', return_value=temp_dir):
+            entry = get_session_index_entry(lookup_path, "test-session")
+            assert entry is not None, \
+                "Should find index using stored path even when cwd changed"
+            assert entry['customTitle'] == "Test Session Title"

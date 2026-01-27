@@ -18,6 +18,7 @@ from db import (
     upsert_project, update_project_path_by_session,
     upsert_session, update_session_metadata, update_session_name_if_empty,
     get_stale_session_ids, delete_sessions_cascade,
+    get_session_project_path,
     create_prompt
 )
 
@@ -185,9 +186,10 @@ def main() -> None:
             create_prompt(conn, session_id)
             log(conn, "Created prompt", session_id=session_id)
 
-        # Update session metadata
+        # Update session metadata using stored project path (not current cwd)
         if hook_type in ('SessionStart', 'UserPromptSubmit'):
-            update_session_from_index(conn, project_path, session_id)
+            stored_path = get_session_project_path(conn, session_id) or project_path
+            update_session_from_index(conn, stored_path, session_id)
 
         # Create prompt on user prompt submit
         if hook_type == 'UserPromptSubmit':
