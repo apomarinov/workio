@@ -10,7 +10,9 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-
+from db import (
+    init_db, log
+)
 import requests
 from dotenv import load_dotenv
 
@@ -60,10 +62,14 @@ def process_emit(session_id: str, event: str, data_json: str) -> None:
     # Acquire lock
     lock_file.write_text(datetime.now().isoformat())
 
+    conn = init_db()
     try:
         data = json.loads(data_json)
         emit_event(event, data)
     finally:
+        log(conn, "Emitted event", event=event, data=data)
+        conn.commit()
+        conn.close()
         # Release lock
         try:
             lock_file.unlink()

@@ -6,7 +6,7 @@ Cleanup worker for removing old data from the database and stale files.
 import time
 from pathlib import Path
 
-from db import init_db
+from db import init_db, log
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 LOCKS_DIR = Path(__file__).parent / "locks"
@@ -102,6 +102,31 @@ def delete_orphan_projects(conn) -> int:
     return cursor.rowcount
 
 
+def delete_empty_sessions(conn) -> int:
+    """Delete sessions with only a single null prompt and no messages. Returns count deleted."""
+    # Find sessions that have exactly one prompt, that prompt is null, and has no messages
+    cursor = conn.execute('''
+        DELETE FROM sessions WHERE session_id IN (
+            SELECT s.session_id
+            FROM sessions s
+            JOIN prompts p ON p.session_id = s.session_id
+            LEFT JOIN messages m ON m.prompt_id = p.id
+            GROUP BY s.session_id
+            HAVING COUNT(DISTINCT p.id) = 1
+               AND MAX(p.prompt) IS NULL
+               AND COUNT(m.id) = 0
+        )
+    ''')
+    sessions_deleted = cursor.rowcount
+
+    # Clean up orphaned prompts (prompts without sessions)
+    conn.execute('''
+        DELETE FROM prompts WHERE session_id NOT IN (SELECT session_id FROM sessions)
+    ''')
+
+    return sessions_deleted
+
+
 def cleanup_stale_files(directory: Path, max_age: int) -> int:
     """Delete files older than max_age seconds. Returns count deleted."""
     if not directory.exists():
@@ -124,6 +149,10 @@ def cleanup_stale_files(directory: Path, max_age: int) -> int:
 
 def run_data_cleanup(conn) -> None:
     """Run database data cleanup (weekly)."""
+
+    delete_empty_sessions(conn)
+    delete_orphan_projects(conn)
+
     if has_recent_cleanup(conn, 'data', DATA_CLEANUP_INTERVAL):
         return
 
@@ -132,7 +161,6 @@ def run_data_cleanup(conn) -> None:
     delete_old_messages(conn)
     delete_old_logs_and_hooks(conn)
     delete_old_session_data(conn)
-    delete_orphan_projects(conn)
 
     conn.commit()
 
@@ -150,7 +178,7 @@ def run_locks_cleanup(conn) -> None:
 
 def run_cleanup() -> None:
     """Run all cleanup processes."""
-    conn = get_db()
+    conn = init_db()
 
     run_data_cleanup(conn)
     run_locks_cleanup(conn)

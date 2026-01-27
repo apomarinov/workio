@@ -170,20 +170,6 @@ def main() -> None:
             elif notification_type == 'idle_prompt':
                 status = 'idle'
 
-        # Emit hook event to connected clients
-        terminal_id_str = os.environ.get('CLAUDE_TERMINAL_ID')
-        terminal_id = int(terminal_id_str) if terminal_id_str else None
-        start_socket_worker(session_id, "hook", {
-            "session_id": session_id,
-            "hook_type": hook_type,
-            "status": status,
-            "project_path": project_path,
-            "terminal_id": terminal_id,
-        })
-
-        # Update project path if session already exists
-        update_project_path_by_session(conn, session_id, project_path)
-
         project_id = upsert_project(conn, project_path)
 
         # Update session if we have a status
@@ -221,6 +207,17 @@ def main() -> None:
         # Emit session_update for non-tool events (before printing continue)
         if hook_type not in ('PreToolUse', 'PostToolUse'):
             start_socket_worker(session_id, "session_update", {})
+
+        # Emit hook event to connected clients
+        terminal_id_str = os.environ.get('CLAUDE_TERMINAL_ID')
+        terminal_id = int(terminal_id_str) if terminal_id_str else None
+        start_socket_worker(session_id, "hook", {
+            "session_id": session_id,
+            "hook_type": hook_type,
+            "status": status,
+            "project_path": project_path,
+            "terminal_id": terminal_id,
+        })
 
         # Start debounced worker for session processing
         start_debounced_worker(session_id)

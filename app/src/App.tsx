@@ -37,15 +37,16 @@ function AppContent() {
       const terminal = terminals.find((t) => t.id === data.terminal_id)
       const terminalName =
         terminal?.name || terminal?.cwd || data.project_path || 'Claude'
+      console.log('hook', data)
 
       if (data.status === 'permission_needed') {
         // Play notification sound
         const audio = new Audio('/audio/permissions.mp3')
         audio.volume = 0.5
-        audio.play().catch(() => {})
+        audio.play().catch(() => { })
 
         // Show browser notification
-        notify(`Permission Required`, {
+        notify(`⚠️ Permission Required`, {
           body: `${terminalName} needs permissions`,
           onClick: () => {
             if (data.terminal_id) {
@@ -56,10 +57,10 @@ function AppContent() {
       } else if (data.hook_type === 'Stop') {
         // Play done sound
         const audio = new Audio('/audio/done.mp3')
-        audio.play().catch(() => {})
+        audio.play().catch(() => { })
 
         // Show browser notification
-        notify(`Session Complete`, {
+        notify(`✅ Done`, {
           body: `${terminalName} has finished`,
           onClick: () => {
             if (data.terminal_id) {

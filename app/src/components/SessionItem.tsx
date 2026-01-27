@@ -1,4 +1,4 @@
-import { Bot, Trash2 } from 'lucide-react'
+import { Bot, AlertTriangle, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,9 +17,9 @@ export function SessionItem({ session }: SessionItemProps) {
   const statusColor = {
     started: 'text-green-500',
     active: 'text-[#D97757]',
-    done: 'text-gray-500',
+    done: 'text-green-500',
     ended: 'text-gray-500',
-    permission_needed: 'text-yellow-500',
+    permission_needed: 'text-[#D97757]',
     idle: 'text-gray-400',
   }[session.status]
 
@@ -36,10 +36,13 @@ export function SessionItem({ session }: SessionItemProps) {
   return (
     <>
       <div className="group flex items-center gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default">
-        <Bot
-          className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-          aria-label={session.status}
-        />
+        <div className="flex items-center gap-1">
+          {session.status === 'permission_needed' && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse" />}
+          <Bot
+            className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+            aria-label={session.status}
+          />
+        </div>
         <span className="text-xs truncate flex-1">{displayName}</span>
         <div className="hidden group-hover:flex">
           <Button
