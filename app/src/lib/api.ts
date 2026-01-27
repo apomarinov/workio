@@ -57,12 +57,12 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function updateSettings(
-  settings: Partial<Settings>,
+  updates: Partial<Omit<Settings, 'id'>>,
 ): Promise<Settings> {
   const res = await fetch(`${API_BASE}/settings`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(settings),
+    body: JSON.stringify(updates),
   })
   if (!res.ok) {
     const data = await res.json()

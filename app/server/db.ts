@@ -249,71 +249,46 @@ export function deleteTerminal(id: number): boolean {
 
 // Settings queries
 
+const DEFAULT_CONFIG = {
+  default_shell: '/bin/bash',
+  font_size: null as number | null,
+  show_thinking: false,
+  show_tools: true,
+  show_tool_output: false,
+  message_line_clamp: 5,
+}
+
 export function getSettings(): Settings {
-  let settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as
-    | (Omit<Settings, 'show_thinking' | 'show_tool_output'> & {
-        show_thinking: number | null
-        show_tool_output: number | null
-        message_line_clamp: number | null
-      })
+  const row = db.prepare('SELECT * FROM settings WHERE id = 1').get() as
+    | { id: number; config: string }
     | undefined
-  if (!settings) {
-    db.prepare(
-      "INSERT INTO settings (id, default_shell, show_thinking, show_tool_output, message_line_clamp) VALUES (1, '/bin/bash', 0, 0, 5)",
-    ).run()
-    settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as Omit<
-      Settings,
-      'show_thinking' | 'show_tool_output'
-    > & {
-      show_thinking: number | null
-      show_tool_output: number | null
-      message_line_clamp: number | null
-    }
+
+  if (!row) {
+    db.prepare('INSERT INTO settings (id, config) VALUES (1, ?)').run(
+      JSON.stringify(DEFAULT_CONFIG),
+    )
+    return { id: 1, ...DEFAULT_CONFIG }
   }
+
+  const config = JSON.parse(row.config) as Partial<typeof DEFAULT_CONFIG>
   return {
-    ...settings,
-    show_thinking: Boolean(settings.show_thinking),
-    show_tool_output: Boolean(settings.show_tool_output),
-    message_line_clamp: settings.message_line_clamp ?? 5,
+    id: row.id,
+    ...DEFAULT_CONFIG,
+    ...config,
   }
 }
 
-export function updateSettings(updates: {
-  default_shell?: string
-  font_size?: number | null
-  show_thinking?: boolean
-  show_tool_output?: boolean
-  message_line_clamp?: number
-}): Settings {
-  const setClauses: string[] = []
-  const values: (string | number | null)[] = []
+export function updateSettings(
+  updates: Partial<Omit<Settings, 'id'>>,
+): Settings {
+  const current = getSettings()
+  const { id: _, ...currentConfig } = current
+  const newConfig = { ...currentConfig, ...updates }
 
-  if (updates.default_shell !== undefined) {
-    setClauses.push('default_shell = ?')
-    values.push(updates.default_shell)
-  }
-  if (updates.font_size !== undefined) {
-    setClauses.push('font_size = ?')
-    values.push(updates.font_size)
-  }
-  if (updates.show_thinking !== undefined) {
-    setClauses.push('show_thinking = ?')
-    values.push(updates.show_thinking ? 1 : 0)
-  }
-  if (updates.show_tool_output !== undefined) {
-    setClauses.push('show_tool_output = ?')
-    values.push(updates.show_tool_output ? 1 : 0)
-  }
-  if (updates.message_line_clamp !== undefined) {
-    setClauses.push('message_line_clamp = ?')
-    values.push(updates.message_line_clamp)
-  }
+  db.prepare('UPDATE settings SET config = ? WHERE id = 1').run(
+    JSON.stringify(newConfig),
+  )
 
-  if (setClauses.length > 0) {
-    db.prepare(`UPDATE settings SET ${setClauses.join(', ')} WHERE id = 1`).run(
-      ...values,
-    )
-  }
   return getSettings()
 }
 

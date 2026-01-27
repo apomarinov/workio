@@ -1,4 +1,11 @@
-import { AlignLeft, Brain, Code, TerminalSquare, Type } from 'lucide-react'
+import {
+  AlignLeft,
+  Brain,
+  Code,
+  TerminalSquare,
+  Type,
+  Wrench,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +31,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [defaultShell, setDefaultShell] = useState('')
   const [fontSize, setFontSize] = useState<string>('')
   const [showThinking, setShowThinking] = useState(false)
+  const [showTools, setShowTools] = useState(true)
   const [showToolOutput, setShowToolOutput] = useState(false)
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [saving, setSaving] = useState(false)
@@ -33,6 +41,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       setDefaultShell(settings.default_shell)
       setFontSize(settings.font_size?.toString() ?? '')
       setShowThinking(settings.show_thinking)
+      setShowTools(settings.show_tools)
       setShowToolOutput(settings.show_tool_output)
       setMessageLineClamp(settings.message_line_clamp.toString())
     }
@@ -50,7 +59,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         default_shell: defaultShell.trim(),
         font_size: fontSizeValue,
         show_thinking: showThinking,
-        show_tool_output: showToolOutput,
+        show_tools: showTools,
+        show_tool_output: showTools ? showToolOutput : false,
         message_line_clamp: lineClampValue,
       })
       toast.success('Settings saved')
@@ -71,7 +81,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-3">
           <div className="space-y-2">
             <label htmlFor="default_shell" className="text-sm font-medium">
               Default Shell <span className="text-red-500">*</span>
@@ -115,35 +125,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </p>
           </div>
 
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-muted-foreground" />
-              <label htmlFor="show_thinking" className="text-sm font-medium">
-                Show thinking by default
-              </label>
-            </div>
-            <Switch
-              id="show_thinking"
-              checked={showThinking}
-              onCheckedChange={setShowThinking}
-            />
-          </div>
-
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-muted-foreground" />
-              <label htmlFor="show_tool_output" className="text-sm font-medium">
-                Show tool output by default
-              </label>
-            </div>
-            <Switch
-              id="show_tool_output"
-              checked={showToolOutput}
-              onCheckedChange={setShowToolOutput}
-            />
-          </div>
-
-          <div className="space-y-2">
+          <div className="space-y-2]">
             <label htmlFor="message_line_clamp" className="text-sm font-medium">
               Message Preview Lines
             </label>
@@ -160,9 +142,58 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 className="pl-10"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Lines to show in session list message preview (1-20). Default: 5
             </p>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t-[1px] mt-1 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-muted-foreground" />
+                <label htmlFor="show_thinking" className="text-sm font-medium">
+                  Expand Thinking
+                </label>
+              </div>
+              <Switch
+                id="show_thinking"
+                checked={showThinking}
+                onCheckedChange={setShowThinking}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-muted-foreground" />
+                <label htmlFor="show_tools" className="text-sm font-medium">
+                  Tools
+                </label>
+              </div>
+              <Switch
+                id="show_tools"
+                checked={showTools}
+                onCheckedChange={setShowTools}
+              />
+            </div>
+
+            {showTools && (
+              <div className="flex items-center justify-between pl-6">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4 text-muted-foreground" />
+                  <label
+                    htmlFor="show_tool_output"
+                    className="text-sm font-medium"
+                  >
+                    Show tool output by default
+                  </label>
+                </div>
+                <Switch
+                  id="show_tool_output"
+                  checked={showToolOutput}
+                  onCheckedChange={setShowToolOutput}
+                />
+              </div>
+            )}
           </div>
 
           <DialogFooter>

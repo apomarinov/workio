@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSessionContext } from '../context/SessionContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useSessionMessages } from '../hooks/useSessionMessages'
-import type { SessionMessage } from '../types'
+import { useSettings } from '../hooks/useSettings'
+import type { SessionMessage, TodoWriteTool } from '../types'
 import { MessageBubble, ThinkingGroup } from './MessageBubble'
 
 type GroupedMessage =
@@ -36,6 +37,7 @@ function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
 export function SessionChat() {
   const { activeSessionId } = useSessionContext()
   const { sessions } = useClaudeSessions()
+  const { settings } = useSettings()
   const { messages, loading, isLoadingMore, hasMore, loadMore } =
     useSessionMessages(activeSessionId)
 
@@ -46,7 +48,37 @@ export function SessionChat() {
 
   const session = sessions.find((s) => s.session_id === activeSessionId)
 
-  const groupedMessages = useMemo(() => groupMessages(messages), [messages])
+  // Filter and reorder messages
+  const filteredMessages = useMemo(() => {
+    let result = messages
+
+    // Filter out tool messages if show_tools is disabled, but keep todos
+    if (settings?.show_tools === false) {
+      result = result.filter((m) => !m.tools || m.todo_id)
+    }
+
+    // Find message with incomplete todos and move to end (shows first in chat)
+    const hasIncompleteTodos = (m: SessionMessage) => {
+      if (m.tools?.name !== 'TodoWrite') return false
+      const tool = m.tools as TodoWriteTool
+      return tool.input.todos?.some((t) => t.status !== 'completed')
+    }
+
+    const incompleteTodoMsg = result.find(hasIncompleteTodos)
+    if (incompleteTodoMsg) {
+      result = [
+        ...result.filter((m) => m !== incompleteTodoMsg),
+        incompleteTodoMsg,
+      ]
+    }
+
+    return result
+  }, [messages, settings?.show_tools])
+
+  const groupedMessages = useMemo(
+    () => groupMessages(filteredMessages),
+    [filteredMessages],
+  )
 
   // Set up IntersectionObserver for infinite scroll
   const handleIntersection = useCallback(

@@ -487,6 +487,7 @@ function ReadToolDisplay({
   return (
     <div className="space-y-1">
       <ToolHeader
+        diff
         icon={FileSearch}
         label={`Read ${fileName}`}
         status={tool.status}

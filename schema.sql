@@ -96,14 +96,10 @@ CREATE TABLE IF NOT EXISTS terminals (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- Settings table (singleton)
+-- Settings table (singleton with JSON config)
 CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    default_shell TEXT NOT NULL DEFAULT '/bin/bash',
-    font_size INTEGER,
-    show_thinking INTEGER DEFAULT 0,
-    show_tool_output INTEGER DEFAULT 0,
-    message_line_clamp INTEGER DEFAULT 5
+    config JSON NOT NULL DEFAULT '{}'
 );
 
 -- Indexes

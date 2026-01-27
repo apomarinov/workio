@@ -8,8 +8,8 @@ export function useSettings() {
     api.getSettings,
   )
 
-  const updateSettings = async (settings: Partial<Settings>) => {
-    const updated = await api.updateSettings(settings)
+  const updateSettings = async (updates: Partial<Omit<Settings, 'id'>>) => {
+    const updated = await api.updateSettings(updates)
     mutate(updated, false)
     return updated
   }

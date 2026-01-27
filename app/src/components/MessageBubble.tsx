@@ -23,18 +23,18 @@ export function ThinkingGroup({ messages }: ThinkingGroupProps) {
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[80%]">
+      <div className="max-w-[80%] group">
         <button
           type="button"
           onClick={() => setIsExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
+          className="flex items-center cursor-pointer gap-1 text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors"
         >
           {expanded ? (
             <ChevronDown className="w-3 h-3" />
           ) : (
             <ChevronRight className="w-3 h-3" />
           )}
-          <span className="italic">Thinking...</span>
+          <span className="italic  group-hover:text-zinc-400">Thinking...</span>
         </button>
         {expanded && (
           <div className="mt-1 p-3 bg-zinc-800/50 rounded-lg border border-zinc-800 text-xs text-zinc-400 whitespace-pre-wrap">
