@@ -51,15 +51,32 @@ export function useSessionMessages(sessionId: string | null) {
         if (data.session_id !== sessionId) return
         if (!data.messages || data.messages.length === 0) return
 
-        // Prepend new messages (they're newest, allMessages is newest-first)
         setAllMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id))
-          const newMessages = data.messages.filter(
-            (m) => !existingIds.has(m.id),
-          )
-          return [...newMessages, ...prev]
+          const result = [...prev]
+
+          for (const msg of data.messages) {
+            // For todo messages, find by todo_id and replace
+            if (msg.todo_id) {
+              const existingIdx = result.findIndex(
+                (m) => m.todo_id === msg.todo_id,
+              )
+              if (existingIdx !== -1) {
+                // Replace existing todo message
+                result[existingIdx] = msg
+                continue
+              }
+            }
+
+            // For other messages, check by id
+            const existsById = result.some((m) => m.id === msg.id)
+            if (!existsById) {
+              // Prepend new message (newest first in array)
+              result.unshift(msg)
+            }
+          }
+
+          return result
         })
-        setOffset((prev) => prev + data.messages.length)
       },
     )
   }, [subscribe, sessionId])

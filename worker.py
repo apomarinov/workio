@@ -316,7 +316,9 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
                 # TodoWrite uses upsert - updates existing incomplete batch or creates new
                 todos = tool_use.get('input', {}).get('todos', [])
                 msg_id, todo_id, is_new = upsert_todo_message(
-                    conn, prompt_id,
+                    conn,
+                    session_id=session_id,
+                    prompt_id=prompt_id,
                     uuid=tool_use_id,
                     created_at=tool_use.get('timestamp'),
                     tools=tools_str,

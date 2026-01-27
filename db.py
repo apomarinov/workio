@@ -221,8 +221,23 @@ def create_message(
     return cursor.lastrowid
 
 
+def compute_todo_hash(session_id: str, todos: list[dict]) -> str:
+    """Compute MD5 hash from session_id + sorted todo contents.
+
+    This creates a stable identifier for a specific set of todos,
+    regardless of their status, prompt_id, or tool_use_id.
+    """
+    import hashlib
+
+    # Sort todo contents to ensure consistent ordering
+    contents = sorted(t.get('content', '') for t in todos)
+    hash_input = f"{session_id}:" + "|".join(contents)
+    return hashlib.md5(hash_input.encode()).hexdigest()
+
+
 def upsert_todo_message(
     conn: sqlite3.Connection,
+    session_id: str,
     prompt_id: int,
     uuid: str,
     created_at: str,
@@ -231,48 +246,32 @@ def upsert_todo_message(
 ) -> tuple[int, str, bool]:
     """Upsert a todo message. Returns (message_id, todo_id, is_new).
 
-    For a given prompt, there is at most ONE todo message that gets updated
-    as Claude progresses through tasks. This prevents duplicates when the
-    worker reprocesses the transcript.
-
-    Creates a new message only if no todo message exists for this prompt.
-    Otherwise, always updates the existing todo message.
+    Uses MD5 hash of session_id + todo contents as the stable identifier.
+    This ensures the same todo list always maps to the same message,
+    regardless of prompt_id, tool_use_id, or reprocessing.
     """
+    # Compute stable hash from session_id + todo contents
+    todo_hash = compute_todo_hash(session_id, todos)
 
-    # First check if this exact tool call already exists (deduplication by uuid)
-    existing_by_uuid = conn.execute('''
-        SELECT id, todo_id FROM messages WHERE uuid = ?
-    ''', (uuid,)).fetchone()
-
-    if existing_by_uuid:
-        # Same tool call processed again - update it
-        conn.execute('''
-            UPDATE messages SET tools = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ''', (tools, existing_by_uuid['id']))
-        return existing_by_uuid['id'], existing_by_uuid['todo_id'], False
-
-    # Find ANY existing todo message for this prompt (regardless of completion state)
+    # Check if a message with this todo_hash already exists
     existing = conn.execute('''
-        SELECT id, todo_id FROM messages WHERE prompt_id = ? AND todo_id IS NOT NULL
-        ORDER BY id DESC LIMIT 1
-    ''', (prompt_id,)).fetchone()
+        SELECT id, todo_id FROM messages WHERE todo_id = ?
+    ''', (todo_hash,)).fetchone()
 
     if existing:
-        # Always update existing todo message - keeps single todo per prompt
+        # Update existing todo message with latest state
         conn.execute('''
             UPDATE messages SET tools = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ''', (tools, existing['id']))
         return existing['id'], existing['todo_id'], False
 
-    # Create new todo message (first todo for this prompt)
-    # Use the tool_use_id (uuid) as the todo_id for this batch
+    # Create new todo message with hash as todo_id
     cursor = conn.execute('''
         INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user, tools, todo_id)
         VALUES (?, ?, ?, NULL, 0, 0, ?, ?)
-    ''', (prompt_id, uuid, created_at, tools, uuid))
-    return cursor.lastrowid, uuid, True
+    ''', (prompt_id, uuid, created_at, tools, todo_hash))
+    return cursor.lastrowid, todo_hash, True
 
 
 def get_latest_user_message(conn: sqlite3.Connection, prompt_id: int) -> sqlite3.Row | None:
