@@ -15,13 +15,13 @@ export function useClaudeSessions() {
 
   useEffect(() => {
     return subscribe('session_update', () => {
-      // Debounce refetch by 2 seconds
+      // Debounce refetch
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
       }
       debounceRef.current = setTimeout(() => {
         mutate()
-      }, 2000)
+      }, 1000)
     })
   }, [subscribe, mutate])
 

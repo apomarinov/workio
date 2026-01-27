@@ -1,5 +1,5 @@
 import { Bot, AlertTriangle, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
@@ -13,7 +13,20 @@ interface SessionItemProps {
 export function SessionItem({ session }: SessionItemProps) {
   const { deleteSession } = useClaudeSessions()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isFlashing, setIsFlashing] = useState(false)
   const displayName = session.name || 'Untitled'
+
+  useEffect(() => {
+    const handleFlash = (e: CustomEvent<{ sessionId: string }>) => {
+      if (e.detail.sessionId === session.session_id) {
+        setIsFlashing(true)
+        setTimeout(() => setIsFlashing(false), 2100)
+      }
+    }
+    window.addEventListener('flash-session', handleFlash as EventListener)
+    return () => window.removeEventListener('flash-session', handleFlash as EventListener)
+  }, [session.session_id])
+
   const statusColor = {
     started: 'text-green-500',
     active: 'text-[#D97757]',
@@ -35,7 +48,10 @@ export function SessionItem({ session }: SessionItemProps) {
 
   return (
     <>
-      <div className="group flex items-center gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default">
+      <div className={cn(
+        "group flex items-center gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default",
+        isFlashing && "animate-flash"
+      )}>
         <div className="flex items-center gap-1">
           {session.status === 'permission_needed' && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse" />}
           <Bot

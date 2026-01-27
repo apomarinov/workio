@@ -34,10 +34,9 @@ function AppContent() {
   // Subscribe to hook events for notifications
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
-      const terminal = terminals.find((t) => t.id === data.terminal_id)
+      const terminal = terminals.find((t) => t.id === data.terminal_id || t.cwd === data.project_path)
       const terminalName =
         terminal?.name || terminal?.cwd || data.project_path || 'Claude'
-      console.log('hook', data)
 
       if (data.status === 'permission_needed') {
         // Play notification sound
@@ -49,9 +48,10 @@ function AppContent() {
         notify(`⚠️ Permission Required`, {
           body: `${terminalName} needs permissions`,
           onClick: () => {
-            if (data.terminal_id) {
-              selectTerminal(data.terminal_id)
+            if (terminal) {
+              selectTerminal(terminal.id)
             }
+            window.dispatchEvent(new CustomEvent('flash-session', { detail: { sessionId: data.session_id } }))
           },
         })
       } else if (data.hook_type === 'Stop') {
@@ -63,9 +63,10 @@ function AppContent() {
         notify(`✅ Done`, {
           body: `${terminalName} has finished`,
           onClick: () => {
-            if (data.terminal_id) {
-              selectTerminal(data.terminal_id)
+            if (terminal) {
+              selectTerminal(terminal.id)
             }
+            window.dispatchEvent(new CustomEvent('flash-session', { detail: { sessionId: data.session_id } }))
           },
         })
       }

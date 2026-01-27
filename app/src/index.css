@@ -143,3 +143,13 @@ body {
   width: 3px;
   background: var(--sidebar-ring);
 }
+
+/* Flash animation for session items */
+@keyframes flash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: var(--sidebar-accent); }
+}
+
+.animate-flash {
+  animation: flash 0.7s ease-in-out infinite;
+}

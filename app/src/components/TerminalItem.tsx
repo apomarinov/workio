@@ -17,6 +17,7 @@ import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
+import { cn } from '@/lib/utils'
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -80,11 +81,11 @@ export function TerminalItem({
         <div
           onClick={() => selectTerminal(terminal.id)}
           className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
-          {(hasSessions || hasProcesses) && (
+          {(hasSessions || hasProcesses) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -97,6 +98,8 @@ export function TerminalItem({
                 <ChevronRight className="w-4 h-4" />
               )}
             </Button>
+          ) : (
+            <div className={cn("h-6 w-6 flex-shrink-0", !hideFolder ? 'hidden' : '')} />
           )}
           {terminal.orphaned ? (
             <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
