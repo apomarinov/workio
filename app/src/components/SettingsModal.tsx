@@ -1,4 +1,4 @@
-import { Brain, TerminalSquare, Type } from 'lucide-react'
+import { AlignLeft, Brain, TerminalSquare, Type } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +24,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [defaultShell, setDefaultShell] = useState('')
   const [fontSize, setFontSize] = useState<string>('')
   const [showThinking, setShowThinking] = useState(false)
+  const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       setDefaultShell(settings.default_shell)
       setFontSize(settings.font_size?.toString() ?? '')
       setShowThinking(settings.show_thinking)
+      setMessageLineClamp(settings.message_line_clamp.toString())
     }
   }, [settings])
 
@@ -41,10 +43,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     setSaving(true)
     try {
       const fontSizeValue = fontSize.trim() ? parseInt(fontSize, 10) : null
+      const lineClampValue = parseInt(messageLineClamp, 10) || 5
       await updateSettings({
         default_shell: defaultShell.trim(),
         font_size: fontSizeValue,
         show_thinking: showThinking,
+        message_line_clamp: lineClampValue,
       })
       toast.success('Settings saved')
       onOpenChange(false)
@@ -120,6 +124,28 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               checked={showThinking}
               onCheckedChange={setShowThinking}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="message_line_clamp" className="text-sm font-medium">
+              Message Preview Lines
+            </label>
+            <div className="relative">
+              <AlignLeft className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="message_line_clamp"
+                type="number"
+                min={1}
+                max={20}
+                value={messageLineClamp}
+                onChange={(e) => setMessageLineClamp(e.target.value)}
+                placeholder="5"
+                className="pl-10"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Lines to show in session list message preview (1-20). Default: 5
+            </p>
           </div>
 
           <DialogFooter>

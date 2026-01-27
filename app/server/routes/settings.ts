@@ -6,6 +6,7 @@ interface UpdateSettingsBody {
   default_shell?: string
   font_size?: number | null
   show_thinking?: boolean
+  message_line_clamp?: number
 }
 
 export default async function settingsRoutes(fastify: FastifyInstance) {
@@ -18,13 +19,15 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
   fastify.patch<{ Body: UpdateSettingsBody }>(
     '/api/settings',
     async (request, reply) => {
-      const { default_shell, font_size, show_thinking } = request.body
+      const { default_shell, font_size, show_thinking, message_line_clamp } =
+        request.body
 
       // Validate at least one field is provided
       if (
         default_shell === undefined &&
         font_size === undefined &&
-        show_thinking === undefined
+        show_thinking === undefined &&
+        message_line_clamp === undefined
       ) {
         return reply
           .status(400)
@@ -51,10 +54,20 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Validate message_line_clamp if provided
+      if (message_line_clamp !== undefined) {
+        if (message_line_clamp < 1 || message_line_clamp > 20) {
+          return reply
+            .status(400)
+            .send({ error: 'Message line clamp must be between 1 and 20' })
+        }
+      }
+
       const settings = updateSettings({
         default_shell,
         font_size,
         show_thinking,
+        message_line_clamp,
       })
       return settings
     },

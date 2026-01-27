@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
+import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
+import { MarkdownContent } from './MarkdownContent'
 
 interface SessionItemProps {
   session: SessionWithProject
@@ -22,6 +24,7 @@ interface SessionItemProps {
 export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   const { deleteSession } = useClaudeSessions()
   const { activeSessionId, selectSession } = useSessionContext()
+  const { settings } = useSettings()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
   const displayName = session.name || 'Untitled'
@@ -69,7 +72,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         )}
       >
         <div className="flex items-start gap-1 mt-0.5 relative">
-          <div className="absolute top-[30%] left-[45%] border-l-[1px] border-b-[1px] w-[87%] h-[60%]"></div>
+          <div className="absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[40%]"></div>
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
@@ -105,11 +108,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {!['active', 'permission_needed', 'done'].includes(
             session.status,
           ) && (
-            <Bot
-              className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-              aria-label={session.status}
-            />
-          )}
+              <Bot
+                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                aria-label={session.status}
+              />
+            )}
         </div>
         <div className="flex-1 min-w-0">
           <span
@@ -132,15 +135,22 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             </span>
           )}
           {session.latest_user_message && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5 flex gap-1 items-center">
-              <ChevronRight className="min-w-3 min-h-3 w-3 h-3" />{' '}
-              {session.latest_user_message}
+            <p className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
+              <MarkdownContent content={session.latest_user_message} />
             </p>
+
           )}
           {session.latest_agent_message && (
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {session.latest_agent_message.slice(0, 300)}
-            </p>
+            <div
+              className="text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: settings?.message_line_clamp ?? 5,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              <MarkdownContent content={session.latest_agent_message} />
+            </div>
           )}
         </div>
         <div className="absolute invisible group-hover:visible top-1 right-1">

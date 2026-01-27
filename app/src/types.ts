@@ -83,4 +83,5 @@ export interface Settings {
   default_shell: string
   font_size: number | null
   show_thinking: boolean
+  message_line_clamp: number
 }
