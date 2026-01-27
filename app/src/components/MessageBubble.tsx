@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionMessage } from '../types'
 import { MarkdownContent } from './MarkdownContent'
+import { ToolCallDisplay } from './ToolCallDisplay'
 
 interface MessageBubbleProps {
   message: SessionMessage
@@ -48,9 +49,21 @@ export function ThinkingGroup({ messages }: ThinkingGroupProps) {
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.is_user
 
-  // For user messages, show prompt_text if available, otherwise body
-  const displayText =
-    isUser && message.prompt_text ? message.prompt_text : message.body
+  // If it's a tool message, render ToolCallDisplay
+  if (message.tools) {
+    return (
+      <div className="flex gap-2 justify-start">
+        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-700/50 flex items-center justify-center">
+          <Bot className="w-3.5 h-3.5 text-zinc-400" />
+        </div>
+        <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-zinc-800/50 border border-zinc-700/50 rounded-bl-sm">
+          <ToolCallDisplay tool={message.tools} />
+        </div>
+      </div>
+    )
+  }
+
+  const displayText = message.body
 
   return (
     <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
@@ -67,7 +80,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-zinc-800 text-zinc-100 rounded-bl-sm',
         )}
       >
-        {isUser ? displayText : <MarkdownContent content={displayText} />}
+        {isUser ? displayText : <MarkdownContent content={displayText || ''} />}
       </div>
       {!!isUser && (
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center">

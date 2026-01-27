@@ -45,9 +45,20 @@ CREATE TABLE IF NOT EXISTS messages (
     uuid TEXT UNIQUE,
     is_user BOOLEAN DEFAULT 0,
     thinking BOOLEAN DEFAULT 0,
+    todo_id TEXT,
     body TEXT,
-    created_at TEXT
+    tools JSON,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Messages updated_at trigger
+CREATE TRIGGER IF NOT EXISTS messages_updated_at
+AFTER UPDATE ON messages
+FOR EACH ROW
+BEGIN
+    UPDATE messages SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
 
 -- Logs table
 CREATE TABLE IF NOT EXISTS logs (

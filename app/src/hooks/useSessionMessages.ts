@@ -14,9 +14,14 @@ export function useSessionMessages(sessionId: string | null) {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // Fetch initial page of messages
+  // Use dedupingInterval to prevent duplicate requests from StrictMode double-renders
   const { data, error, isLoading, mutate } = useSWR<SessionMessagesResponse>(
     sessionId ? `/api/sessions/${sessionId}/messages` : null,
     () => api.getSessionMessages(sessionId!, PAGE_SIZE, 0),
+    {
+      dedupingInterval: 2000,
+      revalidateOnFocus: false,
+    },
   )
 
   // Reset state when session changes

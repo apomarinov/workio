@@ -59,7 +59,9 @@ export function getAllSessions(): SessionWithProject[] {
         (
           SELECT m.body FROM messages m
           JOIN prompts pr ON m.prompt_id = pr.id
-          WHERE pr.session_id = s.session_id AND m.is_user = 0
+          WHERE pr.session_id = s.session_id
+            AND m.is_user = 0
+            AND m.tools IS NULL
           ORDER BY m.created_at DESC LIMIT 1
         ) as latest_agent_message
       FROM sessions s
@@ -75,8 +77,11 @@ export interface SessionMessage {
   uuid: string
   is_user: boolean
   thinking: boolean
-  body: string
+  todo_id: string | null
+  body: string | null
+  tools: string | null // JSON string from SQLite
   created_at: string
+  updated_at: string | null
   prompt_text: string | null
 }
 
@@ -111,8 +116,11 @@ export function getSessionMessages(
         m.uuid,
         m.is_user,
         m.thinking,
+        m.todo_id,
         m.body,
+        m.tools,
         m.created_at,
+        m.updated_at,
         p.prompt as prompt_text
       FROM messages m
       JOIN prompts p ON m.prompt_id = p.id
@@ -123,10 +131,18 @@ export function getSessionMessages(
     )
     .all(sessionId, limit, offset) as SessionMessage[]
 
+  // Parse tools JSON and convert boolean fields
+  const parsedMessages = messages.map((m) => ({
+    ...m,
+    is_user: Boolean(m.is_user),
+    thinking: Boolean(m.thinking),
+    tools: m.tools ? JSON.parse(m.tools) : null,
+  }))
+
   return {
-    messages,
+    messages: parsedMessages,
     total: total.count,
-    hasMore: offset + messages.length < total.count,
+    hasMore: offset + parsedMessages.length < total.count,
   }
 }
 

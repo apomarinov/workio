@@ -220,8 +220,10 @@ def main() -> None:
         # Start debounced worker for session processing
         start_debounced_worker(session_id)
 
-        # Start cleanup worker
-        start_cleanup_worker()
+        # Start cleanup worker (skip on SessionStart to avoid race condition
+        # where newly created session with null prompt gets deleted)
+        if hook_type != 'SessionStart':
+            start_cleanup_worker()
 
         print(json.dumps({"continue": True}))
 

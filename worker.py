@@ -3,6 +3,7 @@
 Debounced async worker for processing session jobs.
 """
 
+import difflib
 import json
 import os
 import sys
@@ -13,12 +14,206 @@ from pathlib import Path
 from db import (
     get_db, log,
     get_session, get_latest_prompt, update_prompt_text,
-    message_exists, create_message, get_latest_user_message
+    message_exists, create_message, get_latest_user_message, upsert_todo_message
 )
 from socket_worker import emit_event
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 DEBOUNCE_SECONDS = int(os.environ.get("DEBOUNCE_SECONDS", 2))
+
+# Tool processing constants
+MAX_OUTPUT_LENGTH = 10000      # Max chars for command output
+MAX_DIFF_LENGTH = 5000         # Max chars for diff content
+MAX_CONTENT_LENGTH = 10000     # Max chars for file content
+
+
+def truncate_output(text: str, max_length: int) -> tuple[str, bool]:
+    """Truncate text if too long. Returns (text, was_truncated)."""
+    if not text:
+        return "", False
+    if len(text) <= max_length:
+        return text, False
+    return text[:max_length] + "\n... [truncated]", True
+
+
+def generate_diff(old_string: str, new_string: str, file_path: str) -> tuple[str, int, int]:
+    """
+    Generate unified diff and count lines changed.
+    Returns: (diff_text, lines_added, lines_removed)
+    """
+    try:
+        if not old_string and not new_string:
+            return "", 0, 0
+
+        old_lines = (old_string or "").splitlines(keepends=True)
+        new_lines = (new_string or "").splitlines(keepends=True)
+
+        # Get just the filename for shorter diff headers
+        filename = Path(file_path).name if file_path else "file"
+
+        diff = difflib.unified_diff(
+            old_lines, new_lines,
+            fromfile=f"a/{filename}",
+            tofile=f"b/{filename}",
+            lineterm=""
+        )
+
+        diff_text = "".join(diff)
+
+        # Count additions and deletions
+        lines_added = sum(1 for line in diff_text.splitlines() if line.startswith('+') and not line.startswith('+++'))
+        lines_removed = sum(1 for line in diff_text.splitlines() if line.startswith('-') and not line.startswith('---'))
+
+        return diff_text, lines_added, lines_removed
+    except Exception as e:
+        return f"[Error generating diff: {str(e)}]", 0, 0
+
+
+def build_tool_json(tool_use: dict, result: dict) -> dict | None:
+    """Build the tool JSON structure based on tool type."""
+    try:
+        name = tool_use.get('name')
+        if not name:
+            return None
+
+        input_data = tool_use.get('input') or {}
+        result_content = result.get('content', '')
+        is_error = result.get('is_error', False)
+
+        # Extract text from result content (can be string or list)
+        output_text = ""
+        try:
+            if isinstance(result_content, list):
+                for item in result_content:
+                    if isinstance(item, dict) and item.get('type') == 'text':
+                        output_text += item.get('text', '')
+            elif result_content:
+                output_text = str(result_content)
+        except Exception:
+            output_text = "[Error extracting output]"
+
+        base = {
+            'tool_use_id': tool_use.get('tool_use_id', ''),
+            'name': name,
+            'status': 'error' if is_error else 'success',
+        }
+
+        if name == 'Bash':
+            output, truncated = truncate_output(output_text, MAX_OUTPUT_LENGTH)
+            return {
+                **base,
+                'input': {
+                    'command': input_data.get('command', ''),
+                    'description': input_data.get('description'),
+                },
+                'output': output,
+                'output_truncated': truncated,
+            }
+
+        elif name == 'Edit':
+            old_string = input_data.get('old_string') or ''
+            new_string = input_data.get('new_string') or ''
+            file_path = input_data.get('file_path') or ''
+
+            diff_text, lines_added, lines_removed = generate_diff(old_string, new_string, file_path)
+
+            diff_truncated = False
+            if len(diff_text) > MAX_DIFF_LENGTH:
+                diff_text = "[Diff too large to display]"
+                diff_truncated = True
+
+            return {
+                **base,
+                'input': {
+                    'file_path': file_path,
+                    'replace_all': input_data.get('replace_all', False),
+                },
+                'diff': diff_text,
+                'lines_added': lines_added,
+                'lines_removed': lines_removed,
+                'diff_truncated': diff_truncated,
+            }
+
+        elif name == 'Read':
+            output, truncated = truncate_output(output_text, MAX_CONTENT_LENGTH)
+            return {
+                **base,
+                'input': {
+                    'file_path': input_data.get('file_path') or '',
+                    'offset': input_data.get('offset'),
+                    'limit': input_data.get('limit'),
+                },
+                'output': output,
+                'output_truncated': truncated,
+            }
+
+        elif name == 'Write':
+            content = input_data.get('content') or ''
+            content, truncated = truncate_output(content, MAX_CONTENT_LENGTH)
+            return {
+                **base,
+                'input': {
+                    'file_path': input_data.get('file_path') or '',
+                },
+                'content': content,
+                'content_truncated': truncated,
+            }
+
+        elif name in ('Grep', 'Glob'):
+            output, truncated = truncate_output(output_text, MAX_OUTPUT_LENGTH)
+            return {
+                **base,
+                'input': {
+                    'pattern': input_data.get('pattern') or input_data.get('glob') or '',
+                    'path': input_data.get('path'),
+                    'glob': input_data.get('glob'),
+                    'output_mode': input_data.get('output_mode'),
+                },
+                'output': output,
+                'output_truncated': truncated,
+            }
+
+        elif name == 'Task':
+            output, truncated = truncate_output(output_text, MAX_OUTPUT_LENGTH)
+            return {
+                **base,
+                'input': {
+                    'description': input_data.get('description') or '',
+                    'subagent_type': input_data.get('subagent_type') or '',
+                },
+                'output': output,
+                'output_truncated': truncated,
+            }
+
+        elif name == 'TodoWrite':
+            todos = input_data.get('todos') or []
+            if not isinstance(todos, list):
+                todos = []
+            return {
+                **base,
+                'input': {
+                    'todos': todos,
+                },
+            }
+
+        # Generic fallback for other/unknown tools
+        output, truncated = truncate_output(output_text, MAX_OUTPUT_LENGTH)
+        return {
+            **base,
+            'input': input_data,
+            'output': output,
+            'output_truncated': truncated,
+        }
+
+    except Exception as e:
+        return {
+            'tool_use_id': tool_use.get('tool_use_id', ''),
+            'name': tool_use.get('name', 'Unknown'),
+            'status': 'error',
+            'input': {},
+            'output': f"[Error processing tool: {str(e)}]",
+            'output_truncated': False,
+        }
 
 
 def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict]:
@@ -43,69 +238,189 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
     prompt_text = prompt_row['prompt']
     new_messages = []
 
-    with open(transcript_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
+    # Read all entries first for two-pass tool processing
+    entries = []
+    try:
+        with open(transcript_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    entries.append(entry)
+                except json.JSONDecodeError:
+                    continue
+    except IOError as e:
+        log(conn, "Error reading transcript file", session_id=session_id, error=str(e))
+        return []
+
+    # Pass 1: Collect tool_uses from assistant messages
+    tool_uses = {}  # tool_use_id -> {tool_use_id, timestamp, name, input}
+    for entry in entries:
+        try:
+            if entry.get('type') == 'assistant':
+                msg = entry.get('message', {})
+                content_list = msg.get('content', [])
+                if not isinstance(content_list, list):
+                    continue
+                for item in content_list:
+                    if isinstance(item, dict) and item.get('type') == 'tool_use':
+                        tool_use_id = item.get('id')
+                        if not tool_use_id:
+                            continue
+                        tool_uses[tool_use_id] = {
+                            'tool_use_id': tool_use_id,
+                            'timestamp': entry.get('timestamp'),
+                            'name': item.get('name'),
+                            'input': item.get('input') or {}
+                        }
+        except Exception as e:
+            log(conn, "Error processing assistant entry for tools", session_id=session_id, error=str(e))
+            continue
+
+    # Pass 2: Collect tool_results from user messages
+    tool_results = {}  # tool_use_id -> {content, is_error}
+    for entry in entries:
+        try:
+            if entry.get('type') == 'user':
+                msg = entry.get('message', {})
+                content = msg.get('content', [])
+                if isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict) and item.get('type') == 'tool_result':
+                            tool_use_id = item.get('tool_use_id')
+                            if not tool_use_id:
+                                continue
+                            tool_results[tool_use_id] = {
+                                'content': item.get('content'),
+                                'is_error': item.get('is_error', False)
+                            }
+        except Exception as e:
+            log(conn, "Error processing user entry for tools", session_id=session_id, error=str(e))
+            continue
+
+    # Pass 3: Process matched tool calls and create tool messages
+    for tool_use_id, tool_use in tool_uses.items():
+        try:
+            result = tool_results.get(tool_use_id, {})
+            tool_json = build_tool_json(tool_use, result)
+
+            if not tool_json:
                 continue
 
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+            tool_name = tool_use.get('name')
+            tools_str = json.dumps(tool_json)
 
-            entry_type = entry.get('type')
-            message = entry.get('message', {})
-            uuid = entry.get('uuid')
-            timestamp = entry.get('timestamp')
-
-            if not uuid:
-                continue
-
-            # Check if message already exists
-            if message_exists(conn, uuid):
-                continue
-
-            body = None
-            is_thinking = False
-            is_user = False
-
-            # User message (only string content, skip tool_results which are lists)
-            if entry_type == 'user' and message.get('role') == 'user':
-                content = message.get('content', '')
-                if isinstance(content, str) and len(content) > 0:
-                    # Skip local command messages
-                    if '<local-command-stdout>' in content or '<local-command-caveat>' in content or '<command-name>' in content:
-                        continue
-                    body = content
-                    is_user = True
-
-            # Assistant message
-            elif entry_type == 'assistant' and message.get('role') == 'assistant' and message.get('type') == 'message':
-                content_list = message.get('content', [])
-                if content_list and len(content_list) > 0:
-                    first_content = content_list[0]
-                    content_type = first_content.get('type')
-
-                    if content_type == 'thinking':
-                        body = first_content.get('thinking')
-                        is_thinking = True
-                    elif content_type == 'text':
-                        body = first_content.get('text')
-
-            # Store message if we have body
-            if body:
-                msg_id = create_message(conn, prompt_id, uuid, timestamp, body, is_thinking, is_user)
+            if tool_name == 'TodoWrite':
+                # TodoWrite uses upsert - updates existing incomplete batch or creates new
+                todos = tool_use.get('input', {}).get('todos', [])
+                msg_id, todo_id, is_new = upsert_todo_message(
+                    conn, prompt_id,
+                    uuid=tool_use_id,
+                    created_at=tool_use.get('timestamp'),
+                    tools=tools_str,
+                    todos=todos
+                )
                 new_messages.append({
                     'id': msg_id,
                     'prompt_id': prompt_id,
-                    'uuid': uuid,
-                    'is_user': is_user,
-                    'thinking': is_thinking,
-                    'body': body,
-                    'created_at': timestamp,
-                    'prompt_text': prompt_text if is_user else None,
+                    'uuid': tool_use_id,
+                    'is_user': False,
+                    'thinking': False,
+                    'todo_id': todo_id,
+                    'body': None,
+                    'tools': tool_json,
+                    'created_at': tool_use.get('timestamp'),
+                    'prompt_text': None,
+                    'is_update': not is_new,
                 })
+            else:
+                # Regular tool call - skip if already exists
+                if message_exists(conn, tool_use_id):
+                    continue
+
+                msg_id = create_message(
+                    conn, prompt_id,
+                    uuid=tool_use_id,
+                    created_at=tool_use.get('timestamp'),
+                    body=None,
+                    is_thinking=False,
+                    is_user=False,
+                    tools=tools_str
+                )
+                new_messages.append({
+                    'id': msg_id,
+                    'prompt_id': prompt_id,
+                    'uuid': tool_use_id,
+                    'is_user': False,
+                    'thinking': False,
+                    'todo_id': None,
+                    'body': None,
+                    'tools': tool_json,
+                    'created_at': tool_use.get('timestamp'),
+                    'prompt_text': None,
+                })
+        except Exception as e:
+            log(conn, "Error processing tool call", session_id=session_id, tool_id=tool_use_id, error=str(e))
+            continue
+
+    # Pass 4: Process text messages (user and assistant)
+    for entry in entries:
+        entry_type = entry.get('type')
+        message = entry.get('message', {})
+        uuid = entry.get('uuid')
+        timestamp = entry.get('timestamp')
+
+        if not uuid:
+            continue
+
+        # Check if message already exists
+        if message_exists(conn, uuid):
+            continue
+
+        body = None
+        is_thinking = False
+        is_user = False
+
+        # User message (only string content, skip tool_results which are lists)
+        if entry_type == 'user' and message.get('role') == 'user':
+            content = message.get('content', '')
+            if isinstance(content, str) and len(content) > 0:
+                # Skip local command messages
+                if '<local-command-stdout>' in content or '<local-command-caveat>' in content or '<command-name>' in content:
+                    continue
+                body = content
+                is_user = True
+
+        # Assistant message
+        elif entry_type == 'assistant' and message.get('role') == 'assistant' and message.get('type') == 'message':
+            content_list = message.get('content', [])
+            if content_list and len(content_list) > 0:
+                first_content = content_list[0]
+                content_type = first_content.get('type')
+
+                if content_type == 'thinking':
+                    body = first_content.get('thinking')
+                    is_thinking = True
+                elif content_type == 'text':
+                    body = first_content.get('text')
+
+        # Store message if we have body
+        if body:
+            msg_id = create_message(conn, prompt_id, uuid, timestamp, body, is_thinking, is_user)
+            new_messages.append({
+                'id': msg_id,
+                'prompt_id': prompt_id,
+                'uuid': uuid,
+                'is_user': is_user,
+                'thinking': is_thinking,
+                'todo_id': None,
+                'body': body,
+                'tools': None,
+                'created_at': timestamp,
+                'prompt_text': prompt_text if is_user else None,
+            })
 
     log(conn, "Processed transcript", session_id=session_id, messages_added=len(new_messages))
 
