@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CheckIcon, GitBranch, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bot, CheckIcon, Folder, GitBranch, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,7 @@ import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { MarkdownContent } from './MarkdownContent'
+import { TruncatedPath } from './TruncatedPath'
 
 interface SessionItemProps {
   session: SessionWithProject
@@ -65,7 +66,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         )}
       >
         <div className="flex items-start gap-1 mt-0.5 relative">
-          <div className="absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[50%]"></div>
+          {session.latest_agent_message && (
+            <div className="absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[50%]"></div>
+          )}
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
@@ -101,11 +104,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {!['active', 'permission_needed', 'done'].includes(
             session.status,
           ) && (
-            <Bot
-              className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-              aria-label={session.status}
-            />
-          )}
+              <Bot
+                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                aria-label={session.status}
+              />
+            )}
         </div>
         <div className="flex-1 min-w-0">
           <span
@@ -116,21 +119,30 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           >
             {displayName}
           </span>
+          {showGitBranch && session.project_path && false && (
+            <span
+              className={cn(
+                'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
+              )}
+            >
+              <Folder className={cn('w-2.5 h-2.5 mr-1')} />
+              <TruncatedPath path={session.project_path} />
+            </span>
+          )}
           {showGitBranch && session.git_branch && (
             <span
               className={cn(
                 'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
-                showGitBranch && '',
               )}
             >
-              <GitBranch className={cn('w-2.5 h-2.5', showGitBranch && '')} />
+              <GitBranch className={cn('w-2.5 h-2.5 mr-1', showGitBranch && '')} />
               {session.git_branch}
             </span>
           )}
-          {session.latest_user_message && (
-            <p className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
+          {session.latest_user_message && session.latest_user_message !== displayName && (
+            <div className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
               <MarkdownContent content={session.latest_user_message} />
-            </p>
+            </div>
           )}
           {session.latest_agent_message && (
             <div
