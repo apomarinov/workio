@@ -42,6 +42,8 @@ export function SessionChat() {
 
   const sentinelRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const prevScrollHeightRef = useRef<number>(0)
+  const isInitialLoadRef = useRef(true)
 
   const session = sessions.find((s) => s.session_id === activeSessionId)
 
@@ -51,6 +53,10 @@ export function SessionChat() {
   const handleIntersection = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       if (entries[0].isIntersecting && hasMore && !isLoadingMore && !loading) {
+        // Save scroll height before loading more
+        if (scrollContainerRef.current) {
+          prevScrollHeightRef.current = scrollContainerRef.current.scrollHeight
+        }
         loadMore()
       }
     },
@@ -69,11 +75,27 @@ export function SessionChat() {
     return () => observer.disconnect()
   }, [handleIntersection])
 
-  // Scroll to bottom on initial load
+  // Reset initial load flag when session changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on session change
+  useEffect(() => {
+    isInitialLoadRef.current = true
+  }, [activeSessionId])
+
+  // Handle scroll position
   useEffect(() => {
     if (!loading && messages.length > 0 && scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop =
-        scrollContainerRef.current.scrollHeight
+      if (isInitialLoadRef.current) {
+        // Scroll to bottom on initial load
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight
+        isInitialLoadRef.current = false
+      } else if (prevScrollHeightRef.current > 0) {
+        // Preserve scroll position when loading more at top
+        const newScrollHeight = scrollContainerRef.current.scrollHeight
+        const scrollDiff = newScrollHeight - prevScrollHeightRef.current
+        scrollContainerRef.current.scrollTop += scrollDiff
+        prevScrollHeightRef.current = 0
+      }
     }
   }, [loading, messages.length])
 

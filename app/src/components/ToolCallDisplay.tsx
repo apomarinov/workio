@@ -54,74 +54,284 @@ function ToolHeader({
   label,
   status,
   meta,
+  onExpand,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   status: 'success' | 'error'
   meta?: React.ReactNode
+  onExpand?: () => void
 }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       <StatusDot status={status} />
       <Icon className="w-4 h-4 min-w-4 min-h-4 text-zinc-400" />
-      <span className="font-mono text-zinc-300">{label}</span>
+      <span className="font-mono text-zinc-300 flex-1 truncate">{label}</span>
       {meta && <span className="text-xs text-zinc-500">{meta}</span>}
+      {onExpand && (
+        <button
+          type="button"
+          onClick={onExpand}
+          className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+          title="Expand to fullscreen"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   )
 }
 
-function FullscreenModal({
+function getToolIcon(name: string) {
+  switch (name) {
+    case 'Bash':
+      return Terminal
+    case 'Edit':
+      return FilePen
+    case 'Read':
+      return FileSearch
+    case 'Write':
+      return FileCode
+    case 'Grep':
+    case 'Glob':
+      return Search
+    case 'Task':
+      return Sparkles
+    case 'TodoWrite':
+      return ListTodo
+    default:
+      return FileText
+  }
+}
+
+function getToolTitle(tool: ToolData): string {
+  switch (tool.name) {
+    case 'Bash':
+      return `$ ${(tool as BashTool).input.command}`
+    case 'Edit':
+      return `Edit: ${(tool as EditTool).input.file_path}`
+    case 'Read':
+      return `Read: ${(tool as ReadTool).input.file_path}`
+    case 'Write':
+      return `Write: ${(tool as WriteTool).input.file_path}`
+    case 'Grep':
+    case 'Glob':
+      return `${tool.name}: ${(tool as GrepTool).input.pattern}`
+    case 'Task':
+      return `Task: ${(tool as TaskTool).input.description}`
+    case 'TodoWrite':
+      return 'Todo List'
+    default:
+      return tool.name
+  }
+}
+
+function ToolMetadata({ tool }: { tool: ToolData }) {
+  switch (tool.name) {
+    case 'Bash': {
+      const t = tool as BashTool
+      return t.input.description ? (
+        <div className="text-sm text-zinc-400 mt-1">{t.input.description}</div>
+      ) : null
+    }
+    case 'Edit': {
+      const t = tool as EditTool
+      return (
+        <div className="flex items-center gap-4 text-sm text-zinc-400 mt-1">
+          <span className="font-mono">{t.input.file_path}</span>
+          <span className="text-green-400">+{t.lines_added}</span>
+          <span className="text-red-400">-{t.lines_removed}</span>
+        </div>
+      )
+    }
+    case 'Read': {
+      const t = tool as ReadTool
+      return (
+        <div className="text-sm text-zinc-400 font-mono mt-1">
+          {t.input.file_path}
+          {t.input.offset != null && ` (offset: ${t.input.offset})`}
+          {t.input.limit != null && ` (limit: ${t.input.limit})`}
+        </div>
+      )
+    }
+    case 'Write': {
+      const t = tool as WriteTool
+      return (
+        <div className="text-sm text-zinc-400 font-mono mt-1">
+          {t.input.file_path}
+        </div>
+      )
+    }
+    case 'Grep':
+    case 'Glob': {
+      const t = tool as GrepTool
+      return t.input.path ? (
+        <div className="text-sm text-zinc-400 font-mono mt-1">
+          in {t.input.path}
+        </div>
+      ) : null
+    }
+    case 'Task': {
+      const t = tool as TaskTool
+      return (
+        <div className="text-sm text-zinc-400 mt-1">
+          Agent: {t.input.subagent_type}
+        </div>
+      )
+    }
+    default:
+      return null
+  }
+}
+
+function FullscreenToolOutput({ tool }: { tool: ToolData }) {
+  switch (tool.name) {
+    case 'Bash': {
+      const t = tool as BashTool
+      return (
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs text-zinc-500 mb-1">Command</div>
+            <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+              {t.input.command}
+            </pre>
+          </div>
+          {t.output && (
+            <div>
+              <div className="text-xs text-zinc-500 mb-1">
+                Output {t.output_truncated && '(truncated)'}
+              </div>
+              <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+                {t.output}
+              </pre>
+            </div>
+          )}
+        </div>
+      )
+    }
+    case 'Edit': {
+      const t = tool as EditTool
+      if (t.diff_truncated) {
+        return <p className="text-zinc-500">[Diff too large to display]</p>
+      }
+      return t.diff ? <DiffView diff={t.diff} /> : null
+    }
+    case 'Read': {
+      const t = tool as ReadTool
+      return t.output ? (
+        <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+          {t.output}
+        </pre>
+      ) : null
+    }
+    case 'Write': {
+      const t = tool as WriteTool
+      return t.content ? (
+        <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+          {t.content}
+        </pre>
+      ) : null
+    }
+    case 'Grep':
+    case 'Glob': {
+      const t = tool as GrepTool
+      return t.output ? (
+        <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+          {t.output}
+        </pre>
+      ) : null
+    }
+    case 'Task': {
+      const t = tool as TaskTool
+      return t.output ? (
+        <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+          {t.output}
+        </pre>
+      ) : null
+    }
+    case 'TodoWrite': {
+      const t = tool as TodoWriteTool
+      const todos = t.input.todos || []
+      return (
+        <div className="space-y-2">
+          {todos.map((todo, i) => (
+            <div
+              key={`${i}-${todo.content}`}
+              className="flex items-center gap-3"
+            >
+              {todo.status === 'completed' ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : todo.status === 'in_progress' ? (
+                <CircleDot className="w-4 h-4 text-blue-500" />
+              ) : (
+                <Circle className="w-4 h-4 text-zinc-500" />
+              )}
+              <span
+                className={cn(
+                  'text-sm',
+                  todo.status === 'completed' && 'text-zinc-500 line-through',
+                  todo.status === 'in_progress' && 'text-blue-400',
+                  todo.status === 'pending' && 'text-zinc-300',
+                )}
+              >
+                {todo.content}
+              </span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    default: {
+      const t = tool as GenericTool
+      return t.output ? (
+        <pre className="p-3 bg-zinc-950 rounded text-sm text-zinc-300 whitespace-pre-wrap">
+          {t.output}
+        </pre>
+      ) : null
+    }
+  }
+}
+
+function FullscreenToolDialog({
+  tool,
   open,
   onOpenChange,
-  title,
-  children,
 }: {
+  tool: ToolData
   open: boolean
   onOpenChange: (open: boolean) => void
-  title: string
-  children: React.ReactNode
 }) {
+  const Icon = getToolIcon(tool.name)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="font-mono text-sm">{title}</DialogTitle>
+      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col sm:max-w-[95vw]">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 font-mono text-sm">
+            <StatusDot status={tool.status} />
+            <Icon className="w-4 h-4 text-zinc-400" />
+            <span>{getToolTitle(tool)}</span>
+          </DialogTitle>
+          <ToolMetadata tool={tool} />
         </DialogHeader>
-        <div className="flex-1 overflow-auto bg-zinc-900 rounded p-4">
-          {children}
+        <div className="flex-1 overflow-auto bg-zinc-900 rounded p-4 min-h-0">
+          <FullscreenToolOutput tool={tool} />
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-function ExpandButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="absolute bottom-2 right-2 p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
-      title="Expand to fullscreen"
-    >
-      <Maximize2 className="w-3.5 h-3.5" />
-    </button>
-  )
-}
-
 function CollapsibleOutput({
   output,
   truncated,
-  title = 'Output',
 }: {
   output: string
   truncated: boolean
-  title?: string
 }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Use local state if set, otherwise fall back to setting
   const expanded = isExpanded ?? settings?.show_tool_output ?? false
   const hasOutput = output && output.trim().length > 0
 
@@ -143,27 +353,21 @@ function CollapsibleOutput({
         {truncated && <span className="text-amber-500">(truncated)</span>}
       </button>
       {expanded && (
-        <div className="relative">
-          <pre className="mt-1 p-2 bg-zinc-900 rounded text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
-            {output}
-          </pre>
-          <ExpandButton onClick={() => setIsFullscreen(true)} />
-        </div>
-      )}
-      <FullscreenModal
-        open={isFullscreen}
-        onOpenChange={setIsFullscreen}
-        title={title}
-      >
-        <pre className="text-xs text-zinc-300 whitespace-pre-wrap">
+        <pre className="mt-1 p-2 bg-zinc-900 rounded text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
           {output}
         </pre>
-      </FullscreenModal>
+      )}
     </div>
   )
 }
 
-function BashToolDisplay({ tool }: { tool: BashTool }) {
+function BashToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: BashTool
+  onExpand: () => void
+}) {
   const command =
     tool.input.command.length > 500
       ? `${tool.input.command.slice(0, 60)}...`
@@ -176,20 +380,25 @@ function BashToolDisplay({ tool }: { tool: BashTool }) {
         label={command}
         status={tool.status}
         meta={tool.input.description}
+        onExpand={onExpand}
       />
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
-        title={`$ ${tool.input.command}`}
       />
     </div>
   )
 }
 
-function EditToolDisplay({ tool }: { tool: EditTool }) {
+function EditToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: EditTool
+  onExpand: () => void
+}) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const expanded = isExpanded ?? settings?.show_tool_output ?? false
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
@@ -205,6 +414,7 @@ function EditToolDisplay({ tool }: { tool: EditTool }) {
             <span className="text-red-400">-{tool.lines_removed}</span>
           </>
         }
+        onExpand={onExpand}
       />
       <div className="text-xs text-zinc-500 font-mono pl-6">
         {tool.input.file_path}
@@ -229,20 +439,10 @@ function EditToolDisplay({ tool }: { tool: EditTool }) {
               <span>{expanded ? 'Hide diff' : 'Show diff'}</span>
             </button>
             {expanded && (
-              <div className="relative">
-                <div className="mt-1 bg-zinc-900 rounded overflow-hidden max-h-80 overflow-y-auto">
-                  <DiffView diff={tool.diff} />
-                </div>
-                <ExpandButton onClick={() => setIsFullscreen(true)} />
+              <div className="mt-1 bg-zinc-900 rounded overflow-hidden max-h-80 overflow-y-auto">
+                <DiffView diff={tool.diff} />
               </div>
             )}
-            <FullscreenModal
-              open={isFullscreen}
-              onOpenChange={setIsFullscreen}
-              title={tool.input.file_path}
-            >
-              <DiffView diff={tool.diff} />
-            </FullscreenModal>
           </div>
         )
       )}
@@ -250,7 +450,13 @@ function EditToolDisplay({ tool }: { tool: EditTool }) {
   )
 }
 
-function ReadToolDisplay({ tool }: { tool: ReadTool }) {
+function ReadToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: ReadTool
+  onExpand: () => void
+}) {
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
   return (
@@ -259,6 +465,7 @@ function ReadToolDisplay({ tool }: { tool: ReadTool }) {
         icon={FileSearch}
         label={`Read ${fileName}`}
         status={tool.status}
+        onExpand={onExpand}
       />
       <div className="text-xs text-zinc-500 font-mono pl-6">
         {tool.input.file_path}
@@ -268,13 +475,18 @@ function ReadToolDisplay({ tool }: { tool: ReadTool }) {
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
-        title={tool.input.file_path}
       />
     </div>
   )
 }
 
-function WriteToolDisplay({ tool }: { tool: WriteTool }) {
+function WriteToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: WriteTool
+  onExpand: () => void
+}) {
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
   return (
@@ -283,6 +495,7 @@ function WriteToolDisplay({ tool }: { tool: WriteTool }) {
         icon={FileCode}
         label={`Write ${fileName}`}
         status={tool.status}
+        onExpand={onExpand}
       />
       <div className="text-xs text-zinc-500 font-mono pl-6">
         {tool.input.file_path}
@@ -290,13 +503,18 @@ function WriteToolDisplay({ tool }: { tool: WriteTool }) {
       <CollapsibleOutput
         output={tool.content}
         truncated={tool.content_truncated}
-        title={tool.input.file_path}
       />
     </div>
   )
 }
 
-function GrepToolDisplay({ tool }: { tool: GrepTool }) {
+function GrepToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: GrepTool
+  onExpand: () => void
+}) {
   const isGlob = tool.name === 'Glob'
 
   return (
@@ -305,6 +523,7 @@ function GrepToolDisplay({ tool }: { tool: GrepTool }) {
         icon={Search}
         label={`${isGlob ? 'Glob' : 'Grep'} ${tool.input.pattern}`}
         status={tool.status}
+        onExpand={onExpand}
       />
       {tool.input.path && (
         <div className="text-xs text-zinc-500 font-mono pl-6">
@@ -314,13 +533,18 @@ function GrepToolDisplay({ tool }: { tool: GrepTool }) {
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
-        title={`${tool.name === 'Glob' ? 'Glob' : 'Grep'}: ${tool.input.pattern}`}
       />
     </div>
   )
 }
 
-function TaskToolDisplay({ tool }: { tool: TaskTool }) {
+function TaskToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: TaskTool
+  onExpand: () => void
+}) {
   return (
     <div className="space-y-1">
       <ToolHeader
@@ -328,11 +552,11 @@ function TaskToolDisplay({ tool }: { tool: TaskTool }) {
         label={`Task: ${tool.input.description}`}
         status={tool.status}
         meta={tool.input.subagent_type}
+        onExpand={onExpand}
       />
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
-        title={`Task: ${tool.input.description}`}
       />
     </div>
   )
@@ -373,15 +597,25 @@ function TodoWriteToolDisplay({ tool }: { tool: TodoWriteTool }) {
   )
 }
 
-function GenericToolDisplay({ tool }: { tool: GenericTool }) {
+function GenericToolDisplay({
+  tool,
+  onExpand,
+}: {
+  tool: GenericTool
+  onExpand: () => void
+}) {
   return (
     <div className="space-y-1">
-      <ToolHeader icon={FileText} label={tool.name} status={tool.status} />
+      <ToolHeader
+        icon={FileText}
+        label={tool.name}
+        status={tool.status}
+        onExpand={onExpand}
+      />
       {tool.output && (
         <CollapsibleOutput
           output={tool.output}
           truncated={tool.output_truncated || false}
-          title={tool.name}
         />
       )}
     </div>
@@ -389,23 +623,50 @@ function GenericToolDisplay({ tool }: { tool: GenericTool }) {
 }
 
 export function ToolCallDisplay({ tool }: ToolCallDisplayProps) {
-  switch (tool.name) {
-    case 'Bash':
-      return <BashToolDisplay tool={tool as BashTool} />
-    case 'Edit':
-      return <EditToolDisplay tool={tool as EditTool} />
-    case 'Read':
-      return <ReadToolDisplay tool={tool as ReadTool} />
-    case 'Write':
-      return <WriteToolDisplay tool={tool as WriteTool} />
-    case 'Grep':
-    case 'Glob':
-      return <GrepToolDisplay tool={tool as GrepTool} />
-    case 'Task':
-      return <TaskToolDisplay tool={tool as TaskTool} />
-    case 'TodoWrite':
-      return <TodoWriteToolDisplay tool={tool as TodoWriteTool} />
-    default:
-      return <GenericToolDisplay tool={tool as GenericTool} />
-  }
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const onExpand = () => setIsFullscreen(true)
+
+  return (
+    <>
+      {tool.name === 'Bash' && (
+        <BashToolDisplay tool={tool as BashTool} onExpand={onExpand} />
+      )}
+      {tool.name === 'Edit' && (
+        <EditToolDisplay tool={tool as EditTool} onExpand={onExpand} />
+      )}
+      {tool.name === 'Read' && (
+        <ReadToolDisplay tool={tool as ReadTool} onExpand={onExpand} />
+      )}
+      {tool.name === 'Write' && (
+        <WriteToolDisplay tool={tool as WriteTool} onExpand={onExpand} />
+      )}
+      {(tool.name === 'Grep' || tool.name === 'Glob') && (
+        <GrepToolDisplay tool={tool as GrepTool} onExpand={onExpand} />
+      )}
+      {tool.name === 'Task' && (
+        <TaskToolDisplay tool={tool as TaskTool} onExpand={onExpand} />
+      )}
+      {tool.name === 'TodoWrite' && (
+        <TodoWriteToolDisplay tool={tool as TodoWriteTool} />
+      )}
+      {![
+        'Bash',
+        'Edit',
+        'Read',
+        'Write',
+        'Grep',
+        'Glob',
+        'Task',
+        'TodoWrite',
+      ].includes(tool.name) && (
+        <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
+      )}
+
+      <FullscreenToolDialog
+        tool={tool}
+        open={isFullscreen}
+        onOpenChange={setIsFullscreen}
+      />
+    </>
+  )
 }
