@@ -49,14 +49,15 @@ export function useSessionMessages(sessionId: string | null) {
         // Prepend new messages (they're newest, allMessages is newest-first)
         setAllMessages((prev) => {
           const existingIds = new Set(prev.map((m) => m.id))
-          const newMessages = data.messages.filter((m) => !existingIds.has(m.id))
+          const newMessages = data.messages.filter(
+            (m) => !existingIds.has(m.id),
+          )
           return [...newMessages, ...prev]
         })
         setOffset((prev) => prev + data.messages.length)
       },
     )
   }, [subscribe, sessionId])
-
 
   // Load more messages (older messages)
   const loadMore = useCallback(async () => {

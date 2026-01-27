@@ -73,7 +73,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
-          {session.status === 'done' && (<CheckIcon className='w-3.5 h-3.5 text-green-500' />)}
+          {session.status === 'done' && (
+            <CheckIcon className="w-3.5 h-3.5 text-green-500" />
+          )}
           {['active', 'permission_needed'].includes(session.status) && (
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -100,7 +102,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
               </path>
             </svg>
           )}
-          {!['active', 'permission_needed', 'done'].includes(session.status) && (
+          {!['active', 'permission_needed', 'done'].includes(
+            session.status,
+          ) && (
             <Bot
               className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
               aria-label={session.status}

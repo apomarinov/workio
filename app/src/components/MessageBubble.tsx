@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionMessage } from '../types'
+import { MarkdownContent } from './MarkdownContent'
 
 interface MessageBubbleProps {
   message: SessionMessage
@@ -60,13 +61,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       )}
       <div
         className={cn(
-          'max-w-[80%] px-3 py-2 rounded-lg text-sm whitespace-pre-wrap',
+          'max-w-[80%] px-3 py-2 rounded-lg text-sm',
           isUser
-            ? 'bg-blue-600 text-white rounded-br-sm'
+            ? 'bg-blue-600 text-white rounded-br-sm whitespace-pre-wrap'
             : 'bg-zinc-800 text-zinc-100 rounded-bl-sm',
         )}
       >
-        {displayText}
+        {isUser ? displayText : <MarkdownContent content={displayText} />}
       </div>
       {!!isUser && (
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center">
