@@ -136,7 +136,7 @@ def main() -> None:
 
         try:
             event = json.load(sys.stdin)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             log(conn, "Invalid Hook Event", error=str(e), error_type=type(e).__name__)
             print(json.dumps({"continue": True}))
             return

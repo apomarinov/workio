@@ -103,22 +103,22 @@ def delete_orphan_projects(conn) -> int:
 
 
 def delete_empty_sessions(conn) -> int:
-    """Delete sessions with only a single null prompt and no messages. Returns count deleted."""
-    # Find sessions that have exactly one prompt, that prompt is null, and has no messages
+    """Delete sessions with no prompts, or only a single null prompt and no messages. Returns count deleted."""
+    # Find sessions that have no prompts, or exactly one null prompt with no messages
     cursor = conn.execute('''
         DELETE FROM sessions WHERE session_id IN (
             SELECT s.session_id
             FROM sessions s
-            JOIN prompts p ON p.session_id = s.session_id
+            LEFT JOIN prompts p ON p.session_id = s.session_id
             LEFT JOIN messages m ON m.prompt_id = p.id
             GROUP BY s.session_id
-            HAVING COUNT(DISTINCT p.id) = 1
+            HAVING COUNT(DISTINCT p.id) <= 1
                AND MAX(p.prompt) IS NULL
                AND COUNT(m.id) = 0
         )
     ''')
     sessions_deleted = cursor.rowcount
-
+    
     # Clean up orphaned prompts (prompts without sessions)
     conn.execute('''
         DELETE FROM prompts WHERE session_id NOT IN (SELECT session_id FROM sessions)

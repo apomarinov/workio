@@ -1,11 +1,4 @@
-import {
-  AlertTriangle,
-  Bot,
-  CheckIcon,
-  ChevronRight,
-  GitBranch,
-  Trash2,
-} from 'lucide-react'
+import { AlertTriangle, Bot, CheckIcon, GitBranch, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -72,7 +65,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         )}
       >
         <div className="flex items-start gap-1 mt-0.5 relative">
-          <div className="absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[40%]"></div>
+          <div className="absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[50%]"></div>
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
@@ -108,11 +101,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {!['active', 'permission_needed', 'done'].includes(
             session.status,
           ) && (
-              <Bot
-                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-                aria-label={session.status}
-              />
-            )}
+            <Bot
+              className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+              aria-label={session.status}
+            />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <span
@@ -138,7 +131,6 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             <p className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
               <MarkdownContent content={session.latest_user_message} />
             </p>
-
           )}
           {session.latest_agent_message && (
             <div
