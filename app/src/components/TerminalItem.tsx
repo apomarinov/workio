@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useProcesses } from '../hooks/useProcesses'
 import { useTerminals } from '../hooks/useTerminals'
@@ -18,7 +19,6 @@ import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
-import { cn } from '@/lib/utils'
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -56,7 +56,7 @@ export function TerminalItem({
     if (hideFolder) return null
     const allSessions = [...sessions, ...otherSessions]
     const activeSessions = allSessions.filter(
-      (s) => s.status === 'active' || s.status === 'permission_needed'
+      (s) => s.status === 'active' || s.status === 'permission_needed',
     )
     const session = activeSessions[0] || allSessions[0]
     return session?.git_branch || null
@@ -92,12 +92,13 @@ export function TerminalItem({
       <div>
         <div
           onClick={() => selectTerminal(terminal.id)}
-          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-            } ${terminal.orphaned ? 'opacity-60' : ''}`}
+          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+            isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
-          {(hasSessions || hasProcesses) ? (
+          {hasSessions || hasProcesses ? (
             <Button
               variant="ghost"
               size="icon"
@@ -111,7 +112,12 @@ export function TerminalItem({
               )}
             </Button>
           ) : (
-            <div className={cn("h-6 w-6 flex-shrink-0", !hideFolder ? 'hidden' : '')} />
+            <div
+              className={cn(
+                'h-6 w-6 flex-shrink-0',
+                !hideFolder ? 'hidden' : '',
+              )}
+            />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">

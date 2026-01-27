@@ -45,7 +45,10 @@ function getProcessesForTerminal(
   if (!session.pty.pid) return processes
 
   try {
-    if (session.currentCommand && !COMMAND_IGNORE_LIST.includes(session.currentCommand)) {
+    if (
+      session.currentCommand &&
+      !COMMAND_IGNORE_LIST.includes(session.currentCommand)
+    ) {
       processes.push({
         pid: 0,
         name: session.currentCommand.split(' ')[0] || '',

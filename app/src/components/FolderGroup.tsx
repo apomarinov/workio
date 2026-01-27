@@ -33,7 +33,7 @@ export function FolderGroup({
     ]
     // Prefer active/permission_needed sessions, then most recent
     const activeSessions = allSessions.filter(
-      (s) => s.status === 'active' || s.status === 'permission_needed'
+      (s) => s.status === 'active' || s.status === 'permission_needed',
     )
     const session = activeSessions[0] || allSessions[0]
     return session?.git_branch || null
@@ -53,10 +53,7 @@ export function FolderGroup({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <Folder className="w-4 h-4 flex-shrink-0" />
-            <TruncatedPath
-              path={cwd}
-              className="text-sm font-medium"
-            />
+            <TruncatedPath path={cwd} className="text-sm font-medium" />
           </div>
           {gitBranch && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">

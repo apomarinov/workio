@@ -34,7 +34,9 @@ function AppContent() {
   // Subscribe to hook events for notifications
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
-      const terminal = terminals.find((t) => t.id === data.terminal_id || t.cwd === data.project_path)
+      const terminal = terminals.find(
+        (t) => t.id === data.terminal_id || t.cwd === data.project_path,
+      )
       const terminalName =
         terminal?.name || terminal?.cwd || data.project_path || 'Claude'
 
@@ -42,7 +44,7 @@ function AppContent() {
         // Play notification sound
         const audio = new Audio('/audio/permissions.mp3')
         audio.volume = 0.5
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
 
         // Show browser notification
         notify(`⚠️ Permission Required`, {
@@ -51,13 +53,17 @@ function AppContent() {
             if (terminal) {
               selectTerminal(terminal.id)
             }
-            window.dispatchEvent(new CustomEvent('flash-session', { detail: { sessionId: data.session_id } }))
+            window.dispatchEvent(
+              new CustomEvent('flash-session', {
+                detail: { sessionId: data.session_id },
+              }),
+            )
           },
         })
       } else if (data.hook_type === 'Stop') {
         // Play done sound
         const audio = new Audio('/audio/done.mp3')
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
 
         // Show browser notification
         notify(`✅ Done`, {
@@ -66,7 +72,11 @@ function AppContent() {
             if (terminal) {
               selectTerminal(terminal.id)
             }
-            window.dispatchEvent(new CustomEvent('flash-session', { detail: { sessionId: data.session_id } }))
+            window.dispatchEvent(
+              new CustomEvent('flash-session', {
+                detail: { sessionId: data.session_id },
+              }),
+            )
           },
         })
       }

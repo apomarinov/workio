@@ -20,7 +20,7 @@ export function SessionGroup({
   // Get git branch from the most recent active session
   const gitBranch = useMemo(() => {
     const activeSessions = sessions.filter(
-      (s) => s.status === 'active' || s.status === 'permission_needed'
+      (s) => s.status === 'active' || s.status === 'permission_needed',
     )
     const session = activeSessions[0] || sessions[0]
     return session?.git_branch || null
@@ -40,10 +40,7 @@ export function SessionGroup({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <Folder className="w-4 h-4 flex-shrink-0" />
-            <TruncatedPath
-              path={projectPath}
-              className="text-sm font-medium"
-            />
+            <TruncatedPath path={projectPath} className="text-sm font-medium" />
           </div>
           {gitBranch && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
