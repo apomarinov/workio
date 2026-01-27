@@ -15,6 +15,7 @@ from db import (
     get_session, get_latest_prompt, update_prompt_text,
     message_exists, create_message, get_latest_user_message
 )
+from socket_worker import emit_event
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 DEBOUNCE_SECONDS = int(os.environ.get("DEBOUNCE_SECONDS", 2))
@@ -197,6 +198,8 @@ def process_session(session_id: str, timestamp: str) -> None:
 
             if session and session['transcript_path']:
                 process_transcript(conn, session_id, session['transcript_path'])
+                # Fire session_update event to notify frontend of new messages
+                emit_event("session_update", {"session_id": session_id})
             else:
                 log(conn, "No transcript path in session", session_id=session_id)
 

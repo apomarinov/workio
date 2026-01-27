@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bot, ChevronRight, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -51,11 +51,11 @@ export function SessionItem({ session }: SessionItemProps) {
     <>
       <div
         className={cn(
-          'group flex items-center gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default',
+          'group flex items-start gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-default',
           isFlashing && 'animate-flash',
         )}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 mt-0.5">
           {session.status === 'permission_needed' && (
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
@@ -88,7 +88,19 @@ export function SessionItem({ session }: SessionItemProps) {
             />
           )}
         </div>
-        <span className="text-xs truncate flex-1">{displayName}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs truncate block">{displayName}</span>
+          {session.latest_user_message && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5 flex gap-1 items-center">
+              <ChevronRight className='w-3' /> {session.latest_user_message}
+            </p>
+          )}
+          {session.latest_agent_message && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {session.latest_agent_message}
+            </p>
+          )}
+        </div>
         <div className="hidden group-hover:flex">
           <Button
             variant="ghost"

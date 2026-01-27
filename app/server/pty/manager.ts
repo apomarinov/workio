@@ -427,5 +427,3 @@ export function attachSession(
   return true
 }
 
-// Export CommandEvent type for consumers
-export type { CommandEvent }

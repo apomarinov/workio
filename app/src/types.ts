@@ -31,6 +31,8 @@ export interface Session {
 
 export interface SessionWithProject extends Session {
   project_path: string
+  latest_user_message: string | null
+  latest_agent_message: string | null
 }
 
 export interface Prompt {

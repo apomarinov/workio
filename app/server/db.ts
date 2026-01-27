@@ -2,14 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import type { Project, Session, Settings, Terminal } from '../src/types'
+import type { Project, SessionWithProject, Settings, Terminal } from '../src/types'
 import { env } from './env'
-
-export type { Terminal, Project, Session, Settings }
-
-export interface SessionWithProject extends Session {
-  project_path: string
-}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = path.join(__dirname, '../../schema.sql')
@@ -49,7 +43,20 @@ export function getProjectById(id: number): Project | undefined {
 export function getAllSessions(): SessionWithProject[] {
   return db
     .prepare(`
-      SELECT s.*, p.path as project_path
+      SELECT
+        s.*,
+        p.path as project_path,
+        (
+          SELECT pr.prompt FROM prompts pr
+          WHERE pr.session_id = s.session_id AND pr.prompt IS NOT NULL
+          ORDER BY pr.created_at DESC LIMIT 1
+        ) as latest_user_message,
+        (
+          SELECT m.body FROM messages m
+          JOIN prompts pr ON m.prompt_id = pr.id
+          WHERE pr.session_id = s.session_id AND m.is_user = 0
+          ORDER BY m.created_at DESC LIMIT 1
+        ) as latest_agent_message
       FROM sessions s
       JOIN projects p ON s.project_id = p.id
       WHERE s.status != 'ended'

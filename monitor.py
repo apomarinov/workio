@@ -204,10 +204,6 @@ def main() -> None:
             project_name = Path(project_path).name if project_path else 'Unknown'
             notify(project_name, "Permission Request")
 
-        # Emit session_update for non-tool events (before printing continue)
-        if hook_type not in ('PreToolUse', 'PostToolUse'):
-            start_socket_worker(session_id, "session_update", {})
-
         # Emit hook event to connected clients
         terminal_id_str = os.environ.get('CLAUDE_TERMINAL_ID')
         terminal_id = int(terminal_id_str) if terminal_id_str else None

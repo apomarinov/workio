@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import * as api from '../lib/api'
-import type { SessionWithProject } from '../types'
+import type { HookEvent, SessionWithProject } from '../types'
 import { useSocket } from './useSocket'
 
 export function useClaudeSessions() {
@@ -14,7 +14,11 @@ export function useClaudeSessions() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    return subscribe('session_update', () => {
+    return subscribe<HookEvent>('hook', (data) => {
+      if (data.hook_type === 'UserPromptSubmit') {
+        mutate();
+        return;
+      }
       // Debounce refetch
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
@@ -22,6 +26,12 @@ export function useClaudeSessions() {
       debounceRef.current = setTimeout(() => {
         mutate()
       }, 1000)
+    })
+  }, [subscribe, mutate])
+
+  useEffect(() => {
+    return subscribe('session_update', () => {
+      mutate()
     })
   }, [subscribe, mutate])
 
