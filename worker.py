@@ -23,9 +23,9 @@ DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 DEBOUNCE_SECONDS = int(os.environ.get("DEBOUNCE_SECONDS", 2))
 
 # Tool processing constants
-MAX_OUTPUT_LENGTH = 10000      # Max chars for command output
-MAX_DIFF_LENGTH = 5000         # Max chars for diff content
-MAX_CONTENT_LENGTH = 10000     # Max chars for file content
+MAX_OUTPUT_LENGTH = 50000      # Max chars for command output
+MAX_DIFF_LENGTH = 50000         # Max chars for diff content
+MAX_CONTENT_LENGTH = 50000     # Max chars for file content
 
 
 def truncate_output(text: str, max_length: int) -> tuple[str, bool]:
@@ -408,14 +408,25 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
         is_thinking = False
         is_user = False
 
-        # User message (only string content, skip tool_results which are lists)
+        # User message - can be string or list with text item
         if entry_type == 'user' and message.get('role') == 'user':
             content = message.get('content', '')
+            text_content = None
+
             if isinstance(content, str) and len(content) > 0:
+                text_content = content
+            elif isinstance(content, list):
+                # Look for text item in list (skip tool_results)
+                for item in content:
+                    if isinstance(item, dict) and item.get('type') == 'text':
+                        text_content = item.get('text', '')
+                        break
+
+            if text_content:
                 # Skip local command messages
-                if '<local-command-stdout>' in content or '<local-command-caveat>' in content or '<command-name>' in content:
+                if '<local-command-stdout>' in text_content or '<local-command-caveat>' in text_content or '<command-name>' in text_content:
                     continue
-                body = content
+                body = text_content
                 is_user = True
 
         # Assistant message

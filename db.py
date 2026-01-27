@@ -288,11 +288,12 @@ def upsert_todo_message(
         except (json.JSONDecodeError, TypeError):
             pass  # No state change if we can't parse old tools
 
-        # Update existing todo message with latest state
-        conn.execute('''
-            UPDATE messages SET tools = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ''', (tools, existing['id']))
+        # Only update if state changed - don't touch updated_at for no-op reprocessing
+        if state_changed:
+            conn.execute('''
+                UPDATE messages SET tools = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (tools, existing['id']))
         return existing['id'], existing['todo_id'], False, state_changed
 
     # Create new todo message with hash as todo_id

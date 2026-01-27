@@ -9,12 +9,19 @@ import {
   FileSearch,
   FileText,
   ListTodo,
+  Maximize2,
   Search,
   Sparkles,
   Terminal,
   XCircle,
 } from 'lucide-react'
 import { useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import type {
@@ -63,15 +70,56 @@ function ToolHeader({
   )
 }
 
+function FullscreenModal({
+  open,
+  onOpenChange,
+  title,
+  children,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="font-mono text-sm">{title}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto bg-zinc-900 rounded p-4">
+          {children}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ExpandButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute bottom-2 right-2 p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
+      title="Expand to fullscreen"
+    >
+      <Maximize2 className="w-3.5 h-3.5" />
+    </button>
+  )
+}
+
 function CollapsibleOutput({
   output,
   truncated,
+  title = 'Output',
 }: {
   output: string
   truncated: boolean
+  title?: string
 }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Use local state if set, otherwise fall back to setting
   const expanded = isExpanded ?? settings?.show_tool_output ?? false
@@ -95,10 +143,22 @@ function CollapsibleOutput({
         {truncated && <span className="text-amber-500">(truncated)</span>}
       </button>
       {expanded && (
-        <pre className="mt-1 p-2 bg-zinc-900 rounded text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+        <div className="relative">
+          <pre className="mt-1 p-2 bg-zinc-900 rounded text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+            {output}
+          </pre>
+          <ExpandButton onClick={() => setIsFullscreen(true)} />
+        </div>
+      )}
+      <FullscreenModal
+        open={isFullscreen}
+        onOpenChange={setIsFullscreen}
+        title={title}
+      >
+        <pre className="text-xs text-zinc-300 whitespace-pre-wrap">
           {output}
         </pre>
-      )}
+      </FullscreenModal>
     </div>
   )
 }
@@ -120,6 +180,7 @@ function BashToolDisplay({ tool }: { tool: BashTool }) {
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        title={`$ ${tool.input.command}`}
       />
     </div>
   )
@@ -128,6 +189,7 @@ function BashToolDisplay({ tool }: { tool: BashTool }) {
 function EditToolDisplay({ tool }: { tool: EditTool }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const expanded = isExpanded ?? settings?.show_tool_output ?? false
   const fileName = tool.input.file_path.split('/').pop() || tool.input.file_path
 
@@ -167,10 +229,20 @@ function EditToolDisplay({ tool }: { tool: EditTool }) {
               <span>{expanded ? 'Hide diff' : 'Show diff'}</span>
             </button>
             {expanded && (
-              <div className="mt-1 bg-zinc-900 rounded overflow-hidden max-h-80 overflow-y-auto">
-                <DiffView diff={tool.diff} />
+              <div className="relative">
+                <div className="mt-1 bg-zinc-900 rounded overflow-hidden max-h-80 overflow-y-auto">
+                  <DiffView diff={tool.diff} />
+                </div>
+                <ExpandButton onClick={() => setIsFullscreen(true)} />
               </div>
             )}
+            <FullscreenModal
+              open={isFullscreen}
+              onOpenChange={setIsFullscreen}
+              title={tool.input.file_path}
+            >
+              <DiffView diff={tool.diff} />
+            </FullscreenModal>
           </div>
         )
       )}
@@ -196,6 +268,7 @@ function ReadToolDisplay({ tool }: { tool: ReadTool }) {
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        title={tool.input.file_path}
       />
     </div>
   )
@@ -217,6 +290,7 @@ function WriteToolDisplay({ tool }: { tool: WriteTool }) {
       <CollapsibleOutput
         output={tool.content}
         truncated={tool.content_truncated}
+        title={tool.input.file_path}
       />
     </div>
   )
@@ -240,6 +314,7 @@ function GrepToolDisplay({ tool }: { tool: GrepTool }) {
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        title={`${tool.name === 'Glob' ? 'Glob' : 'Grep'}: ${tool.input.pattern}`}
       />
     </div>
   )
@@ -257,6 +332,7 @@ function TaskToolDisplay({ tool }: { tool: TaskTool }) {
       <CollapsibleOutput
         output={tool.output}
         truncated={tool.output_truncated}
+        title={`Task: ${tool.input.description}`}
       />
     </div>
   )
@@ -305,6 +381,7 @@ function GenericToolDisplay({ tool }: { tool: GenericTool }) {
         <CollapsibleOutput
           output={tool.output}
           truncated={tool.output_truncated || false}
+          title={tool.name}
         />
       )}
     </div>
