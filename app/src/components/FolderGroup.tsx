@@ -13,6 +13,8 @@ interface FolderGroupProps {
   otherSessionsForCwd: SessionWithProject[]
   expandedTerminalSessions: Set<number>
   onToggleTerminalSessions: (terminalId: number) => void
+  expandedOtherSessions: Set<number>
+  onToggleOtherSessions: (terminalId: number) => void
 }
 
 export function FolderGroup({
@@ -24,6 +26,8 @@ export function FolderGroup({
   otherSessionsForCwd,
   expandedTerminalSessions,
   onToggleTerminalSessions,
+  expandedOtherSessions,
+  onToggleOtherSessions,
 }: FolderGroupProps) {
   // Get git branch from the most recent active session
   const gitBranch = useMemo(() => {
@@ -80,6 +84,8 @@ export function FolderGroup({
               }
               sessionsExpanded={expandedTerminalSessions.has(terminal.id)}
               onToggleSessions={() => onToggleTerminalSessions(terminal.id)}
+              otherSessionsExpanded={expandedOtherSessions.has(terminal.id)}
+              onToggleOtherSessions={() => onToggleOtherSessions(terminal.id)}
             />
           ))}
         </div>

@@ -7,7 +7,6 @@ import {
   useDefaultLayout,
 } from 'react-resizable-panels'
 import { Toaster } from '@/components/ui/sonner'
-import { HomePage } from './components/HomePage'
 import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
@@ -91,16 +90,6 @@ function AppContent() {
       <div className="h-full flex items-center justify-center bg-zinc-950 text-white">
         <p className="text-zinc-400">Loading...</p>
       </div>
-    )
-  }
-
-  // Show home page if no terminals
-  if (terminals.length === 0) {
-    return (
-      <>
-        <HomePage />
-        <Toaster />
-      </>
     )
   }
 

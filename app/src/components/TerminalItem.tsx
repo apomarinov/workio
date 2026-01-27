@@ -19,6 +19,7 @@ import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
+import { useSessionContext } from '@/context/SessionContext'
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -27,6 +28,8 @@ interface TerminalItemProps {
   otherSessions?: SessionWithProject[]
   sessionsExpanded?: boolean
   onToggleSessions?: () => void
+  otherSessionsExpanded?: boolean
+  onToggleOtherSessions?: () => void
 }
 
 export function TerminalItem({
@@ -36,9 +39,12 @@ export function TerminalItem({
   otherSessions = [],
   sessionsExpanded = true,
   onToggleSessions,
+  otherSessionsExpanded = true,
+  onToggleOtherSessions,
 }: TerminalItemProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminals()
+  const { clearSession } = useSessionContext()
   const allProcesses = useProcesses()
   const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
   const isActive = terminal.id === activeTerminal?.id
@@ -46,7 +52,6 @@ export function TerminalItem({
   const [showEditModal, setShowEditModal] = useState(false)
   const [processesExpanded, setProcessesExpanded] = useState(true)
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
-  const [otherSessionsExpanded, setOtherSessionsExpanded] = useState(true)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0 || otherSessions.length > 0
   const hasProcesses = processes.length > 0
@@ -91,12 +96,14 @@ export function TerminalItem({
     <>
       <div>
         <div
-          onClick={() => selectTerminal(terminal.id)}
-          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-          } ${terminal.orphaned ? 'opacity-60' : ''}`}
+          onClick={() => {
+            selectTerminal(terminal.id)
+            clearSession()
+          }}
+          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            } ${terminal.orphaned ? 'opacity-60' : ''}`}
         >
           {hasSessions || hasProcesses ? (
             <Button
@@ -226,21 +233,16 @@ export function TerminalItem({
               <>
                 <button
                   type="button"
-                  onClick={() =>
-                    setOtherSessionsExpanded(!otherSessionsExpanded)
-                  }
-                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  onClick={() => onToggleOtherSessions?.()}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground cursor-pointer transition-colors w-full"
                 >
                   {otherSessionsExpanded ? (
                     <ChevronDown className="w-3 h-3" />
                   ) : (
                     <ChevronRight className="w-3 h-3" />
                   )}
-                  <span className="hidden @[230px]/sidebar:block">
-                    Other Claude Sessions ({otherSessions.length})
-                  </span>
-                  <span className="@[230px]/sidebar:hidden">
-                    Other Sessions ({otherSessions.length})
+                  <span>
+                    Claude Sessions ({otherSessions.length})
                   </span>
                 </button>
                 {otherSessionsExpanded &&

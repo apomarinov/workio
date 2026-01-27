@@ -164,10 +164,10 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         </div>
         <div className="absolute invisible group-hover:visible top-1 right-1">
           <Button
-            variant="ghost"
+            variant='secondary'
             size="icon"
             onClick={handleDeleteClick}
-            className="h-4 w-4 text-muted-foreground hover:text-destructive"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
           >
             <Trash2 className="w-3 h-3" />
           </Button>

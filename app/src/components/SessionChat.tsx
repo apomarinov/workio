@@ -1,4 +1,4 @@
-import { Loader2, X } from 'lucide-react'
+import { Folder, Loader2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useSessionContext } from '../context/SessionContext'
@@ -113,19 +113,14 @@ export function SessionChat() {
               {session?.name || 'Session Chat'}
             </h2>
             {session?.project_path && (
-              <p className="text-xs text-zinc-500 truncate">
-                {session.project_path}
-              </p>
+              <div className='flex gap-1 items-center'>
+                <Folder className='w-3 h-3' />
+                <p className="text-xs text-zinc-500 truncate">
+                  {session.project_path}
+                </p>
+              </div>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={clearSession}
-            className="flex-shrink-0 text-zinc-400 hover:text-zinc-100"
-          >
-            <X className="w-4 h-4" />
-          </Button>
         </div>
 
         {/* Messages */}
