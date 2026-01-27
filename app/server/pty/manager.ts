@@ -7,12 +7,14 @@ import type { ActiveProcess } from '../../shared/types'
 import { getSettings, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
 import { type CommandEvent, createOscParser } from './osc-parser'
-import { getChildProcesses, getZellijSessionProcesses } from './process-tree'
+import { getZellijSessionProcesses } from './process-tree'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const MAX_BUFFER_LINES = 5000
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+
+const COMMAND_IGNORE_LIST = ['claude']
 
 export interface PtySession {
   pty: IPty
@@ -43,10 +45,14 @@ function getProcessesForTerminal(
   if (!session.pty.pid) return processes
 
   try {
-    // Check direct child processes
-    const procs = getChildProcesses(session.pty.pid, terminalId)
-    for (const p of procs) {
-      processes.push(p)
+    if (session.currentCommand && !COMMAND_IGNORE_LIST.includes(session.currentCommand)) {
+      processes.push({
+        pid: 0,
+        name: session.currentCommand.split(' ')[0] || '',
+        command: session.currentCommand,
+        terminalId: terminalId,
+        source: 'direct',
+      })
     }
 
     // Check Zellij session (terminal-<ID>)
