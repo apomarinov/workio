@@ -235,6 +235,20 @@ def compute_todo_hash(session_id: str, todos: list[dict]) -> str:
     return hashlib.md5(hash_input.encode()).hexdigest()
 
 
+def compute_state_key(todos: list[dict]) -> str:
+    """Compute MD5 hash from all todo statuses in order.
+
+    This creates a key that changes whenever any todo status changes,
+    enabling socket updates for todo progress.
+    """
+    import hashlib
+
+    # Preserve order - statuses in the same order as todos
+    statuses = [t.get('status', 'pending') for t in todos]
+    hash_input = "|".join(statuses)
+    return hashlib.md5(hash_input.encode()).hexdigest()
+
+
 def upsert_todo_message(
     conn: sqlite3.Connection,
     session_id: str,
@@ -242,36 +256,51 @@ def upsert_todo_message(
     uuid: str,
     created_at: str,
     tools: str,
-    todos: list[dict]
-) -> tuple[int, str, bool]:
-    """Upsert a todo message. Returns (message_id, todo_id, is_new).
+    todos: list[dict],
+    state_key: str
+) -> tuple[int, str, bool, bool]:
+    """Upsert a todo message. Returns (message_id, todo_id, is_new, state_changed).
 
     Uses MD5 hash of session_id + todo contents as the stable identifier.
     This ensures the same todo list always maps to the same message,
     regardless of prompt_id, tool_use_id, or reprocessing.
+
+    state_key is used to detect when todo statuses have changed.
     """
     # Compute stable hash from session_id + todo contents
     todo_hash = compute_todo_hash(session_id, todos)
 
     # Check if a message with this todo_hash already exists
     existing = conn.execute('''
-        SELECT id, todo_id FROM messages WHERE todo_id = ?
+        SELECT id, todo_id, tools FROM messages WHERE todo_id = ?
     ''', (todo_hash,)).fetchone()
 
     if existing:
+        # Check if state_key changed by comparing with stored tools JSON
+        # Only consider it a state change if old todo HAD a state_key (not empty/missing)
+        state_changed = False
+        try:
+            old_tools = json.loads(existing['tools']) if existing['tools'] else {}
+            old_state_key = old_tools.get('state_key', '')
+            # Only emit state change if old had a state_key AND it differs
+            if old_state_key and old_state_key != state_key:
+                state_changed = True
+        except (json.JSONDecodeError, TypeError):
+            pass  # No state change if we can't parse old tools
+
         # Update existing todo message with latest state
         conn.execute('''
             UPDATE messages SET tools = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ''', (tools, existing['id']))
-        return existing['id'], existing['todo_id'], False
+        return existing['id'], existing['todo_id'], False, state_changed
 
     # Create new todo message with hash as todo_id
     cursor = conn.execute('''
         INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user, tools, todo_id)
         VALUES (?, ?, ?, NULL, 0, 0, ?, ?)
     ''', (prompt_id, uuid, created_at, tools, todo_hash))
-    return cursor.lastrowid, todo_hash, True
+    return cursor.lastrowid, todo_hash, True, False
 
 
 def get_latest_user_message(conn: sqlite3.Connection, prompt_id: int) -> sqlite3.Row | None:

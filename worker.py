@@ -14,7 +14,8 @@ from pathlib import Path
 from db import (
     get_db, log,
     get_session, get_latest_prompt, update_prompt_text,
-    message_exists, create_message, get_latest_user_message, upsert_todo_message
+    message_exists, create_message, get_latest_user_message, upsert_todo_message,
+    compute_state_key, compute_todo_hash
 )
 from socket_worker import emit_event
 
@@ -189,11 +190,13 @@ def build_tool_json(tool_use: dict, result: dict) -> dict | None:
             todos = input_data.get('todos') or []
             if not isinstance(todos, list):
                 todos = []
+            state_key = compute_state_key(todos)
             return {
                 **base,
                 'input': {
                     'todos': todos,
                 },
+                'state_key': state_key,
             }
 
         # Generic fallback for other/unknown tools
@@ -300,6 +303,19 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
             log(conn, "Error processing user entry for tools", session_id=session_id, error=str(e))
             continue
 
+    # Pass 2.5: Deduplicate TodoWrite entries - keep only the LAST one per todo_hash
+    # This prevents re-emitting all state transitions on reprocessing
+    todo_final_states = {}  # todo_hash -> tool_use_id (latest)
+    for tool_use_id, tool_use in tool_uses.items():
+        if tool_use.get('name') == 'TodoWrite':
+            todos = tool_use.get('input', {}).get('todos', [])
+            todo_hash = compute_todo_hash(session_id, todos)
+            # Later entries overwrite earlier ones, so we keep the final state
+            todo_final_states[todo_hash] = tool_use_id
+
+    # Set of TodoWrite tool_use_ids that are the final state for their todo_hash
+    final_todo_ids = set(todo_final_states.values())
+
     # Pass 3: Process matched tool calls and create tool messages
     for tool_use_id, tool_use in tool_uses.items():
         try:
@@ -313,30 +329,37 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
             tools_str = json.dumps(tool_json)
 
             if tool_name == 'TodoWrite':
-                # TodoWrite uses upsert - updates existing incomplete batch or creates new
+                # Skip non-final TodoWrite entries (we only process the last one per todo_hash)
+                if tool_use_id not in final_todo_ids:
+                    continue
+
+                # TodoWrite uses upsert - updates existing or creates new based on content hash
                 todos = tool_use.get('input', {}).get('todos', [])
-                msg_id, todo_id, is_new = upsert_todo_message(
+                state_key = tool_json.get('state_key', '')
+                msg_id, todo_id, is_new, state_changed = upsert_todo_message(
                     conn,
                     session_id=session_id,
                     prompt_id=prompt_id,
                     uuid=tool_use_id,
                     created_at=tool_use.get('timestamp'),
                     tools=tools_str,
-                    todos=todos
+                    todos=todos,
+                    state_key=state_key
                 )
-                new_messages.append({
-                    'id': msg_id,
-                    'prompt_id': prompt_id,
-                    'uuid': tool_use_id,
-                    'is_user': False,
-                    'thinking': False,
-                    'todo_id': todo_id,
-                    'body': None,
-                    'tools': tool_json,
-                    'created_at': tool_use.get('timestamp'),
-                    'prompt_text': None,
-                    'is_update': not is_new,
-                })
+                # Emit if message was created (is_new) or updated (state_changed)
+                if is_new or state_changed:
+                    new_messages.append({
+                        'id': msg_id,
+                        'prompt_id': prompt_id,
+                        'uuid': tool_use_id,
+                        'is_user': False,
+                        'thinking': False,
+                        'todo_id': todo_id,
+                        'body': None,
+                        'tools': tool_json,
+                        'created_at': tool_use.get('timestamp'),
+                        'prompt_text': None,
+                    })
             else:
                 # Regular tool call - skip if already exists
                 if message_exists(conn, tool_use_id):

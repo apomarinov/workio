@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import * as api from '../lib/api'
 import type { SessionMessage, SessionMessagesResponse } from '../types'
@@ -88,7 +88,14 @@ export function useSessionMessages(sessionId: string | null) {
     setIsLoadingMore(true)
     try {
       const result = await api.getSessionMessages(sessionId, PAGE_SIZE, offset)
-      setAllMessages((prev) => [...prev, ...result.messages])
+      setAllMessages((prev) => {
+        // Deduplicate - only add messages not already in the list
+        const existingIds = new Set(prev.map((m) => m.id))
+        const newMessages = result.messages.filter(
+          (m) => !existingIds.has(m.id),
+        )
+        return [...prev, ...newMessages]
+      })
       setOffset((prev) => prev + result.messages.length)
       setHasMore(result.hasMore)
     } finally {
@@ -97,7 +104,18 @@ export function useSessionMessages(sessionId: string | null) {
   }, [sessionId, offset, isLoadingMore, hasMore])
 
   // Reverse messages for display (newest first in API, oldest first in UI)
-  const displayMessages = [...allMessages].reverse()
+  // Also deduplicate to prevent React key errors
+  const displayMessages = useMemo(() => {
+    const seen = new Set<number>()
+    const deduped: SessionMessage[] = []
+    for (const msg of allMessages) {
+      if (!seen.has(msg.id)) {
+        seen.add(msg.id)
+        deduped.push(msg)
+      }
+    }
+    return deduped.reverse()
+  }, [allMessages])
 
   return {
     messages: displayMessages,
