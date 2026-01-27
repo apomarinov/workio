@@ -133,9 +133,13 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             style={{
               lineHeight: showGitBranch ? '' : undefined,
             }}
-            className={cn('text-xs block', showGitBranch && '')}
+            className={cn(
+              'text-xs block whitespace-break-spaces break-all',
+              showGitBranch && '',
+            )}
           >
-            {displayName.slice(0, 300)}
+            {displayName.slice(0, 200)}
+            {displayName.length > 200 ? '...' : ''}
           </span>
           {showGitBranch && session.project_path && !session.git_branch && (
             <span

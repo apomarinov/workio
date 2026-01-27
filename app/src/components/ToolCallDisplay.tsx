@@ -55,19 +55,32 @@ function ToolHeader({
   status,
   meta,
   onExpand,
+  diff,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   status: 'success' | 'error'
   meta?: React.ReactNode
   onExpand?: () => void
+  diff?: boolean
 }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       <StatusDot status={status} />
       <Icon className="w-4 h-4 min-w-4 min-h-4 text-zinc-400" />
-      <span className="font-mono text-zinc-300 flex-1">{label}</span>
-      {meta && <span className="text-xs text-zinc-500">{meta}</span>}
+      {!diff ? (
+        <div className="flex flex-col gap-2 flex-1">
+          {meta && <span className=" text-zinc-300">{meta}</span>}
+          <span className="font-mono text-xs text-zinc-500 flex-1">
+            {label}
+          </span>
+        </div>
+      ) : (
+        <>
+          <span className="font-mono text-zinc-300 flex-1">{label}</span>
+          {meta && <span className="text-xs text-zinc-500">{meta}</span>}
+        </>
+      )}
       {onExpand && (
         <button
           type="button"
@@ -415,10 +428,15 @@ function EditToolDisplay({
         icon={FilePen}
         label={`Update ${fileName}`}
         status={tool.status}
+        diff
         meta={
           <>
-            <span className="text-green-400 mr-1">+{tool.lines_added}</span>
-            <span className="text-red-400">-{tool.lines_removed}</span>
+            {tool.lines_added > 0 && (
+              <span className="text-green-400 mr-1">+{tool.lines_added}</span>
+            )}
+            {tool.lines_removed > 0 && (
+              <span className="text-red-400">-{tool.lines_removed}</span>
+            )}
           </>
         }
         onExpand={onExpand}
