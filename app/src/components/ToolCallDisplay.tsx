@@ -69,7 +69,7 @@ function ToolHeader({
       <StatusDot status={status} />
       <Icon className="w-4 h-4 min-w-4 min-h-4 text-zinc-400" />
       {!diff ? (
-        <div className="flex flex-col gap-2 flex-1">
+        <div className="flex flex-col gap-0 flex-1">
           {meta && <span className=" text-zinc-300">{meta}</span>}
           <span className="font-mono text-xs text-zinc-500 flex-1">
             {label}
@@ -690,8 +690,8 @@ export function ToolCallDisplay({ tool }: ToolCallDisplayProps) {
         'Task',
         'TodoWrite',
       ].includes(tool.name) && (
-        <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
-      )}
+          <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
+        )}
 
       <FullscreenToolDialog
         tool={tool}
