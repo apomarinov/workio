@@ -11,6 +11,49 @@ export interface ResolvedSSHConfig {
   identityFile: string
 }
 
+export interface SSHHostEntry {
+  alias: string
+  hostname: string
+  user: string | null
+}
+
+export function listSSHHosts(): SSHHostEntry[] {
+  const configPath = path.join(os.homedir(), '.ssh', 'config')
+
+  if (!fs.existsSync(configPath)) {
+    return []
+  }
+
+  let configText: string
+  try {
+    configText = fs.readFileSync(configPath, 'utf-8')
+  } catch {
+    return []
+  }
+
+  const config = SSHConfig.parse(configText)
+  const hosts: SSHHostEntry[] = []
+
+  for (const section of config) {
+    if (
+      'param' in section &&
+      section.param === 'Host' &&
+      section.value &&
+      !String(section.value).includes('*')
+    ) {
+      const alias = String(section.value)
+      const resolved = config.compute(alias)
+      hosts.push({
+        alias,
+        hostname: (resolved.HostName as string) || alias,
+        user: (resolved.User as string) || null,
+      })
+    }
+  }
+
+  return hosts
+}
+
 export function validateSSHHost(
   alias: string,
 ):

@@ -237,8 +237,9 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('all')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'all' ? 'bg-accent' : ''
+                }`}
               >
                 <TerminalIcon className="w-4 h-4" />
                 Terminals
@@ -248,8 +249,9 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('sessions')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'sessions' ? 'bg-accent' : ''
+                }`}
               >
                 <Bot className="w-4 h-4" />
                 Sessions
@@ -259,8 +261,9 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('folder')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
+                  groupingMode === 'folder' ? 'bg-accent' : ''
+                }`}
               >
                 <Folder className="w-4 h-4" />
                 Folders
@@ -295,38 +298,38 @@ export function Sidebar({ width }: SidebarProps) {
       <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
         {groupingMode === 'sessions'
           ? sessions.map((session) => (
-            <SessionItem
-              key={session.session_id}
-              session={session}
-              showGitBranch
-            />
-          ))
+              <SessionItem
+                key={session.session_id}
+                session={session}
+                showGitBranch
+              />
+            ))
           : groupingMode === 'folder'
             ? Array.from(groupedTerminals.entries()).map(
-              ([folderCwd, folderTerminals]) => (
-                <FolderGroup
-                  key={folderCwd}
-                  cwd={folderCwd}
-                  terminals={folderTerminals}
-                  expanded={expandedFolders.has(folderCwd)}
-                  onToggle={() => toggleFolder(folderCwd)}
-                  sessionsForTerminal={sessionsForTerminal}
-                  expandedTerminalSessions={expandedTerminalSessionsSet}
-                  onToggleTerminalSessions={toggleTerminalSessions}
-                />
-              ),
-            )
+                ([folderCwd, folderTerminals]) => (
+                  <FolderGroup
+                    key={folderCwd}
+                    cwd={folderCwd}
+                    terminals={folderTerminals}
+                    expanded={expandedFolders.has(folderCwd)}
+                    onToggle={() => toggleFolder(folderCwd)}
+                    sessionsForTerminal={sessionsForTerminal}
+                    expandedTerminalSessions={expandedTerminalSessionsSet}
+                    onToggleTerminalSessions={toggleTerminalSessions}
+                  />
+                ),
+              )
             : terminals.map((terminal) => (
-              <TerminalItem
-                key={terminal.id}
-                terminal={terminal}
-                sessions={sessionsForTerminal.get(terminal.id) || []}
-                sessionsExpanded={expandedTerminalSessionsSet.has(
-                  terminal.id,
-                )}
-                onToggleSessions={() => toggleTerminalSessions(terminal.id)}
-              />
-            ))}
+                <TerminalItem
+                  key={terminal.id}
+                  terminal={terminal}
+                  sessions={sessionsForTerminal.get(terminal.id) || []}
+                  sessionsExpanded={expandedTerminalSessionsSet.has(
+                    terminal.id,
+                  )}
+                  onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+                />
+              ))}
 
         {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
         {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (

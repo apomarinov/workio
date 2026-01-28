@@ -22,7 +22,7 @@ import {
   updateTerminal,
 } from '../db'
 import { destroySession } from '../pty/manager'
-import { validateSSHHost } from '../ssh/config'
+import { listSSHHosts, validateSSHHost } from '../ssh/config'
 
 interface CreateTerminalBody {
   cwd?: string
@@ -40,6 +40,11 @@ interface TerminalParams {
 }
 
 export default async function terminalRoutes(fastify: FastifyInstance) {
+  // List available SSH hosts from ~/.ssh/config
+  fastify.get('/api/ssh/hosts', async () => {
+    return listSSHHosts()
+  })
+
   // List all terminals
   fastify.get('/api/terminals', async () => {
     const terminals = getAllTerminals()

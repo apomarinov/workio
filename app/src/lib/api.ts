@@ -13,6 +13,18 @@ export async function getTerminals(): Promise<Terminal[]> {
   return res.json()
 }
 
+export interface SSHHostEntry {
+  alias: string
+  hostname: string
+  user: string | null
+}
+
+export async function getSSHHosts(): Promise<SSHHostEntry[]> {
+  const res = await fetch(`${API_BASE}/ssh/hosts`)
+  if (!res.ok) throw new Error('Failed to fetch SSH hosts')
+  return res.json()
+}
+
 export async function createTerminal(
   cwd: string,
   name?: string,

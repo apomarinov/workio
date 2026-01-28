@@ -1,5 +1,5 @@
-import { Globe, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -8,8 +8,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { useTerminals } from '../hooks/useTerminals'
+import { getSSHHosts, type SSHHostEntry } from '../lib/api'
+import { cn } from '@/lib/utils'
 
 interface CreateSSHTerminalModalProps {
   open: boolean
@@ -26,12 +35,23 @@ export function CreateSSHTerminalModal({
   const [sshHost, setSSHHost] = useState('')
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [hosts, setHosts] = useState<SSHHostEntry[]>([])
+  const [loadingHosts, setLoadingHosts] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setLoadingHosts(true)
+      getSSHHosts()
+        .then(setHosts)
+        .catch(() => toast.error('Failed to load SSH hosts'))
+        .finally(() => setLoadingHosts(false))
+    }
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const trimmedHost = sshHost.trim()
-    if (!trimmedHost) {
+    if (!sshHost) {
       toast.error('SSH host is required')
       return
     }
@@ -42,7 +62,7 @@ export function CreateSSHTerminalModal({
         '~',
         name.trim() || undefined,
         undefined,
-        trimmedHost,
+        sshHost,
       )
       setSSHHost('')
       setName('')
@@ -65,24 +85,32 @@ export function CreateSSHTerminalModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label htmlFor="ssh_host" className="text-sm font-medium">
               SSH Host
             </label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="ssh_host"
-                type="text"
-                value={sshHost}
-                onChange={(e) => setSSHHost(e.target.value)}
-                placeholder="e.g. hz-1"
-                className="pl-10"
-                autoFocus
-              />
-            </div>
+            <Select value={sshHost} onValueChange={setSSHHost}>
+              <SelectTrigger id="ssh_host" className={cn("w-full [&>span]:text-left", sshHost && '!h-12')}>
+                <SelectValue
+                  placeholder={loadingHosts ? 'Loading...' : 'Select a host'}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {hosts.map((host) => (
+                  <SelectItem key={host.alias} value={host.alias}>
+                    <div className="flex flex-col">
+                      <span>{host.alias}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {host.user ? `${host.user}@` : ''}
+                        {host.hostname}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
-              Alias from ~/.ssh/config
+              Hosts from ~/.ssh/config
             </p>
           </div>
 
@@ -99,7 +127,11 @@ export function CreateSSHTerminalModal({
             />
           </div>
 
-          <Button type="submit" disabled={creating} className="w-full mt-2">
+          <Button
+            type="submit"
+            disabled={creating || !sshHost}
+            className="w-full mt-2"
+          >
             <Plus className="w-4 h-4 mr-2" />
             {creating ? 'Connecting...' : 'Connect'}
           </Button>
