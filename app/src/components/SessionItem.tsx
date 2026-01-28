@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   Bot,
   CheckIcon,
+  ChevronDown,
+  ChevronRight,
   Folder,
   GitBranch,
   Trash2,
@@ -11,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
@@ -28,8 +31,31 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   const { settings } = useSettings()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
+  const [collapsedSessions, setCollapsedSessions] = useLocalStorage<string[]>(
+    'sidebar-collapsed-sessions',
+    [],
+  )
+  const isExpanded = !collapsedSessions.includes(session.session_id)
   const displayName = session.name || 'Untitled'
   const isSelected = activeSessionId === session.session_id
+
+  const toggleExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCollapsedSessions((prev) =>
+      prev.includes(session.session_id)
+        ? prev.filter((id) => id !== session.session_id)
+        : [...prev, session.session_id],
+    )
+  }
+
+  const handleClick = () => {
+    if (!isExpanded) {
+      setCollapsedSessions((prev) =>
+        prev.filter((id) => id !== session.session_id),
+      )
+    }
+    selectSession(session.session_id)
+  }
 
   useEffect(() => {
     const handleFlash = (e: CustomEvent<{ sessionId: string }>) => {
@@ -65,13 +91,15 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
     deleteSession(session.session_id)
   }
   const showUserMessage =
-    session.latest_user_message && (session.latest_user_message !== displayName && session.latest_user_message.indexOf(displayName) !== 0)
-  const isSmall = !session.latest_user_message && !session.latest_agent_message;
+    session.latest_user_message &&
+    session.latest_user_message !== displayName &&
+    session.latest_user_message.indexOf(displayName) !== 0
+  const isSmall = !session.latest_user_message && !session.latest_agent_message
 
   return (
     <>
       <div
-        onClick={() => selectSession(session.session_id)}
+        onClick={handleClick}
         className={cn(
           'group flex items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer relative',
           isFlashing && 'animate-flash',
@@ -79,113 +107,135 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         )}
       >
         <div className="flex items-start gap-1 mt-0.5 relative">
-          {session.latest_agent_message && (
+          {isExpanded && session.latest_agent_message && (
             <div
               className={cn(
                 'absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[calc(100%-33px)]',
               )}
             ></div>
           )}
-          {session.status === 'done' && (
-            <CheckIcon className="w-3.5 h-3.5 text-green-500" />
-          )}
-          {['active', 'permission_needed'].includes(session.status) && (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 300 150"
-              className="w-3.5 h-3.5"
-            >
-              <path
-                fill="none"
-                stroke="#D97757"
-                strokeWidth="40"
-                strokeLinecap="round"
-                strokeDasharray="300 385"
-                strokeDashoffset="0"
-                d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
-              >
-                <animate
-                  attributeName="stroke-dashoffset"
-                  calcMode="spline"
-                  dur="2s"
-                  values="685;-685"
-                  keySplines="0 0 1 1"
-                  repeatCount="indefinite"
-                />
-              </path>
-            </svg>
-          )}
-          {session.status === 'permission_needed' && (
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse ml-1" />
-          )}
-          {!['active', 'permission_needed', 'done'].includes(
-            session.status,
-          ) && (
-              <Bot
-                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-                aria-label={session.status}
-              />
+          <div className="icons group-hover:hidden">
+            {session.status === 'done' && (
+              <CheckIcon className="w-3.5 h-3.5 text-green-500" />
             )}
+            {['active', 'permission_needed'].includes(session.status) && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 300 150"
+                className="w-3.5 h-3.5"
+              >
+                <path
+                  fill="none"
+                  stroke="#D97757"
+                  strokeWidth="40"
+                  strokeLinecap="round"
+                  strokeDasharray="300 385"
+                  strokeDashoffset="0"
+                  d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+                >
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    calcMode="spline"
+                    dur="2s"
+                    values="685;-685"
+                    keySplines="0 0 1 1"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              </svg>
+            )}
+            {session.status === 'permission_needed' && (
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse ml-1" />
+            )}
+            {!['active', 'permission_needed', 'done'].includes(
+              session.status,
+            ) && (
+                <Bot
+                  className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                  aria-label={session.status}
+                />
+              )}
+          </div>
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className="hidden cursor-pointer group-hover:block"
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
         <div className="flex-1 min-w-0">
-          <span
-            style={{
-              lineHeight: showGitBranch ? '' : undefined,
-            }}
-            className={cn(
-              'text-xs block whitespace-break-spaces break-all',
-              showGitBranch && '',
-            )}
-          >
-            {displayName.slice(0, 200)}
-            {displayName.length > 200 ? '...' : ''}
-          </span>
-          {showGitBranch && session.project_path && !session.git_branch && (
-            <span
-              className={cn(
-                'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
+          {isExpanded ? (
+            <>
+              <span
+                style={{
+                  lineHeight: showGitBranch ? '' : undefined,
+                }}
+                className={cn(
+                  'text-xs block whitespace-break-spaces break-all',
+                  showGitBranch && '',
+                )}
+              >
+                {displayName.slice(0, 200)}
+                {displayName.length > 200 ? '...' : ''}
+              </span>
+              {showGitBranch && session.project_path && !session.git_branch && (
+                <span
+                  className={cn(
+                    'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
+                  )}
+                >
+                  <Folder className={cn('w-2.5 h-2.5 mr-1')} />
+                  <TruncatedPath path={session.project_path} />
+                </span>
               )}
-            >
-              <Folder className={cn('w-2.5 h-2.5 mr-1')} />
-              <TruncatedPath path={session.project_path} />
-            </span>
-          )}
-          {showGitBranch && session.git_branch && (
-            <span
-              className={cn(
-                'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
+              {showGitBranch && session.git_branch && (
+                <span
+                  className={cn(
+                    'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
+                  )}
+                >
+                  <GitBranch
+                    className={cn('w-2.5 h-2.5 mr-1', showGitBranch && '')}
+                  />
+                  {session.git_branch}
+                </span>
               )}
-            >
-              <GitBranch
-                className={cn('w-2.5 h-2.5 mr-1', showGitBranch && '')}
-              />
-              {session.git_branch}
-            </span>
-          )}
-          {showUserMessage && session.latest_user_message && (
-            <div className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
-              <MarkdownContent content={session.latest_user_message} />
-            </div>
-          )}
-          {session.latest_agent_message && (
-            <div
-              className="text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
-              style={{
-                display: '-webkit-box',
-                WebkitLineClamp: settings?.message_line_clamp ?? 5,
-                WebkitBoxOrient: 'vertical',
-              }}
-            >
-              <MarkdownContent content={session.latest_agent_message} />
-            </div>
+              {showUserMessage && session.latest_user_message && (
+                <div className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
+                  <MarkdownContent content={session.latest_user_message} />
+                </div>
+              )}
+              {session.latest_agent_message && (
+                <div
+                  className="text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: settings?.message_line_clamp ?? 5,
+                    WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  <MarkdownContent content={session.latest_agent_message} />
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="text-xs truncate block">{displayName}</span>
           )}
         </div>
         <div className="absolute invisible group-hover:visible top-1 right-1">
           <Button
-            variant={isSmall ? "ghost" : "secondary"}
+            variant={isSmall ? 'ghost' : 'secondary'}
             size="icon"
             onClick={handleDeleteClick}
-            className={cn("h-7 w-7 text-muted-foreground hover:text-destructive", isSmall && 'w-4 h-4')}
+            className={cn(
+              'h-7 w-7 text-muted-foreground hover:text-destructive',
+              isSmall && 'w-4 h-4',
+            )}
           >
             <Trash2 className="w-3 h-3" />
           </Button>

@@ -166,7 +166,7 @@ export function SessionChat() {
             </h2>
             {session?.project_path && (
               <div className="flex gap-1 items-center">
-                <Folder className="w-3 h-3" />
+                <Folder className="w-3 h-3 text-zinc-500" />
                 <p className="text-xs text-zinc-500 truncate">
                   {session.project_path}
                 </p>
@@ -214,7 +214,7 @@ export function SessionChat() {
               )}
               {session &&
                 ['active', 'permission_needed'].includes(session.status) && (
-                  <div className='flex gap-2 items-center'>
+                  <div className="flex gap-2 items-center">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 300 150"
@@ -240,7 +240,7 @@ export function SessionChat() {
                       </path>
                     </svg>
                     {session && session.status === 'permission_needed' && (
-                      <div className='flex gap-2 items-center'>
+                      <div className="flex gap-2 items-center">
                         <AlertTriangle className="w-7 h-7 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
                         <span>Permission Requested</span>
                       </div>
