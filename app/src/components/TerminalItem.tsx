@@ -25,22 +25,16 @@ interface TerminalItemProps {
   terminal: Terminal
   hideFolder?: boolean
   sessions?: SessionWithProject[]
-  otherSessions?: SessionWithProject[]
   sessionsExpanded?: boolean
   onToggleSessions?: () => void
-  otherSessionsExpanded?: boolean
-  onToggleOtherSessions?: () => void
 }
 
 export function TerminalItem({
   terminal,
   hideFolder,
   sessions = [],
-  otherSessions = [],
   sessionsExpanded = true,
   onToggleSessions,
-  otherSessionsExpanded = true,
-  onToggleOtherSessions,
 }: TerminalItemProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminals()
@@ -53,19 +47,18 @@ export function TerminalItem({
   const [processesExpanded, setProcessesExpanded] = useState(true)
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
-  const hasSessions = sessions.length > 0 || otherSessions.length > 0
+  const hasSessions = sessions.length > 0
   const hasProcesses = processes.length > 0
 
   // Get git branch from the most recent active session (only show when not in folder mode)
   const gitBranch = useMemo(() => {
     if (hideFolder) return null
-    const allSessions = [...sessions, ...otherSessions]
-    const activeSessions = allSessions.filter(
+    const activeSessions = sessions.filter(
       (s) => s.status === 'active' || s.status === 'permission_needed',
     )
-    const session = activeSessions[0] || allSessions[0]
+    const session = activeSessions[0] || sessions[0]
     return session?.git_branch || null
-  }, [hideFolder, sessions, otherSessions])
+  }, [hideFolder, sessions])
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -226,31 +219,6 @@ export function TerminalItem({
                 </button>
                 {sessionsListExpanded &&
                   sessions.map((session) => (
-                    <SessionItem key={session.session_id} session={session} />
-                  ))}
-              </>
-            )}
-            {otherSessions.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onToggleOtherSessions?.()}
-                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground cursor-pointer transition-colors w-full"
-                >
-                  {otherSessionsExpanded ? (
-                    <ChevronDown className="w-3 h-3" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3" />
-                  )}
-                  <span className="hidden @[230px]/sidebar:block">
-                    Other Claude Sessions ({otherSessions.length})
-                  </span>
-                  <span className="@[230px]/sidebar:hidden">
-                    Other Sessions ({otherSessions.length})
-                  </span>
-                </button>
-                {otherSessionsExpanded &&
-                  otherSessions.map((session) => (
                     <SessionItem key={session.session_id} session={session} />
                   ))}
               </>

@@ -10,11 +10,8 @@ interface FolderGroupProps {
   expanded: boolean
   onToggle: () => void
   sessionsForTerminal: Map<number, SessionWithProject[]>
-  otherSessionsForCwd: SessionWithProject[]
   expandedTerminalSessions: Set<number>
   onToggleTerminalSessions: (terminalId: number) => void
-  expandedOtherSessions: Set<number>
-  onToggleOtherSessions: (terminalId: number) => void
 }
 
 export function FolderGroup({
@@ -23,25 +20,21 @@ export function FolderGroup({
   expanded,
   onToggle,
   sessionsForTerminal,
-  otherSessionsForCwd,
   expandedTerminalSessions,
   onToggleTerminalSessions,
-  expandedOtherSessions,
-  onToggleOtherSessions,
 }: FolderGroupProps) {
   // Get git branch from the most recent active session
   const gitBranch = useMemo(() => {
-    const allSessions = [
-      ...otherSessionsForCwd,
-      ...terminals.flatMap((t) => sessionsForTerminal.get(t.id) || []),
-    ]
+    const allSessions = terminals.flatMap(
+      (t) => sessionsForTerminal.get(t.id) || [],
+    )
     // Prefer active/permission_needed sessions, then most recent
     const activeSessions = allSessions.filter(
       (s) => s.status === 'active' || s.status === 'permission_needed',
     )
     const session = activeSessions[0] || allSessions[0]
     return session?.git_branch || null
-  }, [terminals, sessionsForTerminal, otherSessionsForCwd])
+  }, [terminals, sessionsForTerminal])
 
   return (
     <div>
@@ -72,20 +65,14 @@ export function FolderGroup({
       </div>
       {expanded && (
         <div className="ml-4 space-y-1 mt-1">
-          {terminals.map((terminal, index) => (
+          {terminals.map((terminal) => (
             <TerminalItem
               key={terminal.id}
               terminal={terminal}
               hideFolder
               sessions={sessionsForTerminal.get(terminal.id) || []}
-              otherSessions={
-                // Only show "other" sessions on the first terminal in the folder
-                index === 0 ? otherSessionsForCwd : []
-              }
               sessionsExpanded={expandedTerminalSessions.has(terminal.id)}
               onToggleSessions={() => onToggleTerminalSessions(terminal.id)}
-              otherSessionsExpanded={expandedOtherSessions.has(terminal.id)}
-              onToggleOtherSessions={() => onToggleOtherSessions(terminal.id)}
             />
           ))}
         </div>

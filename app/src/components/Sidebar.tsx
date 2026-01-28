@@ -51,9 +51,6 @@ export function Sidebar({ width }: SidebarProps) {
   >('sidebar-expanded-session-groups', [])
   const [expandedTerminalSessions, setExpandedTerminalSessions] =
     useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
-  const [expandedOtherSessions, setExpandedOtherSessions] = useLocalStorage<
-    number[]
-  >('sidebar-expanded-other-sessions', [])
 
   const expandedFolders = useMemo(
     () => new Set(expandedFoldersArray),
@@ -72,42 +69,31 @@ export function Sidebar({ width }: SidebarProps) {
 
   // Compute session assignments:
   // - sessionsForTerminal: sessions with terminal_id matching an existing terminal
-  // - otherSessionsForTerminal: sessions with project_path matching terminal cwd but no valid terminal_id
-  // - orphanSessionGroups: sessions with no matching terminal, grouped by project_path
-  const { sessionsForTerminal, otherSessionsForTerminal, orphanSessionGroups } =
-    useMemo(() => {
-      const terminalIds = new Set(terminals.map((t) => t.id))
-      const terminalCwds = new Set(terminals.map((t) => t.cwd))
-      const sessionsForTerminal = new Map<number, SessionWithProject[]>()
-      const otherSessionsForTerminal = new Map<string, SessionWithProject[]>()
-      const orphanGroups = new Map<string, SessionWithProject[]>()
+  // - orphanSessionGroups: sessions with no matching terminal_id, grouped by project_path
+  const { sessionsForTerminal, orphanSessionGroups } = useMemo(() => {
+    const terminalIds = new Set(terminals.map((t) => t.id))
+    const sessionsForTerminal = new Map<number, SessionWithProject[]>()
+    const orphanGroups = new Map<string, SessionWithProject[]>()
 
-      for (const session of sessions) {
-        if (session.terminal_id && terminalIds.has(session.terminal_id)) {
-          // Session has a terminal_id that matches an existing terminal
-          const existing = sessionsForTerminal.get(session.terminal_id) || []
-          existing.push(session)
-          sessionsForTerminal.set(session.terminal_id, existing)
-        } else if (terminalCwds.has(session.project_path)) {
-          // Session has no valid terminal_id but project_path matches a terminal cwd
-          const existing =
-            otherSessionsForTerminal.get(session.project_path) || []
-          existing.push(session)
-          otherSessionsForTerminal.set(session.project_path, existing)
-        } else {
-          // Orphan session - group by project_path
-          const existing = orphanGroups.get(session.project_path) || []
-          existing.push(session)
-          orphanGroups.set(session.project_path, existing)
-        }
+    for (const session of sessions) {
+      if (session.terminal_id && terminalIds.has(session.terminal_id)) {
+        // Session has a terminal_id that matches an existing terminal
+        const existing = sessionsForTerminal.get(session.terminal_id) || []
+        existing.push(session)
+        sessionsForTerminal.set(session.terminal_id, existing)
+      } else {
+        // Orphan session - no matching terminal_id, group by project_path
+        const existing = orphanGroups.get(session.project_path) || []
+        existing.push(session)
+        orphanGroups.set(session.project_path, existing)
       }
+    }
 
-      return {
-        sessionsForTerminal,
-        otherSessionsForTerminal,
-        orphanSessionGroups: orphanGroups,
-      }
-    }, [sessions, terminals])
+    return {
+      sessionsForTerminal,
+      orphanSessionGroups: orphanGroups,
+    }
+  }, [sessions, terminals])
 
   const allFolders = useMemo(
     () => Array.from(groupedTerminals.keys()),
@@ -142,22 +128,8 @@ export function Sidebar({ width }: SidebarProps) {
     [expandedTerminalSessions],
   )
 
-  const expandedOtherSessionsSet = useMemo(
-    () => new Set(expandedOtherSessions),
-    [expandedOtherSessions],
-  )
-
   const toggleTerminalSessions = (terminalId: number) => {
     setExpandedTerminalSessions((prev) => {
-      if (prev.includes(terminalId)) {
-        return prev.filter((id) => id !== terminalId)
-      }
-      return [...prev, terminalId]
-    })
-  }
-
-  const toggleOtherSessions = (terminalId: number) => {
-    setExpandedOtherSessions((prev) => {
       if (prev.includes(terminalId)) {
         return prev.filter((id) => id !== terminalId)
       }
@@ -290,13 +262,8 @@ export function Sidebar({ width }: SidebarProps) {
                     expanded={expandedFolders.has(folderCwd)}
                     onToggle={() => toggleFolder(folderCwd)}
                     sessionsForTerminal={sessionsForTerminal}
-                    otherSessionsForCwd={
-                      otherSessionsForTerminal.get(folderCwd) || []
-                    }
                     expandedTerminalSessions={expandedTerminalSessionsSet}
                     onToggleTerminalSessions={toggleTerminalSessions}
-                    expandedOtherSessions={expandedOtherSessionsSet}
-                    onToggleOtherSessions={toggleOtherSessions}
                   />
                 ),
               )
@@ -305,17 +272,10 @@ export function Sidebar({ width }: SidebarProps) {
                   key={terminal.id}
                   terminal={terminal}
                   sessions={sessionsForTerminal.get(terminal.id) || []}
-                  otherSessions={
-                    otherSessionsForTerminal.get(terminal.cwd) || []
-                  }
                   sessionsExpanded={expandedTerminalSessionsSet.has(
                     terminal.id,
                   )}
                   onToggleSessions={() => toggleTerminalSessions(terminal.id)}
-                  otherSessionsExpanded={expandedOtherSessionsSet.has(
-                    terminal.id,
-                  )}
-                  onToggleOtherSessions={() => toggleOtherSessions(terminal.id)}
                 />
               ))}
 
