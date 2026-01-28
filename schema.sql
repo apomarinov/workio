@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS messages (
     todo_id TEXT,
     body TEXT,
     tools JSON,
+    images JSON,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

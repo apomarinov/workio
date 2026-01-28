@@ -80,6 +80,7 @@ export interface SessionMessage {
   todo_id: string | null
   body: string | null
   tools: string | null // JSON string from SQLite
+  images: string | null // JSON string from SQLite
   created_at: string
   updated_at: string | null
   prompt_text: string | null
@@ -119,6 +120,7 @@ export function getSessionMessages(
         m.todo_id,
         m.body,
         m.tools,
+        m.images,
         m.created_at,
         m.updated_at,
         p.prompt as prompt_text
@@ -131,12 +133,13 @@ export function getSessionMessages(
     )
     .all(sessionId, limit, offset) as SessionMessage[]
 
-  // Parse tools JSON and convert boolean fields
+  // Parse tools/images JSON and convert boolean fields
   const parsedMessages = messages.map((m) => ({
     ...m,
     is_user: Boolean(m.is_user),
     thinking: Boolean(m.thinking),
     tools: m.tools ? JSON.parse(m.tools) : null,
+    images: m.images ? JSON.parse(m.images) : null,
   }))
 
   return {

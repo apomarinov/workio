@@ -211,13 +211,14 @@ def create_message(
     is_thinking: bool,
     is_user: bool,
     tools: str | None = None,
-    todo_id: str | None = None
+    todo_id: str | None = None,
+    images: str | None = None
 ) -> int:
     """Create a new message."""
     cursor = conn.execute('''
-        INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user, tools, todo_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (prompt_id, uuid, created_at, body, is_thinking, is_user, tools, todo_id))
+        INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user, tools, todo_id, images)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (prompt_id, uuid, created_at, body, is_thinking, is_user, tools, todo_id, images))
     return cursor.lastrowid
 
 

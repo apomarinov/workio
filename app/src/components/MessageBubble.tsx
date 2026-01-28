@@ -64,6 +64,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }
 
   const displayText = message.body
+  const hasImages = message.images && message.images.length > 0
 
   return (
     <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
@@ -80,7 +81,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-zinc-800 text-zinc-100 rounded-bl-sm',
         )}
       >
-        {isUser ? displayText : <MarkdownContent content={displayText || ''} />}
+        {hasImages && (
+          <div className="flex flex-col gap-2 mb-2">
+            {message.images!.map((img, idx) => (
+              <img
+                key={`${message.id}-img-${img.data.slice(0, 16)}`}
+                src={`data:${img.media_type};base64,${img.data}`}
+                alt={`Attached image ${idx + 1}`}
+                className="max-w-full max-h-96 rounded object-contain"
+              />
+            ))}
+          </div>
+        )}
+        {displayText &&
+          (isUser ? (
+            displayText
+          ) : (
+            <MarkdownContent content={displayText || ''} />
+          ))}
       </div>
       {!!isUser && (
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center">

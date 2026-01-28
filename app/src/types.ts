@@ -157,6 +157,11 @@ export type ToolData =
   | TodoWriteTool
   | GenericTool
 
+export interface MessageImage {
+  media_type: string
+  data: string
+}
+
 export interface Message {
   id: number
   prompt_id: number
@@ -166,6 +171,7 @@ export interface Message {
   todo_id: string | null
   body: string | null
   tools: ToolData | null
+  images: MessageImage[] | null
   created_at: string
   updated_at: string | null
 }

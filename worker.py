@@ -406,27 +406,43 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
         body = None
         is_thinking = False
         is_user = False
+        images_json = None
 
-        # User message - can be string or list with text item
+        # User message - can be string or list with text and image items
         if entry_type == 'user' and message.get('role') == 'user':
             content = message.get('content', '')
-            text_content = None
+            text_parts = []
+            images = []
 
             if isinstance(content, str) and len(content) > 0:
-                text_content = content
+                text_parts.append(content)
             elif isinstance(content, list):
-                # Look for text item in list (skip tool_results)
+                # Collect all text items and image items
                 for item in content:
-                    if isinstance(item, dict) and item.get('type') == 'text':
-                        text_content = item.get('text', '')
-                        break
+                    if isinstance(item, dict):
+                        item_type = item.get('type')
+                        if item_type == 'text':
+                            text = item.get('text', '')
+                            if text:
+                                text_parts.append(text)
+                        elif item_type == 'image':
+                            source = item.get('source', {})
+                            if source.get('data'):
+                                images.append({
+                                    'media_type': source.get('media_type', 'image/png'),
+                                    'data': source.get('data')
+                                })
 
-            if text_content:
+            text_content = '\n'.join(text_parts) if text_parts else None
+
+            if text_content or images:
                 # Skip local command messages
-                if '<local-command-stdout>' in text_content or '<local-command-caveat>' in text_content or '<command-name>' in text_content:
+                if text_content and ('<local-command-stdout>' in text_content or '<local-command-caveat>' in text_content or '<command-name>' in text_content):
                     continue
                 body = text_content
                 is_user = True
+                if images:
+                    images_json = json.dumps(images)
 
         # Assistant message
         elif entry_type == 'assistant' and message.get('role') == 'assistant' and message.get('type') == 'message':
@@ -441,9 +457,9 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
                 elif content_type == 'text':
                     body = first_content.get('text')
 
-        # Store message if we have body
-        if body:
-            msg_id = create_message(conn, prompt_id, uuid, timestamp, body, is_thinking, is_user)
+        # Store message if we have body or images
+        if body or images_json:
+            msg_id = create_message(conn, prompt_id, uuid, timestamp, body, is_thinking, is_user, images=images_json)
             new_messages.append({
                 'id': msg_id,
                 'prompt_id': prompt_id,
@@ -453,6 +469,7 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
                 'todo_id': None,
                 'body': body,
                 'tools': None,
+                'images': json.loads(images_json) if images_json else None,
                 'created_at': timestamp,
                 'prompt_text': prompt_text if is_user else None,
             })
