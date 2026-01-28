@@ -150,12 +150,16 @@ def cleanup_stale_files(directory: Path, max_age: int) -> int:
 def run_data_cleanup(conn) -> None:
     """Run database data cleanup (weekly)."""
 
+    log(conn, "cleanup empty")
     delete_empty_sessions(conn)
     delete_orphan_projects(conn)
 
     if has_recent_cleanup(conn, 'data', DATA_CLEANUP_INTERVAL):
+        log(conn, "skip old cleanup")
+        conn.commit()
         return
 
+    log(conn, "cleanup old")
     record_cleanup(conn, 'data')
 
     delete_old_messages(conn)
@@ -180,6 +184,7 @@ def run_cleanup() -> None:
     """Run all cleanup processes."""
     conn = init_db()
 
+    log(conn, "cleanup process start")
     run_data_cleanup(conn)
     run_locks_cleanup(conn)
 
