@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -70,9 +71,15 @@ export function TerminalItem({
     setShowEditModal(true)
   }
 
-  const handleEditSave = (name: string) => {
-    setShowEditModal(false)
-    updateTerminal(terminal.id, { name })
+  const handleEditSave = async (updates: { name: string; cwd?: string }) => {
+    try {
+      await updateTerminal(terminal.id, updates)
+      setShowEditModal(false)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to update terminal',
+      )
+    }
   }
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -242,6 +249,8 @@ export function TerminalItem({
       <EditTerminalModal
         open={showEditModal}
         currentName={terminal.name || ''}
+        currentCwd={terminal.cwd}
+        isSSH={!!terminal.ssh_host}
         onSave={handleEditSave}
         onCancel={() => setShowEditModal(false)}
       />

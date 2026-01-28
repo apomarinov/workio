@@ -45,14 +45,17 @@ export async function createTerminal(
 
 export async function updateTerminal(
   id: number,
-  updates: { name?: string },
+  updates: { name?: string; cwd?: string },
 ): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   })
-  if (!res.ok) throw new Error('Failed to update terminal')
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to update terminal')
+  }
   return res.json()
 }
 

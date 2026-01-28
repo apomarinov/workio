@@ -16,9 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import { cn } from '@/lib/utils'
 import { useTerminals } from '../hooks/useTerminals'
 import { getSSHHosts, type SSHHostEntry } from '../lib/api'
-import { cn } from '@/lib/utils'
 
 interface CreateSSHTerminalModalProps {
   open: boolean
@@ -90,7 +90,10 @@ export function CreateSSHTerminalModal({
               SSH Host
             </label>
             <Select value={sshHost} onValueChange={setSSHHost}>
-              <SelectTrigger id="ssh_host" className={cn("w-full [&>span]:text-left", sshHost && '!h-12')}>
+              <SelectTrigger
+                id="ssh_host"
+                className={cn('w-full [&>span]:text-left', sshHost && '!h-12')}
+              >
                 <SelectValue
                   placeholder={loadingHosts ? 'Loading...' : 'Select a host'}
                 />

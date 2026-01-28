@@ -33,6 +33,7 @@ interface CreateTerminalBody {
 
 interface UpdateTerminalBody {
   name?: string
+  cwd?: string
 }
 
 interface TerminalParams {
@@ -130,7 +131,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
-  // Update terminal (rename)
+  // Update terminal
   fastify.patch<{ Params: TerminalParams; Body: UpdateTerminalBody }>(
     '/api/terminals/:id',
     async (request, reply) => {
@@ -144,7 +145,29 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Terminal not found' })
       }
 
-      const updated = updateTerminal(id, request.body)
+      const body = { ...request.body }
+
+      // Validate cwd if provided
+      if (body.cwd !== undefined) {
+        const cwd = expandPath(body.cwd.trim())
+        if (!fs.existsSync(cwd)) {
+          return reply.status(400).send({ error: 'Directory does not exist' })
+        }
+        const stat = fs.statSync(cwd)
+        if (!stat.isDirectory()) {
+          return reply.status(400).send({ error: 'Path is not a directory' })
+        }
+        try {
+          fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK)
+        } catch {
+          return reply
+            .status(403)
+            .send({ error: 'Permission denied: cannot access directory' })
+        }
+        body.cwd = cwd
+      }
+
+      const updated = updateTerminal(id, body)
       return updated
     },
   )

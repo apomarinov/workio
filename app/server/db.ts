@@ -235,6 +235,7 @@ export function updateTerminal(
   id: number,
   updates: {
     name?: string
+    cwd?: string
     pid?: number | null
     status?: string
     active_cmd?: string | null
@@ -246,6 +247,10 @@ export function updateTerminal(
   if (updates.name !== undefined) {
     setClauses.push('name = ?')
     values.push(updates.name)
+  }
+  if (updates.cwd !== undefined) {
+    setClauses.push('cwd = ?')
+    values.push(updates.cwd)
   }
   if (updates.pid !== undefined) {
     setClauses.push('pid = ?')

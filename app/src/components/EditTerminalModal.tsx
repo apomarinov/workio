@@ -1,3 +1,4 @@
+import { FolderOpen } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,37 +13,69 @@ import { Input } from '@/components/ui/input'
 interface EditTerminalModalProps {
   open: boolean
   currentName: string
-  onSave: (name: string) => void
+  currentCwd: string
+  isSSH: boolean
+  onSave: (updates: { name: string; cwd?: string }) => void
   onCancel: () => void
 }
 
 export function EditTerminalModal({
   open,
   currentName,
+  currentCwd,
+  isSSH,
   onSave,
   onCancel,
 }: EditTerminalModalProps) {
   const [name, setName] = useState(currentName)
+  const [cwd, setCwd] = useState(currentCwd)
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(name.trim())
+    const updates: { name: string; cwd?: string } = { name: name.trim() }
+    if (!isSSH && cwd.trim() !== currentCwd) {
+      updates.cwd = cwd.trim()
+    }
+    onSave(updates)
   }
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <DialogContent className="bg-sidebar">
         <DialogHeader>
-          <DialogTitle>Rename Terminal</DialogTitle>
+          <DialogTitle>Edit Terminal</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSave}>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Terminal name"
-            autoFocus
-          />
-          <DialogFooter className="mt-4">
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="edit-name" className="text-sm font-medium">
+              Name
+            </label>
+            <Input
+              id="edit-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Terminal name"
+              autoFocus
+            />
+          </div>
+          {!isSSH && (
+            <div className="space-y-2">
+              <label htmlFor="edit-cwd" className="text-sm font-medium">
+                Path
+              </label>
+              <div className="relative">
+                <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-cwd"
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                  placeholder="~"
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
             <Button type="button" variant="ghost" onClick={onCancel}>
               Cancel
             </Button>

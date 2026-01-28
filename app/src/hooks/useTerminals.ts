@@ -19,7 +19,10 @@ export function useTerminals() {
     return terminal
   }
 
-  const updateTerminal = async (id: number, updates: { name?: string }) => {
+  const updateTerminal = async (
+    id: number,
+    updates: { name?: string; cwd?: string },
+  ) => {
     const updated = await api.updateTerminal(id, updates)
     mutate((prev) => prev?.map((t) => (t.id === id ? updated : t)), false)
     return updated
