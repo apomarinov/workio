@@ -95,11 +95,10 @@ export function TerminalItem({
               onToggleSessions?.()
             }
           }}
-          className={`group flex items-center gap-2 min-h-14 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-          } ${terminal.orphaned ? 'opacity-60' : ''}`}
+          className={cn(`group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            } ${terminal.orphaned ? 'opacity-60' : ''}`, !hasSessions && !hasProcesses && 'pl-2.5')}
         >
           {hasSessions || hasProcesses ? (
             <Button
@@ -182,7 +181,7 @@ export function TerminalItem({
                 <button
                   type="button"
                   onClick={() => setProcessesExpanded(!processesExpanded)}
-                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
                 >
                   {processesExpanded ? (
                     <ChevronDown className="w-3 h-3" />

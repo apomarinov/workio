@@ -17,6 +17,11 @@ export function Terminal({ terminalId }: TerminalProps) {
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const [dimensions, setDimensions] = useState({ cols: 80, rows: 24 })
+  const [pendingCopy, setPendingCopy] = useState<string | null>(null)
+  const pendingCopyRef = useRef<string | null>(null)
+  const copyBtnRef = useRef<HTMLButtonElement>(null)
+  const cursorRef = useRef({ x: 0, y: 0 })
+  const sessionLiveRef = useRef(false)
   const { settings } = useSettings()
 
   const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
@@ -39,6 +44,12 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const handleReady = useCallback(() => {
     terminalRef.current?.focus()
+    // Defer marking session live until xterm.js has finished processing all
+    // queued writes (buffer replay). write('', cb) queues after replay data,
+    // so the callback fires only after replay parsing is complete.
+    terminalRef.current?.write('', () => {
+      sessionLiveRef.current = true
+    })
   }, [])
 
   const { status, sendInput, sendResize } = useTerminalSocket({
@@ -69,6 +80,40 @@ export function Terminal({ terminalId }: TerminalProps) {
     sendInputRef.current = sendInput
     sendResizeRef.current = sendResize
   }, [sendInput, sendResize])
+
+  // Track cursor position for clipboard copy button
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      cursorRef.current = { x: e.clientX, y: e.clientY }
+      if (copyBtnRef.current) {
+        copyBtnRef.current.style.left = `${e.clientX}px`
+        copyBtnRef.current.style.top = `${e.clientY}px`
+      }
+    }
+    document.addEventListener('mousemove', handler)
+    return () => document.removeEventListener('mousemove', handler)
+  }, [])
+
+  // Dismiss clipboard button on Escape (window-level for when terminal loses focus)
+  useEffect(() => {
+    if (pendingCopy === null) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        pendingCopyRef.current = null
+        setPendingCopy(null)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [pendingCopy])
+
+  const handleCopyClick = useCallback(() => {
+    if (pendingCopyRef.current) {
+      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => {})
+    }
+    pendingCopyRef.current = null
+    setPendingCopy(null)
+  }, [])
 
   // Initialize xterm.js - only once
   useEffect(() => {
@@ -126,6 +171,42 @@ export function Terminal({ terminalId }: TerminalProps) {
       // WebGL not available, canvas renderer will be used
     }
 
+    // OSC 52 clipboard handler — intercept copy sequences from programs like zellij
+    // Skip during buffer replay (before 'ready' message) to avoid stale clipboard popups
+    terminal.parser.registerOscHandler(52, (data: string) => {
+      if (!sessionLiveRef.current) return true
+      const idx = data.indexOf(';')
+      if (idx === -1) return false
+      const payload = data.slice(idx + 1)
+      if (!payload || payload === '?') return true
+      try {
+        const decoded = atob(payload)
+        const text = new TextDecoder().decode(
+          Uint8Array.from(decoded, (c) => c.charCodeAt(0)),
+        )
+        if (text.length > 1_000_000) return true
+        pendingCopyRef.current = text
+        setPendingCopy(text)
+      } catch {
+        // invalid base64
+      }
+      return true
+    })
+
+    // Escape dismisses copy button when terminal is focused (prevents sending \x1b to PTY)
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (
+        event.type === 'keydown' &&
+        event.key === 'Escape' &&
+        pendingCopyRef.current !== null
+      ) {
+        pendingCopyRef.current = null
+        setPendingCopy(null)
+        return false
+      }
+      return true
+    })
+
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
@@ -171,6 +252,8 @@ export function Terminal({ terminalId }: TerminalProps) {
     if (terminalRef.current && terminalId !== null) {
       terminalRef.current.clear()
     }
+    // Reset live flag — new connection will replay buffer before sending ready
+    sessionLiveRef.current = false
   }, [terminalId])
 
   // Update font size when settings change
@@ -213,6 +296,24 @@ export function Terminal({ terminalId }: TerminalProps) {
         ref={containerRef}
         className={`flex-1 min-h-0 overflow-hidden ${terminalId === null ? 'hidden' : ''}`}
       />
+      {pendingCopy !== null && (
+        <button
+          ref={copyBtnRef}
+          type="button"
+          onClick={handleCopyClick}
+          className="fixed z-[9999] px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-medium rounded-md shadow-lg cursor-pointer select-none"
+          style={{
+            left: cursorRef.current.x,
+            top: cursorRef.current.y,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          Copy to clipboard{' '}
+          <kbd className="ml-1 px-1 py-0.5 bg-blue-700/50 rounded text-[10px]">
+            esc
+          </kbd>
+        </button>
+      )}
     </div>
   )
 }
