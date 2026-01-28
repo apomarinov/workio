@@ -306,6 +306,13 @@ export async function createSession(
   // Start global process polling if not already running
   startGlobalProcessPolling()
 
+  // cd into cwd for SSH terminals
+  if (terminal.ssh_host && terminal.cwd && terminal.cwd !== '~') {
+    setTimeout(() => {
+      backend.write(`cd ${terminal.cwd}\n`)
+    }, 100)
+  }
+
   // Inject shell integration for local terminals only
   if (!terminal.ssh_host) {
     const shell = terminal.shell || getSettings().default_shell || '/bin/bash'

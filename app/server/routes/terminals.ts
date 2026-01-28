@@ -73,9 +73,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ error: result.error })
         }
 
-        // Ignore cwd/shell for SSH terminals, store "~" as placeholder
         const terminal = createTerminal(
-          '~',
+          rawCwd?.trim() || '~',
           name?.trim() || trimmedHost,
           null,
           trimmedHost,
@@ -147,24 +146,28 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       const body = { ...request.body }
 
-      // Validate cwd if provided
+      // Validate cwd if provided (skip for SSH terminals — path is remote)
       if (body.cwd !== undefined) {
-        const cwd = expandPath(body.cwd.trim())
-        if (!fs.existsSync(cwd)) {
-          return reply.status(400).send({ error: 'Directory does not exist' })
+        if (terminal.ssh_host) {
+          body.cwd = body.cwd.trim()
+        } else {
+          const cwd = expandPath(body.cwd.trim())
+          if (!fs.existsSync(cwd)) {
+            return reply.status(400).send({ error: 'Directory does not exist' })
+          }
+          const stat = fs.statSync(cwd)
+          if (!stat.isDirectory()) {
+            return reply.status(400).send({ error: 'Path is not a directory' })
+          }
+          try {
+            fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK)
+          } catch {
+            return reply
+              .status(403)
+              .send({ error: 'Permission denied: cannot access directory' })
+          }
+          body.cwd = cwd
         }
-        const stat = fs.statSync(cwd)
-        if (!stat.isDirectory()) {
-          return reply.status(400).send({ error: 'Path is not a directory' })
-        }
-        try {
-          fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK)
-        } catch {
-          return reply
-            .status(403)
-            .send({ error: 'Permission denied: cannot access directory' })
-        }
-        body.cwd = cwd
       }
 
       const updated = updateTerminal(id, body)

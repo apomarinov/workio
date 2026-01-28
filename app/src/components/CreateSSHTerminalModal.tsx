@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { FolderOpen, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,6 +34,7 @@ export function CreateSSHTerminalModal({
   const { createTerminal } = useTerminals()
   const [sshHost, setSSHHost] = useState('')
   const [name, setName] = useState('')
+  const [cwd, setCwd] = useState('')
   const [creating, setCreating] = useState(false)
   const [hosts, setHosts] = useState<SSHHostEntry[]>([])
   const [loadingHosts, setLoadingHosts] = useState(false)
@@ -59,13 +60,14 @@ export function CreateSSHTerminalModal({
     setCreating(true)
     try {
       const terminal = await createTerminal(
-        '~',
+        cwd.trim() || '~',
         name.trim() || undefined,
         undefined,
         sshHost,
       )
       setSSHHost('')
       setName('')
+      setCwd('')
       onOpenChange(false)
       onCreated?.(terminal.id)
     } catch (err) {
@@ -128,6 +130,23 @@ export function CreateSSHTerminalModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="My Server"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="ssh_cwd" className="text-sm font-medium">
+              Path
+            </label>
+            <div className="relative">
+              <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="ssh_cwd"
+                type="text"
+                value={cwd}
+                onChange={(e) => setCwd(e.target.value)}
+                placeholder="~"
+                className="pl-10"
+              />
+            </div>
           </div>
 
           <Button
