@@ -64,9 +64,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
     }
     deleteSession(session.session_id)
   }
-
   const showUserMessage =
-    session.latest_user_message && session.latest_user_message !== displayName
+    session.latest_user_message && (session.latest_user_message !== displayName && session.latest_user_message.indexOf(displayName) !== 0)
+  const isSmall = !session.latest_user_message && !session.latest_agent_message;
 
   return (
     <>
@@ -82,13 +82,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           {session.latest_agent_message && (
             <div
               className={cn(
-                'absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[calc(50%+5px)]',
-                !showUserMessage && 'h-[35%]',
+                'absolute top-[20px] left-[7px] border-l-[1px] border-b-[1px] w-[110%] h-[calc(100%-33px)]',
               )}
             ></div>
-          )}
-          {session.status === 'permission_needed' && (
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse mr-1" />
           )}
           {session.status === 'done' && (
             <CheckIcon className="w-3.5 h-3.5 text-green-500" />
@@ -118,6 +114,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
                 />
               </path>
             </svg>
+          )}
+          {session.status === 'permission_needed' && (
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse ml-1" />
           )}
           {!['active', 'permission_needed', 'done'].includes(
             session.status,
@@ -163,12 +162,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
               {session.git_branch}
             </span>
           )}
-          {session.latest_user_message &&
-            session.latest_user_message !== displayName && (
-              <div className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
-                <MarkdownContent content={session.latest_user_message} />
-              </div>
-            )}
+          {showUserMessage && session.latest_user_message && (
+            <div className="text-xs line-clamp-3 text-muted-foreground py-0.5 my-1">
+              <MarkdownContent content={session.latest_user_message} />
+            </div>
+          )}
           {session.latest_agent_message && (
             <div
               className="text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
@@ -184,10 +182,10 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         </div>
         <div className="absolute invisible group-hover:visible top-1 right-1">
           <Button
-            variant="secondary"
+            variant={isSmall ? "ghost" : "secondary"}
             size="icon"
             onClick={handleDeleteClick}
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            className={cn("h-7 w-7 text-muted-foreground hover:text-destructive", isSmall && 'w-4 h-4')}
           >
             <Trash2 className="w-3 h-3" />
           </Button>

@@ -498,11 +498,13 @@ function ReadToolDisplay({
         {tool.input.offset != null && ` (offset: ${tool.input.offset})`}
         {tool.input.limit != null && ` (limit: ${tool.input.limit})`}
       </div>
-      <CollapsibleOutput
-        output={tool.output}
-        truncated={tool.output_truncated}
-        status={tool.status}
-      />
+      {tool.output && (
+        <CollapsibleOutput
+          output={tool.output}
+          truncated={tool.output_truncated}
+          status={tool.status}
+        />
+      )}
     </div>
   )
 }
@@ -690,8 +692,8 @@ export function ToolCallDisplay({ tool }: ToolCallDisplayProps) {
         'Task',
         'TodoWrite',
       ].includes(tool.name) && (
-          <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
-        )}
+        <GenericToolDisplay tool={tool as GenericTool} onExpand={onExpand} />
+      )}
 
       <FullscreenToolDialog
         tool={tool}

@@ -136,7 +136,7 @@ def build_tool_json(tool_use: dict, result: dict) -> dict | None:
             }
 
         elif name == 'Read':
-            output, truncated = truncate_output(output_text, MAX_CONTENT_LENGTH)
+            # Don't store file content - just track that the read happened
             return {
                 **base,
                 'input': {
@@ -144,8 +144,7 @@ def build_tool_json(tool_use: dict, result: dict) -> dict | None:
                     'offset': input_data.get('offset'),
                     'limit': input_data.get('limit'),
                 },
-                'output': output,
-                'output_truncated': truncated,
+                'output_truncated': len(output_text) > MAX_CONTENT_LENGTH,
             }
 
         elif name == 'Write':

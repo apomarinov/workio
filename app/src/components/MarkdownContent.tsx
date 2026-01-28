@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import remarkGfm from 'remark-gfm'
 
 interface MarkdownContentProps {
   content: string
@@ -9,6 +10,7 @@ interface MarkdownContentProps {
 export function MarkdownContent({ content }: MarkdownContentProps) {
   return (
     <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
       components={{
         code({ className, children, ...props }) {
           const match = /language-(\w+)/.exec(className || '')
@@ -98,6 +100,36 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
         },
         hr() {
           return <hr className="border-zinc-700 my-3" />
+        },
+        table({ children }) {
+          return (
+            <div className="overflow-x-auto mb-2">
+              <table className="min-w-full border-collapse border border-zinc-700 text-sm">
+                {children}
+              </table>
+            </div>
+          )
+        },
+        thead({ children }) {
+          return <thead className="bg-zinc-800">{children}</thead>
+        },
+        tbody({ children }) {
+          return <tbody>{children}</tbody>
+        },
+        tr({ children }) {
+          return <tr className="border-b border-zinc-700">{children}</tr>
+        },
+        th({ children }) {
+          return (
+            <th className="border border-zinc-700 px-3 py-1.5 text-left font-semibold">
+              {children}
+            </th>
+          )
+        },
+        td({ children }) {
+          return (
+            <td className="border border-zinc-700 px-3 py-1.5">{children}</td>
+          )
         },
       }}
     >

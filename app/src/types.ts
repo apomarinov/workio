@@ -111,7 +111,7 @@ export interface EditTool extends BaseTool {
 export interface ReadTool extends BaseTool {
   name: 'Read'
   input: ReadInput
-  output: string
+  output?: string
   output_truncated: boolean
 }
 
