@@ -51,6 +51,10 @@ export function Sidebar({ width }: SidebarProps) {
   >('sidebar-expanded-session-groups', [])
   const [expandedTerminalSessions, setExpandedTerminalSessions] =
     useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
+  const [, setCollapsedSessions] = useLocalStorage<string[]>(
+    'sidebar-collapsed-sessions',
+    [],
+  )
 
   const expandedFolders = useMemo(
     () => new Set(expandedFoldersArray),
@@ -137,15 +141,36 @@ export function Sidebar({ width }: SidebarProps) {
     })
   }
 
+  const allSessionIds = useMemo(
+    () => sessions.map((s) => s.session_id),
+    [sessions],
+  )
+
+  const allTerminalIds = useMemo(() => terminals.map((t) => t.id), [terminals])
+
+  const allOrphanGroupPaths = useMemo(
+    () => Array.from(orphanSessionGroups.keys()),
+    [orphanSessionGroups],
+  )
+
   const expandAll = () => {
     setExpandedFoldersArray(allFolders)
+    setExpandedSessionGroups(allOrphanGroupPaths)
+    setExpandedTerminalSessions(allTerminalIds)
+    setCollapsedSessions([])
   }
 
   const collapseAll = () => {
     setExpandedFoldersArray([])
+    setExpandedSessionGroups([])
+    setExpandedTerminalSessions([])
+    setCollapsedSessions(allSessionIds)
   }
 
-  const allExpanded = allFolders.every((f) => expandedFolders.has(f))
+  const allExpanded =
+    allFolders.every((f) => expandedFolders.has(f)) &&
+    allOrphanGroupPaths.every((p) => expandedSessionGroupsSet.has(p)) &&
+    allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id))
 
   return (
     <div
@@ -216,21 +241,19 @@ export function Sidebar({ width }: SidebarProps) {
               </button>
             </PopoverContent>
           </Popover>
-          {groupingMode === 'folder' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={allExpanded ? collapseAll : expandAll}
-              title={allExpanded ? 'Collapse all' : 'Expand all'}
-            >
-              {allExpanded ? (
-                <ChevronsDownUp className="w-4 h-4" />
-              ) : (
-                <ChevronsUpDown className="w-4 h-4" />
-              )}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={allExpanded ? collapseAll : expandAll}
+            title={allExpanded ? 'Collapse all' : 'Expand all'}
+          >
+            {allExpanded ? (
+              <ChevronsDownUp className="w-4 h-4" />
+            ) : (
+              <ChevronsUpDown className="w-4 h-4" />
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="icon"

@@ -30,7 +30,7 @@ function setFavicon(href: string) {
 function AppContent() {
   const { terminals, loading, activeTerminal, selectTerminal } =
     useTerminalContext()
-  const { activeSessionId } = useSessionContext()
+  const { activeSessionId, selectSession } = useSessionContext()
   const { sessions } = useClaudeSessions()
   const { subscribe } = useSocket()
   const { notify } = useBrowserNotification()
@@ -51,6 +51,24 @@ function AppContent() {
       setFavicon('/favicon.svg')
     }
   }, [sessions])
+
+  // Auto-select first active session when there are no terminals
+  useEffect(() => {
+    if (
+      !loading &&
+      terminals.length === 0 &&
+      sessions.length > 0 &&
+      !activeSessionId
+    ) {
+      const activeSession = sessions.find(
+        (s) => s.status === 'active' || s.status === 'permission_needed',
+      )
+      const sessionToSelect = activeSession || sessions[0]
+      if (sessionToSelect) {
+        selectSession(sessionToSelect.session_id)
+      }
+    }
+  }, [loading, terminals.length, sessions, activeSessionId, selectSession])
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: 'main-layout',
