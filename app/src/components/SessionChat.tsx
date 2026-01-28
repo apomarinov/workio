@@ -59,13 +59,22 @@ export function SessionChat() {
     }
 
     // Find message with incomplete todos and move to end (shows first in chat)
-    const hasIncompleteTodos = (m: SessionMessage) => {
+    // Only if updated within last 5 minutes
+    const hasRecentIncompleteTodos = (m: SessionMessage) => {
       if (m.tools?.name !== 'TodoWrite') return false
       const tool = m.tools as TodoWriteTool
-      return tool.input.todos?.some((t) => t.status !== 'completed')
+      const hasIncomplete = tool.input.todos?.some(
+        (t) => t.status !== 'completed',
+      )
+      if (!hasIncomplete) return false
+
+      // Check if updated within last 5 minutes
+      const updatedAt = m.updated_at || m.created_at
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+      return new Date(updatedAt).getTime() > fiveMinutesAgo
     }
 
-    const incompleteTodoMsg = result.find(hasIncompleteTodos)
+    const incompleteTodoMsg = result.find(hasRecentIncompleteTodos)
     if (incompleteTodoMsg) {
       result = [
         ...result.filter((m) => m !== incompleteTodoMsg),
