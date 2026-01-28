@@ -77,6 +77,18 @@ export async function getClaudeSessions(): Promise<SessionWithProject[]> {
   return res.json()
 }
 
+export async function updateSession(
+  sessionId: string,
+  updates: { name?: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  })
+  if (!res.ok) throw new Error('Failed to update session')
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
     method: 'DELETE',

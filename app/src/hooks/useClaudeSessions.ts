@@ -44,6 +44,14 @@ export function useClaudeSessions() {
     }
   }, [])
 
+  const updateSession = useCallback(
+    async (sessionId: string, updates: { name?: string }) => {
+      await api.updateSession(sessionId, updates)
+      mutate()
+    },
+    [mutate],
+  )
+
   const deleteSession = useCallback(
     async (sessionId: string) => {
       await api.deleteSession(sessionId)
@@ -57,6 +65,7 @@ export function useClaudeSessions() {
     loading: isLoading,
     error: error?.message ?? null,
     refetch: mutate,
+    updateSession,
     deleteSession,
   }
 }

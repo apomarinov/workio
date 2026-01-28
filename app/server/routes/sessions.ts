@@ -1,11 +1,29 @@
 import type { FastifyInstance } from 'fastify'
-import { deleteSession, getAllSessions, getSessionMessages } from '../db'
+import {
+  deleteSession,
+  getAllSessions,
+  getSessionMessages,
+  updateSession,
+} from '../db'
 
 export default async function sessionRoutes(fastify: FastifyInstance) {
   // List all Claude sessions with project paths
   fastify.get('/api/sessions', async () => {
     return getAllSessions()
   })
+
+  // Update a session (rename)
+  fastify.patch<{ Params: { id: string }; Body: { name?: string } }>(
+    '/api/sessions/:id',
+    async (request, reply) => {
+      const { id } = request.params
+      const updated = updateSession(id, request.body)
+      if (!updated) {
+        return reply.status(404).send({ error: 'Session not found' })
+      }
+      return { ok: true }
+    },
+  )
 
   // Delete a session and all related data
   fastify.delete<{ Params: { id: string } }>(

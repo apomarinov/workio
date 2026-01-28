@@ -6,10 +6,17 @@ import {
   ChevronRight,
   Folder,
   GitBranch,
+  MoreVertical,
+  Pencil,
   Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
@@ -17,6 +24,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
+import { EditSessionModal } from './EditSessionModal'
 import { MarkdownContent } from './MarkdownContent'
 import { TruncatedPath } from './TruncatedPath'
 
@@ -26,10 +34,12 @@ interface SessionItemProps {
 }
 
 export function SessionItem({ session, showGitBranch }: SessionItemProps) {
-  const { deleteSession } = useClaudeSessions()
+  const { deleteSession, updateSession } = useClaudeSessions()
   const { activeSessionId, selectSession, clearSession } = useSessionContext()
   const { settings } = useSettings()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
   const [collapsedSessions, setCollapsedSessions] = useLocalStorage<string[]>(
     'sidebar-collapsed-sessions',
@@ -78,8 +88,22 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
     idle: 'text-gray-400',
   }[session.status]
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
+  const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+  }
+
+  const handleRenameClick = () => {
+    setShowMenu(false)
+    setShowRenameModal(true)
+  }
+
+  const handleRenameSave = (name: string) => {
+    setShowRenameModal(false)
+    updateSession(session.session_id, { name })
+  }
+
+  const handleDeleteClick = () => {
+    setShowMenu(false)
     setShowDeleteModal(true)
   }
 
@@ -94,7 +118,9 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
     session.latest_user_message &&
     session.latest_user_message !== displayName &&
     session.latest_user_message.indexOf(displayName) !== 0
-  const isSmall = !session.latest_user_message && !session.latest_agent_message || !isExpanded;
+  const isSmall =
+    (!session.latest_user_message && !session.latest_agent_message) ||
+    !isExpanded
 
   return (
     <>
@@ -228,19 +254,52 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           )}
         </div>
         <div className="absolute invisible group-hover:visible top-1 right-1">
-          <Button
-            variant={isSmall ? 'ghost' : 'secondary'}
-            size="icon"
-            onClick={handleDeleteClick}
-            className={cn(
-              'h-7 w-7 text-muted-foreground hover:text-destructive',
-              isSmall && 'w-4 h-4',
-            )}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
+          <Popover open={showMenu} onOpenChange={setShowMenu}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={'secondary'}
+                size="icon"
+                onClick={handleMenuClick}
+                className={cn(
+                  'h-7 w-7 text-muted-foreground !w-[20px]',
+                  isSmall && 'w-3.5 h-3.5 rounded-sm !py-[10px]',
+                )}
+              >
+                <MoreVertical className="w-3 h-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-36 p-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={handleRenameClick}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteClick}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
+
+      <EditSessionModal
+        open={showRenameModal}
+        currentName={displayName}
+        onSave={handleRenameSave}
+        onCancel={() => setShowRenameModal(false)}
+      />
 
       <ConfirmModal
         open={showDeleteModal}

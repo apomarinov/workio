@@ -146,6 +146,33 @@ export function getSessionMessages(
   }
 }
 
+export function updateSession(
+  sessionId: string,
+  updates: { name?: string },
+): boolean {
+  const setClauses: string[] = []
+  const values: (string | null)[] = []
+
+  if (updates.name !== undefined) {
+    setClauses.push('name = ?')
+    values.push(updates.name)
+  }
+
+  if (setClauses.length === 0) {
+    return true
+  }
+
+  setClauses.push('updated_at = CURRENT_TIMESTAMP')
+  values.push(sessionId)
+
+  const result = db
+    .prepare(
+      `UPDATE sessions SET ${setClauses.join(', ')} WHERE session_id = ?`,
+    )
+    .run(...values)
+  return result.changes > 0
+}
+
 export function deleteSession(sessionId: string): boolean {
   // Delete in order: messages (via prompts), prompts, hooks, then session
   const promptIds = db
