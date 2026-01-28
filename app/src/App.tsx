@@ -64,22 +64,24 @@ function AppContent() {
   // Subscribe to hook events for notifications
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
-      const session = sessions.find(
-        (t) => t.session_id === data.session_id,
-      )
+      const session = sessions.find((t) => t.session_id === data.session_id)
       const terminal = terminals.find(
         (t) => t.id === data.terminal_id || t.cwd === data.project_path,
       )
       const terminalName =
-        session?.latest_user_message || terminal?.name || terminal?.cwd || data.project_path || 'Claude'
+        session?.latest_user_message ||
+        terminal?.name ||
+        terminal?.cwd ||
+        data.project_path ||
+        'Claude'
 
       if (data.status === 'permission_needed') {
         // Play notification sound
         const audio = new Audio('/audio/permissions.mp3')
         audio.volume = 0.5
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
 
-        const title = session?.name || 'Permission Required';
+        const title = session?.name || 'Permission Required'
 
         // Show browser notification
         notify(`⚠️ ${title}`, {
@@ -98,9 +100,9 @@ function AppContent() {
       } else if (data.hook_type === 'Stop') {
         // Play done sound
         const audio = new Audio('/audio/done.mp3')
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
 
-        const title = session?.name || 'Done';
+        const title = session?.name || 'Done'
 
         // Show browser notification
         notify(`✅ ${title}`, {

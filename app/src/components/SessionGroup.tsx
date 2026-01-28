@@ -1,5 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, GitBranch } from 'lucide-react'
-import { useMemo } from 'react'
+import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
 import type { SessionWithProject } from '../types'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
@@ -17,15 +16,6 @@ export function SessionGroup({
   expanded,
   onToggle,
 }: SessionGroupProps) {
-  // Get git branch from the most recent active session
-  const gitBranch = useMemo(() => {
-    const activeSessions = sessions.filter(
-      (s) => s.status === 'active' || s.status === 'permission_needed',
-    )
-    const session = activeSessions[0] || sessions[0]
-    return session?.git_branch || null
-  }, [sessions])
-
   return (
     <div>
       <div
@@ -42,12 +32,6 @@ export function SessionGroup({
             <Folder className="w-4 h-4 flex-shrink-0" />
             <TruncatedPath path={projectPath} className="text-sm font-medium" />
           </div>
-          {gitBranch && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <GitBranch className="w-3 h-3" />
-              {gitBranch}
-            </span>
-          )}
         </div>
         <span className="text-xs text-muted-foreground flex-shrink-0">
           {sessions.length}

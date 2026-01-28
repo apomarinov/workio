@@ -144,7 +144,8 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             {session.status === 'done' && (
               <CheckIcon className="w-3.5 h-3.5 text-green-500" />
             )}
-            {(session.status === 'active' || !isSmall && session.status === 'permission_needed') && (
+            {(session.status === 'active' ||
+              (!isSmall && session.status === 'permission_needed')) && (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 300 150"
@@ -171,16 +172,20 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
               </svg>
             )}
             {session.status === 'permission_needed' && (
-              <AlertTriangle className={cn("w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse")} />
+              <AlertTriangle
+                className={cn(
+                  'w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse',
+                )}
+              />
             )}
             {!['active', 'permission_needed', 'done'].includes(
               session.status,
             ) && (
-                <Bot
-                  className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-                  aria-label={session.status}
-                />
-              )}
+              <Bot
+                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                aria-label={session.status}
+              />
+            )}
           </div>
           <button
             type="button"

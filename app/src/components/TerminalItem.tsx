@@ -50,15 +50,14 @@ export function TerminalItem({
   const hasSessions = sessions.length > 0
   const hasProcesses = processes.length > 0
 
-  // Get git branch from the most recent active session (only show when not in folder mode)
+  // Get git branch from the most recent active session
   const gitBranch = useMemo(() => {
-    if (hideFolder) return null
     const activeSessions = sessions.filter(
       (s) => s.status === 'active' || s.status === 'permission_needed',
     )
     const session = activeSessions[0] || sessions[0]
     return session?.git_branch || null
-  }, [hideFolder, sessions])
+  }, [sessions])
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()

@@ -1,5 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, GitBranch } from 'lucide-react'
-import { useMemo } from 'react'
+import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
 import type { SessionWithProject, Terminal } from '../types'
 import { TerminalItem } from './TerminalItem'
 import { TruncatedPath } from './TruncatedPath'
@@ -23,19 +22,6 @@ export function FolderGroup({
   expandedTerminalSessions,
   onToggleTerminalSessions,
 }: FolderGroupProps) {
-  // Get git branch from the most recent active session
-  const gitBranch = useMemo(() => {
-    const allSessions = terminals.flatMap(
-      (t) => sessionsForTerminal.get(t.id) || [],
-    )
-    // Prefer active/permission_needed sessions, then most recent
-    const activeSessions = allSessions.filter(
-      (s) => s.status === 'active' || s.status === 'permission_needed',
-    )
-    const session = activeSessions[0] || allSessions[0]
-    return session?.git_branch || null
-  }, [terminals, sessionsForTerminal])
-
   return (
     <div>
       <div
@@ -52,12 +38,6 @@ export function FolderGroup({
             <Folder className="w-4 h-4 flex-shrink-0" />
             <TruncatedPath path={cwd} className="text-sm font-medium" />
           </div>
-          {gitBranch && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <GitBranch className="w-3 h-3" />
-              {gitBranch}
-            </span>
-          )}
         </div>
         <span className="text-xs text-muted-foreground flex-shrink-0">
           {terminals.length}
