@@ -43,7 +43,6 @@ export function SessionChat() {
 
   const sentinelRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const prevScrollHeightRef = useRef<number>(0)
   const prevMessageCountRef = useRef<number>(0)
   const isInitialLoadRef = useRef(true)
   const isNearBottomRef = useRef(true)
@@ -86,10 +85,6 @@ export function SessionChat() {
   const handleIntersection = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       if (entries[0].isIntersecting && hasMore && !isLoadingMore && !loading) {
-        // Save scroll height before loading more
-        if (scrollContainerRef.current) {
-          prevScrollHeightRef.current = scrollContainerRef.current.scrollHeight
-        }
         loadMore()
       }
     },
@@ -98,10 +93,12 @@ export function SessionChat() {
 
   useEffect(() => {
     const sentinel = sentinelRef.current
-    if (!sentinel) return
+    if (!sentinel || !scrollContainerRef.current) return
 
     const observer = new IntersectionObserver(handleIntersection, {
-      threshold: 0.1,
+      root: scrollContainerRef.current,
+      rootMargin: `${window.innerHeight * 0.6}px`,
+      threshold: 0,
     })
 
     observer.observe(sentinel)
@@ -133,12 +130,6 @@ export function SessionChat() {
         scrollContainerRef.current.scrollTop =
           scrollContainerRef.current.scrollHeight
         isInitialLoadRef.current = false
-      } else if (prevScrollHeightRef.current > 0) {
-        // Preserve scroll position when loading more at top
-        const newScrollHeight = scrollContainerRef.current.scrollHeight
-        const scrollDiff = newScrollHeight - prevScrollHeightRef.current
-        scrollContainerRef.current.scrollTop += scrollDiff
-        prevScrollHeightRef.current = 0
       } else if (
         messages.length > prevMessageCountRef.current &&
         isNearBottomRef.current
@@ -159,7 +150,7 @@ export function SessionChat() {
     <div className="relative h-full">
       <div className="absolute inset-0 flex flex-col bg-sidebar">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-zinc-800 w-full">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-medium text-zinc-100 truncate">
               {session?.name || 'Session Chat'}

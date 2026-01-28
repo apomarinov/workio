@@ -34,12 +34,11 @@ export function CreateTerminalModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!cwd.trim()) return
 
     setCreating(true)
     try {
       const terminal = await createTerminal(
-        cwd.trim(),
+        cwd.trim() || '~',
         name.trim() || undefined,
         shell.trim() || undefined,
       )
@@ -67,7 +66,7 @@ export function CreateTerminalModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="cwd" className="text-sm font-medium">
-              Path <span className="text-red-500">*</span>
+              Path
             </label>
             <div className="relative">
               <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -76,7 +75,7 @@ export function CreateTerminalModal({
                 type="text"
                 value={cwd}
                 onChange={(e) => setCwd(e.target.value)}
-                placeholder="/path/to/project"
+                placeholder="~"
                 className="pl-10"
                 autoFocus
               />
@@ -115,7 +114,7 @@ export function CreateTerminalModal({
 
           <Button
             type="submit"
-            disabled={creating || !cwd.trim()}
+            disabled={creating}
             className="w-full mt-2"
           >
             <Plus className="w-4 h-4 mr-2" />

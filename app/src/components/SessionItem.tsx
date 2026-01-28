@@ -94,7 +94,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
     session.latest_user_message &&
     session.latest_user_message !== displayName &&
     session.latest_user_message.indexOf(displayName) !== 0
-  const isSmall = !session.latest_user_message && !session.latest_agent_message
+  const isSmall = !session.latest_user_message && !session.latest_agent_message || !isExpanded;
 
   return (
     <>
@@ -106,7 +106,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
           isSelected && 'bg-sidebar-accent/50',
         )}
       >
-        <div className="flex items-start gap-1 mt-0.5 relative">
+        <div className="flex items-start gap-1 mt-[1px] relative">
           {isExpanded && session.latest_agent_message && (
             <div
               className={cn(
