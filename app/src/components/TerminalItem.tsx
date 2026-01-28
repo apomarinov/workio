@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   GitBranch,
+  Globe,
   Pencil,
   TerminalSquare as TerminalIcon,
   Trash2,
@@ -95,10 +96,14 @@ export function TerminalItem({
               onToggleSessions?.()
             }
           }}
-          className={cn(`group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-            } ${terminal.orphaned ? 'opacity-60' : ''}`, !hasSessions && !hasProcesses && 'pl-2.5')}
+          className={cn(
+            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            } ${terminal.orphaned ? 'opacity-60' : ''}`,
+            !hasSessions && !hasProcesses && 'pl-2.5',
+          )}
         >
           {hasSessions || hasProcesses ? (
             <Button
@@ -123,7 +128,9 @@ export function TerminalItem({
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              {terminal.orphaned ? (
+              {terminal.ssh_host ? (
+                <Globe className="w-4 h-4 flex-shrink-0 text-blue-400" />
+              ) : terminal.orphaned ? (
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
               ) : (
                 <TerminalIcon
@@ -137,6 +144,10 @@ export function TerminalItem({
             </div>
             {terminal.orphaned ? (
               <p className="text-xs truncate text-yellow-500">Path not found</p>
+            ) : terminal.ssh_host ? (
+              <span className="text-xs text-muted-foreground">
+                SSH: {terminal.ssh_host}
+              </span>
             ) : (
               !hideFolder &&
               terminal.name && (

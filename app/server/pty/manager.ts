@@ -1,11 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { IPty } from 'node-pty'
 import * as pty from 'node-pty'
 import type { ActiveProcess } from '../../shared/types'
 import { getSettings, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
+import { validateSSHHost } from '../ssh/config'
+import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
 import { type CommandEvent, createOscParser } from './osc-parser'
 import { getZellijSessionProcesses } from './process-tree'
 
@@ -17,7 +18,7 @@ const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 const COMMAND_IGNORE_LIST = ['claude']
 
 export interface PtySession {
-  pty: IPty
+  pty: TerminalBackend
   buffer: string[]
   timeoutId: NodeJS.Timeout | null
   terminalId: number
@@ -114,14 +115,14 @@ export function getSession(terminalId: number): PtySession | undefined {
   return sessions.get(terminalId)
 }
 
-export function createSession(
+export async function createSession(
   terminalId: number,
   cols: number,
   rows: number,
   onData: (data: string) => void,
   onExit: (code: number) => void,
   onCommandEvent?: (event: CommandEvent) => void,
-): PtySession | null {
+): Promise<PtySession | null> {
   // Check if session already exists
   const existing = sessions.get(terminalId)
   if (existing) {
@@ -140,62 +141,88 @@ export function createSession(
     return null
   }
 
-  // Validate cwd exists
-  if (!fs.existsSync(terminal.cwd)) {
-    console.error('[pty] Working directory does not exist:', terminal.cwd)
-    return null
-  }
+  let backend: TerminalBackend
 
-  // Get shell - use terminal's shell, default from settings, or fallback to SHELL env
-  const settings = getSettings()
-  let shell = terminal.shell || settings.default_shell
+  if (terminal.ssh_host) {
+    // --- SSH terminal ---
+    const result = validateSSHHost(terminal.ssh_host)
+    if (!result.valid) {
+      console.error('[pty] SSH validation failed:', result.error)
+      return null
+    }
 
-  // Fallback to environment shell if specified shell doesn't exist
-  if (!fs.existsSync(shell)) {
-    const envShell = process.env.SHELL
-    if (envShell && fs.existsSync(envShell)) {
-      console.warn(
-        `[pty] Shell ${shell} not found, falling back to ${envShell}`,
-      )
-      shell = envShell
-    } else {
-      // Last resort fallback
-      const fallbacks = ['/bin/zsh', '/bin/bash', '/bin/sh']
-      const found = fallbacks.find((s) => fs.existsSync(s))
-      if (found) {
-        console.warn(`[pty] Shell ${shell} not found, falling back to ${found}`)
-        shell = found
+    console.log(
+      '[pty] Connecting via SSH:',
+      terminal.ssh_host,
+      '→',
+      result.config.hostname,
+    )
+
+    try {
+      backend = await createSSHSession(result.config, cols, rows)
+    } catch (err) {
+      console.error('[pty] Failed to create SSH session:', err)
+      return null
+    }
+  } else {
+    // --- Local terminal ---
+    // Validate cwd exists
+    if (!fs.existsSync(terminal.cwd)) {
+      console.error('[pty] Working directory does not exist:', terminal.cwd)
+      return null
+    }
+
+    // Get shell - use terminal's shell, default from settings, or fallback to SHELL env
+    const settings = getSettings()
+    let shell = terminal.shell || settings.default_shell
+
+    // Fallback to environment shell if specified shell doesn't exist
+    if (!fs.existsSync(shell)) {
+      const envShell = process.env.SHELL
+      if (envShell && fs.existsSync(envShell)) {
+        console.warn(
+          `[pty] Shell ${shell} not found, falling back to ${envShell}`,
+        )
+        shell = envShell
       } else {
-        console.error('[pty] No valid shell found')
-        return null
+        // Last resort fallback
+        const fallbacks = ['/bin/zsh', '/bin/bash', '/bin/sh']
+        const found = fallbacks.find((s) => fs.existsSync(s))
+        if (found) {
+          console.warn(
+            `[pty] Shell ${shell} not found, falling back to ${found}`,
+          )
+          shell = found
+        } else {
+          console.error('[pty] No valid shell found')
+          return null
+        }
       }
+    }
+
+    console.log('[pty] Spawning shell:', shell, 'in', terminal.cwd)
+
+    try {
+      backend = pty.spawn(shell, [], {
+        name: 'xterm-256color',
+        cols,
+        rows,
+        cwd: terminal.cwd,
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          CLAUDE_TERMINAL_ID: String(terminalId),
+        } as Record<string, string>,
+      })
+    } catch (err) {
+      console.error('[pty] Failed to spawn shell:', err)
+      return null
     }
   }
 
-  console.log('[pty] Spawning shell:', shell, 'in', terminal.cwd)
-
-  // Spawn PTY process
-  let ptyProcess: IPty
-  try {
-    ptyProcess = pty.spawn(shell, [], {
-      name: 'xterm-256color',
-      cols,
-      rows,
-      cwd: terminal.cwd,
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-        CLAUDE_TERMINAL_ID: String(terminalId),
-      } as Record<string, string>,
-    })
-  } catch (err) {
-    console.error('[pty] Failed to spawn shell:', err)
-    return null
-  }
-
   const session: PtySession = {
-    pty: ptyProcess,
+    pty: backend,
     buffer: [],
     timeoutId: null,
     terminalId,
@@ -252,12 +279,12 @@ export function createSession(
   )
 
   // Handle PTY data through OSC parser
-  ptyProcess.onData((data) => {
+  backend.onData((data) => {
     oscParser(data)
   })
 
   // Handle PTY exit
-  ptyProcess.onExit(({ exitCode }) => {
+  backend.onExit(({ exitCode }) => {
     sessions.delete(terminalId)
     stopGlobalProcessPolling()
     updateTerminal(terminalId, {
@@ -268,33 +295,39 @@ export function createSession(
     session.onExit?.(exitCode)
   })
 
-  // Update terminal with PID
-  updateTerminal(terminalId, { pid: ptyProcess.pid, status: 'running' })
+  // Update terminal with PID (SSH sessions have no local PID)
+  updateTerminal(terminalId, {
+    pid: backend.pid || null,
+    status: 'running',
+  })
 
   sessions.set(terminalId, session)
 
   // Start global process polling if not already running
   startGlobalProcessPolling()
 
-  // Inject shell integration after a brief delay to let shell initialize
-  setTimeout(() => {
-    const shellName = path.basename(shell)
-    let integrationScript: string | null = null
+  // Inject shell integration for local terminals only
+  if (!terminal.ssh_host) {
+    const shell = terminal.shell || getSettings().default_shell || '/bin/bash'
+    setTimeout(() => {
+      const shellName = path.basename(shell)
+      let integrationScript: string | null = null
 
-    if (shellName === 'zsh') {
-      integrationScript = path.join(__dirname, 'shell-integration', 'zsh.sh')
-    } else if (shellName === 'bash') {
-      integrationScript = path.join(__dirname, 'shell-integration', 'bash.sh')
-    }
+      if (shellName === 'zsh') {
+        integrationScript = path.join(__dirname, 'shell-integration', 'zsh.sh')
+      } else if (shellName === 'bash') {
+        integrationScript = path.join(__dirname, 'shell-integration', 'bash.sh')
+      }
 
-    if (integrationScript && fs.existsSync(integrationScript)) {
-      // Source the integration silently, then reset and position cursor at top
-      ptyProcess.write(
-        `source "${integrationScript}"; printf '\\033c\\x1b[1;1H'\n`,
-      )
-      ptyProcess.write('clear\n')
-    }
-  }, 100)
+      if (integrationScript && fs.existsSync(integrationScript)) {
+        // Source the integration silently, then reset and position cursor at top
+        backend.write(
+          `source "${integrationScript}"; printf '\\033c\\x1b[1;1H'\n`,
+        )
+        backend.write('clear\n')
+      }
+    }, 100)
+  }
 
   return session
 }
@@ -376,7 +409,8 @@ export function destroySession(terminalId: number): boolean {
     const pid = session.pty.pid
     // Kill the entire process group (negative PID kills the group)
     // This ensures child processes (servers, etc.) are also killed
-    if (pid) {
+    // Guard: pid must be > 0 (SSH sessions have pid=0, which would kill our own process group)
+    if (pid && pid > 0) {
       try {
         process.kill(-pid, 'SIGTERM')
       } catch {

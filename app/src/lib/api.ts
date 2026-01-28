@@ -17,11 +17,12 @@ export async function createTerminal(
   cwd: string,
   name?: string,
   shell?: string,
+  ssh_host?: string,
 ): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cwd, name, shell }),
+    body: JSON.stringify({ cwd, name, shell, ssh_host }),
   })
   if (!res.ok) {
     const data = await res.json()

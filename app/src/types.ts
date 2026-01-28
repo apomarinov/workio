@@ -3,6 +3,7 @@ export interface Terminal {
   cwd: string
   name: string | null
   shell: string | null
+  ssh_host: string | null
   pid: number | null
   status: 'running' | 'stopped'
   active_cmd: string | null

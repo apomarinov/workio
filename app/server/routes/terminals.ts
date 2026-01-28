@@ -22,11 +22,13 @@ import {
   updateTerminal,
 } from '../db'
 import { destroySession } from '../pty/manager'
+import { validateSSHHost } from '../ssh/config'
 
 interface CreateTerminalBody {
-  cwd: string
+  cwd?: string
   name?: string
   shell?: string
+  ssh_host?: string
 }
 
 interface UpdateTerminalBody {
@@ -43,7 +45,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     const terminals = getAllTerminals()
     return terminals.map((terminal) => ({
       ...terminal,
-      orphaned: !fs.existsSync(terminal.cwd),
+      orphaned: terminal.ssh_host ? false : !fs.existsSync(terminal.cwd),
     }))
   })
 
@@ -51,8 +53,31 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateTerminalBody }>(
     '/api/terminals',
     async (request, reply) => {
-      const { cwd: rawCwd, name, shell } = request.body
+      const { cwd: rawCwd, name, shell, ssh_host } = request.body
 
+      if (ssh_host) {
+        // --- SSH terminal creation ---
+        const trimmedHost = ssh_host.trim()
+        if (!trimmedHost) {
+          return reply.status(400).send({ error: 'ssh_host cannot be empty' })
+        }
+
+        const result = validateSSHHost(trimmedHost)
+        if (!result.valid) {
+          return reply.status(400).send({ error: result.error })
+        }
+
+        // Ignore cwd/shell for SSH terminals, store "~" as placeholder
+        const terminal = createTerminal(
+          '~',
+          name?.trim() || trimmedHost,
+          null,
+          trimmedHost,
+        )
+        return reply.status(201).send(terminal)
+      }
+
+      // --- Local terminal creation ---
       if (!rawCwd) {
         return reply.status(400).send({ error: 'cwd is required' })
       }

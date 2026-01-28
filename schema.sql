@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS terminals (
     cwd TEXT NOT NULL,
     name TEXT,
     shell TEXT,
+    ssh_host TEXT,
     pid INTEGER,
     status TEXT DEFAULT 'running',
     active_cmd TEXT,

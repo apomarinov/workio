@@ -220,13 +220,14 @@ export function createTerminal(
   cwd: string,
   name: string | null,
   shell: string | null = null,
+  ssh_host: string | null = null,
 ): Terminal {
   const result = db
     .prepare(`
-    INSERT INTO terminals (cwd, name, shell)
-    VALUES (?, ?, ?)
+    INSERT INTO terminals (cwd, name, shell, ssh_host)
+    VALUES (?, ?, ?, ?)
   `)
-    .run(cwd, name, shell)
+    .run(cwd, name, shell, ssh_host)
   return getTerminalById(result.lastInsertRowid as number)!
 }
 

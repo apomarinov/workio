@@ -3,6 +3,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Folder,
+  Globe,
   LayoutList,
   Plus,
   Settings,
@@ -20,6 +21,7 @@ import { useTerminalContext } from '../context/TerminalContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject, Terminal } from '../types'
+import { CreateSSHTerminalModal } from './CreateSSHTerminalModal'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
 import { SessionGroup } from './SessionGroup'
@@ -37,6 +39,8 @@ export function Sidebar({ width }: SidebarProps) {
   const { terminals, selectTerminal } = useTerminalContext()
   const { sessions } = useClaudeSessions()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showSSHModal, setShowSSHModal] = useState(false)
+  const [createPopoverOpen, setCreatePopoverOpen] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
@@ -180,15 +184,40 @@ export function Sidebar({ width }: SidebarProps) {
       <div className="px-4 py-4 border-b border-sidebar-border flex items-center justify-between">
         <div className="text-sm flex items-center gap-2">
           Terminals{' '}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setShowCreateModal(true)}
-            title="New Terminal"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
+          <Popover open={createPopoverOpen} onOpenChange={setCreatePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                title="New Terminal"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-40 p-1 space-y-1" align="start">
+              <button
+                onClick={() => {
+                  setCreatePopoverOpen(false)
+                  setShowCreateModal(true)
+                }}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+              >
+                <TerminalIcon className="w-4 h-4" />
+                Terminal
+              </button>
+              <button
+                onClick={() => {
+                  setCreatePopoverOpen(false)
+                  setShowSSHModal(true)
+                }}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+              >
+                <Globe className="w-4 h-4" />
+                SSH
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="flex items-center gap-1">
           <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
@@ -208,9 +237,8 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('all')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'all' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                  }`}
               >
                 <TerminalIcon className="w-4 h-4" />
                 Terminals
@@ -220,9 +248,8 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('sessions')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'sessions' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                  }`}
               >
                 <Bot className="w-4 h-4" />
                 Sessions
@@ -232,9 +259,8 @@ export function Sidebar({ width }: SidebarProps) {
                   setGroupingMode('folder')
                   setGroupingOpen(false)
                 }}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                  groupingMode === 'folder' ? 'bg-accent' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                  }`}
               >
                 <Folder className="w-4 h-4" />
                 Folders
@@ -269,38 +295,38 @@ export function Sidebar({ width }: SidebarProps) {
       <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
         {groupingMode === 'sessions'
           ? sessions.map((session) => (
-              <SessionItem
-                key={session.session_id}
-                session={session}
-                showGitBranch
-              />
-            ))
+            <SessionItem
+              key={session.session_id}
+              session={session}
+              showGitBranch
+            />
+          ))
           : groupingMode === 'folder'
             ? Array.from(groupedTerminals.entries()).map(
-                ([folderCwd, folderTerminals]) => (
-                  <FolderGroup
-                    key={folderCwd}
-                    cwd={folderCwd}
-                    terminals={folderTerminals}
-                    expanded={expandedFolders.has(folderCwd)}
-                    onToggle={() => toggleFolder(folderCwd)}
-                    sessionsForTerminal={sessionsForTerminal}
-                    expandedTerminalSessions={expandedTerminalSessionsSet}
-                    onToggleTerminalSessions={toggleTerminalSessions}
-                  />
-                ),
-              )
-            : terminals.map((terminal) => (
-                <TerminalItem
-                  key={terminal.id}
-                  terminal={terminal}
-                  sessions={sessionsForTerminal.get(terminal.id) || []}
-                  sessionsExpanded={expandedTerminalSessionsSet.has(
-                    terminal.id,
-                  )}
-                  onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+              ([folderCwd, folderTerminals]) => (
+                <FolderGroup
+                  key={folderCwd}
+                  cwd={folderCwd}
+                  terminals={folderTerminals}
+                  expanded={expandedFolders.has(folderCwd)}
+                  onToggle={() => toggleFolder(folderCwd)}
+                  sessionsForTerminal={sessionsForTerminal}
+                  expandedTerminalSessions={expandedTerminalSessionsSet}
+                  onToggleTerminalSessions={toggleTerminalSessions}
                 />
-              ))}
+              ),
+            )
+            : terminals.map((terminal) => (
+              <TerminalItem
+                key={terminal.id}
+                terminal={terminal}
+                sessions={sessionsForTerminal.get(terminal.id) || []}
+                sessionsExpanded={expandedTerminalSessionsSet.has(
+                  terminal.id,
+                )}
+                onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+              />
+            ))}
 
         {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
         {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (
@@ -332,6 +358,12 @@ export function Sidebar({ width }: SidebarProps) {
       <CreateTerminalModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
+        onCreated={selectTerminal}
+      />
+
+      <CreateSSHTerminalModal
+        open={showSSHModal}
+        onOpenChange={setShowSSHModal}
         onCreated={selectTerminal}
       />
 

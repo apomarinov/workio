@@ -8,8 +8,13 @@ export function useTerminals() {
     api.getTerminals,
   )
 
-  const createTerminal = async (cwd: string, name?: string, shell?: string) => {
-    const terminal = await api.createTerminal(cwd, name, shell)
+  const createTerminal = async (
+    cwd: string,
+    name?: string,
+    shell?: string,
+    ssh_host?: string,
+  ) => {
+    const terminal = await api.createTerminal(cwd, name, shell, ssh_host)
     mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
     return terminal
   }

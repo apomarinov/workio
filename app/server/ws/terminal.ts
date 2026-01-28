@@ -73,7 +73,7 @@ function sendMessage(ws: WebSocket, message: ServerMessage): void {
 wss.on('connection', (ws: WebSocket) => {
   let terminalId: number | null = null
 
-  ws.on('message', (rawData) => {
+  ws.on('message', async (rawData) => {
     let message: ClientMessage
     try {
       message = JSON.parse(rawData.toString()) as ClientMessage
@@ -116,7 +116,7 @@ wss.on('connection', (ws: WebSocket) => {
         }
 
         // Create new session
-        const session = createSession(
+        const session = await createSession(
           terminalId,
           message.cols,
           message.rows,
