@@ -474,6 +474,17 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
                 'prompt_text': prompt_text if is_user else None,
             })
 
+    # Check for custom-title entry to update session name (use the last one)
+    custom_title = None
+    for entry in entries:
+        if entry.get('type') == 'custom-title' and entry.get('customTitle'):
+            custom_title = entry.get('customTitle')
+    if custom_title:
+        conn.execute(
+            'UPDATE sessions SET name = ? WHERE session_id = ?',
+            (custom_title, session_id)
+        )
+
     log(conn, "Processed transcript", session_id=session_id, messages_added=len(new_messages))
 
     # If latest prompt has no prompt text, set it to newest user message
