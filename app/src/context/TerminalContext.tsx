@@ -7,12 +7,13 @@ interface TerminalContextValue {
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
+  setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
 
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
-  const { terminals, loading } = useTerminals()
+  const { terminals, loading, setTerminalOrder } = useTerminals()
   const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
 
   // Auto-select first terminal when terminals load
@@ -39,6 +40,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         loading,
         activeTerminal,
         selectTerminal: setActiveTerminalId,
+        setTerminalOrder,
       }}
     >
       {children}

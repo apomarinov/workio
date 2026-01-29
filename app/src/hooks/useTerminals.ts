@@ -1,12 +1,41 @@
+import { useMemo } from 'react'
 import useSWR from 'swr'
 import * as api from '../lib/api'
 import type { Terminal } from '../types'
+import { useLocalStorage } from './useLocalStorage'
 
 export function useTerminals() {
   const { data, error, isLoading, mutate } = useSWR<Terminal[]>(
     '/api/terminals',
     api.getTerminals,
   )
+
+  const [terminalOrder, setTerminalOrder] = useLocalStorage<number[]>(
+    'sidebar-terminal-order',
+    [],
+  )
+
+  const raw = data ?? []
+
+  const terminals = useMemo(() => {
+    if (terminalOrder.length === 0) return raw
+    const terminalMap = new Map(raw.map((t) => [t.id, t]))
+    const ordered: Terminal[] = []
+    for (const id of terminalOrder) {
+      const t = terminalMap.get(id)
+      if (t) {
+        ordered.push(t)
+        terminalMap.delete(id)
+      }
+    }
+    // Append any new terminals not yet in the order (newest first, matching default)
+    for (const t of raw) {
+      if (terminalMap.has(t.id)) {
+        ordered.push(t)
+      }
+    }
+    return ordered
+  }, [raw, terminalOrder])
 
   const createTerminal = async (
     cwd: string,
@@ -34,12 +63,13 @@ export function useTerminals() {
   }
 
   return {
-    terminals: data ?? [],
+    terminals,
     loading: isLoading,
     error: error?.message ?? null,
     createTerminal,
     updateTerminal,
     deleteTerminal,
+    setTerminalOrder,
     refetch: mutate,
   }
 }

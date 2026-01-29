@@ -1,3 +1,9 @@
+import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
+import {
+  restrictToParentElement,
+  restrictToVerticalAxis,
+} from '@dnd-kit/modifiers'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
   Bot,
   ChevronsDownUp,
@@ -9,7 +15,7 @@ import {
   Settings,
   Terminal as TerminalIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -27,7 +33,7 @@ import { FolderGroup } from './FolderGroup'
 import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
-import { TerminalItem } from './TerminalItem'
+import { SortableTerminalItem } from './SortableTerminalItem'
 
 type GroupingMode = 'all' | 'folder' | 'sessions'
 
@@ -36,7 +42,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ width }: SidebarProps) {
-  const { terminals, selectTerminal } = useTerminalContext()
+  const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
   const { sessions } = useClaudeSessions()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSSHModal, setShowSSHModal] = useState(false)
@@ -58,6 +64,23 @@ export function Sidebar({ width }: SidebarProps) {
   const [, setCollapsedSessions] = useLocalStorage<string[]>(
     'sidebar-collapsed-sessions',
     [],
+  )
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      const ids = terminals.map((t) => t.id)
+      const oldIndex = ids.indexOf(active.id as number)
+      const newIndex = ids.indexOf(over.id as number)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const newIds = [...ids]
+      newIds.splice(oldIndex, 1)
+      newIds.splice(newIndex, 0, active.id as number)
+      setTerminalOrder(newIds)
+    },
+    [terminals, setTerminalOrder],
   )
 
   const expandedFolders = useMemo(
@@ -296,31 +319,41 @@ export function Sidebar({ width }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
-        {groupingMode === 'sessions'
-          ? sessions.map((session) => (
-              <SessionItem
-                key={session.session_id}
-                session={session}
-                showGitBranch
+        {groupingMode === 'sessions' ? (
+          sessions.map((session) => (
+            <SessionItem
+              key={session.session_id}
+              session={session}
+              showGitBranch
+            />
+          ))
+        ) : groupingMode === 'folder' ? (
+          Array.from(groupedTerminals.entries()).map(
+            ([folderCwd, folderTerminals]) => (
+              <FolderGroup
+                key={folderCwd}
+                cwd={folderCwd}
+                terminals={folderTerminals}
+                expanded={expandedFolders.has(folderCwd)}
+                onToggle={() => toggleFolder(folderCwd)}
+                sessionsForTerminal={sessionsForTerminal}
+                expandedTerminalSessions={expandedTerminalSessionsSet}
+                onToggleTerminalSessions={toggleTerminalSessions}
               />
-            ))
-          : groupingMode === 'folder'
-            ? Array.from(groupedTerminals.entries()).map(
-                ([folderCwd, folderTerminals]) => (
-                  <FolderGroup
-                    key={folderCwd}
-                    cwd={folderCwd}
-                    terminals={folderTerminals}
-                    expanded={expandedFolders.has(folderCwd)}
-                    onToggle={() => toggleFolder(folderCwd)}
-                    sessionsForTerminal={sessionsForTerminal}
-                    expandedTerminalSessions={expandedTerminalSessionsSet}
-                    onToggleTerminalSessions={toggleTerminalSessions}
-                  />
-                ),
-              )
-            : terminals.map((terminal) => (
-                <TerminalItem
+            ),
+          )
+        ) : (
+          <DndContext
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={terminals.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {terminals.map((terminal) => (
+                <SortableTerminalItem
                   key={terminal.id}
                   terminal={terminal}
                   sessions={sessionsForTerminal.get(terminal.id) || []}
@@ -330,6 +363,9 @@ export function Sidebar({ width }: SidebarProps) {
                   onToggleSessions={() => toggleTerminalSessions(terminal.id)}
                 />
               ))}
+            </SortableContext>
+          </DndContext>
+        )}
 
         {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
         {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (
