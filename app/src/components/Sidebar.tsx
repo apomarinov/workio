@@ -374,7 +374,7 @@ export function Sidebar({ width }: SidebarProps) {
                     }`}
                   >
                     <Bot className="w-4 h-4" />
-                    Sessions
+                    Claude
                   </button>
                   <button
                     onClick={() => {
@@ -446,7 +446,7 @@ export function Sidebar({ width }: SidebarProps) {
                   }`}
                 >
                   <Bot className="w-4 h-4" />
-                  Sessions
+                  Claude
                 </button>
                 <button
                   onClick={() => {

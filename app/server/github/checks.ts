@@ -292,6 +292,62 @@ export function stopChecksPolling(): void {
   }
 }
 
+export function fetchPRComments(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  limit: number,
+  offset: number,
+): Promise<{ comments: PRComment[]; total: number }> {
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'pr',
+        'view',
+        String(prNumber),
+        '--repo',
+        `${owner}/${repo}`,
+        '--json',
+        'comments',
+      ],
+      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+      (err, stdout) => {
+        if (err) {
+          resolve({ comments: [], total: 0 })
+          return
+        }
+        try {
+          const data: {
+            comments: {
+              author: { login: string }
+              body: string
+              createdAt: string
+            }[]
+          } = JSON.parse(stdout)
+
+          const filtered = (data.comments || []).filter(
+            (c) => !c.author.login.includes('[bot]'),
+          )
+          const total = filtered.length
+          const sliced = filtered
+            .reverse()
+            .slice(offset, offset + limit)
+            .map((c) => ({
+              author: c.author.login,
+              avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
+              body: c.body,
+              createdAt: c.createdAt,
+            }))
+          resolve({ comments: sliced, total })
+        } catch {
+          resolve({ comments: [], total: 0 })
+        }
+      },
+    )
+  })
+}
+
 /** Send the last polled PR data to a specific socket (e.g. on connect). */
 export function emitCachedPRChecks(socket: {
   emit: (ev: string, data: unknown) => void

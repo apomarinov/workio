@@ -1,13 +1,17 @@
 import {
   Activity,
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
+  CircleX,
   Command,
   GitBranch,
   Globe,
+  Loader2,
   MoreVertical,
   Pencil,
+  RefreshCw,
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
@@ -132,10 +136,9 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && !hasGitHub && 'pl-2.5',
           )}
@@ -240,25 +243,56 @@ export function TerminalItem({
         </div>
 
         {(hasGitHub || hasProcesses || hasSessions) && sessionsExpanded && (
-          <div className="ml-7 mt-1 space-y-0.5">
+          <div className="ml-0 mt-1 space-y-0.5">
             {hasGitHub && prForBranch && (
               <>
                 <button
                   type="button"
                   onClick={toggleGitHub}
                   className={cn(
-                    'flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 transition-colors',
+                    'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 transition-colors',
                     prForBranch.reviewDecision === 'CHANGES_REQUESTED'
-                      ? 'text-yellow-500 hover:text-yellow-400'
-                      : prForBranch.checks.length > 0
-                        ? 'text-red-500 hover:text-red-400'
-                        : 'text-muted-foreground/60 hover:text-muted-foreground',
+                      ? 'text-orange-500 hover:text-orange-400'
+                      : prForBranch.checks.some(
+                        (c) =>
+                          c.status === 'IN_PROGRESS' ||
+                          c.status === 'QUEUED',
+                      )
+                        ? 'text-yellow-500 hover:text-yellow-400'
+                        : prForBranch.checks.some(
+                          (c) =>
+                            c.status === 'COMPLETED' &&
+                            c.conclusion !== 'SUCCESS' &&
+                            c.conclusion !== 'SKIPPED' &&
+                            c.conclusion !== 'NEUTRAL',
+                        )
+                          ? 'text-red-500 hover:text-red-400'
+                          : '',
                   )}
                 >
                   {githubExpanded ? (
                     <ChevronDown className="w-3 h-3" />
                   ) : (
-                    <ChevronRight className="w-3 h-3" />
+                    <>
+                      {(prForBranch.reviewDecision === 'CHANGES_REQUESTED' ||
+                        prForBranch.checks.length > 0) && (
+                          <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
+                        )}
+                      {prForBranch.reviewDecision === 'CHANGES_REQUESTED' ? (
+                        <RefreshCw className="w-3 h-3 text-orange-500 group-hover/gh:hidden" />
+                      ) : prForBranch.checks.some(
+                        (c) =>
+                          c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+                      ) ? (
+                        <Loader2 className="w-3 h-3 text-yellow-500 animate-spin group-hover/gh:hidden" />
+                      ) : prForBranch.reviewDecision === 'APPROVED' ? (
+                        <Check className="w-3 h-3 text-green-500 group-hover/gh:hidden" />
+                      ) : prForBranch.checks.length > 0 ? (
+                        <CircleX className="w-3 h-3 text-red-500 group-hover/gh:hidden" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3" />
+                      )}
+                    </>
                   )}
                   GitHub
                 </button>

@@ -4,7 +4,11 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
-import { emitCachedPRChecks, initGitHubChecks } from './github/checks'
+import {
+  emitCachedPRChecks,
+  fetchPRComments,
+  initGitHubChecks,
+} from './github/checks'
 import { setIO } from './io'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -65,6 +69,17 @@ fastify.post('/api/emit', async (request, reply) => {
   }
   io.emit(event, data)
   return { ok: true }
+})
+
+// GitHub PR comments
+fastify.get<{
+  Params: { owner: string; repo: string; pr: string }
+  Querystring: { limit?: string; offset?: string }
+}>('/api/github/:owner/:repo/pr/:pr/comments', async (request) => {
+  const { owner, repo, pr } = request.params
+  const limit = Math.min(Number(request.query.limit) || 20, 100)
+  const offset = Number(request.query.offset) || 0
+  return fetchPRComments(owner, repo, Number(pr), limit, offset)
 })
 
 // Routes

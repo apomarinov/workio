@@ -129,6 +129,28 @@ export async function deleteSessions(ids: string[]): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete sessions')
 }
 
+export async function getPRComments(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  limit: number,
+  offset: number,
+): Promise<{
+  comments: {
+    author: string
+    avatarUrl: string
+    body: string
+    createdAt: string
+  }[]
+  total: number
+}> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comments?limit=${limit}&offset=${offset}`,
+  )
+  if (!res.ok) throw new Error('Failed to fetch PR comments')
+  return res.json()
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,

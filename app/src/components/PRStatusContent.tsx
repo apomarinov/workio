@@ -13,7 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { PRCheckStatus } from '../../shared/types'
+import { cn } from '@/lib/utils'
+import type { PRCheckStatus, PRComment } from '../../shared/types'
+import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
 
 interface PRStatusContentProps {
@@ -32,7 +34,6 @@ function CommentItem({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const firstLine = comment.body.split('\n')[0] || ''
 
   return (
     <>
@@ -58,23 +59,19 @@ function CommentItem({
           )}
           <span className="text-xs font-medium truncate">{comment.author}</span>
         </button>
-        {!expanded && (
-          <p className="text-xs text-muted-foreground truncate ml-[34px]">
-            {firstLine}
-          </p>
-        )}
-        {expanded && (
-          <div
-            onClick={() => setModalOpen(true)}
-            className="ml-[34px] mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors"
-          >
-            <MarkdownContent content={comment.body} />
-          </div>
-        )}
+        <div
+          onClick={() => setModalOpen(true)}
+          className={cn(
+            ' mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors',
+            !expanded && 'line-clamp-1',
+          )}
+        >
+          <MarkdownContent content={comment.body} />
+        </div>
       </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {comment.avatarUrl && (
@@ -105,6 +102,32 @@ export function PRStatusContent({ pr }: PRStatusContentProps) {
     approvedReviews.length > 0 || changesRequestedReviews.length > 0
   const hasChecks = pr.checks.length > 0
   const hasComments = pr.comments.length > 0
+
+  const [extraComments, setExtraComments] = useState<PRComment[]>([])
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+
+  const [owner, repo] = pr.repo.split('/')
+  const allComments = [...pr.comments, ...extraComments]
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const result = await api.getPRComments(
+        owner,
+        repo,
+        pr.prNumber,
+        20,
+        allComments.length,
+      )
+      setExtraComments((prev) => [...prev, ...result.comments])
+      setHasMore(allComments.length + result.comments.length < result.total)
+    } catch {
+      // ignore
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   if (!hasReviews && !hasChecks && !hasComments) return null
 
@@ -154,28 +177,53 @@ export function PRStatusContent({ pr }: PRStatusContentProps) {
         </a>
       ))}
 
-      {/* Failed checks */}
-      {pr.checks.map((check) => (
-        <a
-          key={check.name}
-          href={check.detailsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
-        >
-          {check.status === 'IN_PROGRESS' || check.status === 'QUEUED' ? (
-            <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
-          ) : (
-            <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
-          )}
-          <span className="text-xs truncate">{check.name}</span>
-        </a>
-      ))}
+      <div className="relative flex flex-col gap-0 pl-3">
+        <div className="absolute h-[calc(100%-5px)] border-l-[1px]"></div>
+        {/* Checks */}
+        {hasChecks && (
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
+            Checks ({pr.checks.length})
+          </p>
+        )}
+        {pr.checks.map((check) => (
+          <a
+            key={check.name}
+            href={check.detailsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
+          >
+            {check.status === 'IN_PROGRESS' || check.status === 'QUEUED' ? (
+              <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
+            ) : (
+              <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+            )}
+            <span className="text-xs truncate">{check.name}</span>
+          </a>
+        ))}
 
-      {/* Comments */}
-      {pr.comments.map((comment, i) => (
-        <CommentItem key={`${comment.author}-${i}`} comment={comment} />
-      ))}
+        {/* Comments */}
+        {hasComments && (
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
+            Comments
+          </p>
+        )}
+        {allComments.map((comment, i) => (
+          <CommentItem key={`${comment.author}-${i}`} comment={comment} />
+        ))}
+
+        {hasComments && hasMore && (
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {loadingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+            {loadingMore ? 'Loading...' : 'Load more comments'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
