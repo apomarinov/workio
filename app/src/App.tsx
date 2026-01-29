@@ -10,6 +10,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
+import { KeyMapProvider } from './context/KeyMapContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useBrowserNotification } from './hooks/useBrowserNotification'
@@ -186,7 +187,9 @@ function App() {
   return (
     <TerminalProvider>
       <SessionProvider>
-        <AppContent />
+        <KeyMapProvider>
+          <AppContent />
+        </KeyMapProvider>
       </SessionProvider>
     </TerminalProvider>
   )

@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Command,
   GitBranch,
   Globe,
   Pencil,
@@ -12,6 +13,7 @@ import {
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
+import { useKeyMapContext } from '@/context/KeyMapContext'
 import { useSessionContext } from '@/context/SessionContext'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -37,9 +39,11 @@ export function TerminalItem({
   sessionsExpanded = true,
   onToggleSessions,
 }: TerminalItemProps) {
-  const { activeTerminal, selectTerminal } = useTerminalContext()
+  const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminalContext()
   const { clearSession } = useSessionContext()
+  const { cmdHeld } = useKeyMapContext()
+  const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
   const allProcesses = useProcesses()
   const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
   const isActive = terminal.id === activeTerminal?.id
@@ -103,10 +107,9 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && 'pl-2.5',
           )}
@@ -174,25 +177,34 @@ export function TerminalItem({
               </span>
             )}
           </div>
-          <div className="h-7 invisible pointer-events-none"></div>
-          <div className="hidden group-hover:flex">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleEditClick}
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDeleteClick}
-              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
+          {cmdHeld && shortcutIndex >= 1 && shortcutIndex <= 9 ? (
+            <span className="flex items-center gap-0.5 text-sm text-muted-foreground font-medium tabular-nums">
+              <Command className="w-3 h-3" />
+              {shortcutIndex}
+            </span>
+          ) : (
+            <>
+              <div className="h-7 invisible pointer-events-none"></div>
+              <div className="hidden group-hover:flex">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleEditClick}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDeleteClick}
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
 
         {(hasProcesses || hasSessions) && sessionsExpanded && (
