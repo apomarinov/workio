@@ -10,6 +10,8 @@ interface SortableTerminalItemProps {
   onToggleSessions: () => void
   processesExpanded: boolean
   onToggleProcesses: () => void
+  githubExpanded: boolean
+  onToggleGitHub: () => void
 }
 
 export function SortableTerminalItem({
@@ -19,6 +21,8 @@ export function SortableTerminalItem({
   onToggleSessions,
   processesExpanded,
   onToggleProcesses,
+  githubExpanded,
+  onToggleGitHub,
 }: SortableTerminalItemProps) {
   const {
     attributes,
@@ -44,6 +48,8 @@ export function SortableTerminalItem({
         onToggleSessions={onToggleSessions}
         processesExpanded={processesExpanded}
         onToggleProcesses={onToggleProcesses}
+        githubExpanded={githubExpanded}
+        onToggleGitHub={onToggleGitHub}
       />
     </div>
   )

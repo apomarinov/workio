@@ -5,6 +5,12 @@ import { fileURLToPath } from 'node:url'
 import * as pty from 'node-pty'
 import type { ActiveProcess } from '../../shared/types'
 import { getSettings, getTerminalById, updateTerminal } from '../db'
+import {
+  refreshPRChecks,
+  startChecksPolling,
+  trackTerminal,
+  untrackTerminal,
+} from '../github/checks'
 import { getIO } from '../io'
 import { validateSSHHost } from '../ssh/config'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
@@ -126,6 +132,7 @@ function detectGitBranch(terminalId: number) {
         if (branch) {
           updateTerminal(terminalId, { git_branch: branch })
           getIO()?.emit('terminal:updated', { terminalId })
+          refreshPRChecks()
         }
       }
     },
@@ -359,6 +366,9 @@ export async function createSession(
 
     // Detect git branch for local terminals
     detectGitBranch(terminalId)
+
+    // Track terminal for GitHub PR checks
+    trackTerminal(terminalId).then(() => startChecksPolling())
   }
 
   return session
@@ -467,6 +477,7 @@ export function destroySession(terminalId: number): boolean {
 
   sessions.delete(terminalId)
   stopGlobalProcessPolling()
+  untrackTerminal(terminalId)
   return true
 }
 

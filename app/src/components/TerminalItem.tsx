@@ -22,6 +22,7 @@ import { useProcesses } from '../hooks/useProcesses'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
+import { PRStatusContent } from './PRStatusContent'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
 
@@ -33,6 +34,8 @@ interface TerminalItemProps {
   onToggleSessions?: () => void
   processesExpanded?: boolean
   onToggleProcesses?: () => void
+  githubExpanded?: boolean
+  onToggleGitHub?: () => void
 }
 
 export function TerminalItem({
@@ -43,6 +46,8 @@ export function TerminalItem({
   onToggleSessions,
   processesExpanded: processesExpandedProp,
   onToggleProcesses,
+  githubExpanded: githubExpandedProp,
+  onToggleGitHub,
 }: TerminalItemProps) {
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminalContext()
@@ -51,6 +56,11 @@ export function TerminalItem({
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
   const allProcesses = useProcesses()
   const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
+  const { githubPRs } = useTerminalContext()
+  const prForBranch = terminal.git_branch
+    ? githubPRs.find((pr) => pr.branch === terminal.git_branch)
+    : undefined
+  const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -58,6 +68,10 @@ export function TerminalItem({
   const processesExpanded = processesExpandedProp ?? localProcessesExpanded
   const toggleProcesses =
     onToggleProcesses ?? (() => setLocalProcessesExpanded((v) => !v))
+  const [localGitHubExpanded, setLocalGitHubExpanded] = useState(true)
+  const githubExpanded = githubExpandedProp ?? localGitHubExpanded
+  const toggleGitHub =
+    onToggleGitHub ?? (() => setLocalGitHubExpanded((v) => !v))
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0
@@ -113,10 +127,10 @@ export function TerminalItem({
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
-            !hasSessions && !hasProcesses && 'pl-2.5',
+            !hasSessions && !hasProcesses && !hasGitHub && 'pl-2.5',
           )}
         >
-          {hasSessions || hasProcesses ? (
+          {hasSessions || hasProcesses || hasGitHub ? (
             <Button
               variant="ghost"
               size="icon"
@@ -210,8 +224,25 @@ export function TerminalItem({
           )}
         </div>
 
-        {(hasProcesses || hasSessions) && sessionsExpanded && (
+        {(hasGitHub || hasProcesses || hasSessions) && sessionsExpanded && (
           <div className="ml-7 mt-1 space-y-0.5">
+            {hasGitHub && prForBranch && (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleGitHub}
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                >
+                  {githubExpanded ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                  GitHub
+                </button>
+                {githubExpanded && <PRStatusContent pr={prForBranch} />}
+              </>
+            )}
             {hasProcesses && (
               <>
                 <button

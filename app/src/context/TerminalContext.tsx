@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
+import type { PRCheckStatus, PRChecksPayload } from '../../shared/types'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
@@ -23,6 +24,7 @@ interface TerminalContextValue {
   deleteTerminal: (id: number) => Promise<void>
   setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
   refetch: () => void
+  githubPRs: PRCheckStatus[]
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -83,6 +85,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe, mutate])
 
+  // GitHub PR checks
+  const [githubPRs, setGithubPRs] = useState<PRCheckStatus[]>([])
+  useEffect(() => {
+    return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
+      setGithubPRs(data.prs)
+    })
+  }, [subscribe])
+
   const activeTerminal =
     terminals.find((t) => t.id === activeTerminalId) ?? null
 
@@ -123,6 +133,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         deleteTerminal,
         setTerminalOrder,
         refetch: () => mutate(),
+        githubPRs,
       }}
     >
       {children}

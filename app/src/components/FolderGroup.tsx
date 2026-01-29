@@ -13,6 +13,8 @@ interface FolderGroupProps {
   onToggleTerminalSessions: (terminalId: number) => void
   collapsedTerminalProcesses: Set<number>
   onToggleTerminalProcesses: (terminalId: number) => void
+  collapsedTerminalGitHub: Set<number>
+  onToggleTerminalGitHub: (terminalId: number) => void
 }
 
 export function FolderGroup({
@@ -25,6 +27,8 @@ export function FolderGroup({
   onToggleTerminalSessions,
   collapsedTerminalProcesses,
   onToggleTerminalProcesses,
+  collapsedTerminalGitHub,
+  onToggleTerminalGitHub,
 }: FolderGroupProps) {
   return (
     <div>
@@ -59,6 +63,8 @@ export function FolderGroup({
               onToggleSessions={() => onToggleTerminalSessions(terminal.id)}
               processesExpanded={!collapsedTerminalProcesses.has(terminal.id)}
               onToggleProcesses={() => onToggleTerminalProcesses(terminal.id)}
+              githubExpanded={!collapsedTerminalGitHub.has(terminal.id)}
+              onToggleGitHub={() => onToggleTerminalGitHub(terminal.id)}
             />
           ))}
         </div>

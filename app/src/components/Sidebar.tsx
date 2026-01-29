@@ -13,6 +13,8 @@ import {
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
   Bot,
+  ChevronDown,
+  ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
   Ellipsis,
@@ -38,6 +40,7 @@ import type { SessionWithProject, Terminal } from '../types'
 import { CreateSSHTerminalModal } from './CreateSSHTerminalModal'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
+import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
@@ -75,6 +78,14 @@ export function Sidebar({ width }: SidebarProps) {
     'sidebar-collapsed-sessions',
     [],
   )
+  const [collapsedTerminalGitHub, setCollapsedTerminalGitHub] = useLocalStorage<
+    number[]
+  >('sidebar-collapsed-terminal-github', [])
+  const [githubSectionCollapsed, setGithubSectionCollapsed] =
+    useLocalStorage<boolean>('sidebar-section-github-collapsed', false)
+  const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
+    useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
+  const { githubPRs } = useTerminalContext()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -196,6 +207,40 @@ export function Sidebar({ width }: SidebarProps) {
     })
   }
 
+  const collapsedTerminalGitHubSet = useMemo(
+    () => new Set(collapsedTerminalGitHub),
+    [collapsedTerminalGitHub],
+  )
+
+  const toggleTerminalGitHub = (terminalId: number) => {
+    setCollapsedTerminalGitHub((prev) => {
+      if (prev.includes(terminalId)) {
+        return prev.filter((id) => id !== terminalId)
+      }
+      return [...prev, terminalId]
+    })
+  }
+
+  // Track expanded state for individual PRs in the sidebar GitHub section
+  const [expandedGitHubPRs, setExpandedGitHubPRs] = useLocalStorage<string[]>(
+    'sidebar-expanded-github-prs',
+    [],
+  )
+
+  const expandedGitHubPRsSet = useMemo(
+    () => new Set(expandedGitHubPRs),
+    [expandedGitHubPRs],
+  )
+
+  const toggleGitHubPR = (branch: string) => {
+    setExpandedGitHubPRs((prev) => {
+      if (prev.includes(branch)) {
+        return prev.filter((b) => b !== branch)
+      }
+      return [...prev, branch]
+    })
+  }
+
   const allSessionIds = useMemo(
     () => sessions.map((s) => s.session_id),
     [sessions],
@@ -213,7 +258,11 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedSessionGroups(allOrphanGroupPaths)
     setExpandedTerminalSessions(allTerminalIds)
     setCollapsedTerminalProcesses([])
+    setCollapsedTerminalGitHub([])
     setCollapsedSessions([])
+    setOtherSessionsSectionCollapsed(false)
+    setGithubSectionCollapsed(false)
+    setExpandedGitHubPRs(githubPRs.map((pr) => pr.branch))
   }
 
   const collapseAll = () => {
@@ -221,13 +270,19 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
     setCollapsedTerminalProcesses(allTerminalIds)
+    setCollapsedTerminalGitHub(allTerminalIds)
     setCollapsedSessions(allSessionIds)
+    setOtherSessionsSectionCollapsed(true)
+    setGithubSectionCollapsed(true)
+    setExpandedGitHubPRs([])
   }
 
   const allExpanded =
     allFolders.every((f) => expandedFolders.has(f)) &&
     allOrphanGroupPaths.every((p) => expandedSessionGroupsSet.has(p)) &&
-    allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id))
+    allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id)) &&
+    !otherSessionsSectionCollapsed &&
+    !githubSectionCollapsed
 
   return (
     <div
@@ -456,6 +511,8 @@ export function Sidebar({ width }: SidebarProps) {
                 onToggleTerminalSessions={toggleTerminalSessions}
                 collapsedTerminalProcesses={collapsedTerminalProcessesSet}
                 onToggleTerminalProcesses={toggleTerminalProcesses}
+                collapsedTerminalGitHub={collapsedTerminalGitHubSet}
+                onToggleTerminalGitHub={toggleTerminalGitHub}
               />
             ),
           )
@@ -483,6 +540,8 @@ export function Sidebar({ width }: SidebarProps) {
                     !collapsedTerminalProcessesSet.has(terminal.id)
                   }
                   onToggleProcesses={() => toggleTerminalProcesses(terminal.id)}
+                  githubExpanded={!collapsedTerminalGitHubSet.has(terminal.id)}
+                  onToggleGitHub={() => toggleTerminalGitHub(terminal.id)}
                 />
               ))}
             </SortableContext>
@@ -498,20 +557,67 @@ export function Sidebar({ width }: SidebarProps) {
                 terminals.length === 0 && 'border-none',
               )}
             />
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1">
+            <button
+              type="button"
+              onClick={() =>
+                setOtherSessionsSectionCollapsed(!otherSessionsSectionCollapsed)
+              }
+              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+            >
+              {otherSessionsSectionCollapsed ? (
+                <ChevronRight className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
               Other Claude Sessions
-            </p>
-            {Array.from(orphanSessionGroups.entries()).map(
-              ([projectPath, groupSessions]) => (
-                <SessionGroup
-                  key={projectPath}
-                  projectPath={projectPath}
-                  sessions={groupSessions}
-                  expanded={expandedSessionGroupsSet.has(projectPath)}
-                  onToggle={() => toggleSessionGroup(projectPath)}
+            </button>
+            {!otherSessionsSectionCollapsed &&
+              Array.from(orphanSessionGroups.entries()).map(
+                ([projectPath, groupSessions]) => (
+                  <SessionGroup
+                    key={projectPath}
+                    projectPath={projectPath}
+                    sessions={groupSessions}
+                    expanded={expandedSessionGroupsSet.has(projectPath)}
+                    onToggle={() => toggleSessionGroup(projectPath)}
+                  />
+                ),
+              )}
+          </>
+        )}
+
+        {/* GitHub PR status */}
+        {groupingMode !== 'sessions' && githubPRs.length > 0 && (
+          <>
+            <div
+              className={cn(
+                'border-t border-sidebar-border my-2',
+                terminals.length === 0 &&
+                  orphanSessionGroups.size === 0 &&
+                  'border-none',
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setGithubSectionCollapsed(!githubSectionCollapsed)}
+              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+            >
+              {githubSectionCollapsed ? (
+                <ChevronRight className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+              GitHub
+            </button>
+            {!githubSectionCollapsed &&
+              githubPRs.map((pr) => (
+                <PRStatusGroup
+                  key={`${pr.repo}:${pr.branch}`}
+                  pr={pr}
+                  expanded={expandedGitHubPRsSet.has(pr.branch)}
+                  onToggle={() => toggleGitHubPR(pr.branch)}
                 />
-              ),
-            )}
+              ))}
           </>
         )}
       </div>

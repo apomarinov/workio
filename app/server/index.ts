@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
+import { emitCachedPRChecks, initGitHubChecks } from './github/checks'
 import { setIO } from './io'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -33,6 +34,7 @@ setIO(io)
 
 io.on('connection', (socket) => {
   fastify.log.info(`Client connected: ${socket.id}`)
+  emitCachedPRChecks(socket)
 
   socket.on('disconnect', () => {
     fastify.log.info(`Client disconnected: ${socket.id}`)
@@ -88,6 +90,9 @@ const start = async () => {
     fastify.log.info(
       '[ws] Terminal WebSocket handler registered at /ws/terminal',
     )
+
+    // Initialize GitHub PR checks polling
+    initGitHubChecks()
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)

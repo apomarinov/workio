@@ -10,3 +10,39 @@ export interface ProcessesPayload {
   terminalId?: number
   processes: ActiveProcess[]
 }
+
+export interface FailedPRCheck {
+  name: string
+  status: string
+  conclusion: string
+  detailsUrl: string
+}
+
+export interface PRComment {
+  author: string
+  avatarUrl: string
+  body: string
+  createdAt: string
+}
+
+export interface PRReview {
+  author: string
+  avatarUrl: string
+  state: string
+}
+
+export interface PRCheckStatus {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  branch: string
+  repo: string
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | ''
+  reviews: PRReview[]
+  checks: FailedPRCheck[]
+  comments: PRComment[]
+}
+
+export interface PRChecksPayload {
+  prs: PRCheckStatus[]
+}
