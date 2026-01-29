@@ -197,6 +197,18 @@ export function deleteSession(sessionId: string): boolean {
   return result.changes > 0
 }
 
+export function deleteSessions(sessionIds: string[]): number {
+  if (sessionIds.length === 0) return 0
+  let deleted = 0
+  const txn = db.transaction(() => {
+    for (const sessionId of sessionIds) {
+      if (deleteSession(sessionId)) deleted++
+    }
+  })
+  txn()
+  return deleted
+}
+
 // Terminal queries
 
 export function getAllTerminals(): Terminal[] {

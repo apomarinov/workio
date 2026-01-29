@@ -60,6 +60,14 @@ export function useClaudeSessions() {
     [mutate],
   )
 
+  const deleteSessions = useCallback(
+    async (ids: string[]) => {
+      await api.deleteSessions(ids)
+      mutate()
+    },
+    [mutate],
+  )
+
   return {
     sessions: data ?? [],
     loading: isLoading,
@@ -67,5 +75,6 @@ export function useClaudeSessions() {
     refetch: mutate,
     updateSession,
     deleteSession,
+    deleteSessions,
   }
 }

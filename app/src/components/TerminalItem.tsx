@@ -4,15 +4,20 @@ import {
   ChevronDown,
   ChevronRight,
   Command,
-  Folder,
   GitBranch,
   Globe,
+  MoreVertical,
   Pencil,
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
 import { useKeyMapContext } from '@/context/KeyMapContext'
 import { useSessionContext } from '@/context/SessionContext'
@@ -64,6 +69,7 @@ export function TerminalItem({
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const [localProcessesExpanded, setLocalProcessesExpanded] = useState(true)
   const processesExpanded = processesExpandedProp ?? localProcessesExpanded
   const toggleProcesses =
@@ -84,8 +90,12 @@ export function TerminalItem({
     onToggleSessions?.()
   }
 
-  const handleEditClick = (e: React.MouseEvent) => {
+  const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+  }
+
+  const handleEditClick = () => {
+    setShowMenu(false)
     setShowEditModal(true)
   }
 
@@ -100,8 +110,8 @@ export function TerminalItem({
     }
   }
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDeleteClick = () => {
+    setShowMenu(false)
     setShowDeleteModal(true)
   }
 
@@ -122,7 +132,7 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
+            `group flex relative items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
               isActive
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -169,22 +179,12 @@ export function TerminalItem({
             </div>
             {terminal.orphaned ? (
               <p className="text-xs truncate text-yellow-500">Path not found</p>
-            ) : terminal.ssh_host ? (
+            ) : (
+              terminal.ssh_host &&
               terminal.name !== terminal.ssh_host && (
                 <span className="text-xs text-muted-foreground">
                   SSH: {terminal.ssh_host}
                 </span>
-              )
-            ) : (
-              !hideFolder &&
-              terminal.name && (
-                <div className="flex gap-1 items-center">
-                  <Folder className="w-2.5 h-2.5 text-zinc-400" />
-                  <TruncatedPath
-                    path={terminal.cwd}
-                    className="text-[10px] text-muted-foreground"
-                  />
-                </div>
               )
             )}
             {gitBranch && (
@@ -200,27 +200,42 @@ export function TerminalItem({
               {shortcutIndex}
             </span>
           ) : (
-            <>
-              <div className="h-7 invisible pointer-events-none"></div>
-              <div className="hidden group-hover:flex">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleEditClick}
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            <div className="absolute invisible group-hover:visible top-1 right-1">
+              <Popover open={showMenu} onOpenChange={setShowMenu}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={handleMenuClick}
+                    className="h-7 w-7 text-muted-foreground !w-[20px]"
+                  >
+                    <MoreVertical className="w-3 h-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-36 p-1"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleDeleteClick}
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </>
+                  <button
+                    type="button"
+                    onClick={handleEditClick}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left text-destructive"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </PopoverContent>
+              </Popover>
+            </div>
           )}
         </div>
 
@@ -231,7 +246,14 @@ export function TerminalItem({
                 <button
                   type="button"
                   onClick={toggleGitHub}
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  className={cn(
+                    'flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 transition-colors',
+                    prForBranch.reviewDecision === 'CHANGES_REQUESTED'
+                      ? 'text-yellow-500 hover:text-yellow-400'
+                      : prForBranch.checks.length > 0
+                        ? 'text-red-500 hover:text-red-400'
+                        : 'text-muted-foreground/60 hover:text-muted-foreground',
+                  )}
                 >
                   {githubExpanded ? (
                     <ChevronDown className="w-3 h-3" />
@@ -276,14 +298,14 @@ export function TerminalItem({
                 <button
                   type="button"
                   onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
-                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
                 >
                   {sessionsListExpanded ? (
                     <ChevronDown className="w-3 h-3" />
                   ) : (
                     <ChevronRight className="w-3 h-3" />
                   )}
-                  Sessions ({sessions.length})
+                  Claude ({sessions.length})
                 </button>
                 {sessionsListExpanded &&
                   sessions.map((session) => (

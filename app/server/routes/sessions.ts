@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import {
   deleteSession,
+  deleteSessions,
   getAllSessions,
   getSessionMessages,
   updateSession,
@@ -35,6 +36,19 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Session not found' })
       }
       return { ok: true }
+    },
+  )
+
+  // Bulk delete sessions
+  fastify.delete<{ Body: { ids: string[] } }>(
+    '/api/sessions',
+    async (request, reply) => {
+      const { ids } = request.body
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return reply.status(400).send({ error: 'ids array is required' })
+      }
+      const deleted = deleteSessions(ids)
+      return { ok: true, deleted }
     },
   )
 

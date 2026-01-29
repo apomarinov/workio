@@ -112,6 +112,15 @@ export async function deleteSession(sessionId: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete session')
 }
 
+export async function deleteSessions(ids: string[]): Promise<void> {
+  const res = await fetch(`${API_BASE}/sessions`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  })
+  if (!res.ok) throw new Error('Failed to delete sessions')
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,
