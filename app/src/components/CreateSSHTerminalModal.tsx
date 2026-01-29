@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
-import { useTerminals } from '../hooks/useTerminals'
+import { useTerminalContext } from '../context/TerminalContext'
 import { getSSHHosts, type SSHHostEntry } from '../lib/api'
 
 interface CreateSSHTerminalModalProps {
@@ -31,7 +31,7 @@ export function CreateSSHTerminalModal({
   onOpenChange,
   onCreated,
 }: CreateSSHTerminalModalProps) {
-  const { createTerminal } = useTerminals()
+  const { createTerminal } = useTerminalContext()
   const [sshHost, setSSHHost] = useState('')
   const [name, setName] = useState('')
   const [cwd, setCwd] = useState('')

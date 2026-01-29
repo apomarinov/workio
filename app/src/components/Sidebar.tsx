@@ -1,4 +1,11 @@
-import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
 import {
   restrictToParentElement,
   restrictToVerticalAxis,
@@ -65,6 +72,10 @@ export function Sidebar({ width }: SidebarProps) {
     'sidebar-collapsed-sessions',
     [],
   )
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  )
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
@@ -344,6 +355,7 @@ export function Sidebar({ width }: SidebarProps) {
           )
         ) : (
           <DndContext
+            sensors={sensors}
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
             onDragEnd={handleDragEnd}

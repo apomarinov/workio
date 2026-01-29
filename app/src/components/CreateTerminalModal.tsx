@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
-import { useTerminals } from '../hooks/useTerminals'
 
 interface CreateTerminalModalProps {
   open: boolean
@@ -23,7 +23,7 @@ export function CreateTerminalModal({
   onOpenChange,
   onCreated,
 }: CreateTerminalModalProps) {
-  const { createTerminal } = useTerminals()
+  const { createTerminal } = useTerminalContext()
   const { settings } = useSettings()
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')

@@ -16,7 +16,6 @@ import { useSessionContext } from '@/context/SessionContext'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useProcesses } from '../hooks/useProcesses'
-import { useTerminals } from '../hooks/useTerminals'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
@@ -39,7 +38,7 @@ export function TerminalItem({
   onToggleSessions,
 }: TerminalItemProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
-  const { updateTerminal, deleteTerminal } = useTerminals()
+  const { updateTerminal, deleteTerminal } = useTerminalContext()
   const { clearSession } = useSessionContext()
   const allProcesses = useProcesses()
   const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
