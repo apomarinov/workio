@@ -42,6 +42,20 @@ export function KeyMapProvider({ children }: { children: React.ReactNode }) {
         e.stopPropagation()
         selectByIndex(Number.parseInt(e.key, 10) - 1)
       }
+
+      // Tab focuses the terminal when it's not already focused
+      if (e.key === 'Tab') {
+        const xtermTextarea = document.querySelector(
+          '.xterm-helper-textarea',
+        ) as HTMLTextAreaElement | null
+        if (!xtermTextarea) return
+        if (document.activeElement === xtermTextarea) return
+        // Don't steal focus from other form inputs
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
+        e.preventDefault()
+        xtermTextarea.focus()
+      }
     }
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Meta') setCmdHeld(false)
