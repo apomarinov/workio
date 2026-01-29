@@ -92,18 +92,13 @@ interface GhPR {
   }[]
 }
 
-function fetchPRChecks(
-  owner: string,
-  repo: string,
-  branches: Set<string>,
-): Promise<PRCheckStatus[]> {
+function fetchPRChecks(owner: string, repo: string): Promise<PRCheckStatus[]> {
   return new Promise((resolve) => {
     const repoKey = `${owner}/${repo}`
     const cached = checksCache.get(repoKey)
 
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
-      // Return cached but re-filter for current branches
-      resolve(cached.prs.filter((pr) => branches.has(pr.branch)))
+      resolve(cached.prs)
       return
     }
 
@@ -114,6 +109,8 @@ function fetchPRChecks(
         'list',
         '--repo',
         `${owner}/${repo}`,
+        '--author',
+        '@me',
         '--state',
         'open',
         '--json',
@@ -122,7 +119,7 @@ function fetchPRChecks(
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
         if (err) {
-          resolve(cached?.prs.filter((pr) => branches.has(pr.branch)) ?? [])
+          resolve(cached?.prs ?? [])
           return
         }
 
@@ -212,9 +209,9 @@ function fetchPRChecks(
             prs: allResults,
             fetchedAt: Date.now(),
           })
-          resolve(allResults.filter((pr) => branches.has(pr.branch)))
+          resolve(allResults)
         } catch {
-          resolve(cached?.prs.filter((pr) => branches.has(pr.branch)) ?? [])
+          resolve(cached?.prs ?? [])
         }
       },
     )
@@ -224,36 +221,26 @@ function fetchPRChecks(
 async function pollAllPRChecks(): Promise<void> {
   if (ghAvailable === false) return
 
-  // Collect unique repos and their branches
-  const repoToBranches = new Map<
-    string,
-    { owner: string; repo: string; branches: Set<string> }
-  >()
+  // Collect unique repos from all monitored terminals
+  const repos = new Map<string, { owner: string; repo: string }>()
 
   for (const [terminalId] of monitoredTerminals) {
     const terminal = getTerminalById(terminalId)
-    if (!terminal || terminal.ssh_host || !terminal.git_branch) continue
+    if (!terminal || terminal.ssh_host) continue
 
     const repo = await detectGitHubRepo(terminal.cwd)
     if (!repo) continue
 
     const key = `${repo.owner}/${repo.repo}`
-    const existing = repoToBranches.get(key)
-    if (existing) {
-      existing.branches.add(terminal.git_branch)
-    } else {
-      repoToBranches.set(key, {
-        owner: repo.owner,
-        repo: repo.repo,
-        branches: new Set([terminal.git_branch]),
-      })
+    if (!repos.has(key)) {
+      repos.set(key, { owner: repo.owner, repo: repo.repo })
     }
   }
 
   const allPRs: PRCheckStatus[] = []
 
-  for (const [, { owner, repo, branches }] of repoToBranches) {
-    const prs = await fetchPRChecks(owner, repo, branches)
+  for (const [, { owner, repo }] of repos) {
+    const prs = await fetchPRChecks(owner, repo)
     allPRs.push(...prs)
   }
 
