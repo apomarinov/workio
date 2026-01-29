@@ -68,6 +68,8 @@ export function Sidebar({ width }: SidebarProps) {
   >('sidebar-expanded-session-groups', [])
   const [expandedTerminalSessions, setExpandedTerminalSessions] =
     useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
+  const [collapsedTerminalProcesses, setCollapsedTerminalProcesses] =
+    useLocalStorage<number[]>('sidebar-collapsed-terminal-processes', [])
   const [, setCollapsedSessions] = useLocalStorage<string[]>(
     'sidebar-collapsed-sessions',
     [],
@@ -179,6 +181,20 @@ export function Sidebar({ width }: SidebarProps) {
     })
   }
 
+  const collapsedTerminalProcessesSet = useMemo(
+    () => new Set(collapsedTerminalProcesses),
+    [collapsedTerminalProcesses],
+  )
+
+  const toggleTerminalProcesses = (terminalId: number) => {
+    setCollapsedTerminalProcesses((prev) => {
+      if (prev.includes(terminalId)) {
+        return prev.filter((id) => id !== terminalId)
+      }
+      return [...prev, terminalId]
+    })
+  }
+
   const allSessionIds = useMemo(
     () => sessions.map((s) => s.session_id),
     [sessions],
@@ -195,6 +211,7 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedFoldersArray(allFolders)
     setExpandedSessionGroups(allOrphanGroupPaths)
     setExpandedTerminalSessions(allTerminalIds)
+    setCollapsedTerminalProcesses([])
     setCollapsedSessions([])
   }
 
@@ -202,6 +219,7 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedFoldersArray([])
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
+    setCollapsedTerminalProcesses(allTerminalIds)
     setCollapsedSessions(allSessionIds)
   }
 
@@ -350,6 +368,8 @@ export function Sidebar({ width }: SidebarProps) {
                 sessionsForTerminal={sessionsForTerminal}
                 expandedTerminalSessions={expandedTerminalSessionsSet}
                 onToggleTerminalSessions={toggleTerminalSessions}
+                collapsedTerminalProcesses={collapsedTerminalProcessesSet}
+                onToggleTerminalProcesses={toggleTerminalProcesses}
               />
             ),
           )
@@ -373,6 +393,10 @@ export function Sidebar({ width }: SidebarProps) {
                     terminal.id,
                   )}
                   onToggleSessions={() => toggleTerminalSessions(terminal.id)}
+                  processesExpanded={
+                    !collapsedTerminalProcessesSet.has(terminal.id)
+                  }
+                  onToggleProcesses={() => toggleTerminalProcesses(terminal.id)}
                 />
               ))}
             </SortableContext>

@@ -31,6 +31,8 @@ interface TerminalItemProps {
   sessions?: SessionWithProject[]
   sessionsExpanded?: boolean
   onToggleSessions?: () => void
+  processesExpanded?: boolean
+  onToggleProcesses?: () => void
 }
 
 export function TerminalItem({
@@ -39,6 +41,8 @@ export function TerminalItem({
   sessions = [],
   sessionsExpanded = true,
   onToggleSessions,
+  processesExpanded: processesExpandedProp,
+  onToggleProcesses,
 }: TerminalItemProps) {
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminalContext()
@@ -50,7 +54,10 @@ export function TerminalItem({
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [processesExpanded, setProcessesExpanded] = useState(true)
+  const [localProcessesExpanded, setLocalProcessesExpanded] = useState(true)
+  const processesExpanded = processesExpandedProp ?? localProcessesExpanded
+  const toggleProcesses =
+    onToggleProcesses ?? (() => setLocalProcessesExpanded((v) => !v))
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0
@@ -149,13 +156,11 @@ export function TerminalItem({
             {terminal.orphaned ? (
               <p className="text-xs truncate text-yellow-500">Path not found</p>
             ) : terminal.ssh_host ? (
-              <>
-                {terminal.name !== terminal.ssh_host && (
-                  <span className="text-xs text-muted-foreground">
-                    SSH: {terminal.ssh_host}
-                  </span>
-                )}
-              </>
+              terminal.name !== terminal.ssh_host && (
+                <span className="text-xs text-muted-foreground">
+                  SSH: {terminal.ssh_host}
+                </span>
+              )
             ) : (
               !hideFolder &&
               terminal.name && (
@@ -211,7 +216,7 @@ export function TerminalItem({
               <>
                 <button
                   type="button"
-                  onClick={() => setProcessesExpanded(!processesExpanded)}
+                  onClick={toggleProcesses}
                   className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
                 >
                   {processesExpanded ? (

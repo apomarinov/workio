@@ -8,6 +8,8 @@ interface SortableTerminalItemProps {
   sessions: SessionWithProject[]
   sessionsExpanded: boolean
   onToggleSessions: () => void
+  processesExpanded: boolean
+  onToggleProcesses: () => void
 }
 
 export function SortableTerminalItem({
@@ -15,6 +17,8 @@ export function SortableTerminalItem({
   sessions,
   sessionsExpanded,
   onToggleSessions,
+  processesExpanded,
+  onToggleProcesses,
 }: SortableTerminalItemProps) {
   const {
     attributes,
@@ -38,6 +42,8 @@ export function SortableTerminalItem({
         sessions={sessions}
         sessionsExpanded={sessionsExpanded}
         onToggleSessions={onToggleSessions}
+        processesExpanded={processesExpanded}
+        onToggleProcesses={onToggleProcesses}
       />
     </div>
   )
