@@ -607,7 +607,7 @@ export function Sidebar({ width }: SidebarProps) {
               ) : (
                 <ChevronDown className="w-3 h-3" />
               )}
-              GitHub
+              Pull requests
             </button>
             {!githubSectionCollapsed &&
               githubPRs.map((pr) => (

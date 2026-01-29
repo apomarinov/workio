@@ -243,22 +243,22 @@ export function TerminalItem({
         </div>
 
         {(hasGitHub || hasProcesses || hasSessions) && sessionsExpanded && (
-          <div className="ml-0 mt-1 space-y-0.5">
+          <div className="ml-2 mt-1 space-y-0.5">
             {hasGitHub && prForBranch && (
               <>
                 <button
                   type="button"
                   onClick={toggleGitHub}
                   className={cn(
-                    'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 transition-colors',
+                    'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
                     prForBranch.reviewDecision === 'CHANGES_REQUESTED'
-                      ? 'text-orange-500 hover:text-orange-400'
-                      : prForBranch.checks.some(
+                      ? 'text-orange-400/70 hover:text-orange-400'
+                      : prForBranch.reviewDecision === 'APPROVED' ? 'text-green-500/70 hover:text-green-500' : prForBranch.checks.some(
                         (c) =>
                           c.status === 'IN_PROGRESS' ||
                           c.status === 'QUEUED',
                       )
-                        ? 'text-yellow-500 hover:text-yellow-400'
+                        ? 'text-yellow-400/70 hover:text-yellow-400'
                         : prForBranch.checks.some(
                           (c) =>
                             c.status === 'COMPLETED' &&
@@ -266,7 +266,7 @@ export function TerminalItem({
                             c.conclusion !== 'SKIPPED' &&
                             c.conclusion !== 'NEUTRAL',
                         )
-                          ? 'text-red-500 hover:text-red-400'
+                          ? 'text-red-400/70 hover:text-red-400'
                           : '',
                   )}
                 >
@@ -274,27 +274,38 @@ export function TerminalItem({
                     <ChevronDown className="w-3 h-3" />
                   ) : (
                     <>
-                      {(prForBranch.reviewDecision === 'CHANGES_REQUESTED' ||
+                      {(prForBranch.reviewDecision === 'CHANGES_REQUESTED' || prForBranch.reviewDecision === 'APPROVED' ||
                         prForBranch.checks.length > 0) && (
                           <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
                         )}
                       {prForBranch.reviewDecision === 'CHANGES_REQUESTED' ? (
-                        <RefreshCw className="w-3 h-3 text-orange-500 group-hover/gh:hidden" />
+                        <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
                       ) : prForBranch.checks.some(
                         (c) =>
                           c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
                       ) ? (
-                        <Loader2 className="w-3 h-3 text-yellow-500 animate-spin group-hover/gh:hidden" />
+                        <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
                       ) : prForBranch.reviewDecision === 'APPROVED' ? (
-                        <Check className="w-3 h-3 text-green-500 group-hover/gh:hidden" />
+                        <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
                       ) : prForBranch.checks.length > 0 ? (
-                        <CircleX className="w-3 h-3 text-red-500 group-hover/gh:hidden" />
+                        <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
                       ) : (
                         <ChevronRight className="w-3 h-3" />
                       )}
                     </>
                   )}
-                  GitHub
+                  {prForBranch.reviewDecision === 'CHANGES_REQUESTED'
+                    ? 'Change request'
+                    : prForBranch.checks.some(
+                      (c) =>
+                        c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+                    )
+                      ? 'Pull request'
+                      : prForBranch.reviewDecision === 'APPROVED'
+                        ? 'approved'
+                        : prForBranch.checks.length > 0
+                          ? 'failed checks'
+                          : 'Pull Request'}
                 </button>
                 {githubExpanded && <PRStatusContent pr={prForBranch} />}
               </>
@@ -332,7 +343,7 @@ export function TerminalItem({
                 <button
                   type="button"
                   onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
                 >
                   {sessionsListExpanded ? (
                     <ChevronDown className="w-3 h-3" />

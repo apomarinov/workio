@@ -163,7 +163,7 @@ export function PRStatusContent({ pr }: PRStatusContentProps) {
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
         >
-          <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-500" />
+          <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />
           {review.avatarUrl ? (
             <img
               src={review.avatarUrl}

@@ -179,11 +179,21 @@ function fetchPRChecks(
                 createdAt: c.createdAt,
               }))
 
-            const reviewDecision = (pr.reviewDecision || '') as
+            let reviewDecision = (pr.reviewDecision || '') as
               | 'APPROVED'
               | 'CHANGES_REQUESTED'
               | 'REVIEW_REQUIRED'
               | ''
+            if (!reviewDecision) {
+              const hasApproval = pr.reviews?.some(
+                (r: { state: string }) => r.state === 'APPROVED',
+              )
+              const hasChangesRequested = pr.reviews?.some(
+                (r: { state: string }) => r.state === 'CHANGES_REQUESTED',
+              )
+              if (hasChangesRequested) reviewDecision = 'CHANGES_REQUESTED'
+              else if (hasApproval) reviewDecision = 'APPROVED'
+            }
 
             allResults.push({
               prNumber: pr.number,

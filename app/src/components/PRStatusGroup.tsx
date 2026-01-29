@@ -33,7 +33,7 @@ export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
   const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
 
   const colorClass = hasChangesRequested
-    ? 'text-orange-500'
+    ? 'text-orange-400'
     : hasRunningChecks
       ? 'text-yellow-500'
       : isApproved
@@ -59,13 +59,13 @@ export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
               <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
             )}
             {hasChangesRequested ? (
-              <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-500 group-hover/pr:hidden" />
+              <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-400 group-hover/pr:hidden" />
             ) : hasRunningChecks ? (
               <Loader2 className="w-4 h-4 flex-shrink-0 text-yellow-500 animate-spin group-hover/pr:hidden" />
             ) : isApproved ? (
               <Check className="w-4 h-4 flex-shrink-0 text-green-500 group-hover/pr:hidden" />
             ) : hasFailedChecks ? (
-              <CircleX className="w-4 h-4 flex-shrink-0 text-red-500 group-hover/pr:hidden" />
+              <CircleX className="w-4 h-4 flex-shrink-0 text-red-400 group-hover/pr:hidden" />
             ) : (
               <ChevronRight className="w-4 h-4 flex-shrink-0" />
             )}

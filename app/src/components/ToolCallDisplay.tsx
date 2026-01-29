@@ -45,7 +45,7 @@ function StatusDot({ status }: { status: 'success' | 'error' }) {
   return status === 'success' ? (
     <CheckCircle2 className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-green-500" />
   ) : (
-    <XCircle className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-red-500" />
+    <XCircle className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-red-400" />
   )
 }
 
