@@ -93,8 +93,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ))}
           </div>
         )}
-        {displayText &&
-          <MarkdownContent content={displayText || ''} />}
+        {displayText && <MarkdownContent content={displayText || ''} />}
       </div>
       {!!isUser && (
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center">
