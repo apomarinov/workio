@@ -112,6 +112,12 @@ wss.on('connection', (ws: WebSocket) => {
 
           // Send ready message
           sendMessage(ws, { type: 'ready' })
+
+          // Force PTY resize to client dimensions — sends SIGWINCH to all
+          // foreground processes (e.g. Zellij), triggering a full redraw.
+          // Without this, TUI apps show stale buffer content and don't
+          // respond to mouse/scroll after reconnection.
+          resizeSession(terminalId, message.cols, message.rows)
           return
         }
 
