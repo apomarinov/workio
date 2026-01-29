@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CircleX,
   GitBranch,
+  GitMerge,
   Loader2,
   RefreshCw,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ interface PRStatusGroupProps {
 }
 
 export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
+  const isMerged = pr.state === 'MERGED'
   const hasRunningChecks = pr.checks.some(
     (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
   )
@@ -32,23 +34,30 @@ export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
   const isApproved = pr.reviewDecision === 'APPROVED'
   const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
 
-  const colorClass = hasChangesRequested
-    ? 'text-orange-400'
-    : hasRunningChecks
-      ? 'text-yellow-500'
-      : isApproved
-        ? 'text-green-500'
-        : hasFailedChecks
-          ? 'text-red-500'
-          : 'text-zinc-400'
+  const colorClass = isMerged
+    ? 'text-purple-400/70'
+    : hasChangesRequested
+      ? 'text-orange-400/70'
+      : hasRunningChecks
+        ? 'text-yellow-500/70'
+        : isApproved
+          ? 'text-green-500/70'
+          : hasFailedChecks
+            ? 'text-red-500/70'
+            : 'text-zinc-400/70'
 
   return (
     <div>
       <div
-        onClick={onToggle}
-        className="group/pr flex items-center gap-2 pr-3 pl-2 py-2 rounded-lg cursor-pointer text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+        onClick={isMerged ? undefined : onToggle}
+        className={cn(
+          'group/pr flex items-center gap-2 pr-3 pl-2 py-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
+          !isMerged && 'cursor-pointer',
+        )}
       >
-        {expanded ? (
+        {isMerged ? (
+          <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-400" />
+        ) : expanded ? (
           <ChevronDown className="w-4 h-4 flex-shrink-0" />
         ) : (
           <>
@@ -56,16 +65,16 @@ export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
               hasRunningChecks ||
               isApproved ||
               hasFailedChecks) && (
-              <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
-            )}
+                <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
+              )}
             {hasChangesRequested ? (
-              <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-400 group-hover/pr:hidden" />
+              <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-400/70 group-hover/pr:hidden" />
             ) : hasRunningChecks ? (
-              <Loader2 className="w-4 h-4 flex-shrink-0 text-yellow-500 animate-spin group-hover/pr:hidden" />
+              <Loader2 className="w-4 h-4 flex-shrink-0 text-yellow-500/70 animate-spin group-hover/pr:hidden" />
             ) : isApproved ? (
-              <Check className="w-4 h-4 flex-shrink-0 text-green-500 group-hover/pr:hidden" />
+              <Check className="w-4 h-4 flex-shrink-0 text-green-500/70 group-hover/pr:hidden" />
             ) : hasFailedChecks ? (
-              <CircleX className="w-4 h-4 flex-shrink-0 text-red-400 group-hover/pr:hidden" />
+              <CircleX className="w-4 h-4 flex-shrink-0 text-red-500/70 group-hover/pr:hidden" />
             ) : (
               <ChevronRight className="w-4 h-4 flex-shrink-0" />
             )}
@@ -74,7 +83,7 @@ export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <GitBranch className={cn('w-4 h-4 flex-shrink-0', colorClass)} />
-            <TruncatedPath className="text-sm font-medium" path={pr.branch} />
+            <TruncatedPath className="text-xs font-medium" path={pr.branch} />
           </div>
         </div>
         <a
@@ -87,7 +96,7 @@ export function PRStatusGroup({ pr, expanded, onToggle }: PRStatusGroupProps) {
           #{pr.prNumber}
         </a>
       </div>
-      {expanded && (
+      {!isMerged && expanded && (
         <div className="ml-4 mt-1">
           <PRStatusContent pr={pr} />
         </div>

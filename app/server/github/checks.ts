@@ -77,6 +77,7 @@ interface GhPR {
   title: string
   headRefName: string
   url: string
+  state: 'OPEN' | 'MERGED' | 'CLOSED'
   reviewDecision: string
   reviews: { author: { login: string }; state: string }[]
   comments: {
@@ -92,7 +93,7 @@ interface GhPR {
   }[]
 }
 
-function fetchPRChecks(owner: string, repo: string): Promise<PRCheckStatus[]> {
+function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
   return new Promise((resolve) => {
     const repoKey = `${owner}/${repo}`
     const cached = checksCache.get(repoKey)
@@ -198,6 +199,7 @@ function fetchPRChecks(owner: string, repo: string): Promise<PRCheckStatus[]> {
               prUrl: pr.url,
               branch: pr.headRefName,
               repo: repoKey,
+              state: 'OPEN',
               reviewDecision,
               reviews: Array.from(reviewsByAuthor.values()),
               checks: failedChecks,
@@ -218,11 +220,72 @@ function fetchPRChecks(owner: string, repo: string): Promise<PRCheckStatus[]> {
   })
 }
 
+/** Fetch merged PRs for specific branches (lightweight, no reviews/comments/checks). */
+function fetchMergedPRsForBranches(
+  owner: string,
+  repo: string,
+  branches: Set<string>,
+): Promise<PRCheckStatus[]> {
+  if (branches.size === 0) return Promise.resolve([])
+
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'pr',
+        'list',
+        '--repo',
+        `${owner}/${repo}`,
+        '--author',
+        '@me',
+        '--state',
+        'merged',
+        '--limit',
+        '30',
+        '--json',
+        'number,title,headRefName,url',
+      ],
+      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+      (err, stdout) => {
+        if (err) {
+          resolve([])
+          return
+        }
+
+        try {
+          const prs: GhPR[] = JSON.parse(stdout)
+          const repoKey = `${owner}/${repo}`
+          const results: PRCheckStatus[] = prs
+            .filter((pr) => branches.has(pr.headRefName))
+            .map((pr) => ({
+              prNumber: pr.number,
+              prTitle: pr.title,
+              prUrl: pr.url,
+              branch: pr.headRefName,
+              repo: repoKey,
+              state: 'MERGED' as const,
+              reviewDecision: '' as const,
+              reviews: [],
+              checks: [],
+              comments: [],
+            }))
+          resolve(results)
+        } catch {
+          resolve([])
+        }
+      },
+    )
+  })
+}
+
 async function pollAllPRChecks(): Promise<void> {
   if (ghAvailable === false) return
 
-  // Collect unique repos from all monitored terminals
-  const repos = new Map<string, { owner: string; repo: string }>()
+  // Collect unique repos and their terminal branches
+  const repoData = new Map<
+    string,
+    { owner: string; repo: string; branches: Set<string> }
+  >()
 
   for (const [terminalId] of monitoredTerminals) {
     const terminal = getTerminalById(terminalId)
@@ -232,16 +295,37 @@ async function pollAllPRChecks(): Promise<void> {
     if (!repo) continue
 
     const key = `${repo.owner}/${repo.repo}`
-    if (!repos.has(key)) {
-      repos.set(key, { owner: repo.owner, repo: repo.repo })
+    const existing = repoData.get(key)
+    if (existing) {
+      if (terminal.git_branch) existing.branches.add(terminal.git_branch)
+    } else {
+      repoData.set(key, {
+        owner: repo.owner,
+        repo: repo.repo,
+        branches: new Set(terminal.git_branch ? [terminal.git_branch] : []),
+      })
     }
   }
 
   const allPRs: PRCheckStatus[] = []
 
-  for (const [, { owner, repo }] of repos) {
-    const prs = await fetchPRChecks(owner, repo)
-    allPRs.push(...prs)
+  for (const [, { owner, repo, branches }] of repoData) {
+    const openPRs = await fetchOpenPRs(owner, repo)
+    allPRs.push(...openPRs)
+
+    // Only check merged for branches that don't already have an open PR
+    const openBranches = new Set(openPRs.map((pr) => pr.branch))
+    const branchesWithoutOpenPR = new Set(
+      [...branches].filter((b) => !openBranches.has(b)),
+    )
+    if (branchesWithoutOpenPR.size > 0) {
+      const mergedPRs = await fetchMergedPRsForBranches(
+        owner,
+        repo,
+        branchesWithoutOpenPR,
+      )
+      allPRs.push(...mergedPRs)
+    }
   }
 
   lastEmittedPRs = allPRs

@@ -83,6 +83,8 @@ export function Sidebar({ width }: SidebarProps) {
   const [collapsedTerminalGitHub, setCollapsedTerminalGitHub] = useLocalStorage<
     number[]
   >('sidebar-collapsed-terminal-github', [])
+  const [terminalsSectionCollapsed, setTerminalsSectionCollapsed] =
+    useLocalStorage<boolean>('sidebar-section-terminals-collapsed', false)
   const [githubSectionCollapsed, setGithubSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-github-collapsed', false)
   const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
@@ -262,6 +264,7 @@ export function Sidebar({ width }: SidebarProps) {
     setCollapsedTerminalProcesses([])
     setCollapsedTerminalGitHub([])
     setCollapsedSessions([])
+    setTerminalsSectionCollapsed(false)
     setOtherSessionsSectionCollapsed(false)
     setGithubSectionCollapsed(false)
     setExpandedGitHubPRs(githubPRs.map((pr) => pr.branch))
@@ -274,6 +277,7 @@ export function Sidebar({ width }: SidebarProps) {
     setCollapsedTerminalProcesses(allTerminalIds)
     setCollapsedTerminalGitHub(allTerminalIds)
     setCollapsedSessions(allSessionIds)
+    setTerminalsSectionCollapsed(true)
     setOtherSessionsSectionCollapsed(true)
     setGithubSectionCollapsed(true)
     setExpandedGitHubPRs([])
@@ -283,6 +287,7 @@ export function Sidebar({ width }: SidebarProps) {
     allFolders.every((f) => expandedFolders.has(f)) &&
     allOrphanGroupPaths.every((p) => expandedSessionGroupsSet.has(p)) &&
     allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id)) &&
+    !terminalsSectionCollapsed &&
     !otherSessionsSectionCollapsed &&
     !githubSectionCollapsed
 
@@ -499,127 +504,169 @@ export function Sidebar({ width }: SidebarProps) {
               showGitBranch
             />
           ))
-        ) : groupingMode === 'folder' ? (
-          Array.from(groupedTerminals.entries()).map(
-            ([folderCwd, folderTerminals]) => (
-              <FolderGroup
-                key={folderCwd}
-                cwd={folderCwd}
-                terminals={folderTerminals}
-                expanded={expandedFolders.has(folderCwd)}
-                onToggle={() => toggleFolder(folderCwd)}
-                sessionsForTerminal={sessionsForTerminal}
-                expandedTerminalSessions={expandedTerminalSessionsSet}
-                onToggleTerminalSessions={toggleTerminalSessions}
-                collapsedTerminalProcesses={collapsedTerminalProcessesSet}
-                onToggleTerminalProcesses={toggleTerminalProcesses}
-                collapsedTerminalGitHub={collapsedTerminalGitHubSet}
-                onToggleTerminalGitHub={toggleTerminalGitHub}
-              />
-            ),
-          )
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={terminals.map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {terminals.map((terminal) => (
-                <SortableTerminalItem
-                  key={terminal.id}
-                  terminal={terminal}
-                  sessions={sessionsForTerminal.get(terminal.id) || []}
-                  sessionsExpanded={expandedTerminalSessionsSet.has(
-                    terminal.id,
-                  )}
-                  onToggleSessions={() => toggleTerminalSessions(terminal.id)}
-                  processesExpanded={
-                    !collapsedTerminalProcessesSet.has(terminal.id)
+          <>
+            {terminals.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTerminalsSectionCollapsed(!terminalsSectionCollapsed)
                   }
-                  onToggleProcesses={() => toggleTerminalProcesses(terminal.id)}
-                  githubExpanded={!collapsedTerminalGitHubSet.has(terminal.id)}
-                  onToggleGitHub={() => toggleTerminalGitHub(terminal.id)}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        )}
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+                >
+                  {terminalsSectionCollapsed ? (
+                    <ChevronRight className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                  Terminals
+                </button>
+                {!terminalsSectionCollapsed &&
+                  (groupingMode === 'folder' ? (
+                    Array.from(groupedTerminals.entries()).map(
+                      ([folderCwd, folderTerminals]) => (
+                        <FolderGroup
+                          key={folderCwd}
+                          cwd={folderCwd}
+                          terminals={folderTerminals}
+                          expanded={expandedFolders.has(folderCwd)}
+                          onToggle={() => toggleFolder(folderCwd)}
+                          sessionsForTerminal={sessionsForTerminal}
+                          expandedTerminalSessions={expandedTerminalSessionsSet}
+                          onToggleTerminalSessions={toggleTerminalSessions}
+                          collapsedTerminalProcesses={
+                            collapsedTerminalProcessesSet
+                          }
+                          onToggleTerminalProcesses={toggleTerminalProcesses}
+                          collapsedTerminalGitHub={collapsedTerminalGitHubSet}
+                          onToggleTerminalGitHub={toggleTerminalGitHub}
+                        />
+                      ),
+                    )
+                  ) : (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      modifiers={[
+                        restrictToVerticalAxis,
+                        restrictToParentElement,
+                      ]}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={terminals.map((t) => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {terminals.map((terminal) => (
+                          <SortableTerminalItem
+                            key={terminal.id}
+                            terminal={terminal}
+                            sessions={
+                              sessionsForTerminal.get(terminal.id) || []
+                            }
+                            sessionsExpanded={expandedTerminalSessionsSet.has(
+                              terminal.id,
+                            )}
+                            onToggleSessions={() =>
+                              toggleTerminalSessions(terminal.id)
+                            }
+                            processesExpanded={
+                              !collapsedTerminalProcessesSet.has(terminal.id)
+                            }
+                            onToggleProcesses={() =>
+                              toggleTerminalProcesses(terminal.id)
+                            }
+                            githubExpanded={
+                              !collapsedTerminalGitHubSet.has(terminal.id)
+                            }
+                            onToggleGitHub={() =>
+                              toggleTerminalGitHub(terminal.id)
+                            }
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  ))}
+              </>
+            )}
 
-        {/* Orphan sessions - grouped by project path (not shown in sessions mode) */}
-        {groupingMode !== 'sessions' && orphanSessionGroups.size > 0 && (
-          <>
-            <div
-              className={cn(
-                'border-t border-sidebar-border my-2',
-                terminals.length === 0 && 'border-none',
-              )}
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setOtherSessionsSectionCollapsed(!otherSessionsSectionCollapsed)
-              }
-              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
-            >
-              {otherSessionsSectionCollapsed ? (
-                <ChevronRight className="w-3 h-3" />
-              ) : (
-                <ChevronDown className="w-3 h-3" />
-              )}
-              Other Claude Sessions
-            </button>
-            {!otherSessionsSectionCollapsed &&
-              Array.from(orphanSessionGroups.entries()).map(
-                ([projectPath, groupSessions]) => (
-                  <SessionGroup
-                    key={projectPath}
-                    projectPath={projectPath}
-                    sessions={groupSessions}
-                    expanded={expandedSessionGroupsSet.has(projectPath)}
-                    onToggle={() => toggleSessionGroup(projectPath)}
-                  />
-                ),
-              )}
-          </>
-        )}
-
-        {/* GitHub PR status */}
-        {groupingMode !== 'sessions' && githubPRs.length > 0 && (
-          <>
-            <div
-              className={cn(
-                'border-t border-sidebar-border my-2',
-                terminals.length === 0 &&
-                  orphanSessionGroups.size === 0 &&
-                  'border-none',
-              )}
-            />
-            <button
-              type="button"
-              onClick={() => setGithubSectionCollapsed(!githubSectionCollapsed)}
-              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
-            >
-              {githubSectionCollapsed ? (
-                <ChevronRight className="w-3 h-3" />
-              ) : (
-                <ChevronDown className="w-3 h-3" />
-              )}
-              Pull requests
-            </button>
-            {!githubSectionCollapsed &&
-              githubPRs.map((pr) => (
-                <PRStatusGroup
-                  key={`${pr.repo}:${pr.branch}`}
-                  pr={pr}
-                  expanded={expandedGitHubPRsSet.has(pr.branch)}
-                  onToggle={() => toggleGitHubPR(pr.branch)}
+            {/* Orphan sessions - grouped by project path */}
+            {orphanSessionGroups.size > 0 && (
+              <>
+                <div
+                  className={cn(
+                    'border-t border-sidebar-border my-2',
+                    terminals.length === 0 && 'border-none',
+                  )}
                 />
-              ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOtherSessionsSectionCollapsed(
+                      !otherSessionsSectionCollapsed,
+                    )
+                  }
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+                >
+                  {otherSessionsSectionCollapsed ? (
+                    <ChevronRight className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                  Other Claude Sessions
+                </button>
+                {!otherSessionsSectionCollapsed &&
+                  Array.from(orphanSessionGroups.entries()).map(
+                    ([projectPath, groupSessions]) => (
+                      <SessionGroup
+                        key={projectPath}
+                        projectPath={projectPath}
+                        sessions={groupSessions}
+                        expanded={expandedSessionGroupsSet.has(projectPath)}
+                        onToggle={() => toggleSessionGroup(projectPath)}
+                      />
+                    ),
+                  )}
+              </>
+            )}
+
+            {/* GitHub PR status */}
+            {githubPRs.length > 0 && (
+              <>
+                <div
+                  className={cn(
+                    'border-t border-sidebar-border my-2',
+                    terminals.length === 0 &&
+                      orphanSessionGroups.size === 0 &&
+                      'border-none',
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGithubSectionCollapsed(!githubSectionCollapsed)
+                  }
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+                >
+                  {githubSectionCollapsed ? (
+                    <ChevronRight className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                  Pull requests
+                </button>
+                {!githubSectionCollapsed &&
+                  githubPRs.map((pr) => (
+                    <PRStatusGroup
+                      key={`${pr.repo}:${pr.branch}`}
+                      pr={pr}
+                      expanded={expandedGitHubPRsSet.has(pr.branch)}
+                      onToggle={() => toggleGitHubPR(pr.branch)}
+                    />
+                  ))}
+              </>
+            )}
           </>
         )}
       </div>

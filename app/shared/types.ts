@@ -37,6 +37,7 @@ export interface PRCheckStatus {
   prUrl: string
   branch: string
   repo: string
+  state: 'OPEN' | 'MERGED' | 'CLOSED'
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | ''
   reviews: PRReview[]
   checks: FailedPRCheck[]
