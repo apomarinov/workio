@@ -104,9 +104,10 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && 'pl-2.5',
           )}
@@ -152,9 +153,11 @@ export function TerminalItem({
               <p className="text-xs truncate text-yellow-500">Path not found</p>
             ) : terminal.ssh_host ? (
               <>
-                {terminal.name !== terminal.ssh_host && (<span className="text-xs text-muted-foreground">
-                  SSH: {terminal.ssh_host}
-                </span>)}
+                {terminal.name !== terminal.ssh_host && (
+                  <span className="text-xs text-muted-foreground">
+                    SSH: {terminal.ssh_host}
+                  </span>
+                )}
               </>
             ) : (
               !hideFolder &&
@@ -245,7 +248,7 @@ export function TerminalItem({
             )}
           </div>
         )}
-      </div >
+      </div>
 
       <EditTerminalModal
         open={showEditModal}

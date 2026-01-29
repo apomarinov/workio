@@ -204,20 +204,32 @@ export function getZellijSessionProcesses(
     const paneShells = getChildPids(serverPid)
 
     for (const shellPid of paneShells) {
+      const shellComm = getProcessComm(shellPid)
+      const shellArgs = getProcessArgs(shellPid)
+
       // Get first child of the shell (the running command)
       const cmdPids = getChildPids(shellPid)
+
       if (cmdPids.length > 0) {
-        try {
-          const cmdArgs = execSync(`ps -o args= -p ${cmdPids[0]}`, {
-            encoding: 'utf8',
-            timeout: 500,
-          }).trim()
-          // Skip ignored processes
-          if (!shouldIgnoreProcess(cmdArgs)) {
-            results.push({ command: cmdArgs, isIdle: false, terminalId })
+        for (const cmdPid of cmdPids) {
+          try {
+            const cmdArgs = execSync(`ps -o args= -p ${cmdPid}`, {
+              encoding: 'utf8',
+              timeout: 500,
+            }).trim()
+            if (!shouldIgnoreProcess(cmdArgs)) {
+              results.push({ command: cmdArgs, isIdle: false, terminalId })
+            }
+          } catch {
+            // Process may have exited
           }
-        } catch (error) {
-          console.error('Error getting Zellij session processes', error)
+        }
+      } else {
+        // No children - auto-started command via zellij layout `command` directive
+        // runs directly as a child of the server, not wrapped in a shell
+        const isIgnored = shellComm ? shouldIgnoreProcess(shellComm) : true
+        if (!isIgnored && shellArgs) {
+          results.push({ command: shellArgs, isIdle: false, terminalId })
         }
       }
     }
