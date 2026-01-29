@@ -70,6 +70,32 @@ function sendMessage(ws: WebSocket, message: ServerMessage): void {
   }
 }
 
+// Coalesce rapid PTY output chunks into fewer WebSocket messages.
+// TUI apps like Zellij emit many small chunks per redraw; sending each
+// as a separate JSON frame floods the client and causes visible stutter.
+const OUTPUT_BATCH_MS = 4
+
+function createOutputBatcher(ws: WebSocket): (data: string) => void {
+  let pending: string[] = []
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  function flush() {
+    timer = null
+    if (pending.length > 0) {
+      const data = pending.join('')
+      pending = []
+      sendMessage(ws, { type: 'output', data })
+    }
+  }
+
+  return (data: string) => {
+    pending.push(data)
+    if (timer === null) {
+      timer = setTimeout(flush, OUTPUT_BATCH_MS)
+    }
+  }
+}
+
 wss.on('connection', (ws: WebSocket) => {
   let terminalId: number | null = null
 
@@ -94,15 +120,10 @@ wss.on('connection', (ws: WebSocket) => {
           clearSessionTimeout(terminalId)
 
           // Update callbacks to use the new WebSocket
-          attachSession(
-            terminalId,
-            (data) => {
-              sendMessage(ws, { type: 'output', data })
-            },
-            (code) => {
-              sendMessage(ws, { type: 'exit', code })
-            },
-          )
+          const batchOutput = createOutputBatcher(ws)
+          attachSession(terminalId, batchOutput, (code) => {
+            sendMessage(ws, { type: 'exit', code })
+          })
 
           // Replay buffer
           const buffer = getSessionBuffer(terminalId)
@@ -122,13 +143,12 @@ wss.on('connection', (ws: WebSocket) => {
         }
 
         // Create new session
+        const batchOutput = createOutputBatcher(ws)
         const session = await createSession(
           terminalId,
           message.cols,
           message.rows,
-          (data) => {
-            sendMessage(ws, { type: 'output', data })
-          },
+          batchOutput,
           (code) => {
             sendMessage(ws, { type: 'exit', code })
           },

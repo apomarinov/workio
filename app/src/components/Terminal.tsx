@@ -52,9 +52,10 @@ export function Terminal({ terminalId }: TerminalProps) {
     })
   }, [])
 
+  const plusCols = 2
   const { status, sendInput, sendResize } = useTerminalSocket({
     terminalId,
-    cols: dimensions.cols,
+    cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
     onData: handleData,
     onExit: handleExit,
@@ -109,7 +110,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const handleCopyClick = useCallback(() => {
     if (pendingCopyRef.current) {
-      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => {})
+      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => { })
     }
     pendingCopyRef.current = null
     setPendingCopy(null)
@@ -235,7 +236,7 @@ export function Terminal({ terminalId }: TerminalProps) {
     requestAnimationFrame(() => {
       fitAddon.fit()
       // Add extra row and column for better coverage
-      const cols = terminal.cols
+      const cols = terminal.cols + plusCols
       const rows = terminal.rows
       terminal.resize(cols, rows)
       setDimensions({ cols, rows })
@@ -251,7 +252,7 @@ export function Terminal({ terminalId }: TerminalProps) {
       if (fitAddonRef.current && terminalRef.current) {
         fitAddonRef.current.fit()
         // Add extra row and column for better coverage
-        const cols = terminalRef.current.cols
+        const cols = terminalRef.current.cols + plusCols
         const rows = terminalRef.current.rows
         terminalRef.current.resize(cols, rows)
         setDimensions({ cols, rows })
@@ -299,13 +300,12 @@ export function Terminal({ terminalId }: TerminalProps) {
         status !== 'connected' && (
           <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
             <span
-              className={`w-2 h-2 rounded-full ${
-                status === 'connecting'
-                  ? 'bg-yellow-400 animate-pulse'
-                  : status === 'error'
-                    ? 'bg-red-400'
-                    : 'bg-gray-400'
-              }`}
+              className={`w-2 h-2 rounded-full ${status === 'connecting'
+                ? 'bg-yellow-400 animate-pulse'
+                : status === 'error'
+                  ? 'bg-red-400'
+                  : 'bg-gray-400'
+                }`}
             />
             {status === 'connecting' && 'Connecting...'}
             {status === 'disconnected' && 'Disconnected - Reconnecting...'}
