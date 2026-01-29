@@ -185,8 +185,11 @@ export function Terminal({ terminalId }: TerminalProps) {
           Uint8Array.from(decoded, (c) => c.charCodeAt(0)),
         )
         if (text.length > 1_000_000) return true
-        pendingCopyRef.current = text
-        setPendingCopy(text)
+        navigator.clipboard.writeText(text).catch(() => {
+          // Clipboard API failed (e.g. not focused), fall back to button
+          pendingCopyRef.current = text
+          setPendingCopy(text)
+        })
       } catch {
         // invalid base64
       }
