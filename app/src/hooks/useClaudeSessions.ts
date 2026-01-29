@@ -4,6 +4,11 @@ import * as api from '../lib/api'
 import type { HookEvent, SessionWithProject } from '../types'
 import { useSocket } from './useSocket'
 
+interface SessionUpdateEvent {
+  session_id: string
+  messages: unknown[]
+}
+
 export function useClaudeSessions() {
   const { subscribe } = useSocket()
   const { data, error, isLoading, mutate } = useSWR<SessionWithProject[]>(
@@ -11,35 +16,70 @@ export function useClaudeSessions() {
     api.getClaudeSessions,
   )
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const debounceMap = useRef(new Map<string, NodeJS.Timeout>())
+
+  const mergeSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        const updated = await api.getClaudeSession(sessionId)
+        mutate(
+          (prev) => {
+            if (!prev) return [updated]
+            const idx = prev.findIndex((s) => s.session_id === sessionId)
+            if (idx >= 0) {
+              const next = [...prev]
+              next[idx] = updated
+              return next
+            }
+            return [updated, ...prev]
+          },
+          { revalidate: false },
+        )
+      } catch {
+        // Session may not exist yet (e.g. SessionStart before DB commit),
+        // fall back to full refetch
+        mutate()
+      }
+    },
+    [mutate],
+  )
+
+  const debouncedMerge = useCallback(
+    (sessionId: string) => {
+      const existing = debounceMap.current.get(sessionId)
+      if (existing) clearTimeout(existing)
+      debounceMap.current.set(
+        sessionId,
+        setTimeout(() => {
+          debounceMap.current.delete(sessionId)
+          mergeSession(sessionId)
+        }, 1000),
+      )
+    },
+    [mergeSession],
+  )
 
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
       if (data.hook_type === 'UserPromptSubmit') {
-        mutate()
+        mergeSession(data.session_id)
         return
       }
-      // Debounce refetch
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-      debounceRef.current = setTimeout(() => {
-        mutate()
-      }, 1000)
+      debouncedMerge(data.session_id)
     })
-  }, [subscribe, mutate])
+  }, [subscribe, mergeSession, debouncedMerge])
 
   useEffect(() => {
-    return subscribe('session_update', () => {
-      mutate()
+    return subscribe<SessionUpdateEvent>('session_update', (data) => {
+      debouncedMerge(data.session_id)
     })
-  }, [subscribe, mutate])
+  }, [subscribe, debouncedMerge])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
+      for (const timeout of debounceMap.current.values()) {
+        clearTimeout(timeout)
       }
     }
   }, [])

@@ -3,6 +3,7 @@ import {
   deleteSession,
   deleteSessions,
   getAllSessions,
+  getSessionById,
   getSessionMessages,
   updateSession,
 } from '../db'
@@ -12,6 +13,19 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
   fastify.get('/api/sessions', async () => {
     return getAllSessions()
   })
+
+  // Get a single session by ID
+  fastify.get<{ Params: { id: string } }>(
+    '/api/sessions/:id',
+    async (request, reply) => {
+      const { id } = request.params
+      const session = getSessionById(id)
+      if (!session) {
+        return reply.status(404).send({ error: 'Session not found' })
+      }
+      return session
+    },
+  )
 
   // Update a session (rename)
   fastify.patch<{ Params: { id: string }; Body: { name?: string } }>(

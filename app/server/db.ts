@@ -45,30 +45,39 @@ export function getProjectById(id: number): Project | undefined {
 
 // Session queries
 
+const SESSION_SELECT = `
+  SELECT
+    s.*,
+    p.path as project_path,
+    (
+      SELECT pr.prompt FROM prompts pr
+      WHERE pr.session_id = s.session_id AND pr.prompt IS NOT NULL
+      ORDER BY pr.created_at DESC LIMIT 1
+    ) as latest_user_message,
+    (
+      SELECT m.body FROM messages m
+      JOIN prompts pr ON m.prompt_id = pr.id
+      WHERE pr.session_id = s.session_id
+        AND m.is_user = 0
+        AND m.tools IS NULL
+      ORDER BY m.created_at DESC LIMIT 1
+    ) as latest_agent_message
+  FROM sessions s
+  JOIN projects p ON s.project_id = p.id
+`
+
 export function getAllSessions(): SessionWithProject[] {
   return db
-    .prepare(`
-      SELECT
-        s.*,
-        p.path as project_path,
-        (
-          SELECT pr.prompt FROM prompts pr
-          WHERE pr.session_id = s.session_id AND pr.prompt IS NOT NULL
-          ORDER BY pr.created_at DESC LIMIT 1
-        ) as latest_user_message,
-        (
-          SELECT m.body FROM messages m
-          JOIN prompts pr ON m.prompt_id = pr.id
-          WHERE pr.session_id = s.session_id
-            AND m.is_user = 0
-            AND m.tools IS NULL
-          ORDER BY m.created_at DESC LIMIT 1
-        ) as latest_agent_message
-      FROM sessions s
-      JOIN projects p ON s.project_id = p.id
-      ORDER BY s.updated_at DESC
-    `)
+    .prepare(`${SESSION_SELECT} ORDER BY s.updated_at DESC`)
     .all() as SessionWithProject[]
+}
+
+export function getSessionById(
+  sessionId: string,
+): SessionWithProject | undefined {
+  return db
+    .prepare(`${SESSION_SELECT} WHERE s.session_id = ?`)
+    .get(sessionId) as SessionWithProject | undefined
 }
 
 export interface SessionMessage {

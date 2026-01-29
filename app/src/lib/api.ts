@@ -93,6 +93,14 @@ export async function getClaudeSessions(): Promise<SessionWithProject[]> {
   return res.json()
 }
 
+export async function getClaudeSession(
+  sessionId: string,
+): Promise<SessionWithProject> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}`)
+  if (!res.ok) throw new Error('Failed to fetch session')
+  return res.json()
+}
+
 export async function updateSession(
   sessionId: string,
   updates: { name?: string },
