@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Command,
+  Folder,
   GitBranch,
   Globe,
   Pencil,
@@ -164,15 +165,18 @@ export function TerminalItem({
             ) : (
               !hideFolder &&
               terminal.name && (
-                <TruncatedPath
-                  path={terminal.cwd}
-                  className="text-xs text-muted-foreground"
-                />
+                <div className='flex gap-1 items-center'>
+                  <Folder className='w-2.5 h-2.5 text-zinc-400' />
+                  <TruncatedPath
+                    path={terminal.cwd}
+                    className="text-[10px] text-muted-foreground"
+                  />
+                </div>
               )
             )}
             {gitBranch && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <GitBranch className="w-3 h-3" />
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <GitBranch className="w-2.5 h-2.5 text-zinc-400" />
                 {gitBranch}
               </span>
             )}

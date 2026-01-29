@@ -195,15 +195,33 @@ export function Terminal({ terminalId }: TerminalProps) {
 
     // Escape dismisses copy button when terminal is focused (prevents sending \x1b to PTY)
     terminal.attachCustomKeyEventHandler((event) => {
-      if (
-        event.type === 'keydown' &&
-        event.key === 'Escape' &&
-        pendingCopyRef.current !== null
-      ) {
+      if (event.type !== 'keydown') return true
+
+      if (event.key === 'Escape' && pendingCopyRef.current !== null) {
         pendingCopyRef.current = null
         setPendingCopy(null)
         return false
       }
+
+      // Option+Arrow word jumping (macOS) — send Meta-b / Meta-f / ESC-backspace
+      if (event.altKey) {
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault()
+          sendInputRef.current('\x1bb')
+          return false
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault()
+          sendInputRef.current('\x1bf')
+          return false
+        }
+        if (event.key === 'Backspace') {
+          event.preventDefault()
+          sendInputRef.current('\x1b\x7f')
+          return false
+        }
+      }
+
       return true
     })
 
