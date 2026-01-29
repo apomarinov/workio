@@ -239,6 +239,7 @@ export function updateTerminal(
     pid?: number | null
     status?: string
     active_cmd?: string | null
+    git_branch?: string | null
   },
 ): Terminal | undefined {
   const setClauses: string[] = []
@@ -263,6 +264,10 @@ export function updateTerminal(
   if (updates.active_cmd !== undefined) {
     setClauses.push('active_cmd = ?')
     values.push(updates.active_cmd)
+  }
+  if (updates.git_branch !== undefined) {
+    setClauses.push('git_branch = ?')
+    values.push(updates.git_branch)
   }
 
   if (setClauses.length === 0) {

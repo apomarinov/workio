@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
 import type { Terminal } from '../types'
 
@@ -27,6 +28,7 @@ interface TerminalContextValue {
 const TerminalContext = createContext<TerminalContextValue | null>(null)
 
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
+  const { subscribe } = useSocket()
   const { data, isLoading, mutate } = useSWR<Terminal[]>(
     '/api/terminals',
     api.getTerminals,
@@ -73,6 +75,13 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       setActiveTerminalId(terminals.length > 0 ? terminals[0].id : null)
     }
   }, [terminals, activeTerminalId])
+
+  // Refetch terminals when server emits an update
+  useEffect(() => {
+    return subscribe('terminal:updated', () => {
+      mutate()
+    })
+  }, [subscribe, mutate])
 
   const activeTerminal =
     terminals.find((t) => t.id === activeTerminalId) ?? null

@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -109,6 +110,26 @@ function stopGlobalProcessPolling() {
     clearInterval(globalProcessPollingId)
     globalProcessPollingId = null
   }
+}
+
+function detectGitBranch(terminalId: number) {
+  const terminal = getTerminalById(terminalId)
+  if (!terminal || terminal.ssh_host) return
+
+  execFile(
+    'git',
+    ['rev-parse', '--abbrev-ref', 'HEAD'],
+    { cwd: terminal.cwd },
+    (err, stdout) => {
+      if (!err && stdout) {
+        const branch = stdout.trim()
+        if (branch) {
+          updateTerminal(terminalId, { git_branch: branch })
+          getIO()?.emit('terminal:updated', { terminalId })
+        }
+      }
+    },
+  )
 }
 
 export function getSession(terminalId: number): PtySession | undefined {
@@ -269,6 +290,7 @@ export async function createSession(
           console.log(
             `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
           )
+          detectGitBranch(terminalId)
           // Scan for process changes after a brief delay
           setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
           break
@@ -334,6 +356,9 @@ export async function createSession(
         backend.write('clear\n')
       }
     }, 100)
+
+    // Detect git branch for local terminals
+    detectGitBranch(terminalId)
   }
 
   return session

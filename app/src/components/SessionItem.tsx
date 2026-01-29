@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronRight,
   Folder,
-  GitBranch,
   MoreVertical,
   Pencil,
   Trash2,
@@ -214,7 +213,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
                 {displayName.slice(0, 200)}
                 {displayName.length > 200 ? '...' : ''}
               </span>
-              {showGitBranch && session.project_path && !session.git_branch && (
+              {showGitBranch && session.project_path && (
                 <span
                   className={cn(
                     'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
@@ -222,18 +221,6 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
                 >
                   <Folder className={cn('w-2.5 h-2.5 mr-1')} />
                   <TruncatedPath path={session.project_path} />
-                </span>
-              )}
-              {showGitBranch && session.git_branch && (
-                <span
-                  className={cn(
-                    'flex -ml-5 items-center gap-1 text-[10px] text-muted-foreground',
-                  )}
-                >
-                  <GitBranch
-                    className={cn('w-2.5 h-2.5 mr-1', showGitBranch && '')}
-                  />
-                  {session.git_branch}
                 </span>
               )}
               {showUserMessage && session.latest_user_message && (

@@ -116,11 +116,10 @@ def update_session_from_index(conn, project_path: str, session_id: str) -> None:
         return
 
     name = entry.get('customTitle') or entry.get('firstPrompt')
-    git_branch = entry.get('gitBranch')
     message_count = entry.get('messageCount')
 
-    log(conn, "Updating session metadata from index", session_id=session_id, project_path=project_path, name=name, git_branch=git_branch, message_count=message_count)
-    update_session_metadata(conn, session_id, name, git_branch, message_count)
+    log(conn, "Updating session metadata from index", session_id=session_id, project_path=project_path, name=name, message_count=message_count)
+    update_session_metadata(conn, session_id, name, message_count)
 
 
 def clean_sessions(conn, project_id: int, current_session_id: str) -> None:

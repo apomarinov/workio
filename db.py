@@ -102,12 +102,12 @@ def upsert_session(conn: sqlite3.Connection, session_id: str, project_id: int, s
     ''', (session_id, project_id, terminal_id, status, transcript_path))
 
 
-def update_session_metadata(conn: sqlite3.Connection, session_id: str, name: str | None, git_branch: str | None, message_count: int | None) -> None:
+def update_session_metadata(conn: sqlite3.Connection, session_id: str, name: str | None, message_count: int | None) -> None:
     """Update session metadata."""
     conn.execute('''
-        UPDATE sessions SET name = ?, git_branch = ?, message_count = ?
+        UPDATE sessions SET name = ?, message_count = ?
         WHERE session_id = ?
-    ''', (name[:200] if name else None, git_branch, message_count, session_id))
+    ''', (name[:200] if name else None, message_count, session_id))
 
 
 def update_session_name_if_empty(conn: sqlite3.Connection, session_id: str, name: str) -> None:

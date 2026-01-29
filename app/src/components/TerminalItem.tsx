@@ -11,7 +11,7 @@ import {
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { useKeyMapContext } from '@/context/KeyMapContext'
@@ -56,14 +56,7 @@ export function TerminalItem({
   const hasSessions = sessions.length > 0
   const hasProcesses = processes.length > 0
 
-  // Get git branch from the most recent active session
-  const gitBranch = useMemo(() => {
-    const activeSessions = sessions.filter(
-      (s) => s.status === 'active' || s.status === 'permission_needed',
-    )
-    const session = activeSessions[0] || sessions[0]
-    return session?.git_branch || null
-  }, [sessions])
+  const gitBranch = terminal.git_branch
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -108,9 +101,10 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex items-center pl-1 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && 'pl-2.5',
           )}
@@ -165,8 +159,8 @@ export function TerminalItem({
             ) : (
               !hideFolder &&
               terminal.name && (
-                <div className='flex gap-1 items-center'>
-                  <Folder className='w-2.5 h-2.5 text-zinc-400' />
+                <div className="flex gap-1 items-center">
+                  <Folder className="w-2.5 h-2.5 text-zinc-400" />
                   <TruncatedPath
                     path={terminal.cwd}
                     className="text-[10px] text-muted-foreground"

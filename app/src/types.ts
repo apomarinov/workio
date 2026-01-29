@@ -7,6 +7,7 @@ export interface Terminal {
   pid: number | null
   status: 'running' | 'stopped'
   active_cmd: string | null
+  git_branch: string | null
   orphaned?: boolean
   created_at: string
   updated_at: string
@@ -22,7 +23,6 @@ export interface Session {
   project_id: number
   terminal_id: number | null
   name: string | null
-  git_branch: string | null
   message_count: number | null
   status: 'started' | 'active' | 'done' | 'ended' | 'permission_needed' | 'idle'
   transcript_path: string | null

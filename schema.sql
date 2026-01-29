@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS sessions (
     project_id INTEGER,
     terminal_id INTEGER,
     name TEXT,
-    git_branch TEXT,
     message_count INTEGER,
     status TEXT,
     transcript_path TEXT,
@@ -94,6 +93,7 @@ CREATE TABLE IF NOT EXISTS terminals (
     pid INTEGER,
     status TEXT DEFAULT 'running',
     active_cmd TEXT,
+    git_branch TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
