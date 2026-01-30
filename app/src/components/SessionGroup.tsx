@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, Folder, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { useClaudeSessions } from '../hooks/useClaudeSessions'
+import { useSessionContext } from '../context/SessionContext'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { SessionItem } from './SessionItem'
@@ -20,7 +20,7 @@ export function SessionGroup({
   expanded,
   onToggle,
 }: SessionGroupProps) {
-  const { deleteSessions } = useClaudeSessions()
+  const { deleteSessions } = useSessionContext()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const handleDeleteClick = (e: React.MouseEvent) => {

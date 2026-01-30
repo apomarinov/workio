@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
-import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject } from '../types'
@@ -33,8 +32,13 @@ interface SessionItemProps {
 }
 
 export function SessionItem({ session, showGitBranch }: SessionItemProps) {
-  const { deleteSession, updateSession } = useClaudeSessions()
-  const { activeSessionId, selectSession, clearSession } = useSessionContext()
+  const {
+    deleteSession,
+    updateSession,
+    activeSessionId,
+    selectSession,
+    clearSession,
+  } = useSessionContext()
   const { settings } = useSettings()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showRenameModal, setShowRenameModal] = useState(false)
@@ -108,9 +112,6 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false)
-    if (activeSessionId === session.session_id) {
-      clearSession()
-    }
     deleteSession(session.session_id)
   }
   const showUserMessage =
@@ -222,10 +223,10 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
                 </div>
               )}
               {session.latest_agent_message && (
-                <div className='relative w-fit h-fit'>
+                <div className="relative w-fit h-fit">
                   {isExpanded && (
-                    <div className='absolute top-1/2 left-[-15px]'>
-                      <div className='w-[15px] border-l-[1px] border-b-[1px] h-[220px] -translate-y-full'></div>
+                    <div className="absolute top-1/2 left-[-15px]">
+                      <div className="w-[15px] border-l-[1px] border-b-[1px] h-[220px] -translate-y-full"></div>
                     </div>
                   )}
                   <div
@@ -245,7 +246,12 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             <span className="text-xs truncate block">{displayName}</span>
           )}
         </div>
-        <div className={cn('bg-sidebar w-5 h-7 absolute top-0 left-0 group-hover:bg-[#1b1b1b]', isSelected ? 'bg-[#1f1f1f]' : '')}></div>
+        <div
+          className={cn(
+            'bg-sidebar w-5 h-7 absolute top-0 left-0 group-hover:bg-[#1b1b1b]',
+            isSelected ? 'bg-[#1f1f1f]' : '',
+          )}
+        ></div>
         <div className="absolute invisible group-hover:visible top-1 right-1">
           <Popover open={showMenu} onOpenChange={setShowMenu}>
             <PopoverTrigger asChild>

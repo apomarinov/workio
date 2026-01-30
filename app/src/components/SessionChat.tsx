@@ -1,7 +1,6 @@
 import { AlertTriangle, Folder, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSessionContext } from '../context/SessionContext'
-import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useSessionMessages } from '../hooks/useSessionMessages'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionMessage, TodoWriteTool } from '../types'
@@ -35,8 +34,7 @@ function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
 }
 
 export function SessionChat() {
-  const { activeSessionId } = useSessionContext()
-  const { sessions } = useClaudeSessions()
+  const { activeSessionId, sessions } = useSessionContext()
   const { settings } = useSettings()
   const { messages, loading, isLoadingMore, hasMore, loadMore } =
     useSessionMessages(activeSessionId)

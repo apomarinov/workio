@@ -39,7 +39,6 @@ import {
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
-import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateSSHTerminalModal } from './CreateSSHTerminalModal'
@@ -59,8 +58,7 @@ interface SidebarProps {
 
 export function Sidebar({ width }: SidebarProps) {
   const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
-  const { clearSession } = useSessionContext()
-  const { sessions } = useClaudeSessions()
+  const { clearSession, sessions } = useSessionContext()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSSHModal, setShowSSHModal] = useState(false)
   const [createPopoverOpen, setCreatePopoverOpen] = useState(false)

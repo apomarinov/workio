@@ -14,7 +14,6 @@ import { KeyMapProvider } from './context/KeyMapContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useBrowserNotification } from './hooks/useBrowserNotification'
-import { useClaudeSessions } from './hooks/useClaudeSessions'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
 
@@ -31,8 +30,7 @@ function setFavicon(href: string) {
 function AppContent() {
   const { terminals, loading, activeTerminal, selectTerminal } =
     useTerminalContext()
-  const { activeSessionId, selectSession } = useSessionContext()
-  const { sessions } = useClaudeSessions()
+  const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe } = useSocket()
   const { notify } = useBrowserNotification()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
