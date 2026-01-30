@@ -1,7 +1,9 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
+import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
 import {
@@ -25,8 +27,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // In production, use CLIENT_PORT since we serve both UI and API
 const port = env.NODE_ENV === 'production' ? env.CLIENT_PORT : env.SERVER_PORT
 
+// Write logs to both stdout and a per-run JSONL file
+const logsDir = path.join(__dirname, 'logs')
+fs.mkdirSync(logsDir, { recursive: true })
+const logFile = path.join(
+  logsDir,
+  `server-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`,
+)
+const logStream = pino.multistream([
+  { stream: process.stdout },
+  { stream: pino.destination(logFile) },
+])
+
 const fastify = Fastify({
-  logger: true,
+  loggerInstance: pino({ level: 'info' }, logStream),
 })
 setLogger(fastify.log)
 
