@@ -52,7 +52,7 @@ export function Terminal({ terminalId }: TerminalProps) {
     })
   }, [])
 
-  const plusCols = 2
+  const plusCols = 0
   const { status, sendInput, sendResize } = useTerminalSocket({
     terminalId,
     cols: dimensions.cols + plusCols,

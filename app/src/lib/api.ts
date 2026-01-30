@@ -171,6 +171,26 @@ export async function requestPRReview(
   }
 }
 
+export async function mergePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  method: 'merge' | 'squash' | 'rebase' = 'squash',
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/merge`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to merge PR')
+  }
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,

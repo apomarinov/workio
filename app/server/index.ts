@@ -8,6 +8,8 @@ import {
   emitCachedPRChecks,
   fetchPRComments,
   initGitHubChecks,
+  mergePR,
+  refreshPRChecks,
   requestPRReview,
 } from './github/checks'
 import { setIO } from './io'
@@ -40,6 +42,7 @@ setIO(io)
 io.on('connection', (socket) => {
   fastify.log.info(`Client connected: ${socket.id}`)
   emitCachedPRChecks(socket)
+  refreshPRChecks()
 
   socket.on('disconnect', () => {
     fastify.log.info(`Client disconnected: ${socket.id}`)
@@ -97,6 +100,22 @@ fastify.post<{
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }
+  refreshPRChecks()
+  return { ok: true }
+})
+
+// Merge PR
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { method?: 'merge' | 'squash' | 'rebase' }
+}>('/api/github/:owner/:repo/pr/:pr/merge', async (request, reply) => {
+  const { owner, repo, pr } = request.params
+  const method = request.body?.method || 'squash'
+  const result = await mergePR(owner, repo, Number(pr), method)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  refreshPRChecks()
   return { ok: true }
 })
 

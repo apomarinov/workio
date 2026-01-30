@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleX,
+  Clock,
   GitMerge,
   Loader2,
   RefreshCw,
@@ -17,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRComment } from '../../shared/types'
@@ -117,8 +125,11 @@ export function PRStatusContent({
   const changesRequestedReviews = pr.reviews.filter(
     (r) => r.state === 'CHANGES_REQUESTED',
   )
+  const pendingReviews = pr.reviews.filter((r) => r.state === 'PENDING')
   const hasReviews =
-    approvedReviews.length > 0 || changesRequestedReviews.length > 0
+    approvedReviews.length > 0 ||
+    changesRequestedReviews.length > 0 ||
+    pendingReviews.length > 0
   const hasChecks = pr.checks.length > 0
   const hasComments = pr.comments.length > 0
   const hasRunningChecks = pr.checks.some(
@@ -160,6 +171,24 @@ export function PRStatusContent({
 
   const [reReviewAuthor, setReReviewAuthor] = useState<string | null>(null)
   const [reReviewLoading, setReReviewLoading] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergeMethod, setMergeMethod] = useState<'merge' | 'squash' | 'rebase'>(
+    'squash',
+  )
+  const [mergeLoading, setMergeLoading] = useState(false)
+
+  const handleMerge = async () => {
+    setMergeLoading(true)
+    try {
+      await api.mergePR(owner, repo, pr.prNumber, mergeMethod)
+      toast.success('PR merged successfully')
+      setMergeOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to merge PR')
+    } finally {
+      setMergeLoading(false)
+    }
+  }
 
   const handleReRequestReview = async () => {
     if (!reReviewAuthor) return
@@ -205,58 +234,69 @@ export function PRStatusContent({
     const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
 
     return (
-      <button
-        type="button"
-        onClick={() => {
-          onToggle()
-          onSeen?.()
-        }}
-        className={cn(
-          'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
-          hasChangesRequested
-            ? 'text-orange-400/70 hover:text-orange-400'
-            : isApproved
-              ? 'text-green-500/70 hover:text-green-500'
-              : hasRunningChecks
-                ? 'text-yellow-400/70 hover:text-yellow-400'
+      <div className="group/header flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            onToggle()
+            onSeen?.()
+          }}
+          className={cn(
+            'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
+            hasChangesRequested
+              ? 'text-orange-400/70 hover:text-orange-400'
+              : isApproved
+                ? 'text-green-500/70 hover:text-green-500'
+                : hasRunningChecks
+                  ? 'text-yellow-400/70 hover:text-yellow-400'
+                  : hasFailedChecks
+                    ? 'text-red-400/70 hover:text-red-400'
+                    : '',
+          )}
+        >
+          {expanded ? (
+            <ChevronDown className="w-3 h-3" />
+          ) : (
+            <>
+              {(hasChangesRequested || isApproved || hasChecks) && (
+                <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
+              )}
+              {hasChangesRequested ? (
+                <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
+              ) : hasRunningChecks ? (
+                <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
+              ) : isApproved ? (
+                <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
+              ) : hasFailedChecks ? (
+                <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
+              ) : (
+                <ChevronRight className="w-3 h-3" />
+              )}
+            </>
+          )}
+          {hasChangesRequested
+            ? 'Change request'
+            : hasRunningChecks
+              ? 'Pull request'
+              : isApproved
+                ? 'approved'
                 : hasFailedChecks
-                  ? 'text-red-400/70 hover:text-red-400'
-                  : '',
+                  ? 'failed checks'
+                  : 'Pull Request'}
+          {hasNewActivity && (
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
+          )}
+        </button>
+        {isApproved && (
+          <button
+            type="button"
+            onClick={() => setMergeOpen(true)}
+            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/header:opacity-100 transition-opacity cursor-pointer pr-2 pt-1"
+          >
+            Merge
+          </button>
         )}
-      >
-        {expanded ? (
-          <ChevronDown className="w-3 h-3" />
-        ) : (
-          <>
-            {(hasChangesRequested || isApproved || hasChecks) && (
-              <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
-            )}
-            {hasChangesRequested ? (
-              <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
-            ) : hasRunningChecks ? (
-              <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
-            ) : isApproved ? (
-              <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
-            ) : hasFailedChecks ? (
-              <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
-            ) : (
-              <ChevronRight className="w-3 h-3" />
-            )}
-          </>
-        )}
-        {hasChangesRequested
-          ? 'Change request'
-          : hasRunningChecks
-            ? 'Pull request'
-            : isApproved
-              ? 'approved'
-              : hasFailedChecks
-                ? 'failed checks'
-                : 'Pull Request'}
-        {hasNewActivity && (
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
-        )}
-      </button>
+      </div>
     )
   }
 
@@ -264,6 +304,7 @@ export function PRStatusContent({
     review: (typeof pr.reviews)[number],
     icon: React.ReactNode,
     keyPrefix: string,
+    showReReview?: boolean,
   ) => (
     <div
       key={`${keyPrefix}-${review.author}`}
@@ -287,13 +328,15 @@ export function PRStatusContent({
         )}
         <span className="text-xs truncate">{review.author}</span>
       </a>
-      <button
-        type="button"
-        onClick={() => setReReviewAuthor(review.author)}
-        className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
-      >
-        Re-review
-      </button>
+      {showReReview && (
+        <button
+          type="button"
+          onClick={() => setReReviewAuthor(review.author)}
+          className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+        >
+          Re-review
+        </button>
+      )}
     </div>
   )
 
@@ -315,6 +358,14 @@ export function PRStatusContent({
               review,
               <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />,
               'changes',
+              true,
+            ),
+          )}
+          {pendingReviews.map((review) =>
+            renderReviewRow(
+              review,
+              <Clock className="w-3 h-3 flex-shrink-0 text-zinc-500" />,
+              'pending',
             ),
           )}
 
@@ -398,6 +449,49 @@ export function PRStatusContent({
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     'Request review'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Merge pull request</DialogTitle>
+                <DialogDescription>
+                  Merge <span className="font-medium">#{pr.prNumber}</span> into
+                  the base branch?
+                </DialogDescription>
+              </DialogHeader>
+              <Select
+                value={mergeMethod}
+                onValueChange={(v) =>
+                  setMergeMethod(v as 'merge' | 'squash' | 'rebase')
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="squash">Squash and merge</SelectItem>
+                  <SelectItem value="merge">Create a merge commit</SelectItem>
+                  <SelectItem value="rebase">Rebase and merge</SelectItem>
+                </SelectContent>
+              </Select>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setMergeOpen(false)}
+                  disabled={mergeLoading}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleMerge} disabled={mergeLoading}>
+                  {mergeLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Merge'
                   )}
                 </Button>
               </DialogFooter>

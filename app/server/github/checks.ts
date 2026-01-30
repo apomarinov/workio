@@ -81,6 +81,7 @@ interface GhPR {
   state: 'OPEN' | 'MERGED' | 'CLOSED'
   reviewDecision: string
   reviews: { author: { login: string }; state: string }[]
+  reviewRequests: { login: string }[]
   comments: {
     author: { login: string }
     body: string
@@ -116,7 +117,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
         '--state',
         'open',
         '--json',
-        'number,title,headRefName,url,updatedAt,statusCheckRollup,reviewDecision,reviews,comments',
+        'number,title,headRefName,url,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -149,6 +150,9 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
               }))
 
             // Extract reviews (APPROVED / CHANGES_REQUESTED only)
+            const pendingReviewers = new Set(
+              (pr.reviewRequests || []).map((r) => r.login),
+            )
             const reviews: PRReview[] = (pr.reviews || [])
               .filter(
                 (r) =>
@@ -157,7 +161,12 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
               .map((r) => ({
                 author: r.author.login,
                 avatarUrl: `https://github.com/${r.author.login}.png?size=32`,
-                state: r.state,
+                // If reviewer has a pending re-review request, mark as PENDING
+                state:
+                  r.state === 'CHANGES_REQUESTED' &&
+                  pendingReviewers.has(r.author.login)
+                    ? 'PENDING'
+                    : r.state,
               }))
 
             // Deduplicate reviews: keep latest per author
@@ -178,20 +187,31 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
                 createdAt: c.createdAt,
               }))
 
-            let reviewDecision = (pr.reviewDecision || '') as
+            // Derive review decision, accounting for re-requested reviews
+            const dedupedReviews = Array.from(reviewsByAuthor.values())
+            const hasActiveChangesRequested = dedupedReviews.some(
+              (r) => r.state === 'CHANGES_REQUESTED',
+            )
+            const hasApproval = dedupedReviews.some(
+              (r) => r.state === 'APPROVED',
+            )
+            const hasPending = dedupedReviews.some((r) => r.state === 'PENDING')
+
+            let reviewDecision:
               | 'APPROVED'
               | 'CHANGES_REQUESTED'
               | 'REVIEW_REQUIRED'
               | ''
-            if (!reviewDecision) {
-              const hasApproval = pr.reviews?.some(
-                (r: { state: string }) => r.state === 'APPROVED',
-              )
-              const hasChangesRequested = pr.reviews?.some(
-                (r: { state: string }) => r.state === 'CHANGES_REQUESTED',
-              )
-              if (hasChangesRequested) reviewDecision = 'CHANGES_REQUESTED'
-              else if (hasApproval) reviewDecision = 'APPROVED'
+            if (hasActiveChangesRequested) {
+              reviewDecision = 'CHANGES_REQUESTED'
+            } else if (hasPending) {
+              // All changes-requested reviewers have been re-requested
+              reviewDecision = 'REVIEW_REQUIRED'
+            } else if (hasApproval) {
+              reviewDecision = 'APPROVED'
+            } else {
+              reviewDecision = (pr.reviewDecision ||
+                '') as typeof reviewDecision
             }
 
             allResults.push({
@@ -451,6 +471,36 @@ export function requestPRReview(
         `reviewers[]=${reviewer}`,
       ],
       { timeout: 15000 },
+      (err, _stdout, stderr) => {
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        checksCache.delete(`${owner}/${repo}`)
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
+export function mergePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  method: 'merge' | 'squash' | 'rebase',
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        '--method',
+        'PUT',
+        `repos/${owner}/${repo}/pulls/${prNumber}/merge`,
+        '-f',
+        `merge_method=${method}`,
+      ],
+      { timeout: 30000 },
       (err, _stdout, stderr) => {
         if (err) {
           resolve({ ok: false, error: stderr || err.message })
