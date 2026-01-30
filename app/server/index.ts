@@ -7,6 +7,7 @@ import { env } from './env'
 import {
   emitCachedPRChecks,
   fetchPRComments,
+  gitFetchAllTerminals,
   initGitHubChecks,
   mergePR,
   refreshPRChecks,
@@ -43,6 +44,10 @@ io.on('connection', (socket) => {
   fastify.log.info(`Client connected: ${socket.id}`)
   emitCachedPRChecks(socket)
   refreshPRChecks()
+
+  socket.on('git:fetch-all', () => {
+    gitFetchAllTerminals()
+  })
 
   socket.on('disconnect', () => {
     fastify.log.info(`Client disconnected: ${socket.id}`)

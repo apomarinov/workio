@@ -100,6 +100,7 @@ interface GhPR {
   title: string
   headRefName: string
   url: string
+  createdAt: string
   updatedAt: string
   state: 'OPEN' | 'MERGED' | 'CLOSED'
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
@@ -141,7 +142,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
         '--state',
         'open',
         '--json',
-        'number,title,headRefName,url,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments,mergeable',
+        'number,title,headRefName,url,createdAt,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments,mergeable',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -250,6 +251,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
               reviews: Array.from(reviewsByAuthor.values()),
               checks: failedChecks,
               comments,
+              createdAt: pr.createdAt || '',
               updatedAt: pr.updatedAt || '',
               mergeable: pr.mergeable || 'UNKNOWN',
             })
@@ -291,7 +293,7 @@ function fetchMergedPRsForBranches(
         '--limit',
         '30',
         '--json',
-        'number,title,headRefName,url,updatedAt',
+        'number,title,headRefName,url,createdAt,updatedAt',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -316,6 +318,7 @@ function fetchMergedPRsForBranches(
               reviews: [],
               checks: [],
               comments: [],
+              createdAt: pr.createdAt || '',
               updatedAt: pr.updatedAt || '',
             }))
           resolve(results)
@@ -585,6 +588,57 @@ export function emitCachedPRChecks(socket: {
   if (lastEmittedPRs.length > 0) {
     socket.emit('github:pr-checks', { prs: lastEmittedPRs })
   }
+}
+
+export async function gitFetchAllTerminals(): Promise<void> {
+  const promises: Promise<void>[] = []
+
+  for (const [terminalId] of monitoredTerminals) {
+    const terminal = getTerminalById(terminalId)
+    if (!terminal) continue
+
+    if (terminal.ssh_host) {
+      promises.push(
+        execSSHCommand(terminal.ssh_host, 'git fetch', terminal.cwd)
+          .then(() => {
+            console.log(
+              `[github] git fetch completed for SSH terminal ${terminalId}`,
+            )
+          })
+          .catch((err) => {
+            console.error(
+              `[github] git fetch failed for SSH terminal ${terminalId}:`,
+              err,
+            )
+          }),
+      )
+    } else {
+      promises.push(
+        new Promise<void>((resolve) => {
+          execFile(
+            'git',
+            ['fetch'],
+            { cwd: terminal.cwd, timeout: 15000 },
+            (err) => {
+              if (err) {
+                console.error(
+                  `[github] git fetch failed for terminal ${terminalId}:`,
+                  err,
+                )
+              } else {
+                console.log(
+                  `[github] git fetch completed for terminal ${terminalId}`,
+                )
+              }
+              resolve()
+            },
+          )
+        }),
+      )
+    }
+  }
+
+  await Promise.all(promises)
 }
 
 export async function initGitHubChecks(): Promise<void> {

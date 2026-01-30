@@ -43,6 +43,7 @@ export interface PRCheckStatus {
   reviews: PRReview[]
   checks: FailedPRCheck[]
   comments: PRComment[]
+  createdAt: string
   updatedAt: string
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
 }
