@@ -52,9 +52,9 @@ export function PRStatusGroup({
           isMerged
             ? undefined
             : () => {
-              onToggle()
-              onSeen?.()
-            }
+                onToggle()
+                onSeen?.()
+              }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
@@ -70,9 +70,10 @@ export function PRStatusGroup({
             {(hasChangesRequested ||
               hasRunningChecks ||
               isApproved ||
-              hasFailedChecks || hasPendingReviews) && (
-                <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
-              )}
+              hasFailedChecks ||
+              hasPendingReviews) && (
+              <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
+            )}
             {hasChangesRequested ? (
               <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-400/70 group-hover/pr:hidden" />
             ) : hasRunningChecks ? (
@@ -118,7 +119,7 @@ export function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => { }}
+            onToggle={() => {}}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />

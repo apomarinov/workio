@@ -64,8 +64,8 @@ export function TerminalItem({
   const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-    ) ??
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+      ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -137,9 +137,10 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && !hasGitHub && 'pl-2.5',
             hideFolder && 'rounded-l-lg',

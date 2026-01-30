@@ -51,7 +51,6 @@ function getProcessesForTerminal(
   session: PtySession,
 ): ActiveProcess[] {
   const processes: ActiveProcess[] = []
-  if (!session.pty.pid) return processes
 
   try {
     if (
@@ -356,15 +355,34 @@ export async function createSession(
   // Start global process polling if not already running
   startGlobalProcessPolling()
 
-  // cd into cwd for SSH terminals
-  if (terminal.ssh_host && terminal.cwd && terminal.cwd !== '~') {
-    setTimeout(() => {
-      backend.write(`cd ${terminal.cwd}\n`)
-    }, 100)
-  }
-
-  // Inject shell integration for local terminals only
-  if (!terminal.ssh_host) {
+  if (terminal.ssh_host) {
+    // Inject shell integration for SSH terminals inline via heredoc
+    try {
+      const inlineScript = fs.readFileSync(
+        path.join(__dirname, 'shell-integration', 'ssh-inline.sh'),
+        'utf-8',
+      )
+      setTimeout(() => {
+        // Use heredoc + eval so the script is interpreted with real newlines
+        const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
+        backend.write(injection)
+        if (terminal.cwd && terminal.cwd !== '~') {
+          backend.write(`cd ${terminal.cwd}\n`)
+        }
+        backend.write("printf '\\033c\\x1b[1;1H'\n")
+        backend.write('clear\n')
+      }, 200)
+    } catch (err) {
+      console.error('[pty] Failed to inject SSH shell integration:', err)
+      // Still cd into cwd even if integration fails
+      if (terminal.cwd && terminal.cwd !== '~') {
+        setTimeout(() => {
+          backend.write(`cd ${terminal.cwd}\n`)
+        }, 200)
+      }
+    }
+  } else {
+    // Inject shell integration for local terminals via source
     const shell = terminal.shell || getSettings().default_shell || '/bin/bash'
     setTimeout(() => {
       const shellName = path.basename(shell)

@@ -349,7 +349,10 @@ export function PRStatusContent({
             <ChevronDown className="w-3 h-3" />
           ) : (
             <>
-              {(hasChangesRequested || isApproved || hasChecks || pendingReviews.length > 0) && (
+              {(hasChangesRequested ||
+                isApproved ||
+                hasChecks ||
+                pendingReviews.length > 0) && (
                 <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
               )}
               {hasChangesRequested ? (
