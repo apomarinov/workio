@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useClaudeSessions } from '../hooks/useClaudeSessions'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -58,6 +59,7 @@ interface SidebarProps {
 
 export function Sidebar({ width }: SidebarProps) {
   const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
+  const { clearSession } = useSessionContext()
   const { sessions } = useClaudeSessions()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSSHModal, setShowSSHModal] = useState(false)
@@ -795,13 +797,19 @@ export function Sidebar({ width }: SidebarProps) {
       <CreateTerminalModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onCreated={selectTerminal}
+        onCreated={(id) => {
+          selectTerminal(id)
+          clearSession()
+        }}
       />
 
       <CreateSSHTerminalModal
         open={showSSHModal}
         onOpenChange={setShowSSHModal}
-        onCreated={selectTerminal}
+        onCreated={(id) => {
+          selectTerminal(id)
+          clearSession()
+        }}
       />
 
       <SettingsModal

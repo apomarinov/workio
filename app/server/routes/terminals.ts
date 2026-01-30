@@ -21,6 +21,7 @@ import {
   getTerminalById,
   updateTerminal,
 } from '../db'
+import { refreshPRChecks } from '../github/checks'
 import { destroySession } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 
@@ -196,6 +197,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       deleteTerminal(id)
+      refreshPRChecks()
       return reply.status(204).send()
     },
   )

@@ -81,7 +81,7 @@ export function CreateTerminalModal({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Git Branch will be detected in this path for PR status
+              Git branch and repo will be detected in this path for PR status
             </p>
           </div>
 
