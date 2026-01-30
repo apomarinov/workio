@@ -450,7 +450,14 @@ async function pollAllPRChecks(): Promise<void> {
   )
 }
 
+let lastRefreshAt = 0
+const REFRESH_MIN_INTERVAL = 10_000 // 10 seconds
+
 export async function refreshPRChecks(): Promise<void> {
+  const now = Date.now()
+  if (now - lastRefreshAt < REFRESH_MIN_INTERVAL) return
+  lastRefreshAt = now
+
   if (ghAvailable === null) {
     ghAvailable = await checkGhAvailable()
   }
