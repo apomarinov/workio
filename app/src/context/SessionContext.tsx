@@ -44,13 +44,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const debounceMap = useRef(new Map<string, NodeJS.Timeout>())
 
-  const selectSession = (id: string) => {
+  const selectSession = useCallback((id: string) => {
     setActiveSessionId(id)
-  }
+  }, [])
 
-  const clearSession = () => {
+  const clearSession = useCallback(() => {
     setActiveSessionId(null)
-  }
+  }, [])
 
   const mergeSession = useCallback(
     async (sessionId: string) => {
@@ -134,7 +134,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       mutate()
     },
-    [mutate],
+    [mutate, activeSessionId, clearSession],
   )
 
   const deleteSessions = useCallback(
@@ -145,7 +145,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       mutate()
     },
-    [mutate, activeSessionId],
+    [mutate, activeSessionId, clearSession],
   )
 
   return (

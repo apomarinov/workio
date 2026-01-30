@@ -23,8 +23,6 @@ import {
   Github,
   Globe,
   LayoutList,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
   Settings,
   Terminal as TerminalIcon,

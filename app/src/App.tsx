@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
 import {
   Group,
