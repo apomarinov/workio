@@ -151,6 +151,26 @@ export async function getPRComments(
   return res.json()
 }
 
+export async function requestPRReview(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  reviewer: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/request-review`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewer }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to request review')
+  }
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,

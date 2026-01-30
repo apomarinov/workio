@@ -1,18 +1,13 @@
 import {
   Activity,
   AlertTriangle,
-  Check,
   ChevronDown,
   ChevronRight,
-  CircleX,
   Command,
   GitBranch,
-  GitMerge,
   Globe,
-  Loader2,
   MoreVertical,
   Pencil,
-  RefreshCw,
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
@@ -69,8 +64,8 @@ export function TerminalItem({
   const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-    ) ??
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+      ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -142,12 +137,13 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && !hasGitHub && 'pl-2.5',
-            hideFolder && 'rounded-l-lg'
+            hideFolder && 'rounded-l-lg',
           )}
         >
           {hasSessions || hasProcesses || hasGitHub ? (
@@ -251,96 +247,15 @@ export function TerminalItem({
 
         {(hasGitHub || hasProcesses || hasSessions) && sessionsExpanded && (
           <div className="ml-2 mt-1 space-y-0.5">
-            {hasGitHub &&
-              prForBranch &&
-              (prForBranch.state === 'MERGED' ? (
-                <a
-                  href={prForBranch.prUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-purple-400/70 hover:text-purple-400 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <GitMerge className="w-3 h-3" />
-                  Merged
-                </a>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      toggleGitHub()
-                      if (prForBranch) markPRSeen(prForBranch)
-                    }}
-                    className={cn(
-                      'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
-                      prForBranch.reviewDecision === 'CHANGES_REQUESTED'
-                        ? 'text-orange-400/70 hover:text-orange-400'
-                        : prForBranch.reviewDecision === 'APPROVED'
-                          ? 'text-green-500/70 hover:text-green-500'
-                          : prForBranch.checks.some(
-                            (c) =>
-                              c.status === 'IN_PROGRESS' ||
-                              c.status === 'QUEUED',
-                          )
-                            ? 'text-yellow-400/70 hover:text-yellow-400'
-                            : prForBranch.checks.some(
-                              (c) =>
-                                c.status === 'COMPLETED' &&
-                                c.conclusion !== 'SUCCESS' &&
-                                c.conclusion !== 'SKIPPED' &&
-                                c.conclusion !== 'NEUTRAL',
-                            )
-                              ? 'text-red-400/70 hover:text-red-400'
-                              : '',
-                    )}
-                  >
-                    {githubExpanded ? (
-                      <ChevronDown className="w-3 h-3" />
-                    ) : (
-                      <>
-                        {(prForBranch.reviewDecision === 'CHANGES_REQUESTED' ||
-                          prForBranch.reviewDecision === 'APPROVED' ||
-                          prForBranch.checks.length > 0) && (
-                            <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
-                          )}
-                        {prForBranch.reviewDecision === 'CHANGES_REQUESTED' ? (
-                          <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
-                        ) : prForBranch.checks.some(
-                          (c) =>
-                            c.status === 'IN_PROGRESS' ||
-                            c.status === 'QUEUED',
-                        ) ? (
-                          <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
-                        ) : prForBranch.reviewDecision === 'APPROVED' ? (
-                          <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
-                        ) : prForBranch.checks.length > 0 ? (
-                          <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3" />
-                        )}
-                      </>
-                    )}
-                    {prForBranch.reviewDecision === 'CHANGES_REQUESTED'
-                      ? 'Change request'
-                      : prForBranch.checks.some(
-                        (c) =>
-                          c.status === 'IN_PROGRESS' ||
-                          c.status === 'QUEUED',
-                      )
-                        ? 'Pull request'
-                        : prForBranch.reviewDecision === 'APPROVED'
-                          ? 'approved'
-                          : prForBranch.checks.length > 0
-                            ? 'failed checks'
-                            : 'Pull Request'}
-                    {hasNewActivity(prForBranch) && (
-                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
-                    )}
-                  </button>
-                  {githubExpanded && <PRStatusContent pr={prForBranch} />}
-                </>
-              ))}
+            {hasGitHub && prForBranch && (
+              <PRStatusContent
+                pr={prForBranch}
+                expanded={githubExpanded}
+                onToggle={toggleGitHub}
+                hasNewActivity={hasNewActivity(prForBranch)}
+                onSeen={() => markPRSeen(prForBranch)}
+              />
+            )}
             {hasProcesses && (
               <>
                 <button

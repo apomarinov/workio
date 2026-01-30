@@ -432,6 +432,37 @@ export function fetchPRComments(
   })
 }
 
+export function requestPRReview(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  reviewer: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    // Use REST API to avoid deprecated projectCards GraphQL field in `gh pr edit`
+    execFile(
+      'gh',
+      [
+        'api',
+        '--method',
+        'POST',
+        `repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`,
+        '-f',
+        `reviewers[]=${reviewer}`,
+      ],
+      { timeout: 15000 },
+      (err, _stdout, stderr) => {
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        checksCache.delete(`${owner}/${repo}`)
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
 /** Send the last polled PR data to a specific socket (e.g. on connect). */
 export function emitCachedPRChecks(socket: {
   emit: (ev: string, data: unknown) => void

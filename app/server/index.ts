@@ -8,6 +8,7 @@ import {
   emitCachedPRChecks,
   fetchPRComments,
   initGitHubChecks,
+  requestPRReview,
 } from './github/checks'
 import { setIO } from './io'
 import sessionRoutes from './routes/sessions'
@@ -80,6 +81,23 @@ fastify.get<{
   const limit = Math.min(Number(request.query.limit) || 20, 100)
   const offset = Number(request.query.offset) || 0
   return fetchPRComments(owner, repo, Number(pr), limit, offset)
+})
+
+// Re-request PR review
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { reviewer: string }
+}>('/api/github/:owner/:repo/pr/:pr/request-review', async (request, reply) => {
+  const { owner, repo, pr } = request.params
+  const { reviewer } = request.body
+  if (!reviewer) {
+    return reply.status(400).send({ error: 'reviewer is required' })
+  }
+  const result = await requestPRReview(owner, repo, Number(pr), reviewer)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  return { ok: true }
 })
 
 // Routes

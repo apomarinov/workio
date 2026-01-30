@@ -3,16 +3,21 @@ import {
   ChevronDown,
   ChevronRight,
   CircleX,
+  GitMerge,
   Loader2,
   RefreshCw,
 } from 'lucide-react'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRComment } from '../../shared/types'
 import * as api from '../lib/api'
@@ -20,6 +25,10 @@ import { MarkdownContent } from './MarkdownContent'
 
 interface PRStatusContentProps {
   pr: PRCheckStatus
+  expanded?: boolean
+  onToggle?: () => void
+  hasNewActivity?: boolean
+  onSeen?: () => void
 }
 
 function CommentItem({
@@ -93,7 +102,17 @@ function CommentItem({
   )
 }
 
-export function PRStatusContent({ pr }: PRStatusContentProps) {
+export function PRStatusContent({
+  pr,
+  expanded: expandedProp,
+  onToggle,
+  hasNewActivity,
+  onSeen,
+}: PRStatusContentProps) {
+  const isMerged = pr.state === 'MERGED'
+  const hasHeader = onToggle !== undefined
+  const expanded = hasHeader ? (expandedProp ?? false) : true
+
   const approvedReviews = pr.reviews.filter((r) => r.state === 'APPROVED')
   const changesRequestedReviews = pr.reviews.filter(
     (r) => r.state === 'CHANGES_REQUESTED',
@@ -102,6 +121,16 @@ export function PRStatusContent({ pr }: PRStatusContentProps) {
     approvedReviews.length > 0 || changesRequestedReviews.length > 0
   const hasChecks = pr.checks.length > 0
   const hasComments = pr.comments.length > 0
+  const hasRunningChecks = pr.checks.some(
+    (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+  )
+  const hasFailedChecks = pr.checks.some(
+    (c) =>
+      c.status === 'COMPLETED' &&
+      c.conclusion !== 'SUCCESS' &&
+      c.conclusion !== 'SKIPPED' &&
+      c.conclusion !== 'NEUTRAL',
+  )
 
   const [extraComments, setExtraComments] = useState<PRComment[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
@@ -129,101 +158,253 @@ export function PRStatusContent({ pr }: PRStatusContentProps) {
     }
   }
 
-  if (!hasReviews && !hasChecks && !hasComments) return null
+  const [reReviewAuthor, setReReviewAuthor] = useState<string | null>(null)
+  const [reReviewLoading, setReReviewLoading] = useState(false)
+
+  const handleReRequestReview = async () => {
+    if (!reReviewAuthor) return
+    setReReviewLoading(true)
+    try {
+      await api.requestPRReview(owner, repo, pr.prNumber, reReviewAuthor)
+      toast.success(`Review requested from ${reReviewAuthor}`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to request review',
+      )
+    } finally {
+      setReReviewLoading(false)
+      setReReviewAuthor(null)
+    }
+  }
+
+  const hasContent = hasReviews || hasChecks || hasComments
+
+  // Header-only mode: if no content and no header, nothing to render
+  if (!hasHeader && !hasContent) return null
+
+  // Merged state with header: just show a merged link
+  if (hasHeader && isMerged) {
+    return (
+      <a
+        href={pr.prUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-purple-400/70 hover:text-purple-400 transition-colors"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GitMerge className="w-3 h-3" />
+        Merged
+      </a>
+    )
+  }
+
+  const renderHeader = () => {
+    if (!hasHeader) return null
+
+    const isApproved = pr.reviewDecision === 'APPROVED'
+    const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
+
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          onToggle()
+          onSeen?.()
+        }}
+        className={cn(
+          'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
+          hasChangesRequested
+            ? 'text-orange-400/70 hover:text-orange-400'
+            : isApproved
+              ? 'text-green-500/70 hover:text-green-500'
+              : hasRunningChecks
+                ? 'text-yellow-400/70 hover:text-yellow-400'
+                : hasFailedChecks
+                  ? 'text-red-400/70 hover:text-red-400'
+                  : '',
+        )}
+      >
+        {expanded ? (
+          <ChevronDown className="w-3 h-3" />
+        ) : (
+          <>
+            {(hasChangesRequested || isApproved || hasChecks) && (
+              <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
+            )}
+            {hasChangesRequested ? (
+              <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
+            ) : hasRunningChecks ? (
+              <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
+            ) : isApproved ? (
+              <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
+            ) : hasFailedChecks ? (
+              <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </>
+        )}
+        {hasChangesRequested
+          ? 'Change request'
+          : hasRunningChecks
+            ? 'Pull request'
+            : isApproved
+              ? 'approved'
+              : hasFailedChecks
+                ? 'failed checks'
+                : 'Pull Request'}
+        {hasNewActivity && (
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
+        )}
+      </button>
+    )
+  }
+
+  const renderReviewRow = (
+    review: (typeof pr.reviews)[number],
+    icon: React.ReactNode,
+    keyPrefix: string,
+  ) => (
+    <div
+      key={`${keyPrefix}-${review.author}`}
+      className="group/review flex items-center gap-1.5 px-2 py-1 rounded text-sidebar-foreground/70"
+    >
+      <a
+        href={pr.prUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
+      >
+        {icon}
+        {review.avatarUrl ? (
+          <img
+            src={review.avatarUrl}
+            alt={review.author}
+            className="w-4 h-4 rounded-full flex-shrink-0"
+          />
+        ) : (
+          <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+        )}
+        <span className="text-xs truncate">{review.author}</span>
+      </a>
+      <button
+        type="button"
+        onClick={() => setReReviewAuthor(review.author)}
+        className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+      >
+        Re-review
+      </button>
+    </div>
+  )
 
   return (
-    <div className="space-y-0.5">
-      {/* Reviews */}
-      {approvedReviews.map((review) => (
-        <a
-          key={`approved-${review.author}`}
-          href={pr.prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
-        >
-          <Check className="w-3 h-3 flex-shrink-0 text-green-500" />
-          {review.avatarUrl ? (
-            <img
-              src={review.avatarUrl}
-              alt={review.author}
-              className="w-4 h-4 rounded-full flex-shrink-0"
-            />
-          ) : (
-            <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+    <>
+      {renderHeader()}
+      {expanded && hasContent && (
+        <div className="space-y-0.5">
+          {/* Reviews */}
+          {approvedReviews.map((review) =>
+            renderReviewRow(
+              review,
+              <Check className="w-3 h-3 flex-shrink-0 text-green-500" />,
+              'approved',
+            ),
           )}
-          <span className="text-xs truncate">{review.author}</span>
-        </a>
-      ))}
-      {changesRequestedReviews.map((review) => (
-        <a
-          key={`changes-${review.author}`}
-          href={pr.prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
-        >
-          <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />
-          {review.avatarUrl ? (
-            <img
-              src={review.avatarUrl}
-              alt={review.author}
-              className="w-4 h-4 rounded-full flex-shrink-0"
-            />
-          ) : (
-            <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+          {changesRequestedReviews.map((review) =>
+            renderReviewRow(
+              review,
+              <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />,
+              'changes',
+            ),
           )}
-          <span className="text-xs truncate">{review.author}</span>
-        </a>
-      ))}
 
-      <div className="relative flex flex-col gap-0 pl-3">
-        <div className="absolute h-[calc(100%-5px)] border-l-[1px]"></div>
-        {/* Checks */}
-        {hasChecks && (
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
-            Checks ({pr.checks.length})
-          </p>
-        )}
-        {pr.checks.map((check) => (
-          <a
-            key={check.name}
-            href={check.detailsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
-          >
-            {check.status === 'IN_PROGRESS' || check.status === 'QUEUED' ? (
-              <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
-            ) : (
-              <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+          <div className="relative flex flex-col gap-0 pl-3">
+            <div className="absolute h-[calc(100%-5px)] border-l-[1px]" />
+            {/* Checks */}
+            {hasChecks && (
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
+                Checks ({pr.checks.length})
+              </p>
             )}
-            <span className="text-xs truncate">{check.name}</span>
-          </a>
-        ))}
+            {pr.checks.map((check) => (
+              <a
+                key={check.name}
+                href={check.detailsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
+              >
+                {check.status === 'IN_PROGRESS' || check.status === 'QUEUED' ? (
+                  <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
+                ) : (
+                  <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+                )}
+                <span className="text-xs truncate">{check.name}</span>
+              </a>
+            ))}
 
-        {/* Comments */}
-        {hasComments && (
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
-            Comments
-          </p>
-        )}
-        {allComments.map((comment, i) => (
-          <CommentItem key={`${comment.author}-${i}`} comment={comment} />
-        ))}
+            {/* Comments */}
+            {hasComments && (
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
+                Comments
+              </p>
+            )}
+            {allComments.map((comment, i) => (
+              <CommentItem key={`${comment.author}-${i}`} comment={comment} />
+            ))}
 
-        {hasComments && hasMore && (
-          <button
-            type="button"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+            {hasComments && hasMore && (
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {loadingMore ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : null}
+                {loadingMore ? 'Loading...' : 'Load more comments'}
+              </button>
+            )}
+          </div>
+
+          <Dialog
+            open={reReviewAuthor !== null}
+            onOpenChange={(open) => {
+              if (!open) setReReviewAuthor(null)
+            }}
           >
-            {loadingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-            {loadingMore ? 'Loading...' : 'Load more comments'}
-          </button>
-        )}
-      </div>
-    </div>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Request re-review</DialogTitle>
+                <DialogDescription>
+                  Ask <span className="font-medium">{reReviewAuthor}</span> to
+                  review this PR again?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setReReviewAuthor(null)}
+                  disabled={reReviewLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleReRequestReview}
+                  disabled={reReviewLoading}
+                >
+                  {reReviewLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Request review'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </>
   )
 }
