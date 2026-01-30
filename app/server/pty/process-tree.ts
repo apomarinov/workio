@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import type { ActiveProcess } from '../../shared/types'
+import { log } from '../logger'
 
 export function getChildPids(pid: number): number[] {
   try {
@@ -236,7 +237,7 @@ export function getZellijSessionProcesses(
 
     return results
   } catch (error) {
-    console.error('Error getting Zellij session processes', error)
+    log.error({ err: error }, 'Error getting Zellij session processes')
     return []
   }
 }
@@ -304,7 +305,7 @@ export function getChildProcesses(
 
     return results
   } catch (error) {
-    console.error('Error getting child processes', error)
+    log.error({ err: error }, 'Error getting child processes')
     return []
   }
 }

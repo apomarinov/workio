@@ -9,6 +9,7 @@ import type {
   Terminal,
 } from '../src/types'
 import { env } from './env'
+import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = path.join(__dirname, '../../schema.sql')
@@ -23,9 +24,9 @@ db.pragma('busy_timeout = 5000')
 if (fs.existsSync(SCHEMA_PATH)) {
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8')
   db.exec(schema)
-  console.log('[db] Database initialized from schema.sql')
+  log.info('[db] Database initialized from schema.sql')
 } else {
-  console.error('[db] Schema file not found:', SCHEMA_PATH)
+  log.error(`[db] Schema file not found: ${SCHEMA_PATH}`)
   process.exit(1)
 }
 

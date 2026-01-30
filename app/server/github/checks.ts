@@ -7,6 +7,7 @@ import type {
 } from '../../shared/types'
 import { getAllTerminals, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
+import { log } from '../logger'
 import { detectGitBranch } from '../pty/manager'
 import { execSSHCommand } from '../ssh/exec'
 
@@ -86,9 +87,9 @@ async function detectGitHubRepo(
     return result
   } catch (err) {
     if (sshHost) {
-      console.error(
-        `[github] Failed to detect repo via SSH (${sshHost}:${cwd}):`,
-        err,
+      log.error(
+        { err },
+        `[github] Failed to detect repo via SSH (${sshHost}:${cwd})`,
       )
     }
     repoCache.set(cacheKey, null)
@@ -360,9 +361,9 @@ async function refreshSSHBranch(terminalId: number): Promise<void> {
       getIO()?.emit('terminal:updated', { terminalId })
     }
   } catch (err) {
-    console.error(
-      `[github] Failed to refresh SSH branch for terminal ${terminalId}:`,
-      err,
+    log.error(
+      { err },
+      `[github] Failed to refresh SSH branch for terminal ${terminalId}`,
     )
   }
 }
@@ -401,9 +402,9 @@ async function pollAllPRChecks(): Promise<void> {
         })
       }
     } catch (err) {
-      console.error(
-        `[github] Failed to detect repo for terminal ${terminalId}:`,
-        err,
+      log.error(
+        { err },
+        `[github] Failed to detect repo for terminal ${terminalId}`,
       )
     }
   }
@@ -429,7 +430,7 @@ async function pollAllPRChecks(): Promise<void> {
         allPRs.push(...mergedPRs)
       }
     } catch (err) {
-      console.error(`[github] Failed to fetch PRs for ${owner}/${repo}:`, err)
+      log.error({ err }, `[github] Failed to fetch PRs for ${owner}/${repo}`)
     }
   }
 
@@ -443,7 +444,7 @@ async function pollAllPRChecks(): Promise<void> {
     { timeout: 5000 },
     (err, stdout) => {
       if (!err && stdout) {
-        console.log(`[github] GraphQL rate limit remaining: ${stdout.trim()}`)
+        log.info(`[github] GraphQL rate limit remaining: ${stdout.trim()}`)
       }
     },
   )
@@ -617,7 +618,7 @@ export function emitCachedPRChecks(socket: {
 }
 
 export async function detectAllTerminalBranches(): Promise<void> {
-  console.log(
+  log.info(
     `[github] detecting branches for ${monitoredTerminals.size} terminals`,
   )
   await Promise.all(

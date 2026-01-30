@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
+import { log } from '../logger'
 import {
   attachSession,
   clearSessionTimeout,
@@ -208,7 +209,7 @@ wss.on('connection', (ws: WebSocket) => {
   })
 
   ws.on('error', (err) => {
-    console.error('[ws] WebSocket error:', err)
+    log.error({ err }, '[ws] WebSocket error')
   })
 })
 

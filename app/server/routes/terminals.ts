@@ -22,6 +22,7 @@ import {
   updateTerminal,
 } from '../db'
 import { refreshPRChecks } from '../github/checks'
+import { log } from '../logger'
 import { destroySession } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 
@@ -193,7 +194,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       // Kill PTY session if running
       const killed = destroySession(id)
       if (killed) {
-        fastify.log.info(`[terminals] Killed PTY session for terminal ${id}`)
+        log.info(`[terminals] Killed PTY session for terminal ${id}`)
       }
 
       deleteTerminal(id)

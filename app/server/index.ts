@@ -14,6 +14,7 @@ import {
   requestPRReview,
 } from './github/checks'
 import { setIO } from './io'
+import { log, setLogger } from './logger'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
@@ -27,6 +28,7 @@ const port = env.NODE_ENV === 'production' ? env.CLIENT_PORT : env.SERVER_PORT
 const fastify = Fastify({
   logger: true,
 })
+setLogger(fastify.log)
 
 // Setup Socket.IO
 const io = new SocketIOServer(fastify.server, {
@@ -41,7 +43,7 @@ const io = new SocketIOServer(fastify.server, {
 setIO(io)
 
 io.on('connection', (socket) => {
-  fastify.log.info(`Client connected: ${socket.id}`)
+  log.info(`Client connected: ${socket.id}`)
   emitCachedPRChecks(socket)
   refreshPRChecks()
 
@@ -50,7 +52,7 @@ io.on('connection', (socket) => {
   })
 
   socket.on('disconnect', () => {
-    fastify.log.info(`Client disconnected: ${socket.id}`)
+    log.info(`Client disconnected: ${socket.id}`)
   })
 })
 
@@ -144,14 +146,12 @@ const start = async () => {
       // For other paths (like /socket.io/), let Socket.IO handle it
     })
 
-    fastify.log.info(
-      '[ws] Terminal WebSocket handler registered at /ws/terminal',
-    )
+    log.info('[ws] Terminal WebSocket handler registered at /ws/terminal')
 
     // Initialize GitHub PR checks polling
     initGitHubChecks()
   } catch (err) {
-    fastify.log.error(err)
+    log.error({ err }, 'Server startup failed')
     process.exit(1)
   }
 }

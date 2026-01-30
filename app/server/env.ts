@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { z } from 'zod'
+import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '../..')
@@ -22,8 +23,8 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env)
 
 if (!parsed.success) {
-  console.error('❌ Invalid environment variables:')
-  console.error(parsed.error.flatten().fieldErrors)
+  log.error('Invalid environment variables:')
+  log.error(JSON.stringify(parsed.error.flatten().fieldErrors))
   process.exit(1)
 }
 
@@ -33,5 +34,5 @@ export const env = {
   DB_PATH: path.join(rootDir, parsed.data.DB_NAME),
 }
 
-console.log(`[env] DB_PATH: ${env.DB_PATH}`)
-console.log(`[env] SERVER_PORT: ${env.SERVER_PORT}`)
+log.info(`[env] DB_PATH: ${env.DB_PATH}`)
+log.info(`[env] SERVER_PORT: ${env.SERVER_PORT}`)

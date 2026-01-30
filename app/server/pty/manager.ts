@@ -12,6 +12,7 @@ import {
   untrackTerminal,
 } from '../github/checks'
 import { getIO } from '../io'
+import { log } from '../logger'
 import { validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
@@ -157,9 +158,9 @@ export async function detectGitBranch(
       }
     }
   } catch (err) {
-    console.error(
-      `[pty] Failed to detect git branch for terminal ${terminalId}:`,
-      err,
+    log.error(
+      { err },
+      `[pty] Failed to detect git branch for terminal ${terminalId}`,
     )
   }
 }
@@ -190,7 +191,7 @@ export async function createSession(
   // Get terminal from database
   const terminal = getTerminalById(terminalId)
   if (!terminal) {
-    console.error('[pty] Terminal not found:', terminalId)
+    log.error(`[pty] Terminal not found: ${terminalId}`)
     return null
   }
 
@@ -200,28 +201,25 @@ export async function createSession(
     // --- SSH terminal ---
     const result = validateSSHHost(terminal.ssh_host)
     if (!result.valid) {
-      console.error('[pty] SSH validation failed:', result.error)
+      log.error(`[pty] SSH validation failed: ${result.error}`)
       return null
     }
 
-    console.log(
-      '[pty] Connecting via SSH:',
-      terminal.ssh_host,
-      '→',
-      result.config.hostname,
+    log.info(
+      `[pty] Connecting via SSH: ${terminal.ssh_host} → ${result.config.hostname}`,
     )
 
     try {
       backend = await createSSHSession(result.config, cols, rows)
     } catch (err) {
-      console.error('[pty] Failed to create SSH session:', err)
+      log.error({ err }, '[pty] Failed to create SSH session')
       return null
     }
   } else {
     // --- Local terminal ---
     // Validate cwd exists
     if (!fs.existsSync(terminal.cwd)) {
-      console.error('[pty] Working directory does not exist:', terminal.cwd)
+      log.error(`[pty] Working directory does not exist: ${terminal.cwd}`)
       return null
     }
 
@@ -233,27 +231,23 @@ export async function createSession(
     if (!fs.existsSync(shell)) {
       const envShell = process.env.SHELL
       if (envShell && fs.existsSync(envShell)) {
-        console.warn(
-          `[pty] Shell ${shell} not found, falling back to ${envShell}`,
-        )
+        log.warn(`[pty] Shell ${shell} not found, falling back to ${envShell}`)
         shell = envShell
       } else {
         // Last resort fallback
         const fallbacks = ['/bin/zsh', '/bin/bash', '/bin/sh']
         const found = fallbacks.find((s) => fs.existsSync(s))
         if (found) {
-          console.warn(
-            `[pty] Shell ${shell} not found, falling back to ${found}`,
-          )
+          log.warn(`[pty] Shell ${shell} not found, falling back to ${found}`)
           shell = found
         } else {
-          console.error('[pty] No valid shell found')
+          log.error('[pty] No valid shell found')
           return null
         }
       }
     }
 
-    console.log('[pty] Spawning shell:', shell, 'in', terminal.cwd)
+    log.info(`[pty] Spawning shell: ${shell} in ${terminal.cwd}`)
 
     try {
       backend = pty.spawn(shell, [], {
@@ -269,7 +263,7 @@ export async function createSession(
         } as Record<string, string>,
       })
     } catch (err) {
-      console.error('[pty] Failed to spawn shell:', err)
+      log.error({ err }, '[pty] Failed to spawn shell')
       return null
     }
   }
@@ -308,18 +302,18 @@ export async function createSession(
           session.isIdle = true
           session.currentCommand = null
           updateTerminal(terminalId, { active_cmd: null })
-          console.log(`[pty:${terminalId}] Shell idle (waiting for input)`)
+          log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
           break
         case 'command_start':
           session.isIdle = false
           session.currentCommand = event.command || null
           updateTerminal(terminalId, { active_cmd: event.command || null })
-          console.log(`[pty:${terminalId}] Command started: ${event.command}`)
+          log.info(`[pty:${terminalId}] Command started: ${event.command}`)
           // Scan for new processes after a brief delay
           setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
           break
         case 'command_end':
-          console.log(
+          log.info(
             `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
           )
           detectGitBranch(terminalId)
@@ -378,7 +372,7 @@ export async function createSession(
         backend.write('clear\n')
       }, 200)
     } catch (err) {
-      console.error('[pty] Failed to inject SSH shell integration:', err)
+      log.error({ err }, '[pty] Failed to inject SSH shell integration')
       // Still cd into cwd even if integration fails
       if (terminal.cwd && terminal.cwd !== '~') {
         setTimeout(() => {
