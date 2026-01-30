@@ -102,6 +102,7 @@ interface GhPR {
   url: string
   updatedAt: string
   state: 'OPEN' | 'MERGED' | 'CLOSED'
+  mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
   reviewDecision: string
   reviews: { author: { login: string }; state: string; body: string }[]
   reviewRequests: { login: string }[]
@@ -140,7 +141,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
         '--state',
         'open',
         '--json',
-        'number,title,headRefName,url,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments',
+        'number,title,headRefName,url,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments,mergeable',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -250,6 +251,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
               checks: failedChecks,
               comments,
               updatedAt: pr.updatedAt || '',
+              mergeable: pr.mergeable || 'UNKNOWN',
             })
           }
 

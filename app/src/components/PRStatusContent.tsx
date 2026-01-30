@@ -5,6 +5,7 @@ import {
   CircleX,
   Clock,
   GitMerge,
+  GitPullRequestDraft,
   Loader2,
   RefreshCw,
 } from 'lucide-react'
@@ -233,6 +234,7 @@ export function PRStatusContent({
       c.conclusion !== 'SKIPPED' &&
       c.conclusion !== 'NEUTRAL',
   )
+  const hasConflicts = pr.mergeable === 'CONFLICTING'
 
   const [extraComments, setExtraComments] = useState<PRComment[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
@@ -336,13 +338,15 @@ export function PRStatusContent({
             'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
             hasChangesRequested
               ? 'text-orange-400/70 hover:text-orange-400'
-              : isApproved
-                ? 'text-green-500/70 hover:text-green-500'
-                : hasRunningChecks
-                  ? 'text-yellow-400/70 hover:text-yellow-400'
-                  : hasFailedChecks
+              : hasRunningChecks
+                ? 'text-yellow-400/70 hover:text-yellow-400'
+                : hasFailedChecks
+                  ? 'text-red-400/70 hover:text-red-400'
+                  : isApproved && hasConflicts
                     ? 'text-red-400/70 hover:text-red-400'
-                    : '',
+                    : isApproved
+                      ? 'text-green-500/70 hover:text-green-500'
+                      : '',
           )}
         >
           {expanded ? (
@@ -359,10 +363,12 @@ export function PRStatusContent({
                 <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
               ) : hasRunningChecks ? (
                 <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
-              ) : isApproved ? (
-                <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
               ) : hasFailedChecks ? (
                 <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
+              ) : isApproved && hasConflicts ? (
+                <GitPullRequestDraft className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
+              ) : isApproved ? (
+                <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
               ) : pendingReviews.length > 0 ? (
                 <Clock className="w-3 h-3 opacity-80 group-hover/gh:hidden" />
               ) : (
@@ -374,11 +380,13 @@ export function PRStatusContent({
             ? 'Change request'
             : hasRunningChecks
               ? 'Pull request'
-              : isApproved
-                ? 'approved'
-                : hasFailedChecks
-                  ? 'failed checks'
-                  : 'Pull Request'}
+              : hasFailedChecks
+                ? 'failed checks'
+                : isApproved && hasConflicts
+                  ? 'Conflicts'
+                  : isApproved
+                    ? 'approved'
+                    : 'Pull Request'}
           {hasNewActivity && (
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
           )}
@@ -387,7 +395,14 @@ export function PRStatusContent({
           <button
             type="button"
             onClick={() => setMergeOpen(true)}
-            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/header:opacity-100 transition-opacity cursor-pointer pr-2 pt-1"
+            disabled={hasConflicts}
+            className={cn(
+              'text-[10px] flex-shrink-0 opacity-0 group-hover/header:opacity-100 transition-opacity pr-2 pt-1',
+              hasConflicts
+                ? 'text-muted-foreground/30 cursor-not-allowed'
+                : 'text-muted-foreground/50 hover:text-muted-foreground cursor-pointer',
+            )}
+            title={hasConflicts ? 'Cannot merge: PR has conflicts' : undefined}
           >
             Merge
           </button>

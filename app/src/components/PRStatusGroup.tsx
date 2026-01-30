@@ -6,6 +6,7 @@ import {
   Clock,
   GitBranch,
   GitMerge,
+  GitPullRequestDraft,
   Loader2,
   RefreshCw,
 } from 'lucide-react'
@@ -42,6 +43,7 @@ export function PRStatusGroup({
   )
   const isApproved = pr.reviewDecision === 'APPROVED'
   const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
+  const hasConflicts = pr.mergeable === 'CONFLICTING'
   const hasPendingReviews =
     pr.reviews.filter((r) => r.state === 'PENDING').length > 0
 
@@ -52,9 +54,9 @@ export function PRStatusGroup({
           isMerged
             ? undefined
             : () => {
-                onToggle()
-                onSeen?.()
-              }
+              onToggle()
+              onSeen?.()
+            }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
@@ -72,16 +74,18 @@ export function PRStatusGroup({
               isApproved ||
               hasFailedChecks ||
               hasPendingReviews) && (
-              <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
-            )}
+                <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
+              )}
             {hasChangesRequested ? (
               <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-400/70 group-hover/pr:hidden" />
             ) : hasRunningChecks ? (
               <Loader2 className="w-4 h-4 flex-shrink-0 text-yellow-500/70 animate-spin group-hover/pr:hidden" />
-            ) : isApproved ? (
-              <Check className="w-4 h-4 flex-shrink-0 text-green-500/70 group-hover/pr:hidden" />
             ) : hasFailedChecks ? (
               <CircleX className="w-4 h-4 flex-shrink-0 text-red-500/70 group-hover/pr:hidden" />
+            ) : isApproved && hasConflicts ? (
+              <GitPullRequestDraft className="w-4 h-4 flex-shrink-0 text-red-500/70 group-hover/pr:hidden" />
+            ) : isApproved ? (
+              <Check className="w-4 h-4 flex-shrink-0 text-green-500/70 group-hover/pr:hidden" />
             ) : hasPendingReviews ? (
               <Clock className="w-4 h-4 opacity-70 group-hover/pr:hidden" />
             ) : (
@@ -119,7 +123,7 @@ export function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => {}}
+            onToggle={() => { }}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />

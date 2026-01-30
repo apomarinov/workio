@@ -44,6 +44,7 @@ export interface PRCheckStatus {
   checks: FailedPRCheck[]
   comments: PRComment[]
   updatedAt: string
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
 }
 
 export interface PRChecksPayload {
