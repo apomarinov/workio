@@ -118,7 +118,7 @@ function stopGlobalProcessPolling() {
   }
 }
 
-async function detectGitBranch(terminalId: number) {
+export async function detectGitBranch(terminalId: number) {
   try {
     const terminal = getTerminalById(terminalId)
     if (!terminal) return

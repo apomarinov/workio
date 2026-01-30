@@ -5,9 +5,9 @@ import Fastify from 'fastify'
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
 import {
+  detectAllTerminalBranches,
   emitCachedPRChecks,
   fetchPRComments,
-  gitFetchAllTerminals,
   initGitHubChecks,
   mergePR,
   refreshPRChecks,
@@ -45,8 +45,8 @@ io.on('connection', (socket) => {
   emitCachedPRChecks(socket)
   refreshPRChecks()
 
-  socket.on('git:fetch-all', () => {
-    gitFetchAllTerminals()
+  socket.on('detect-branches', () => {
+    detectAllTerminalBranches()
   })
 
   socket.on('disconnect', () => {

@@ -42,7 +42,7 @@ interface TerminalContextValue {
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
 
-const RECENT_PR_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
+const RECENT_PR_THRESHOLD_MS = 15 * 60 * 1000 // 5 minutes
 
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, emit } = useSocket()
@@ -105,31 +105,37 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const { notify } = useBrowserNotification()
   const notifyRef = useRef(notify)
   notifyRef.current = notify
+  const [prPoll, setPrPoll] = useState(true)
+
+  useEffect(() => {
+    if (!prPoll) {
+      return
+    }
+    const now = Date.now()
+    const recentPR = githubPRs
+      .filter(
+        (pr) =>
+          pr.createdAt &&
+          now - new Date(pr.createdAt).getTime() < RECENT_PR_THRESHOLD_MS,
+      )
+      .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0]
+    // Trigger git fetch only if no terminal already has a branch matching that PR
+    if (recentPR) {
+      const terminalBranches = new Set(
+        raw.map((t) => t.git_branch).filter(Boolean),
+      )
+      if (!terminalBranches.has(recentPR.branch)) {
+        setPrPoll(false)
+        emit('detect-branches')
+      }
+    }
+  }, [githubPRs, prPoll, raw, emit])
 
   useEffect(() => {
     return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
       setGithubPRs(data.prs)
 
-      // Find the most recently created PR within the last 5 minutes
-      const now = Date.now()
-      const recentPR = data.prs
-        .filter(
-          (pr) =>
-            pr.createdAt &&
-            now - new Date(pr.createdAt).getTime() < RECENT_PR_THRESHOLD_MS,
-        )
-        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0]
-
-      // Trigger git fetch only if no terminal already has a branch matching that PR
-      if (recentPR) {
-        const terminalBranches = new Set(
-          raw.map((t) => t.git_branch).filter(Boolean),
-        )
-        if (!terminalBranches.has(recentPR.branch)) {
-          emit('git:fetch-all')
-        }
-      }
-
+      setPrPoll(true)
       // Browser notification for new PR activity
       const lastNotifAt = localStorage.getItem('pr-activity-notif-at') ?? ''
       const unseenCount = data.prs.filter(
@@ -145,7 +151,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         }
       }
     })
-  }, [subscribe, emit, raw])
+  }, [subscribe])
 
   // PR seen tracking
   const [prSeenTimes, setPRSeenTimes] = useLocalStorage<Record<string, string>>(

@@ -7,6 +7,7 @@ import type {
 } from '../../shared/types'
 import { getAllTerminals, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
+import { detectGitBranch } from '../pty/manager'
 import { execSSHCommand } from '../ssh/exec'
 
 // Cache: cwd -> { owner, repo } or null
@@ -603,55 +604,13 @@ export function emitCachedPRChecks(socket: {
   }
 }
 
-export async function gitFetchAllTerminals(): Promise<void> {
-  const promises: Promise<void>[] = []
-
-  for (const [terminalId] of monitoredTerminals) {
-    const terminal = getTerminalById(terminalId)
-    if (!terminal) continue
-
-    if (terminal.ssh_host) {
-      promises.push(
-        execSSHCommand(terminal.ssh_host, 'git fetch', terminal.cwd)
-          .then(() => {
-            console.log(
-              `[github] git fetch completed for SSH terminal ${terminalId}`,
-            )
-          })
-          .catch((err) => {
-            console.error(
-              `[github] git fetch failed for SSH terminal ${terminalId}:`,
-              err,
-            )
-          }),
-      )
-    } else {
-      promises.push(
-        new Promise<void>((resolve) => {
-          execFile(
-            'git',
-            ['fetch'],
-            { cwd: terminal.cwd, timeout: 15000 },
-            (err) => {
-              if (err) {
-                console.error(
-                  `[github] git fetch failed for terminal ${terminalId}:`,
-                  err,
-                )
-              } else {
-                console.log(
-                  `[github] git fetch completed for terminal ${terminalId}`,
-                )
-              }
-              resolve()
-            },
-          )
-        }),
-      )
-    }
-  }
-
-  await Promise.all(promises)
+export async function detectAllTerminalBranches(): Promise<void> {
+  console.log(
+    `[github] detecting branches for ${monitoredTerminals.size} terminals`,
+  )
+  await Promise.all(
+    [...monitoredTerminals.keys()].map((id) => detectGitBranch(id)),
+  )
 }
 
 export async function initGitHubChecks(): Promise<void> {
