@@ -27,6 +27,7 @@ import {
   Plus,
   Settings,
   Terminal as TerminalIcon,
+  Github,
 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -433,9 +434,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Terminals
@@ -445,9 +445,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -457,9 +456,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -506,9 +504,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Terminals
@@ -518,9 +515,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -530,9 +526,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -694,8 +689,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button
@@ -729,12 +724,13 @@ export function Sidebar({ width }: SidebarProps) {
                             ) : (
                               <ChevronDown className="w-3 h-3 flex-shrink-0" />
                             )}
+                            <Github className='w-3 h-3' />
                             <span className="truncate">{repoName}</span>
                           </button>
                           {!isCollapsed &&
                             repoPRs.map((pr) => (
                               <PRStatusGroup
-                                key={`${pr.repo}:${pr.branch}`}
+                                key={`${pr.repo}:${pr.prNumber}`}
                                 pr={pr}
                                 expanded={expandedGitHubPRsSet.has(pr.branch)}
                                 onToggle={() => toggleGitHubPR(pr.branch)}

@@ -80,7 +80,7 @@ interface GhPR {
   updatedAt: string
   state: 'OPEN' | 'MERGED' | 'CLOSED'
   reviewDecision: string
-  reviews: { author: { login: string }; state: string }[]
+  reviews: { author: { login: string }; state: string; body: string }[]
   reviewRequests: { login: string }[]
   comments: {
     author: { login: string }
@@ -167,6 +167,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
                   pendingReviewers.has(r.author.login)
                     ? 'PENDING'
                     : r.state,
+                body: r.body || '',
               }))
 
             // Deduplicate reviews: keep latest per author

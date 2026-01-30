@@ -29,6 +29,7 @@ export interface PRReview {
   author: string
   avatarUrl: string
   state: string
+  body: string
 }
 
 export interface PRCheckStatus {

@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
-import type { PRCheckStatus, PRComment } from '../../shared/types'
+import type { PRCheckStatus, PRComment, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
 
@@ -37,6 +37,109 @@ interface PRStatusContentProps {
   onToggle?: () => void
   hasNewActivity?: boolean
   onSeen?: () => void
+}
+
+function ContentDialog({
+  author,
+  avatarUrl,
+  content,
+  open,
+  onOpenChange,
+}: {
+  author: string
+  avatarUrl?: string
+  content: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {avatarUrl && (
+              <img
+                src={avatarUrl}
+                alt={author}
+                className="w-5 h-5 rounded-full"
+              />
+            )}
+            {author}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="text-sm">
+          <MarkdownContent content={content} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ReviewRow({
+  review,
+  icon,
+  prUrl,
+  showReReview,
+  onReReview,
+}: {
+  review: PRReview
+  icon: React.ReactNode
+  prUrl: string
+  showReReview?: boolean
+  onReReview: () => void
+}) {
+  const [bodyOpen, setBodyOpen] = useState(false)
+
+  return (
+    <div className="group/review px-2 py-1 rounded text-sidebar-foreground/70">
+      <div className="flex items-center gap-1.5">
+        <a
+          href={prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
+        >
+          {icon}
+          {review.avatarUrl ? (
+            <img
+              src={review.avatarUrl}
+              alt={review.author}
+              className="w-4 h-4 rounded-full flex-shrink-0"
+            />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+          )}
+          <span className="text-xs truncate">{review.author}</span>
+        </a>
+        {showReReview && (
+          <button
+            type="button"
+            onClick={onReReview}
+            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+          >
+            Re-review
+          </button>
+        )}
+      </div>
+      {review.body && (
+        <div
+          onClick={() => setBodyOpen(true)}
+          className="ml-[18px] mt-1 text-xs line-clamp-3 cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors"
+        >
+          <MarkdownContent content={review.body} />
+        </div>
+      )}
+      {review.body && (
+        <ContentDialog
+          author={review.author}
+          avatarUrl={review.avatarUrl}
+          content={review.body}
+          open={bodyOpen}
+          onOpenChange={setBodyOpen}
+        />
+      )}
+    </div>
+  )
 }
 
 function CommentItem({
@@ -87,25 +190,13 @@ function CommentItem({
         </div>
       </div>
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {comment.avatarUrl && (
-                <img
-                  src={comment.avatarUrl}
-                  alt={comment.author}
-                  className="w-5 h-5 rounded-full"
-                />
-              )}
-              {comment.author}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="text-sm">
-            <MarkdownContent content={comment.body} />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContentDialog
+        author={comment.author}
+        avatarUrl={comment.avatarUrl}
+        content={comment.body}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+      />
     </>
   )
 }
@@ -269,7 +360,7 @@ export function PRStatusContent({
                 <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
               ) : hasFailedChecks ? (
                 <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
-              ) : (
+              ) : pendingReviews.length > 0 ? <Clock className='w-3 h-3' /> : (
                 <ChevronRight className="w-3 h-3" />
               )}
             </>
@@ -306,38 +397,14 @@ export function PRStatusContent({
     keyPrefix: string,
     showReReview?: boolean,
   ) => (
-    <div
+    <ReviewRow
       key={`${keyPrefix}-${review.author}`}
-      className="group/review flex items-center gap-1.5 px-2 py-1 rounded text-sidebar-foreground/70"
-    >
-      <a
-        href={pr.prUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
-      >
-        {icon}
-        {review.avatarUrl ? (
-          <img
-            src={review.avatarUrl}
-            alt={review.author}
-            className="w-4 h-4 rounded-full flex-shrink-0"
-          />
-        ) : (
-          <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
-        )}
-        <span className="text-xs truncate">{review.author}</span>
-      </a>
-      {showReReview && (
-        <button
-          type="button"
-          onClick={() => setReReviewAuthor(review.author)}
-          className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
-        >
-          Re-review
-        </button>
-      )}
-    </div>
+      review={review}
+      icon={icon}
+      prUrl={pr.prUrl}
+      showReReview={showReReview}
+      onReReview={() => setReReviewAuthor(review.author)}
+    />
   )
 
   return (
