@@ -42,7 +42,8 @@ export function PRStatusGroup({
   )
   const isApproved = pr.reviewDecision === 'APPROVED'
   const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
-  const hasPendingReviews = pr.reviews.filter((r) => r.state === 'PENDING').length > 0;
+  const hasPendingReviews =
+    pr.reviews.filter((r) => r.state === 'PENDING').length > 0
 
   return (
     <div>
@@ -69,7 +70,7 @@ export function PRStatusGroup({
             {(hasChangesRequested ||
               hasRunningChecks ||
               isApproved ||
-              hasFailedChecks) && (
+              hasFailedChecks || hasPendingReviews) && (
                 <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
               )}
             {hasChangesRequested ? (
@@ -80,7 +81,9 @@ export function PRStatusGroup({
               <Check className="w-4 h-4 flex-shrink-0 text-green-500/70 group-hover/pr:hidden" />
             ) : hasFailedChecks ? (
               <CircleX className="w-4 h-4 flex-shrink-0 text-red-500/70 group-hover/pr:hidden" />
-            ) : hasPendingReviews ? <Clock className='w-4 h-4' /> : (
+            ) : hasPendingReviews ? (
+              <Clock className="w-4 h-4 opacity-70 group-hover/pr:hidden" />
+            ) : (
               <ChevronRight className="w-4 h-4 flex-shrink-0" />
             )}
           </>

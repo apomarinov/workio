@@ -349,7 +349,7 @@ export function PRStatusContent({
             <ChevronDown className="w-3 h-3" />
           ) : (
             <>
-              {(hasChangesRequested || isApproved || hasChecks) && (
+              {(hasChangesRequested || isApproved || hasChecks || pendingReviews.length > 0) && (
                 <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
               )}
               {hasChangesRequested ? (
@@ -360,7 +360,9 @@ export function PRStatusContent({
                 <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
               ) : hasFailedChecks ? (
                 <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
-              ) : pendingReviews.length > 0 ? <Clock className='w-3 h-3' /> : (
+              ) : pendingReviews.length > 0 ? (
+                <Clock className="w-3 h-3 opacity-80 group-hover/gh:hidden" />
+              ) : (
                 <ChevronRight className="w-3 h-3" />
               )}
             </>

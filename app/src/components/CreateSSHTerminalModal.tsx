@@ -147,6 +147,9 @@ export function CreateSSHTerminalModal({
                 className="pl-10"
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Git Branch will be detected in this path for PR status
+            </p>
           </div>
 
           <Button

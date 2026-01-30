@@ -13,6 +13,7 @@ import {
 } from '../github/checks'
 import { getIO } from '../io'
 import { validateSSHHost } from '../ssh/config'
+import { execSSHCommand } from '../ssh/exec'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
 import { type CommandEvent, createOscParser } from './osc-parser'
 import { getZellijSessionProcesses } from './process-tree'
@@ -118,25 +119,45 @@ function stopGlobalProcessPolling() {
   }
 }
 
-function detectGitBranch(terminalId: number) {
-  const terminal = getTerminalById(terminalId)
-  if (!terminal || terminal.ssh_host) return
+async function detectGitBranch(terminalId: number) {
+  try {
+    const terminal = getTerminalById(terminalId)
+    if (!terminal) return
 
-  execFile(
-    'git',
-    ['rev-parse', '--abbrev-ref', 'HEAD'],
-    { cwd: terminal.cwd },
-    (err, stdout) => {
-      if (!err && stdout) {
-        const branch = stdout.trim()
-        if (branch) {
-          updateTerminal(terminalId, { git_branch: branch })
-          getIO()?.emit('terminal:updated', { terminalId })
-          refreshPRChecks()
-        }
-      }
-    },
-  )
+    let branch: string | null = null
+
+    if (terminal.ssh_host) {
+      const result = await execSSHCommand(
+        terminal.ssh_host,
+        'git rev-parse --abbrev-ref HEAD',
+        terminal.cwd,
+      )
+      branch = result.stdout.trim() || null
+    } else {
+      branch = await new Promise<string | null>((resolve) => {
+        execFile(
+          'git',
+          ['rev-parse', '--abbrev-ref', 'HEAD'],
+          { cwd: terminal.cwd },
+          (err, stdout) => {
+            if (err || !stdout) return resolve(null)
+            resolve(stdout.trim() || null)
+          },
+        )
+      })
+    }
+
+    if (branch) {
+      updateTerminal(terminalId, { git_branch: branch })
+      getIO()?.emit('terminal:updated', { terminalId })
+      refreshPRChecks()
+    }
+  } catch (err) {
+    console.error(
+      `[pty] Failed to detect git branch for terminal ${terminalId}:`,
+      err,
+    )
+  }
 }
 
 export function getSession(terminalId: number): PtySession | undefined {
@@ -363,13 +384,11 @@ export async function createSession(
         backend.write('clear\n')
       }
     }, 100)
-
-    // Detect git branch for local terminals
-    detectGitBranch(terminalId)
-
-    // Track terminal for GitHub PR checks
-    trackTerminal(terminalId).then(() => startChecksPolling())
   }
+
+  // Detect git branch and track terminal for GitHub PR checks (local + SSH)
+  detectGitBranch(terminalId)
+  trackTerminal(terminalId).then(() => startChecksPolling())
 
   return session
 }

@@ -5,8 +5,9 @@ import type {
   PRComment,
   PRReview,
 } from '../../shared/types'
-import { getAllTerminals, getTerminalById } from '../db'
+import { getAllTerminals, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
+import { execSSHCommand } from '../ssh/exec'
 
 // Cache: cwd -> { owner, repo } or null
 const repoCache = new Map<string, { owner: string; repo: string } | null>()
@@ -45,31 +46,53 @@ function checkGhAvailable(): Promise<boolean> {
   })
 }
 
-function detectGitHubRepo(
+async function detectGitHubRepo(
   cwd: string,
+  sshHost?: string | null,
 ): Promise<{ owner: string; repo: string } | null> {
-  return new Promise((resolve) => {
-    if (repoCache.has(cwd)) {
-      resolve(repoCache.get(cwd)!)
-      return
+  const cacheKey = sshHost ? `${sshHost}:${cwd}` : cwd
+
+  if (repoCache.has(cacheKey)) {
+    return repoCache.get(cacheKey)!
+  }
+
+  try {
+    let stdout: string
+
+    if (sshHost) {
+      const result = await execSSHCommand(
+        sshHost,
+        'git remote get-url origin',
+        cwd,
+      )
+      stdout = result.stdout
+    } else {
+      stdout = await new Promise<string>((resolve, reject) => {
+        execFile(
+          'git',
+          ['remote', 'get-url', 'origin'],
+          { cwd, timeout: 5000 },
+          (err, out) => {
+            if (err || !out) return reject(err || new Error('No output'))
+            resolve(out)
+          },
+        )
+      })
     }
 
-    execFile(
-      'git',
-      ['remote', 'get-url', 'origin'],
-      { cwd, timeout: 5000 },
-      (err, stdout) => {
-        if (err || !stdout) {
-          repoCache.set(cwd, null)
-          resolve(null)
-          return
-        }
-        const result = parseGitHubRemoteUrl(stdout.trim())
-        repoCache.set(cwd, result)
-        resolve(result)
-      },
-    )
-  })
+    const result = parseGitHubRemoteUrl(stdout.trim())
+    repoCache.set(cacheKey, result)
+    return result
+  } catch (err) {
+    if (sshHost) {
+      console.error(
+        `[github] Failed to detect repo via SSH (${sshHost}:${cwd}):`,
+        err,
+      )
+    }
+    repoCache.set(cacheKey, null)
+    return null
+  }
 }
 
 interface GhPR {
@@ -302,6 +325,29 @@ function fetchMergedPRsForBranches(
   })
 }
 
+async function refreshSSHBranch(terminalId: number): Promise<void> {
+  try {
+    const terminal = getTerminalById(terminalId)
+    if (!terminal?.ssh_host) return
+
+    const result = await execSSHCommand(
+      terminal.ssh_host,
+      'git rev-parse --abbrev-ref HEAD',
+      terminal.cwd,
+    )
+    const branch = result.stdout.trim()
+    if (branch) {
+      updateTerminal(terminalId, { git_branch: branch })
+      getIO()?.emit('terminal:updated', { terminalId })
+    }
+  } catch (err) {
+    console.error(
+      `[github] Failed to refresh SSH branch for terminal ${terminalId}:`,
+      err,
+    )
+  }
+}
+
 async function pollAllPRChecks(): Promise<void> {
   if (ghAvailable === false) return
 
@@ -312,43 +358,59 @@ async function pollAllPRChecks(): Promise<void> {
   >()
 
   for (const [terminalId] of monitoredTerminals) {
-    const terminal = getTerminalById(terminalId)
-    if (!terminal || terminal.ssh_host) continue
+    try {
+      const terminal = getTerminalById(terminalId)
+      if (!terminal) continue
 
-    const repo = await detectGitHubRepo(terminal.cwd)
-    if (!repo) continue
+      // SSH terminals lack shell integration, so refresh branch on each poll
+      if (terminal.ssh_host) {
+        await refreshSSHBranch(terminalId)
+      }
 
-    const key = `${repo.owner}/${repo.repo}`
-    const existing = repoData.get(key)
-    if (existing) {
-      if (terminal.git_branch) existing.branches.add(terminal.git_branch)
-    } else {
-      repoData.set(key, {
-        owner: repo.owner,
-        repo: repo.repo,
-        branches: new Set(terminal.git_branch ? [terminal.git_branch] : []),
-      })
+      const repo = await detectGitHubRepo(terminal.cwd, terminal.ssh_host)
+      if (!repo) continue
+
+      const key = `${repo.owner}/${repo.repo}`
+      const existing = repoData.get(key)
+      if (existing) {
+        if (terminal.git_branch) existing.branches.add(terminal.git_branch)
+      } else {
+        repoData.set(key, {
+          owner: repo.owner,
+          repo: repo.repo,
+          branches: new Set(terminal.git_branch ? [terminal.git_branch] : []),
+        })
+      }
+    } catch (err) {
+      console.error(
+        `[github] Failed to detect repo for terminal ${terminalId}:`,
+        err,
+      )
     }
   }
 
   const allPRs: PRCheckStatus[] = []
 
   for (const [, { owner, repo, branches }] of repoData) {
-    const openPRs = await fetchOpenPRs(owner, repo)
-    allPRs.push(...openPRs)
+    try {
+      const openPRs = await fetchOpenPRs(owner, repo)
+      allPRs.push(...openPRs)
 
-    // Only check merged for branches that don't already have an open PR
-    const openBranches = new Set(openPRs.map((pr) => pr.branch))
-    const branchesWithoutOpenPR = new Set(
-      [...branches].filter((b) => !openBranches.has(b)),
-    )
-    if (branchesWithoutOpenPR.size > 0) {
-      const mergedPRs = await fetchMergedPRsForBranches(
-        owner,
-        repo,
-        branchesWithoutOpenPR,
+      // Only check merged for branches that don't already have an open PR
+      const openBranches = new Set(openPRs.map((pr) => pr.branch))
+      const branchesWithoutOpenPR = new Set(
+        [...branches].filter((b) => !openBranches.has(b)),
       )
-      allPRs.push(...mergedPRs)
+      if (branchesWithoutOpenPR.size > 0) {
+        const mergedPRs = await fetchMergedPRsForBranches(
+          owner,
+          repo,
+          branchesWithoutOpenPR,
+        )
+        allPRs.push(...mergedPRs)
+      }
+    } catch (err) {
+      console.error(`[github] Failed to fetch PRs for ${owner}/${repo}:`, err)
     }
   }
 
@@ -372,7 +434,7 @@ export async function trackTerminal(terminalId: number): Promise<void> {
   if (!ghAvailable) return
 
   const terminal = getTerminalById(terminalId)
-  if (!terminal || terminal.ssh_host) return
+  if (!terminal) return
 
   monitoredTerminals.set(terminalId, terminal.cwd)
 }
@@ -529,9 +591,7 @@ export async function initGitHubChecks(): Promise<void> {
 
   const terminals = getAllTerminals()
   for (const terminal of terminals) {
-    if (!terminal.ssh_host) {
-      monitoredTerminals.set(terminal.id, terminal.cwd)
-    }
+    monitoredTerminals.set(terminal.id, terminal.cwd)
   }
 
   if (monitoredTerminals.size > 0) {
