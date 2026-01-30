@@ -156,8 +156,19 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
           const allResults: PRCheckStatus[] = []
 
           for (const pr of prs) {
+            const allChecks = pr.statusCheckRollup || []
+            const areAllChecksOk =
+              allChecks.length > 0 &&
+              allChecks.every(
+                (c) =>
+                  c.status === 'COMPLETED' &&
+                  (c.conclusion === 'SUCCESS' ||
+                    c.conclusion === 'SKIPPED' ||
+                    c.conclusion === 'NEUTRAL'),
+              )
+
             // Filter checks to non-success
-            const failedChecks: FailedPRCheck[] = (pr.statusCheckRollup || [])
+            const failedChecks: FailedPRCheck[] = allChecks
               .filter(
                 (c) =>
                   c.status === 'IN_PROGRESS' ||
@@ -253,6 +264,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
               comments,
               createdAt: pr.createdAt || '',
               updatedAt: pr.updatedAt || '',
+              areAllChecksOk,
               mergeable: pr.mergeable || 'UNKNOWN',
             })
           }
@@ -320,6 +332,7 @@ function fetchMergedPRsForBranches(
               comments: [],
               createdAt: pr.createdAt || '',
               updatedAt: pr.updatedAt || '',
+              areAllChecksOk: false,
             }))
           resolve(results)
         } catch {

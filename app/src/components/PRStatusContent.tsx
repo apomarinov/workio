@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CircleX,
   Clock,
+  ExternalLink,
   GitMerge,
   GitPullRequestDraft,
   Loader2,
@@ -234,6 +235,7 @@ export function PRStatusContent({
       c.conclusion !== 'SKIPPED' &&
       c.conclusion !== 'NEUTRAL',
   )
+
   const hasConflicts = pr.mergeable === 'CONFLICTING'
 
   const [extraComments, setExtraComments] = useState<PRComment[]>([])
@@ -357,8 +359,8 @@ export function PRStatusContent({
                 isApproved ||
                 hasChecks ||
                 pendingReviews.length > 0) && (
-                <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
-              )}
+                  <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
+                )}
               {hasChangesRequested ? (
                 <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
               ) : hasRunningChecks ? (
@@ -377,19 +379,30 @@ export function PRStatusContent({
             </>
           )}
           {hasChangesRequested
-            ? 'Change request'
+            ? 'pr Change request'
             : hasRunningChecks
-              ? 'Pull request'
+              ? 'pr running checks'
               : hasFailedChecks
-                ? 'failed checks'
+                ? 'pr failed checks'
                 : isApproved && hasConflicts
-                  ? 'Conflicts'
+                  ? 'pr Conflicts'
                   : isApproved
-                    ? 'approved'
-                    : 'Pull Request'}
+                    ? 'pr approved'
+                    : pr.areAllChecksOk
+                      ? 'pr checks passed'
+                      : 'Pull Request'}
           {hasNewActivity && (
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
           )}
+          <a
+            href={pr.prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </button>
         {isApproved && (
           <button

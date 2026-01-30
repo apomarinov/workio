@@ -45,6 +45,7 @@ export interface PRCheckStatus {
   comments: PRComment[]
   createdAt: string
   updatedAt: string
+  areAllChecksOk: boolean
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
 }
 
