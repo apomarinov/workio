@@ -9,8 +9,9 @@ import {
   GitPullRequestDraft,
   Loader2,
   RefreshCw,
+  X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRComment, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
@@ -126,7 +128,7 @@ function ReviewRow({
       {review.body && (
         <div
           onClick={() => setBodyOpen(true)}
-          className="ml-[18px] mt-1 text-xs line-clamp-3 cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors"
+          className="mt-1 text-xs line-clamp-3 cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors"
         >
           <MarkdownContent content={review.body} />
         </div>
@@ -146,6 +148,7 @@ function ReviewRow({
 
 function CommentItem({
   comment,
+  onHide,
 }: {
   comment: {
     author: string
@@ -153,34 +156,46 @@ function CommentItem({
     body: string
     createdAt: string
   }
+  onHide: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
 
   return (
     <>
-      <div className="px-2 py-1 rounded text-sidebar-foreground/70">
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 w-full cursor-pointer"
-        >
-          {expanded ? (
-            <ChevronDown className="w-3 h-3 flex-shrink-0" />
-          ) : (
-            <ChevronRight className="w-3 h-3 flex-shrink-0" />
-          )}
-          {comment.avatarUrl ? (
-            <img
-              src={comment.avatarUrl}
-              alt={comment.author}
-              className="w-4 h-4 rounded-full flex-shrink-0"
-            />
-          ) : (
-            <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
-          )}
-          <span className="text-xs font-medium truncate">{comment.author}</span>
-        </button>
+      <div className="group/comment px-2 py-1 rounded text-sidebar-foreground/70">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer"
+          >
+            {expanded ? (
+              <ChevronDown className="w-3 h-3 flex-shrink-0" />
+            ) : (
+              <ChevronRight className="w-3 h-3 flex-shrink-0" />
+            )}
+            {comment.avatarUrl ? (
+              <img
+                src={comment.avatarUrl}
+                alt={comment.author}
+                className="w-4 h-4 rounded-full flex-shrink-0"
+              />
+            ) : (
+              <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+            )}
+            <span className="text-xs font-medium truncate">
+              {comment.author}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onHide}
+            className="text-muted-foreground/30 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
         <div
           onClick={() => setModalOpen(true)}
           className={cn(
@@ -214,6 +229,16 @@ export function PRStatusContent({
   const hasHeader = onToggle !== undefined
   const expanded = hasHeader ? (expandedProp ?? false) : true
 
+  const [hiddenAuthors, setHiddenAuthors] = useLocalStorage<string[]>(
+    'hidden-comment-authors',
+    [],
+  )
+  const [hideAuthor, setHideAuthor] = useState<string | null>(null)
+  const hiddenAuthorsSet = useMemo(
+    () => new Set(hiddenAuthors),
+    [hiddenAuthors],
+  )
+
   const approvedReviews = pr.reviews.filter((r) => r.state === 'APPROVED')
   const changesRequestedReviews = pr.reviews.filter(
     (r) => r.state === 'CHANGES_REQUESTED',
@@ -224,7 +249,7 @@ export function PRStatusContent({
     changesRequestedReviews.length > 0 ||
     pendingReviews.length > 0
   const hasChecks = pr.checks.length > 0
-  const hasComments = pr.comments.length > 0
+  const hasComments = pr.comments.some((c) => !hiddenAuthorsSet.has(c.author))
   const hasRunningChecks = pr.checks.some(
     (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
   )
@@ -243,7 +268,9 @@ export function PRStatusContent({
   const [hasMore, setHasMore] = useState(true)
 
   const [owner, repo] = pr.repo.split('/')
-  const allComments = [...pr.comments, ...extraComments]
+  const allComments = [...pr.comments, ...extraComments].filter(
+    (c) => !hiddenAuthorsSet.has(c.author),
+  )
 
   const handleLoadMore = async () => {
     setLoadingMore(true)
@@ -254,6 +281,7 @@ export function PRStatusContent({
         pr.prNumber,
         20,
         allComments.length,
+        hiddenAuthors.length > 0 ? hiddenAuthors : undefined,
       )
       setExtraComments((prev) => [...prev, ...result.comments])
       setHasMore(allComments.length + result.comments.length < result.total)
@@ -309,16 +337,27 @@ export function PRStatusContent({
   // Merged state with header: just show a merged link
   if (hasHeader && isMerged) {
     return (
-      <a
-        href={pr.prUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-purple-400/70 hover:text-purple-400 transition-colors"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GitMerge className="w-3 h-3" />
-        Merged
-      </a>
+      <div className='flex gap-1 items-center group/mr'>
+        <a
+          href={pr.prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[10px] uppercase tracking-wider pl-2 pt-1 text-purple-400/70 group-hover/mr:text-purple-400 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GitMerge className="w-3 h-3" />
+          Merged
+        </a>
+        <a
+          href={pr.prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="ml-0.5 mt-0.5 hidden text-muted-foreground/40 group-hover/mr:block hover:text-muted-foreground transition-colors"
+        >
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
     )
   }
 
@@ -337,7 +376,7 @@ export function PRStatusContent({
             onSeen?.()
           }}
           className={cn(
-            'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
+            'group/gh flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
             hasChangesRequested
               ? 'text-orange-400/70 hover:text-orange-400'
               : hasRunningChecks
@@ -359,8 +398,8 @@ export function PRStatusContent({
                 isApproved ||
                 hasChecks ||
                 pendingReviews.length > 0) && (
-                <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
-              )}
+                  <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
+                )}
               {hasChangesRequested ? (
                 <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
               ) : hasRunningChecks ? (
@@ -378,19 +417,21 @@ export function PRStatusContent({
               )}
             </>
           )}
-          {hasChangesRequested
-            ? 'pr Change request'
-            : hasRunningChecks
-              ? 'pr running checks'
-              : hasFailedChecks
-                ? 'pr failed checks'
-                : isApproved && hasConflicts
-                  ? 'pr Conflicts'
-                  : isApproved
-                    ? 'pr approved'
-                    : pr.areAllChecksOk
-                      ? 'pr checks passed'
-                      : 'Pull Request'}
+          <span className="pt-0.5">
+            {hasChangesRequested
+              ? 'pr Change request'
+              : hasRunningChecks
+                ? 'pr running checks'
+                : hasFailedChecks
+                  ? 'pr failed checks'
+                  : isApproved && hasConflicts
+                    ? 'pr Conflicts'
+                    : isApproved
+                      ? 'pr approved'
+                      : pr.areAllChecksOk
+                        ? 'pr checks passed'
+                        : 'Pull Request'}
+          </span>
           {hasNewActivity && (
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
           )}
@@ -399,7 +440,7 @@ export function PRStatusContent({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            className="ml-1 hidden group-hover/gh:block text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
           </a>
@@ -469,8 +510,8 @@ export function PRStatusContent({
             ),
           )}
 
-          <div className="relative flex flex-col gap-0 pl-3">
-            <div className="absolute h-[calc(100%-5px)] border-l-[1px]" />
+          <div className="relative flex flex-col gap-0 pl-[13px]">
+            <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
             {/* Checks */}
             {hasChecks && (
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
@@ -501,7 +542,11 @@ export function PRStatusContent({
               </p>
             )}
             {allComments.map((comment, i) => (
-              <CommentItem key={`${comment.author}-${i}`} comment={comment} />
+              <CommentItem
+                key={`${comment.author}-${i}`}
+                comment={comment}
+                onHide={() => setHideAuthor(comment.author)}
+              />
             ))}
 
             {hasComments && hasMore && (
@@ -593,6 +638,42 @@ export function PRStatusContent({
                   ) : (
                     'Merge'
                   )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={hideAuthor !== null}
+            onOpenChange={(open) => {
+              if (!open) setHideAuthor(null)
+            }}
+          >
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Hide comments</DialogTitle>
+                <DialogDescription>
+                  Hide all comments from{' '}
+                  <span className="font-medium">{hideAuthor}</span>?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setHideAuthor(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (hideAuthor) {
+                      setHiddenAuthors((prev) =>
+                        prev.includes(hideAuthor)
+                          ? prev
+                          : [...prev, hideAuthor],
+                      )
+                    }
+                    setHideAuthor(null)
+                  }}
+                >
+                  Hide
                 </Button>
               </DialogFooter>
             </DialogContent>

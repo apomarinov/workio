@@ -99,12 +99,15 @@ fastify.post('/api/emit', async (request, reply) => {
 // GitHub PR comments
 fastify.get<{
   Params: { owner: string; repo: string; pr: string }
-  Querystring: { limit?: string; offset?: string }
+  Querystring: { limit?: string; offset?: string; exclude?: string }
 }>('/api/github/:owner/:repo/pr/:pr/comments', async (request) => {
   const { owner, repo, pr } = request.params
   const limit = Math.min(Number(request.query.limit) || 20, 100)
   const offset = Number(request.query.offset) || 0
-  return fetchPRComments(owner, repo, Number(pr), limit, offset)
+  const excludeAuthors = request.query.exclude
+    ? request.query.exclude.split(',').filter(Boolean)
+    : undefined
+  return fetchPRComments(owner, repo, Number(pr), limit, offset, excludeAuthors)
 })
 
 // Re-request PR review

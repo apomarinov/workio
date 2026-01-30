@@ -64,8 +64,8 @@ export function TerminalItem({
   const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -137,10 +137,9 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions && !hasProcesses && !hasGitHub && 'pl-2.5',
             hideFolder && 'rounded-l-lg',
@@ -246,7 +245,7 @@ export function TerminalItem({
         </div>
 
         {(hasGitHub || hasProcesses || hasSessions) && sessionsExpanded && (
-          <div className="ml-2 mt-1 space-y-0.5">
+          <div className="ml-2 space-y-0.5">
             {hasGitHub && prForBranch && (
               <PRStatusContent
                 pr={prForBranch}
@@ -289,7 +288,7 @@ export function TerminalItem({
                 <button
                   type="button"
                   onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
+                  className="flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
                 >
                   {sessionsListExpanded ? (
                     <ChevronDown className="w-3 h-3" />

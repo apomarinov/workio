@@ -504,6 +504,7 @@ export function fetchPRComments(
   prNumber: number,
   limit: number,
   offset: number,
+  excludeAuthors?: string[],
 ): Promise<{ comments: PRComment[]; total: number }> {
   return new Promise((resolve) => {
     execFile(
@@ -532,8 +533,11 @@ export function fetchPRComments(
             }[]
           } = JSON.parse(stdout)
 
+          const excludeSet = excludeAuthors ? new Set(excludeAuthors) : null
           const filtered = (data.comments || []).filter(
-            (c) => !c.author.login.includes('[bot]'),
+            (c) =>
+              !c.author.login.includes('[bot]') &&
+              (!excludeSet || !excludeSet.has(c.author.login)),
           )
           const total = filtered.length
           const sliced = filtered

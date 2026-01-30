@@ -130,35 +130,35 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         <div className="flex items-start z-[1] gap-1 mt-[1px] relative">
           <div className="icons group-hover:hidden">
             {session.status === 'done' && (
-              <CheckIcon className="w-3.5 h-3.5 text-green-500" />
+              <CheckIcon className="w-3.5 h-3.5 text-green-500/70" />
             )}
             {(session.status === 'active' ||
               (!isSmall && session.status === 'permission_needed')) && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 300 150"
-                className="w-3.5 h-3.5"
-              >
-                <path
-                  fill="none"
-                  stroke="#D97757"
-                  strokeWidth="40"
-                  strokeLinecap="round"
-                  strokeDasharray="300 385"
-                  strokeDashoffset="0"
-                  d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 300 150"
+                  className="w-3.5 h-3.5"
                 >
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    calcMode="spline"
-                    dur="2s"
-                    values="685;-685"
-                    keySplines="0 0 1 1"
-                    repeatCount="indefinite"
-                  />
-                </path>
-              </svg>
-            )}
+                  <path
+                    fill="none"
+                    stroke="#D97757"
+                    strokeWidth="40"
+                    strokeLinecap="round"
+                    strokeDasharray="300 385"
+                    strokeDashoffset="0"
+                    d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      calcMode="spline"
+                      dur="2s"
+                      values="685;-685"
+                      keySplines="0 0 1 1"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                </svg>
+              )}
             {session.status === 'permission_needed' && (
               <AlertTriangle
                 className={cn(
@@ -169,11 +169,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             {!['active', 'permission_needed', 'done'].includes(
               session.status,
             ) && (
-              <Bot
-                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-                aria-label={session.status}
-              />
-            )}
+                <Bot
+                  className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                  aria-label={session.status}
+                />
+              )}
           </div>
           <button
             type="button"
@@ -243,7 +243,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
         </div>
         <div
           className={cn(
-            'bg-sidebar w-5 h-7 absolute top-0 left-0 group-hover:bg-[#1b1b1b]',
+            'bg-sidebar w-5 h-6 absolute top-0 left-0 group-hover:bg-[#1b1b1b]',
             isSelected ? 'bg-[#1f1f1f]' : '',
           )}
         ></div>

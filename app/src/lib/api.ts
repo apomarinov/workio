@@ -135,6 +135,7 @@ export async function getPRComments(
   prNumber: number,
   limit: number,
   offset: number,
+  excludeAuthors?: string[],
 ): Promise<{
   comments: {
     author: string
@@ -144,9 +145,11 @@ export async function getPRComments(
   }[]
   total: number
 }> {
-  const res = await fetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comments?limit=${limit}&offset=${offset}`,
-  )
+  let url = `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comments?limit=${limit}&offset=${offset}`
+  if (excludeAuthors && excludeAuthors.length > 0) {
+    url += `&exclude=${excludeAuthors.map(encodeURIComponent).join(',')}`
+  }
+  const res = await fetch(url)
   if (!res.ok) throw new Error('Failed to fetch PR comments')
   return res.json()
 }
