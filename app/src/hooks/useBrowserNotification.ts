@@ -20,9 +20,20 @@ export function useBrowserNotification() {
   const notify = useCallback(
     (
       title: string,
-      options?: NotificationOptions & { onClick?: () => void },
+      options?: NotificationOptions & {
+        onClick?: () => void
+        audio?: string
+        audioVolume?: number
+      },
     ) => {
       if (permission !== 'granted') return null
+
+      if (options?.audio) {
+        const sound = new Audio(options.audio)
+        if (options.audioVolume !== undefined)
+          sound.volume = options.audioVolume
+        sound.play().catch(() => {})
+      }
 
       const notification = new Notification(title, options)
 

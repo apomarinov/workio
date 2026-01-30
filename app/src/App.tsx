@@ -95,16 +95,12 @@ function AppContent() {
         'Claude'
 
       if (data.status === 'permission_needed') {
-        // Play notification sound
-        const audio = new Audio('/audio/permissions.mp3')
-        audio.volume = 0.5
-        audio.play().catch(() => {})
-
         const title = session?.name || 'Permission Required'
 
-        // Show browser notification
         notify(`⚠️ ${title}`, {
           body: `"${terminalName}" needs permissions`,
+          audio: '/audio/permissions.mp3',
+          audioVolume: 0.5,
           onClick: () => {
             if (terminal) {
               selectTerminal(terminal.id)
@@ -117,15 +113,11 @@ function AppContent() {
           },
         })
       } else if (data.hook_type === 'Stop') {
-        // Play done sound
-        const audio = new Audio('/audio/done.mp3')
-        audio.play().catch(() => {})
-
         const title = session?.name || 'Done'
 
-        // Show browser notification
         notify(`✅ ${title}`, {
           body: `"${terminalName}" has finished`,
+          audio: '/audio/done.mp3',
           onClick: () => {
             if (terminal) {
               selectTerminal(terminal.id)

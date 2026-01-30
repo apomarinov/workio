@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
+  Bell,
   Bot,
   ChevronDown,
   ChevronRight,
@@ -89,7 +90,14 @@ export function Sidebar({ width }: SidebarProps) {
     useLocalStorage<boolean>('sidebar-section-github-collapsed', false)
   const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
-  const { githubPRs } = useTerminalContext()
+  const {
+    githubPRs,
+    hasNewActivity,
+    markPRSeen,
+    markAllPRsSeen,
+    hasAnyUnseenPRs,
+  } = useTerminalContext()
+  const [bellOpen, setBellOpen] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -298,7 +306,6 @@ export function Sidebar({ width }: SidebarProps) {
     >
       <div className="px-4 py-4 border-b border-sidebar-border flex items-center justify-between">
         <div className="text-sm flex items-center gap-2">
-          Terminals{' '}
           <Popover open={createPopoverOpen} onOpenChange={setCreatePopoverOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -335,88 +342,113 @@ export function Sidebar({ width }: SidebarProps) {
           </Popover>
         </div>
         {width !== undefined && width < 220 ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                title="More options"
-              >
-                <Ellipsis className="w-4 h-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-40 p-1 space-y-1" align="end">
-              <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
+          <div className="flex items-center gap-1">
+            {hasAnyUnseenPRs && (
+              <Popover open={bellOpen} onOpenChange={setBellOpen}>
                 <PopoverTrigger asChild>
-                  <button className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer">
-                    <LayoutList className="w-4 h-4" />
-                    Grouping
-                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 relative"
+                    title="Notifications"
+                  >
+                    <Bell className="w-4 h-4" />
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
+                  </Button>
                 </PopoverTrigger>
-                <PopoverContent
-                  className="w-40 p-1 space-y-1"
-                  side="right"
-                  align="start"
-                >
+                <PopoverContent className="w-40 p-1" align="end">
                   <button
                     onClick={() => {
-                      setGroupingMode('all')
-                      setGroupingOpen(false)
+                      markAllPRsSeen()
+                      setBellOpen(false)
                     }}
-                    className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                      groupingMode === 'all' ? 'bg-accent' : ''
-                    }`}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
                   >
-                    <TerminalIcon className="w-4 h-4" />
-                    Terminals
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGroupingMode('sessions')
-                      setGroupingOpen(false)
-                    }}
-                    className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                      groupingMode === 'sessions' ? 'bg-accent' : ''
-                    }`}
-                  >
-                    <Bot className="w-4 h-4" />
-                    Claude
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGroupingMode('folder')
-                      setGroupingOpen(false)
-                    }}
-                    className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                      groupingMode === 'folder' ? 'bg-accent' : ''
-                    }`}
-                  >
-                    <Folder className="w-4 h-4" />
-                    Folders
+                    Mark all as read
                   </button>
                 </PopoverContent>
               </Popover>
-              <button
-                onClick={allExpanded ? collapseAll : expandAll}
-                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-              >
-                {allExpanded ? (
-                  <ChevronsDownUp className="w-4 h-4" />
-                ) : (
-                  <ChevronsUpDown className="w-4 h-4" />
-                )}
-                {allExpanded ? 'Collapse all' : 'Expand all'}
-              </button>
-              <button
-                onClick={() => setShowSettingsModal(true)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
-            </PopoverContent>
-          </Popover>
+            )}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  title="More options"
+                >
+                  <Ellipsis className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-1 space-y-1" align="end">
+                <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer">
+                      <LayoutList className="w-4 h-4" />
+                      Grouping
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-40 p-1 space-y-1"
+                    side="right"
+                    align="start"
+                  >
+                    <button
+                      onClick={() => {
+                        setGroupingMode('all')
+                        setGroupingOpen(false)
+                      }}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
+                    >
+                      <TerminalIcon className="w-4 h-4" />
+                      Terminals
+                    </button>
+                    <button
+                      onClick={() => {
+                        setGroupingMode('sessions')
+                        setGroupingOpen(false)
+                      }}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
+                    >
+                      <Bot className="w-4 h-4" />
+                      Claude
+                    </button>
+                    <button
+                      onClick={() => {
+                        setGroupingMode('folder')
+                        setGroupingOpen(false)
+                      }}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
+                    >
+                      <Folder className="w-4 h-4" />
+                      Folders
+                    </button>
+                  </PopoverContent>
+                </Popover>
+                <button
+                  onClick={allExpanded ? collapseAll : expandAll}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                >
+                  {allExpanded ? (
+                    <ChevronsDownUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronsUpDown className="w-4 h-4" />
+                  )}
+                  {allExpanded ? 'Collapse all' : 'Expand all'}
+                </button>
+                <button
+                  onClick={() => setShowSettingsModal(true)}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
         ) : (
           <div className="flex items-center gap-1">
             <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
@@ -436,9 +468,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Terminals
@@ -448,9 +479,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -460,9 +490,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -491,6 +520,32 @@ export function Sidebar({ width }: SidebarProps) {
             >
               <Settings className="w-4 h-4" />
             </Button>
+            {hasAnyUnseenPRs && (
+              <Popover open={bellOpen} onOpenChange={setBellOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 relative"
+                    title="Notifications"
+                  >
+                    <Bell className="w-4 h-4" />
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-40 p-1" align="end">
+                  <button
+                    onClick={() => {
+                      markAllPRsSeen()
+                      setBellOpen(false)
+                    }}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                  >
+                    Mark all as read
+                  </button>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         )}
       </div>
@@ -638,8 +693,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button
@@ -663,6 +718,8 @@ export function Sidebar({ width }: SidebarProps) {
                       pr={pr}
                       expanded={expandedGitHubPRsSet.has(pr.branch)}
                       onToggle={() => toggleGitHubPR(pr.branch)}
+                      hasNewActivity={hasNewActivity(pr)}
+                      onSeen={() => markPRSeen(pr)}
                     />
                   ))}
               </>

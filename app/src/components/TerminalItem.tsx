@@ -66,7 +66,7 @@ export function TerminalItem({
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
   const allProcesses = useProcesses()
   const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
-  const { githubPRs } = useTerminalContext()
+  const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
@@ -268,7 +268,10 @@ export function TerminalItem({
                 <>
                   <button
                     type="button"
-                    onClick={toggleGitHub}
+                    onClick={() => {
+                      toggleGitHub()
+                      if (prForBranch) markPRSeen(prForBranch)
+                    }}
                     className={cn(
                       'group/gh flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
                       prForBranch.reviewDecision === 'CHANGES_REQUESTED'
@@ -331,6 +334,9 @@ export function TerminalItem({
                           : prForBranch.checks.length > 0
                             ? 'failed checks'
                             : 'Pull Request'}
+                    {hasNewActivity(prForBranch) && (
+                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
+                    )}
                   </button>
                   {githubExpanded && <PRStatusContent pr={prForBranch} />}
                 </>

@@ -42,6 +42,7 @@ export interface PRCheckStatus {
   reviews: PRReview[]
   checks: FailedPRCheck[]
   comments: PRComment[]
+  updatedAt: string
 }
 
 export interface PRChecksPayload {

@@ -1,6 +1,15 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import useSWR from 'swr'
 import type { PRCheckStatus, PRChecksPayload } from '../../shared/types'
+import { useBrowserNotification } from '../hooks/useBrowserNotification'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
@@ -25,6 +34,10 @@ interface TerminalContextValue {
   setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
   refetch: () => void
   githubPRs: PRCheckStatus[]
+  hasNewActivity: (pr: PRCheckStatus) => boolean
+  markPRSeen: (pr: PRCheckStatus) => void
+  markAllPRsSeen: () => void
+  hasAnyUnseenPRs: boolean
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -87,11 +100,81 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   // GitHub PR checks
   const [githubPRs, setGithubPRs] = useState<PRCheckStatus[]>([])
+  const { notify } = useBrowserNotification()
+  const notifyRef = useRef(notify)
+  notifyRef.current = notify
+
   useEffect(() => {
     return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
       setGithubPRs(data.prs)
+
+      // Browser notification for new PR activity
+      const lastNotifAt = localStorage.getItem('pr-activity-notif-at') ?? ''
+      const unseenCount = data.prs.filter(
+        (pr) => pr.updatedAt && pr.updatedAt > lastNotifAt,
+      ).length
+      if (unseenCount > 0) {
+        const sent = notifyRef.current(
+          `New activity on ${unseenCount} PR${unseenCount !== 1 ? 's' : ''}`,
+          { audio: '/audio/pr-noti.mp3' },
+        )
+        if (sent) {
+          localStorage.setItem('pr-activity-notif-at', new Date().toISOString())
+        }
+      }
     })
   }, [subscribe])
+
+  // PR seen tracking
+  const [prSeenTimes, setPRSeenTimes] = useLocalStorage<Record<string, string>>(
+    'pr-seen-times',
+    {},
+  )
+
+  const hasNewActivity = useCallback(
+    (pr: PRCheckStatus): boolean => {
+      if (!pr.updatedAt) return false
+      const seen = prSeenTimes[`${pr.repo}#${pr.prNumber}`]
+      if (!seen) return true
+      return pr.updatedAt > seen
+    },
+    [prSeenTimes],
+  )
+
+  const markPRSeen = useCallback(
+    (pr: PRCheckStatus): void => {
+      if (!pr.updatedAt) return
+      const key = `${pr.repo}#${pr.prNumber}`
+      setPRSeenTimes((prev) => {
+        if (prev[key] === pr.updatedAt) return prev
+        return { ...prev, [key]: pr.updatedAt }
+      })
+    },
+    [setPRSeenTimes],
+  )
+
+  const markAllPRsSeen = useCallback(() => {
+    setPRSeenTimes((prev) => {
+      const next = { ...prev }
+      for (const pr of githubPRs) {
+        if (pr.updatedAt) {
+          next[`${pr.repo}#${pr.prNumber}`] = pr.updatedAt
+        }
+      }
+      return next
+    })
+  }, [githubPRs, setPRSeenTimes])
+
+  const hasAnyUnseenPRs = useMemo(
+    () =>
+      githubPRs.some((pr) => {
+        if (!pr.updatedAt) return false
+        const seen = prSeenTimes[`${pr.repo}#${pr.prNumber}`]
+        if (!seen) return true
+        return pr.updatedAt > seen
+      }),
+    [githubPRs, prSeenTimes],
+  )
 
   const activeTerminal =
     terminals.find((t) => t.id === activeTerminalId) ?? null
@@ -134,6 +217,10 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         setTerminalOrder,
         refetch: () => mutate(),
         githubPRs,
+        hasNewActivity,
+        markPRSeen,
+        markAllPRsSeen,
+        hasAnyUnseenPRs,
       }}
     >
       {children}
