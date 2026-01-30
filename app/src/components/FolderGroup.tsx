@@ -34,7 +34,7 @@ export function FolderGroup({
     <div>
       <div
         onClick={onToggle}
-        className="flex items-start gap-2 pr-3 pl-2 py-2 rounded-lg cursor-pointer text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+        className="flex items-start gap-2 pr-3 pl-2 py-1.5 cursor-pointer text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
       >
         {expanded ? (
           <ChevronDown className="w-4 h-4 flex-shrink-0 mt-0.5" />

@@ -32,7 +32,7 @@ function parseGitHubRemoteUrl(
 ): { owner: string; repo: string } | null {
   // SSH: git@github.com:owner/repo.git
   // HTTPS: https://github.com/owner/repo.git
-  const match = url.match(/github\.com[:/]([^/]+)\/([^/.]+?)(?:\.git)?$/)
+  const match = url.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/)
   if (match) return { owner: match[1], repo: match[2] }
   return null
 }

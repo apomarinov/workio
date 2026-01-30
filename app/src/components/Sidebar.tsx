@@ -88,6 +88,9 @@ export function Sidebar({ width }: SidebarProps) {
     useLocalStorage<boolean>('sidebar-section-terminals-collapsed', false)
   const [githubSectionCollapsed, setGithubSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-github-collapsed', false)
+  const [collapsedGitHubRepos, setCollapsedGitHubRepos] = useLocalStorage<
+    string[]
+  >('sidebar-collapsed-github-repos', [])
   const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
   const {
@@ -253,6 +256,35 @@ export function Sidebar({ width }: SidebarProps) {
     })
   }
 
+  const collapsedGitHubReposSet = useMemo(
+    () => new Set(collapsedGitHubRepos),
+    [collapsedGitHubRepos],
+  )
+
+  const toggleGitHubRepo = (repo: string) => {
+    setCollapsedGitHubRepos((prev) =>
+      prev.includes(repo) ? prev.filter((r) => r !== repo) : [...prev, repo],
+    )
+  }
+
+  const githubPRsByRepo = useMemo(() => {
+    const grouped = new Map<string, typeof githubPRs>()
+    for (const pr of githubPRs) {
+      const existing = grouped.get(pr.repo)
+      if (existing) {
+        existing.push(pr)
+      } else {
+        grouped.set(pr.repo, [pr])
+      }
+    }
+    return grouped
+  }, [githubPRs])
+
+  const allGitHubRepos = useMemo(
+    () => Array.from(githubPRsByRepo.keys()),
+    [githubPRsByRepo],
+  )
+
   const allSessionIds = useMemo(
     () => sessions.map((s) => s.session_id),
     [sessions],
@@ -275,6 +307,7 @@ export function Sidebar({ width }: SidebarProps) {
     setTerminalsSectionCollapsed(false)
     setOtherSessionsSectionCollapsed(false)
     setGithubSectionCollapsed(false)
+    setCollapsedGitHubRepos([])
     setExpandedGitHubPRs(githubPRs.map((pr) => pr.branch))
   }
 
@@ -288,6 +321,7 @@ export function Sidebar({ width }: SidebarProps) {
     setTerminalsSectionCollapsed(true)
     setOtherSessionsSectionCollapsed(true)
     setGithubSectionCollapsed(true)
+    setCollapsedGitHubRepos(allGitHubRepos)
     setExpandedGitHubPRs([])
   }
 
@@ -297,7 +331,8 @@ export function Sidebar({ width }: SidebarProps) {
     allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id)) &&
     !terminalsSectionCollapsed &&
     !otherSessionsSectionCollapsed &&
-    !githubSectionCollapsed
+    !githubSectionCollapsed &&
+    allGitHubRepos.every((r) => !collapsedGitHubReposSet.has(r))
 
   return (
     <div
@@ -550,7 +585,7 @@ export function Sidebar({ width }: SidebarProps) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1 @container/sidebar">
+      <div className="flex-1 overflow-y-auto p-0 space-y-1 @container/sidebar">
         {groupingMode === 'sessions' ? (
           sessions.map((session) => (
             <SessionItem
@@ -568,7 +603,7 @@ export function Sidebar({ width }: SidebarProps) {
                   onClick={() =>
                     setTerminalsSectionCollapsed(!terminalsSectionCollapsed)
                   }
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 hover:text-muted-foreground transition-colors w-full"
                 >
                   {terminalsSectionCollapsed ? (
                     <ChevronRight className="w-3 h-3" />
@@ -646,46 +681,6 @@ export function Sidebar({ width }: SidebarProps) {
               </>
             )}
 
-            {/* Orphan sessions - grouped by project path */}
-            {orphanSessionGroups.size > 0 && (
-              <>
-                <div
-                  className={cn(
-                    'border-t border-sidebar-border my-2',
-                    terminals.length === 0 && 'border-none',
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOtherSessionsSectionCollapsed(
-                      !otherSessionsSectionCollapsed,
-                    )
-                  }
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
-                >
-                  {otherSessionsSectionCollapsed ? (
-                    <ChevronRight className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
-                  Other Claude Sessions
-                </button>
-                {!otherSessionsSectionCollapsed &&
-                  Array.from(orphanSessionGroups.entries()).map(
-                    ([projectPath, groupSessions]) => (
-                      <SessionGroup
-                        key={projectPath}
-                        projectPath={projectPath}
-                        sessions={groupSessions}
-                        expanded={expandedSessionGroupsSet.has(projectPath)}
-                        onToggle={() => toggleSessionGroup(projectPath)}
-                      />
-                    ),
-                  )}
-              </>
-            )}
-
             {/* GitHub PR status */}
             {githubPRs.length > 0 && (
               <>
@@ -702,7 +697,7 @@ export function Sidebar({ width }: SidebarProps) {
                   onClick={() =>
                     setGithubSectionCollapsed(!githubSectionCollapsed)
                   }
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pb-1 hover:text-muted-foreground transition-colors w-full"
+                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
                 >
                   {githubSectionCollapsed ? (
                     <ChevronRight className="w-3 h-3" />
@@ -712,18 +707,81 @@ export function Sidebar({ width }: SidebarProps) {
                   Pull requests
                 </button>
                 {!githubSectionCollapsed &&
-                  githubPRs.map((pr) => (
-                    <PRStatusGroup
-                      key={`${pr.repo}:${pr.branch}`}
-                      pr={pr}
-                      expanded={expandedGitHubPRsSet.has(pr.branch)}
-                      onToggle={() => toggleGitHubPR(pr.branch)}
-                      hasNewActivity={hasNewActivity(pr)}
-                      onSeen={() => markPRSeen(pr)}
-                    />
-                  ))}
+                  Array.from(githubPRsByRepo.entries()).map(
+                    ([repo, repoPRs]) => {
+                      const repoName = repo.split('/')[1] || repo
+                      const isCollapsed = collapsedGitHubReposSet.has(repo)
+                      return (
+                        <div key={repo}>
+                          <button
+                            type="button"
+                            onClick={() => toggleGitHubRepo(repo)}
+                            className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                            )}
+                            <span className="truncate">{repoName}</span>
+                          </button>
+                          {!isCollapsed &&
+                            repoPRs.map((pr) => (
+                              <PRStatusGroup
+                                key={`${pr.repo}:${pr.branch}`}
+                                pr={pr}
+                                expanded={expandedGitHubPRsSet.has(pr.branch)}
+                                onToggle={() => toggleGitHubPR(pr.branch)}
+                                hasNewActivity={hasNewActivity(pr)}
+                                onSeen={() => markPRSeen(pr)}
+                              />
+                            ))}
+                        </div>
+                      )
+                    },
+                  )}
               </>
             )}
+          </>
+        )}
+
+        {/* Orphan sessions - grouped by project path */}
+        {orphanSessionGroups.size > 0 && (
+          <>
+            <div
+              className={cn(
+                'border-t border-sidebar-border my-2',
+                terminals.length === 0 && 'border-none',
+              )}
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setOtherSessionsSectionCollapsed(
+                  !otherSessionsSectionCollapsed,
+                )
+              }
+              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
+            >
+              {otherSessionsSectionCollapsed ? (
+                <ChevronRight className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+              Other Claude Sessions
+            </button>
+            {!otherSessionsSectionCollapsed &&
+              Array.from(orphanSessionGroups.entries()).map(
+                ([projectPath, groupSessions]) => (
+                  <SessionGroup
+                    key={projectPath}
+                    projectPath={projectPath}
+                    sessions={groupSessions}
+                    expanded={expandedSessionGroupsSet.has(projectPath)}
+                    onToggle={() => toggleSessionGroup(projectPath)}
+                  />
+                ),
+              )}
           </>
         )}
       </div>
