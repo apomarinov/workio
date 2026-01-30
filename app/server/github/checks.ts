@@ -435,6 +435,18 @@ async function pollAllPRChecks(): Promise<void> {
 
   lastEmittedPRs = allPRs
   getIO()?.emit('github:pr-checks', { prs: allPRs })
+
+  // Log GraphQL rate limit after fetching PRs
+  execFile(
+    'gh',
+    ['api', 'rate_limit', '--jq', '.resources.graphql.remaining'],
+    { timeout: 5000 },
+    (err, stdout) => {
+      if (!err && stdout) {
+        console.log(`[github] GraphQL rate limit remaining: ${stdout.trim()}`)
+      }
+    },
+  )
 }
 
 export async function refreshPRChecks(): Promise<void> {
@@ -609,8 +621,12 @@ export async function detectAllTerminalBranches(): Promise<void> {
     `[github] detecting branches for ${monitoredTerminals.size} terminals`,
   )
   await Promise.all(
-    [...monitoredTerminals.keys()].map((id) => detectGitBranch(id)),
+    [...monitoredTerminals.keys()].map((id) =>
+      detectGitBranch(id, { skipPRRefresh: true }),
+    ),
   )
+  // Single PR refresh after all branches are detected, instead of per-terminal
+  refreshPRChecks()
 }
 
 export async function initGitHubChecks(): Promise<void> {

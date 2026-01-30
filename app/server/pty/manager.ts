@@ -118,7 +118,10 @@ function stopGlobalProcessPolling() {
   }
 }
 
-export async function detectGitBranch(terminalId: number) {
+export async function detectGitBranch(
+  terminalId: number,
+  options?: { skipPRRefresh?: boolean },
+) {
   try {
     const terminal = getTerminalById(terminalId)
     if (!terminal) return
@@ -149,7 +152,9 @@ export async function detectGitBranch(terminalId: number) {
     if (branch) {
       updateTerminal(terminalId, { git_branch: branch })
       getIO()?.emit('terminal:updated', { terminalId })
-      refreshPRChecks()
+      if (!options?.skipPRRefresh) {
+        refreshPRChecks()
+      }
     }
   } catch (err) {
     console.error(

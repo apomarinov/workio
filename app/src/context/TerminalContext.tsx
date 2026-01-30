@@ -106,12 +106,17 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const notifyRef = useRef(notify)
   notifyRef.current = notify
   const [prPoll, setPrPoll] = useState(true)
+  const lastDetectEmitRef = useRef(0)
 
   useEffect(() => {
     if (!prPoll) {
       return
     }
     const now = Date.now()
+    // Cooldown: don't re-emit detect-branches within 30 seconds
+    if (now - lastDetectEmitRef.current < 30_000) {
+      return
+    }
     const recentPR = githubPRs
       .filter(
         (pr) =>
@@ -126,6 +131,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       )
       if (!terminalBranches.has(recentPR.branch)) {
         setPrPoll(false)
+        lastDetectEmitRef.current = now
         emit('detect-branches')
       }
     }
