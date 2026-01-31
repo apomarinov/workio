@@ -11,7 +11,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -79,7 +79,7 @@ function ContentDialog({
   )
 }
 
-function ReviewRow({
+const ReviewRow = memo(function ReviewRow({
   review,
   icon,
   prUrl,
@@ -90,9 +90,14 @@ function ReviewRow({
   icon: React.ReactNode
   prUrl: string
   showReReview?: boolean
-  onReReview: () => void
+  onReReview: (author: string) => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
+
+  const handleReReview = useCallback(
+    () => onReReview(review.author),
+    [onReReview, review.author],
+  )
 
   return (
     <div className="group/review px-2 py-1 rounded text-sidebar-foreground/70">
@@ -118,7 +123,7 @@ function ReviewRow({
         {showReReview && (
           <button
             type="button"
-            onClick={onReReview}
+            onClick={handleReReview}
             className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
           >
             Re-review
@@ -144,9 +149,9 @@ function ReviewRow({
       )}
     </div>
   )
-}
+})
 
-function CommentItem({
+const CommentItem = memo(function CommentItem({
   comment,
   onHide,
 }: {
@@ -156,10 +161,15 @@ function CommentItem({
     body: string
     createdAt: string
   }
-  onHide: () => void
+  onHide: (author: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+
+  const handleHide = useCallback(
+    () => onHide(comment.author),
+    [onHide, comment.author],
+  )
 
   return (
     <>
@@ -190,7 +200,7 @@ function CommentItem({
           </button>
           <button
             type="button"
-            onClick={onHide}
+            onClick={handleHide}
             className="text-muted-foreground/30 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
           >
             <X className="w-3 h-3" />
@@ -216,7 +226,7 @@ function CommentItem({
       />
     </>
   )
-}
+})
 
 export function PRStatusContent({
   pr,
@@ -239,26 +249,44 @@ export function PRStatusContent({
     [hiddenAuthors],
   )
 
-  const approvedReviews = pr.reviews.filter((r) => r.state === 'APPROVED')
-  const changesRequestedReviews = pr.reviews.filter(
-    (r) => r.state === 'CHANGES_REQUESTED',
+  const approvedReviews = useMemo(
+    () => pr.reviews.filter((r) => r.state === 'APPROVED'),
+    [pr.reviews],
   )
-  const pendingReviews = pr.reviews.filter((r) => r.state === 'PENDING')
+  const changesRequestedReviews = useMemo(
+    () => pr.reviews.filter((r) => r.state === 'CHANGES_REQUESTED'),
+    [pr.reviews],
+  )
+  const pendingReviews = useMemo(
+    () => pr.reviews.filter((r) => r.state === 'PENDING'),
+    [pr.reviews],
+  )
   const hasReviews =
     approvedReviews.length > 0 ||
     changesRequestedReviews.length > 0 ||
     pendingReviews.length > 0
   const hasChecks = pr.checks.length > 0
-  const hasComments = pr.comments.some((c) => !hiddenAuthorsSet.has(c.author))
-  const hasRunningChecks = pr.checks.some(
-    (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+  const hasComments = useMemo(
+    () => pr.comments.some((c) => !hiddenAuthorsSet.has(c.author)),
+    [pr.comments, hiddenAuthorsSet],
   )
-  const hasFailedChecks = pr.checks.some(
-    (c) =>
-      c.status === 'COMPLETED' &&
-      c.conclusion !== 'SUCCESS' &&
-      c.conclusion !== 'SKIPPED' &&
-      c.conclusion !== 'NEUTRAL',
+  const hasRunningChecks = useMemo(
+    () =>
+      pr.checks.some(
+        (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+      ),
+    [pr.checks],
+  )
+  const hasFailedChecks = useMemo(
+    () =>
+      pr.checks.some(
+        (c) =>
+          c.status === 'COMPLETED' &&
+          c.conclusion !== 'SUCCESS' &&
+          c.conclusion !== 'SKIPPED' &&
+          c.conclusion !== 'NEUTRAL',
+      ),
+    [pr.checks],
   )
 
   const hasConflicts = pr.mergeable === 'CONFLICTING'
@@ -268,8 +296,12 @@ export function PRStatusContent({
   const [hasMore, setHasMore] = useState(true)
 
   const [owner, repo] = pr.repo.split('/')
-  const allComments = [...pr.comments, ...extraComments].filter(
-    (c) => !hiddenAuthorsSet.has(c.author),
+  const allComments = useMemo(
+    () =>
+      [...pr.comments, ...extraComments].filter(
+        (c) => !hiddenAuthorsSet.has(c.author),
+      ),
+    [pr.comments, extraComments, hiddenAuthorsSet],
   )
 
   const handleLoadMore = async () => {
@@ -328,6 +360,16 @@ export function PRStatusContent({
       setReReviewAuthor(null)
     }
   }
+
+  const handleReReview = useCallback(
+    (author: string) => setReReviewAuthor(author),
+    [],
+  )
+
+  const handleHideComment = useCallback(
+    (author: string) => setHideAuthor(author),
+    [],
+  )
 
   const hasContent = hasReviews || hasChecks || hasComments
 
@@ -465,50 +507,42 @@ export function PRStatusContent({
     )
   }
 
-  const renderReviewRow = (
-    review: (typeof pr.reviews)[number],
-    icon: React.ReactNode,
-    keyPrefix: string,
-    showReReview?: boolean,
-  ) => (
-    <ReviewRow
-      key={`${keyPrefix}-${review.author}`}
-      review={review}
-      icon={icon}
-      prUrl={pr.prUrl}
-      showReReview={showReReview}
-      onReReview={() => setReReviewAuthor(review.author)}
-    />
-  )
-
   return (
     <>
       {renderHeader()}
       {expanded && hasContent && (
         <div className="space-y-0.5">
           {/* Reviews */}
-          {approvedReviews.map((review) =>
-            renderReviewRow(
-              review,
-              <Check className="w-3 h-3 flex-shrink-0 text-green-500" />,
-              'approved',
-            ),
-          )}
-          {changesRequestedReviews.map((review) =>
-            renderReviewRow(
-              review,
-              <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />,
-              'changes',
-              true,
-            ),
-          )}
-          {pendingReviews.map((review) =>
-            renderReviewRow(
-              review,
-              <Clock className="w-3 h-3 flex-shrink-0 text-zinc-500" />,
-              'pending',
-            ),
-          )}
+          {approvedReviews.map((review) => (
+            <ReviewRow
+              key={`approved-${review.author}`}
+              review={review}
+              icon={<Check className="w-3 h-3 flex-shrink-0 text-green-500" />}
+              prUrl={pr.prUrl}
+              onReReview={handleReReview}
+            />
+          ))}
+          {changesRequestedReviews.map((review) => (
+            <ReviewRow
+              key={`changes-${review.author}`}
+              review={review}
+              icon={
+                <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />
+              }
+              prUrl={pr.prUrl}
+              showReReview
+              onReReview={handleReReview}
+            />
+          ))}
+          {pendingReviews.map((review) => (
+            <ReviewRow
+              key={`pending-${review.author}`}
+              review={review}
+              icon={<Clock className="w-3 h-3 flex-shrink-0 text-zinc-500" />}
+              prUrl={pr.prUrl}
+              onReReview={handleReReview}
+            />
+          ))}
 
           <div className="relative flex flex-col gap-0 pl-[13px]">
             <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
@@ -545,7 +579,7 @@ export function PRStatusContent({
               <CommentItem
                 key={`${comment.author}-${i}`}
                 comment={comment}
-                onHide={() => setHideAuthor(comment.author)}
+                onHide={handleHideComment}
               />
             ))}
 
