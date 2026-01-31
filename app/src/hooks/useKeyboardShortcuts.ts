@@ -1,24 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
-import { useSessionContext } from './SessionContext'
-import { useTerminalContext } from './TerminalContext'
+import { useCallback, useEffect, useRef } from 'react'
+import { useSessionContext } from '../context/SessionContext'
+import { useTerminalContext } from '../context/TerminalContext'
 
-interface KeyMapContextValue {
-  cmdHeld: boolean
-}
-
-const KeyMapContext = createContext<KeyMapContextValue | null>(null)
-
-export function KeyMapProvider({ children }: { children: React.ReactNode }) {
+export function useKeyboardShortcuts() {
   const { terminals, selectTerminal } = useTerminalContext()
   const { clearSession } = useSessionContext()
-  const [cmdHeld, setCmdHeld] = useState(false)
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
 
@@ -35,8 +21,6 @@ export function KeyMapProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Meta') setCmdHeld(true)
-
       if (e.metaKey && e.key >= '1' && e.key <= '9') {
         e.preventDefault()
         e.stopPropagation()
@@ -57,32 +41,10 @@ export function KeyMapProvider({ children }: { children: React.ReactNode }) {
         xtermTextarea.focus()
       }
     }
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Meta') setCmdHeld(false)
-    }
-    const handleBlur = () => setCmdHeld(false)
 
     window.addEventListener('keydown', handleKeyDown, true)
-    window.addEventListener('keyup', handleKeyUp)
-    window.addEventListener('blur', handleBlur)
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true)
-      window.removeEventListener('keyup', handleKeyUp)
-      window.removeEventListener('blur', handleBlur)
     }
   }, [selectByIndex])
-
-  return (
-    <KeyMapContext.Provider value={{ cmdHeld }}>
-      {children}
-    </KeyMapContext.Provider>
-  )
-}
-
-export function useKeyMapContext() {
-  const context = useContext(KeyMapContext)
-  if (!context) {
-    throw new Error('useKeyMapContext must be used within KeyMapProvider')
-  }
-  return context
 }

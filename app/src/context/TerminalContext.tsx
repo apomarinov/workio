@@ -254,55 +254,79 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe])
 
-  const activeTerminal =
-    terminals.find((t) => t.id === activeTerminalId) ?? null
+  const activeTerminal = useMemo(
+    () => terminals.find((t) => t.id === activeTerminalId) ?? null,
+    [terminals, activeTerminalId],
+  )
 
-  const createTerminal = async (
-    cwd: string,
-    name?: string,
-    shell?: string,
-    ssh_host?: string,
-  ) => {
-    const terminal = await api.createTerminal(cwd, name, shell, ssh_host)
-    mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
-    return terminal
-  }
+  const createTerminal = useCallback(
+    async (cwd: string, name?: string, shell?: string, ssh_host?: string) => {
+      const terminal = await api.createTerminal(cwd, name, shell, ssh_host)
+      mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
+      return terminal
+    },
+    [mutate],
+  )
 
-  const updateTerminal = async (
-    id: number,
-    updates: { name?: string; cwd?: string },
-  ) => {
-    const updated = await api.updateTerminal(id, updates)
-    mutate((prev) => prev?.map((t) => (t.id === id ? updated : t)), false)
-    return updated
-  }
+  const updateTerminal = useCallback(
+    async (id: number, updates: { name?: string; cwd?: string }) => {
+      const updated = await api.updateTerminal(id, updates)
+      mutate((prev) => prev?.map((t) => (t.id === id ? updated : t)), false)
+      return updated
+    },
+    [mutate],
+  )
 
-  const deleteTerminal = async (id: number) => {
-    await api.deleteTerminal(id)
-    mutate((prev) => prev?.filter((t) => t.id !== id), false)
-  }
+  const deleteTerminal = useCallback(
+    async (id: number) => {
+      await api.deleteTerminal(id)
+      mutate((prev) => prev?.filter((t) => t.id !== id), false)
+    },
+    [mutate],
+  )
+
+  const refetch = useCallback(() => mutate(), [mutate])
+
+  const value = useMemo(
+    () => ({
+      terminals,
+      loading: isLoading,
+      activeTerminal,
+      selectTerminal: setActiveTerminalId,
+      createTerminal,
+      updateTerminal,
+      deleteTerminal,
+      setTerminalOrder,
+      refetch,
+      githubPRs,
+      hasNewActivity,
+      markPRSeen,
+      markAllPRsSeen,
+      hasAnyUnseenPRs,
+      processes,
+      terminalPorts,
+    }),
+    [
+      terminals,
+      isLoading,
+      activeTerminal,
+      createTerminal,
+      updateTerminal,
+      deleteTerminal,
+      setTerminalOrder,
+      refetch,
+      githubPRs,
+      hasNewActivity,
+      markPRSeen,
+      markAllPRsSeen,
+      hasAnyUnseenPRs,
+      processes,
+      terminalPorts,
+    ],
+  )
 
   return (
-    <TerminalContext.Provider
-      value={{
-        terminals,
-        loading: isLoading,
-        activeTerminal,
-        selectTerminal: setActiveTerminalId,
-        createTerminal,
-        updateTerminal,
-        deleteTerminal,
-        setTerminalOrder,
-        refetch: () => mutate(),
-        githubPRs,
-        hasNewActivity,
-        markPRSeen,
-        markAllPRsSeen,
-        hasAnyUnseenPRs,
-        processes,
-        terminalPorts,
-      }}
-    >
+    <TerminalContext.Provider value={value}>
       {children}
     </TerminalContext.Provider>
   )

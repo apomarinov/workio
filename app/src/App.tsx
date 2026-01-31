@@ -10,10 +10,10 @@ import { Toaster } from '@/components/ui/sonner'
 import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
-import { KeyMapProvider } from './context/KeyMapContext'
 import { useNotifications } from './context/NotificationContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
 
@@ -34,6 +34,7 @@ function AppContent() {
   const { subscribe } = useSocket()
   const { sendNotification } = useNotifications()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
+  useKeyboardShortcuts()
 
   // Example: Change favicon based on session status
   useEffect(() => {
@@ -176,9 +177,7 @@ function App() {
   return (
     <TerminalProvider>
       <SessionProvider>
-        <KeyMapProvider>
-          <AppContent />
-        </KeyMapProvider>
+        <AppContent />
       </SessionProvider>
     </TerminalProvider>
   )

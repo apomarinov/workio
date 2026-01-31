@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -148,23 +149,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [mutate, activeSessionId, clearSession],
   )
 
+  const sessions = useMemo(() => data ?? [], [data])
+  const errorMessage = useMemo(() => error?.message ?? null, [error])
+
+  const value = useMemo(
+    () => ({
+      activeSessionId,
+      selectSession,
+      clearSession,
+      sessions,
+      loading: isLoading,
+      error: errorMessage,
+      refetch: mutate,
+      updateSession,
+      deleteSession,
+      deleteSessions,
+    }),
+    [
+      activeSessionId,
+      selectSession,
+      clearSession,
+      sessions,
+      isLoading,
+      errorMessage,
+      mutate,
+      updateSession,
+      deleteSession,
+      deleteSessions,
+    ],
+  )
+
   return (
-    <SessionContext.Provider
-      value={{
-        activeSessionId,
-        selectSession,
-        clearSession,
-        sessions: data ?? [],
-        loading: isLoading,
-        error: error?.message ?? null,
-        refetch: mutate,
-        updateSession,
-        deleteSession,
-        deleteSessions,
-      }}
-    >
-      {children}
-    </SessionContext.Provider>
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   )
 }
 

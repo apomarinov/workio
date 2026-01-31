@@ -20,8 +20,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
-import { useKeyMapContext } from '@/context/KeyMapContext'
 import { useSessionContext } from '@/context/SessionContext'
+import { useCmdHeld } from '@/hooks/useCmdHeld'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
@@ -53,7 +53,7 @@ export function TerminalItem({
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { updateTerminal, deleteTerminal } = useTerminalContext()
   const { clearSession } = useSessionContext()
-  const { cmdHeld } = useKeyMapContext()
+  const cmdHeld = useCmdHeld()
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
   const {
     githubPRs,
