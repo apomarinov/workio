@@ -216,6 +216,11 @@ interface ConductorJson {
   archive?: string
   run?: string
   runScriptMode?: string
+  scripts?: {
+    setup?: string
+    archive?: string
+    run?: string
+  }
 }
 
 function readConductorJson(cwd: string): ConductorJson | null {
@@ -224,7 +229,7 @@ function readConductorJson(cwd: string): ConductorJson | null {
   return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
 }
 
-function emitWorkspace(
+export function emitWorkspace(
   terminalId: number,
   payload: Record<string, unknown>,
 ): void {
@@ -256,8 +261,10 @@ function resolveScripts(
   if (setupObj?.conductor) {
     const config = readConductorJson(cwd)
     if (config) {
-      if (config.setup) setupScript = path.resolve(cwd, config.setup)
-      if (config.archive) deleteScript = path.resolve(cwd, config.archive)
+      const setup = config.scripts?.setup ?? config.setup
+      const archive = config.scripts?.archive ?? config.archive
+      if (setup) setupScript = path.resolve(cwd, setup)
+      if (archive) deleteScript = path.resolve(cwd, archive)
     }
   }
 

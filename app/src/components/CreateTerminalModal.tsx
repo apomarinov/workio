@@ -115,7 +115,6 @@ export function CreateTerminalModal({
 
     // Don't re-fetch if we already fetched this query or a prefix that returned results
     if (fetchedQueriesRef.current.has(q)) return
-
     setIsLoadingRepos(true)
     searchTimerRef.current = setTimeout(() => {
       getGitHubRepos(q)
@@ -329,12 +328,14 @@ export function CreateTerminalModal({
                       onValueChange={handleRepoSearch}
                       isLoading={isLoadingRepos}
                     />
-                    <CommandList className="max-h-[300px] overflow-y-auto">
-                      <CommandEmpty>
-                        {repoSearch.trim()
-                          ? 'No repos found. Type owner/repo to add new.'
-                          : 'Loading...'}
-                      </CommandEmpty>
+                    {filteredRepos.length > 0 && (<CommandList className="max-h-[300px] overflow-y-auto">
+                      {!isLoadingRepos && (
+                        <CommandEmpty>
+                          {repoSearch.trim()
+                            ? 'No repos found. Type owner/repo to add new.'
+                            : 'Loading...'}
+                        </CommandEmpty>
+                      )}
                       <CommandGroup>
                         {manualEntry && !isLoadingRepos && (
                           <CommandItem
@@ -362,7 +363,7 @@ export function CreateTerminalModal({
                         {filteredRepos.map((repo) => (
                           <CommandItem
                             key={repo}
-                            className='cursor-pointer'
+                            className="cursor-pointer"
                             value={repo}
                             onSelect={() => {
                               setGitRepo(repo === gitRepo ? '' : repo)
@@ -380,7 +381,7 @@ export function CreateTerminalModal({
                           </CommandItem>
                         ))}
                       </CommandGroup>
-                    </CommandList>
+                    </CommandList>)}
                   </Command>
                 </PopoverContent>
               </Popover>

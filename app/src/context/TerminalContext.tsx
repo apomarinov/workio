@@ -319,8 +319,12 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTerminal = useCallback(
     async (id: number) => {
-      await api.deleteTerminal(id)
-      mutate((prev) => prev?.filter((t) => t.id !== id), false)
+      const isAsync = await api.deleteTerminal(id)
+      if (!isAsync) {
+        mutate((prev) => prev?.filter((t) => t.id !== id), false)
+      }
+      // For async (202), the WebSocket 'terminal:workspace' event
+      // will update setup.status to 'delete' and eventually emit { deleted: true }
     },
     [mutate],
   )

@@ -68,8 +68,8 @@ export function TerminalItem({
   const ports = terminalPorts[terminal.id] ?? []
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -163,20 +163,18 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors ${
-              isSettingUp || isDeleting
-                ? 'opacity-60 cursor-default'
-                : `cursor-pointer ${
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                  }`
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors ${isSettingUp || isDeleting
+              ? 'opacity-60 cursor-default'
+              : `cursor-pointer ${isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+              }`
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions &&
-              !hasProcesses &&
-              !hasGitHub &&
-              !hasPorts &&
-              'pl-2.5',
+            !hasProcesses &&
+            !hasGitHub &&
+            !hasPorts &&
+            'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
@@ -228,29 +226,35 @@ export function TerminalItem({
               )
             )}
             {terminal.git_repo?.status === 'setup' && (
-              <span className="text-xs text-blue-400">
+              <div className="text-[10px] text-blue-400">
                 Cloning repository...
-              </span>
+              </div>
             )}
             {terminal.git_repo?.status === 'failed' && (
-              <span className="text-xs text-destructive truncate">
+              <div className="text-[10px] text-destructive break-all">
                 Clone failed: {terminal.git_repo.error}
-              </span>
+              </div>
             )}
-            {terminal.setup?.status === 'setup' && (
-              <span className="text-xs text-blue-400">Running setup...</span>
+            {terminal.git_repo?.status === 'done' && (
+              <>
+                {terminal.setup?.status === 'setup' && (
+                  <div className="text-[10px] text-blue-400">
+                    Running setup...
+                  </div>
+                )}
+                {terminal.setup?.status === 'failed' && (
+                  <div className="text-[10px] text-destructive break-all">
+                    {terminal.setup.error}
+                  </div>
+                )}
+                {terminal.setup?.status === 'delete' && (
+                  <div className="text-[10px] text-blue-400">
+                    Running teardown...
+                  </div>
+                )}
+              </>
             )}
-            {terminal.setup?.status === 'failed' && (
-              <span className="text-xs text-destructive truncate">
-                Setup failed: {terminal.setup.error}
-              </span>
-            )}
-            {terminal.setup?.status === 'delete' && (
-              <span className="text-xs text-yellow-500">
-                Running delete script...
-              </span>
-            )}
-            {gitBranch && (
+            {gitBranch && terminal.setup?.status !== 'delete' && (
               <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <GitBranch className="w-2.5 h-2.5 text-zinc-400" />
                 {gitBranch}
@@ -264,7 +268,7 @@ export function TerminalItem({
             </span>
           ) : (
             <div className="absolute invisible group-hover:visible top-1 right-1">
-              <Popover open={showMenu} onOpenChange={setShowMenu}>
+              {(!isSettingUp && !isDeleting) && (<Popover open={showMenu} onOpenChange={setShowMenu}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="secondary"
@@ -307,7 +311,7 @@ export function TerminalItem({
                     Delete
                   </button>
                 </PopoverContent>
-              </Popover>
+              </Popover>)}
             </div>
           )}
         </div>

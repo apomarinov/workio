@@ -18,7 +18,8 @@ export function Terminal({ terminalId }: TerminalProps) {
   const { activeTerminal } = useTerminalContext()
   const isSettingUp =
     activeTerminal?.git_repo?.status === 'setup' ||
-    activeTerminal?.setup?.status === 'setup'
+    activeTerminal?.setup?.status === 'setup' ||
+    activeTerminal?.setup?.status === 'delete'
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -116,7 +117,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const handleCopyClick = useCallback(() => {
     if (pendingCopyRef.current) {
-      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => {})
+      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => { })
     }
     pendingCopyRef.current = null
     setPendingCopy(null)
@@ -302,12 +303,16 @@ export function Terminal({ terminalId }: TerminalProps) {
           Select a terminal from the sidebar
         </div>
       ) : isSettingUp ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400">
+        <div className="flex-1 flex flex-col items-center justify-center w-full h-full gap-3 text-gray-400">
           <Loader2 className="w-6 h-6 animate-spin" />
           <span className="text-sm">
             {activeTerminal?.git_repo?.status === 'setup'
               ? 'Cloning repository...'
-              : 'Running setup...'}
+              : activeTerminal?.setup?.status === 'setup'
+                ? 'Running setup...'
+                : activeTerminal?.setup?.status === 'delete'
+                  ? 'Running teardown...'
+                  : ''}
           </span>
         </div>
       ) : (
@@ -315,13 +320,12 @@ export function Terminal({ terminalId }: TerminalProps) {
         status !== 'connected' && (
           <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
             <span
-              className={`w-2 h-2 rounded-full ${
-                status === 'connecting'
+              className={`w-2 h-2 rounded-full ${status === 'connecting'
                   ? 'bg-yellow-400 animate-pulse'
                   : status === 'error'
                     ? 'bg-red-400'
                     : 'bg-gray-400'
-              }`}
+                }`}
             />
             {status === 'connecting' && 'Connecting...'}
             {status === 'disconnected' && 'Disconnected - Reconnecting...'}
@@ -331,7 +335,7 @@ export function Terminal({ terminalId }: TerminalProps) {
       )}
       <div
         ref={containerRef}
-        className={`flex-1 min-h-0 overflow-hidden ${terminalId === null ? 'hidden' : ''}`}
+        className={`flex-1 min-h-0 overflow-hidden ${terminalId === null || isSettingUp ? 'hidden' : ''}`}
       />
       {pendingCopy !== null && (
         <button

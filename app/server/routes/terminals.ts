@@ -27,6 +27,7 @@ import { destroySession } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import {
   deleteTerminalWorkspace,
+  emitWorkspace,
   setupTerminalWorkspace,
 } from '../workspace/setup'
 
@@ -345,12 +346,13 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       // Setup with delete script or conductor: run delete script async, then delete
       const hasDeleteFlow =
         terminal.setup &&
+        terminal.setup.status !== 'failed' &&
         (terminal.setup.conductor || terminal.setup.delete) &&
         terminal.git_repo?.status === 'done'
       if (hasDeleteFlow) {
-        await updateTerminal(id, {
-          setup: { ...terminal.setup, status: 'delete' as const },
-        })
+        const deleteSetup = { ...terminal.setup, status: 'delete' as const }
+        await updateTerminal(id, { setup: deleteSetup })
+        emitWorkspace(id, { setup: deleteSetup })
         deleteTerminalWorkspace(id).catch((err) =>
           log.error(
             `[terminals] Delete workspace error: ${err instanceof Error ? err.message : err}`,
