@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CircleX,
   Clock,
+  ExternalLink,
   GitBranch,
   GitMerge,
   GitPullRequestDraft,
@@ -110,9 +111,9 @@ export function PRStatusGroup({
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="text-xs text-muted-foreground flex-shrink-0 hover:text-foreground transition-colors"
+          className="text-xs text-muted-foreground hidden group-hover/pr:block flex-shrink-0 hover:text-foreground transition-colors"
         >
-          #{pr.prNumber}
+          <ExternalLink className="w-4 h-4 cursor-pointer" />
         </a>
         {hasNewActivity && (
           <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />

@@ -17,7 +17,11 @@ import { validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
 import { type CommandEvent, createOscParser } from './osc-parser'
-import { getZellijSessionProcesses } from './process-tree'
+import {
+  getListeningPortsForTerminal,
+  getSystemListeningPorts,
+  getZellijSessionProcesses,
+} from './process-tree'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -88,23 +92,46 @@ function getProcessesForTerminal(
   return processes
 }
 
+function getPortsForTerminal(
+  terminalId: number,
+  session: PtySession,
+  systemPorts: Map<number, number[]>,
+): number[] {
+  const shellPid = session.pty.pid
+  const zellijSessionName = `terminal-${terminalId}`
+  return getListeningPortsForTerminal(shellPid, zellijSessionName, systemPorts)
+}
+
 function scanAndEmitProcessesForTerminal(terminalId: number) {
   const session = sessions.get(terminalId)
   if (!session) return
 
   const processes = getProcessesForTerminal(terminalId, session)
-  getIO()?.emit('processes', { terminalId, processes })
+  const systemPorts = getSystemListeningPorts()
+  const ports = getPortsForTerminal(terminalId, session, systemPorts)
+  const terminalPorts: Record<number, number[]> = {}
+  if (ports.length > 0) {
+    terminalPorts[terminalId] = ports
+  }
+  getIO()?.emit('processes', { terminalId, processes, ports: terminalPorts })
 }
 
 function scanAndEmitAllProcesses() {
   const allProcesses: ActiveProcess[] = []
+  const systemPorts = getSystemListeningPorts()
+  const terminalPorts: Record<number, number[]> = {}
 
   for (const [terminalId, session] of sessions) {
     const procs = getProcessesForTerminal(terminalId, session)
     allProcesses.push(...procs)
+
+    const ports = getPortsForTerminal(terminalId, session, systemPorts)
+    if (ports.length > 0) {
+      terminalPorts[terminalId] = ports
+    }
   }
 
-  getIO()?.emit('processes', { processes: allProcesses })
+  getIO()?.emit('processes', { processes: allProcesses, ports: terminalPorts })
 }
 
 function startGlobalProcessPolling() {

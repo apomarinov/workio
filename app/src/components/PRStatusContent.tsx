@@ -346,7 +346,7 @@ export function PRStatusContent({
           onClick={(e) => e.stopPropagation()}
         >
           <GitMerge className="w-3 h-3" />
-          Merged
+          PR Merged
         </a>
         <a
           href={pr.prUrl}

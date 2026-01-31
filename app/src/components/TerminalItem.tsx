@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Command,
+  ExternalLink,
   GitBranch,
   Globe,
   MoreVertical,
@@ -23,7 +24,6 @@ import { useKeyMapContext } from '@/context/KeyMapContext'
 import { useSessionContext } from '@/context/SessionContext'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
-import { useProcesses } from '../hooks/useProcesses'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
@@ -37,8 +37,6 @@ interface TerminalItemProps {
   sessions?: SessionWithProject[]
   sessionsExpanded?: boolean
   onToggleSessions?: () => void
-  processesExpanded?: boolean
-  onToggleProcesses?: () => void
   githubExpanded?: boolean
   onToggleGitHub?: () => void
 }
@@ -49,8 +47,6 @@ export function TerminalItem({
   sessions = [],
   sessionsExpanded = true,
   onToggleSessions,
-  processesExpanded: processesExpandedProp,
-  onToggleProcesses,
   githubExpanded: githubExpandedProp,
   onToggleGitHub,
 }: TerminalItemProps) {
@@ -59,9 +55,15 @@ export function TerminalItem({
   const { clearSession } = useSessionContext()
   const { cmdHeld } = useKeyMapContext()
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
-  const allProcesses = useProcesses()
+  const {
+    githubPRs,
+    hasNewActivity,
+    markPRSeen,
+    processes: allProcesses,
+    terminalPorts,
+  } = useTerminalContext()
   const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
-  const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
+  const ports = terminalPorts[terminal.id] ?? []
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
@@ -75,18 +77,17 @@ export function TerminalItem({
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [localProcessesExpanded, setLocalProcessesExpanded] = useState(true)
-  const processesExpanded = processesExpandedProp ?? localProcessesExpanded
-  const toggleProcesses =
-    onToggleProcesses ?? (() => setLocalProcessesExpanded((v) => !v))
+  const [processesExpanded, setProcessesExpanded] = useState(false)
   const [localGitHubExpanded, setLocalGitHubExpanded] = useState(true)
   const githubExpanded = githubExpandedProp ?? localGitHubExpanded
   const toggleGitHub =
     onToggleGitHub ?? (() => setLocalGitHubExpanded((v) => !v))
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
+  const [portsExpanded, setPortsExpanded] = useState(false)
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0
   const hasProcesses = processes.length > 0
+  const hasPorts = ports.length > 0
 
   const gitBranch = terminal.git_branch
 
@@ -142,11 +143,15 @@ export function TerminalItem({
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
-            !hasSessions && !hasProcesses && !hasGitHub && 'pl-2.5',
+            !hasSessions &&
+              !hasProcesses &&
+              !hasGitHub &&
+              !hasPorts &&
+              'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
-          {hasSessions || hasProcesses || hasGitHub ? (
+          {hasSessions || hasProcesses || hasGitHub || hasPorts ? (
             <Button
               variant="ghost"
               size="icon"
@@ -245,67 +250,99 @@ export function TerminalItem({
           )}
         </div>
 
-        {(hasGitHub || hasProcesses || hasSessions) && sessionsExpanded && (
-          <div className="ml-2 space-y-0.5">
-            {hasGitHub && prForBranch && (
-              <PRStatusContent
-                pr={prForBranch}
-                expanded={githubExpanded}
-                onToggle={toggleGitHub}
-                hasNewActivity={hasNewActivity(prForBranch)}
-                onSeen={() => markPRSeen(prForBranch)}
-              />
-            )}
-            {hasProcesses && (
-              <>
-                <button
-                  type="button"
-                  onClick={toggleProcesses}
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
-                >
-                  {processesExpanded ? (
-                    <ChevronDown className="w-3 h-3" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3" />
-                  )}
-                  Processes ({processes.length})
-                </button>
-                {processesExpanded &&
-                  processes.map((process) => (
-                    <div
-                      key={`${process.pid}-${process.command}`}
-                      className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
-                    >
-                      <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
-                      <span className="text-xs truncate">
-                        {process.command}
-                      </span>
-                    </div>
-                  ))}
-              </>
-            )}
-            {sessions.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
-                  className="flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
-                >
-                  {sessionsListExpanded ? (
-                    <ChevronDown className="w-3 h-3" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3" />
-                  )}
-                  Claude ({sessions.length})
-                </button>
-                {sessionsListExpanded &&
-                  sessions.map((session) => (
-                    <SessionItem key={session.session_id} session={session} />
-                  ))}
-              </>
-            )}
-          </div>
-        )}
+        {(hasGitHub || hasProcesses || hasPorts || hasSessions) &&
+          sessionsExpanded && (
+            <div className="ml-2 space-y-0.5">
+              {hasGitHub && prForBranch && (
+                <PRStatusContent
+                  pr={prForBranch}
+                  expanded={githubExpanded}
+                  onToggle={toggleGitHub}
+                  hasNewActivity={hasNewActivity(prForBranch)}
+                  onSeen={() => markPRSeen(prForBranch)}
+                />
+              )}
+              {hasProcesses && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setProcessesExpanded((v) => !v)}
+                    className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  >
+                    {processesExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                    Processes ({processes.length})
+                  </button>
+                  {processesExpanded &&
+                    processes.map((process) => (
+                      <div
+                        key={`${process.pid}-${process.command}`}
+                        className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                      >
+                        <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                        <span className="text-xs truncate">
+                          {process.command}
+                        </span>
+                      </div>
+                    ))}
+                </>
+              )}
+              {hasPorts && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPortsExpanded((v) => !v)}
+                    className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
+                  >
+                    {portsExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                    Ports ({ports.length})
+                  </button>
+                  {portsExpanded &&
+                    ports.map((port) => (
+                      <a
+                        key={port}
+                        href={`http://localhost:${port}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                      >
+                        <span className="text-xs">{port}</span>
+                        <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
+                      </a>
+                    ))}
+                </>
+              )}
+              {sessions.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSessionsListExpanded(!sessionsListExpanded)
+                    }
+                    className="flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
+                  >
+                    {sessionsListExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                    Claude ({sessions.length})
+                  </button>
+                  {sessionsListExpanded &&
+                    sessions.map((session) => (
+                      <SessionItem key={session.session_id} session={session} />
+                    ))}
+                </>
+              )}
+            </div>
+          )}
       </div>
 
       <EditTerminalModal

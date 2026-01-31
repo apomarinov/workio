@@ -26,6 +26,10 @@ done
 
 echo "🤖 Claude Dashboard"
 echo ""
+echo "Options:"
+echo "  --rebuild   Force rebuild the webapp (npm install + npm run build)"
+echo "  --drop-db   Drop and recreate the database from schema.sql"
+echo ""
 
 # Load environment variables (line-by-line to handle special chars in values)
 load_env() {

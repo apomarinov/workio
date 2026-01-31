@@ -11,8 +11,6 @@ interface FolderGroupProps {
   sessionsForTerminal: Map<number, SessionWithProject[]>
   expandedTerminalSessions: Set<number>
   onToggleTerminalSessions: (terminalId: number) => void
-  collapsedTerminalProcesses: Set<number>
-  onToggleTerminalProcesses: (terminalId: number) => void
   collapsedTerminalGitHub: Set<number>
   onToggleTerminalGitHub: (terminalId: number) => void
 }
@@ -25,8 +23,6 @@ export function FolderGroup({
   sessionsForTerminal,
   expandedTerminalSessions,
   onToggleTerminalSessions,
-  collapsedTerminalProcesses,
-  onToggleTerminalProcesses,
   collapsedTerminalGitHub,
   onToggleTerminalGitHub,
 }: FolderGroupProps) {
@@ -61,8 +57,6 @@ export function FolderGroup({
               sessions={sessionsForTerminal.get(terminal.id) || []}
               sessionsExpanded={expandedTerminalSessions.has(terminal.id)}
               onToggleSessions={() => onToggleTerminalSessions(terminal.id)}
-              processesExpanded={!collapsedTerminalProcesses.has(terminal.id)}
-              onToggleProcesses={() => onToggleTerminalProcesses(terminal.id)}
               githubExpanded={!collapsedTerminalGitHub.has(terminal.id)}
               onToggleGitHub={() => onToggleTerminalGitHub(terminal.id)}
             />

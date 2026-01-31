@@ -248,6 +248,102 @@ export function hasZellijSession(terminalId: number): boolean {
   return findZellijServerForSession(sessionName) !== null
 }
 
+// Get all descendant PIDs of a process (recursive)
+export function getDescendantPids(pid: number): Set<number> {
+  const descendants = new Set<number>()
+  const visit = (p: number) => {
+    if (descendants.has(p)) return
+    descendants.add(p)
+    for (const child of getChildPids(p)) {
+      visit(child)
+    }
+  }
+  for (const child of getChildPids(pid)) {
+    visit(child)
+  }
+  return descendants
+}
+
+// Get all TCP listening ports on the system, grouped by PID
+// Returns Map<pid, port[]>
+export function getSystemListeningPorts(): Map<number, number[]> {
+  const pidPorts = new Map<number, number[]>()
+  try {
+    const output = execSync('lsof -iTCP -sTCP:LISTEN -P -n -Fpn', {
+      encoding: 'utf8',
+      timeout: 3000,
+    })
+
+    let currentPid: number | null = null
+    for (const line of output.split('\n')) {
+      if (line.startsWith('p')) {
+        currentPid = Number.parseInt(line.slice(1), 10)
+      } else if (line.startsWith('n') && currentPid !== null) {
+        // Format: n*:3000 or n127.0.0.1:3000 or n[::1]:3000
+        const portMatch = line.match(/:(\d+)$/)
+        if (portMatch) {
+          const port = Number.parseInt(portMatch[1], 10)
+          const existing = pidPorts.get(currentPid)
+          if (existing) {
+            if (!existing.includes(port)) existing.push(port)
+          } else {
+            pidPorts.set(currentPid, [port])
+          }
+        }
+      }
+    }
+  } catch {
+    // lsof failed or not available
+  }
+  return pidPorts
+}
+
+// Get listening ports for a terminal by intersecting its descendant PIDs
+// with the system-wide listening ports map.
+// shellPid: the terminal's shell PID (0 for SSH)
+// zellijSessionName: optional Zellij session name to also check server descendants
+export function getListeningPortsForTerminal(
+  shellPid: number,
+  zellijSessionName: string | null,
+  systemPorts: Map<number, number[]>,
+): number[] {
+  if (systemPorts.size === 0) return []
+
+  const allPids = new Set<number>()
+
+  // Collect descendants from the shell process tree
+  if (shellPid > 0) {
+    for (const pid of getDescendantPids(shellPid)) {
+      allPids.add(pid)
+    }
+  }
+
+  // Also collect descendants from Zellij server (processes run under the
+  // server daemon, not the client terminal)
+  if (zellijSessionName) {
+    const serverPid = findZellijServerForSession(zellijSessionName)
+    if (serverPid) {
+      for (const pid of getDescendantPids(serverPid)) {
+        allPids.add(pid)
+      }
+    }
+  }
+
+  if (allPids.size === 0) return []
+
+  const ports = new Set<number>()
+  for (const pid of allPids) {
+    const pidPorts = systemPorts.get(pid)
+    if (pidPorts) {
+      for (const port of pidPorts) {
+        ports.add(port)
+      }
+    }
+  }
+
+  return [...ports].sort((a, b) => a - b)
+}
+
 export function getChildProcesses(
   shellPid: number,
   terminalId?: number,

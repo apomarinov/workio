@@ -8,8 +8,6 @@ interface SortableTerminalItemProps {
   sessions: SessionWithProject[]
   sessionsExpanded: boolean
   onToggleSessions: () => void
-  processesExpanded: boolean
-  onToggleProcesses: () => void
   githubExpanded: boolean
   onToggleGitHub: () => void
 }
@@ -19,8 +17,6 @@ export function SortableTerminalItem({
   sessions,
   sessionsExpanded,
   onToggleSessions,
-  processesExpanded,
-  onToggleProcesses,
   githubExpanded,
   onToggleGitHub,
 }: SortableTerminalItemProps) {
@@ -46,8 +42,6 @@ export function SortableTerminalItem({
         sessions={sessions}
         sessionsExpanded={sessionsExpanded}
         onToggleSessions={onToggleSessions}
-        processesExpanded={processesExpanded}
-        onToggleProcesses={onToggleProcesses}
         githubExpanded={githubExpanded}
         onToggleGitHub={onToggleGitHub}
       />

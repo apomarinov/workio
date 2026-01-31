@@ -74,8 +74,6 @@ export function Sidebar({ width }: SidebarProps) {
   >('sidebar-expanded-session-groups', [])
   const [expandedTerminalSessions, setExpandedTerminalSessions] =
     useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
-  const [collapsedTerminalProcesses, setCollapsedTerminalProcesses] =
-    useLocalStorage<number[]>('sidebar-collapsed-terminal-processes', [])
   const [, setCollapsedSessions] = useLocalStorage<string[]>(
     'sidebar-collapsed-sessions',
     [],
@@ -207,20 +205,6 @@ export function Sidebar({ width }: SidebarProps) {
     })
   }
 
-  const collapsedTerminalProcessesSet = useMemo(
-    () => new Set(collapsedTerminalProcesses),
-    [collapsedTerminalProcesses],
-  )
-
-  const toggleTerminalProcesses = (terminalId: number) => {
-    setCollapsedTerminalProcesses((prev) => {
-      if (prev.includes(terminalId)) {
-        return prev.filter((id) => id !== terminalId)
-      }
-      return [...prev, terminalId]
-    })
-  }
-
   const collapsedTerminalGitHubSet = useMemo(
     () => new Set(collapsedTerminalGitHub),
     [collapsedTerminalGitHub],
@@ -300,7 +284,6 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedFoldersArray(allFolders)
     setExpandedSessionGroups(allOrphanGroupPaths)
     setExpandedTerminalSessions(allTerminalIds)
-    setCollapsedTerminalProcesses([])
     setCollapsedTerminalGitHub([])
     setCollapsedSessions([])
     setTerminalsSectionCollapsed(false)
@@ -314,7 +297,6 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedFoldersArray([])
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
-    setCollapsedTerminalProcesses(allTerminalIds)
     setCollapsedTerminalGitHub(allTerminalIds)
     setCollapsedSessions(allSessionIds)
     setTerminalsSectionCollapsed(true)
@@ -432,9 +414,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Terminals
@@ -444,9 +425,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -456,9 +436,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -505,9 +484,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Terminals
@@ -517,9 +495,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -529,9 +506,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -630,10 +606,6 @@ export function Sidebar({ width }: SidebarProps) {
                           sessionsForTerminal={sessionsForTerminal}
                           expandedTerminalSessions={expandedTerminalSessionsSet}
                           onToggleTerminalSessions={toggleTerminalSessions}
-                          collapsedTerminalProcesses={
-                            collapsedTerminalProcessesSet
-                          }
-                          onToggleTerminalProcesses={toggleTerminalProcesses}
                           collapsedTerminalGitHub={collapsedTerminalGitHubSet}
                           onToggleTerminalGitHub={toggleTerminalGitHub}
                         />
@@ -666,12 +638,6 @@ export function Sidebar({ width }: SidebarProps) {
                             onToggleSessions={() =>
                               toggleTerminalSessions(terminal.id)
                             }
-                            processesExpanded={
-                              !collapsedTerminalProcessesSet.has(terminal.id)
-                            }
-                            onToggleProcesses={() =>
-                              toggleTerminalProcesses(terminal.id)
-                            }
                             githubExpanded={
                               !collapsedTerminalGitHubSet.has(terminal.id)
                             }
@@ -693,8 +659,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button
@@ -772,7 +738,7 @@ export function Sidebar({ width }: SidebarProps) {
               ) : (
                 <ChevronDown className="w-3 h-3" />
               )}
-              Other Claude Sessions
+              Claude not in terminal
             </button>
             {!otherSessionsSectionCollapsed &&
               Array.from(orphanSessionGroups.entries()).map(
