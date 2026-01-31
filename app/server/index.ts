@@ -1,3 +1,4 @@
+import { type ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,6 +6,7 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
+import { initDb } from './db'
 import { env } from './env'
 import {
   detectAllTerminalBranches,
@@ -16,6 +18,7 @@ import {
   requestPRReview,
 } from './github/checks'
 import { setIO } from './io'
+import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -43,6 +46,9 @@ const fastify = Fastify({
   loggerInstance: pino({ level: 'info' }, logStream),
 })
 setLogger(fastify.log)
+
+// Initialize database
+await initDb()
 
 // Setup Socket.IO
 const io = new SocketIOServer(fastify.server, {
@@ -84,16 +90,6 @@ if (env.NODE_ENV === 'production') {
 // Health check
 fastify.get('/api/health', async () => {
   return { status: 'ok' }
-})
-
-// Emit to Socket.IO clients
-fastify.post('/api/emit', async (request, reply) => {
-  const { event, data } = request.body as { event: string; data: unknown }
-  if (!event) {
-    return reply.status(400).send({ error: 'event is required' })
-  }
-  io.emit(event, data)
-  return { ok: true }
 })
 
 // GitHub PR comments
@@ -148,9 +144,52 @@ await fastify.register(terminalRoutes)
 await fastify.register(settingsRoutes)
 await fastify.register(sessionRoutes)
 
+// Start monitor daemon (persistent Python process for hook events)
+const projectRoot = path.resolve(__dirname, '../..')
+const daemonScript = path.join(projectRoot, 'monitor_daemon.py')
+let daemonProcess: ChildProcess | null = null
+
+function startDaemon() {
+  daemonProcess = spawn('python3', [daemonScript], {
+    cwd: projectRoot,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  })
+  daemonProcess.stderr?.on('data', (data: Buffer) => {
+    const msg = data.toString().trim()
+    if (msg) log.info(`[daemon] ${msg}`)
+  })
+  daemonProcess.on('exit', (code) => {
+    log.info(`[daemon] Monitor daemon exited with code ${code}`)
+    daemonProcess = null
+  })
+}
+
+function stopDaemon() {
+  if (daemonProcess) {
+    daemonProcess.kill('SIGTERM')
+    daemonProcess = null
+  }
+  // Clean up socket file
+  const sockPath = path.join(projectRoot, 'daemon.sock')
+  try {
+    fs.unlinkSync(sockPath)
+  } catch {}
+}
+
+process.on('exit', stopDaemon)
+process.on('SIGTERM', () => {
+  stopDaemon()
+  process.exit(0)
+})
+process.on('SIGINT', () => {
+  stopDaemon()
+  process.exit(0)
+})
+
 // Start server
 const start = async () => {
   try {
+    startDaemon()
     await fastify.listen({ port, host: '0.0.0.0' })
 
     // Handle WebSocket upgrades for terminal PTY
@@ -164,6 +203,9 @@ const start = async () => {
     })
 
     log.info('[ws] Terminal WebSocket handler registered at /ws/terminal')
+
+    // Initialize PostgreSQL NOTIFY/LISTEN
+    await initPgListener(io, env.DATABASE_URL)
 
     // Initialize GitHub PR checks polling
     initGitHubChecks()

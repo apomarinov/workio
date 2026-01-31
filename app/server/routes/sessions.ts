@@ -11,7 +11,7 @@ import {
 export default async function sessionRoutes(fastify: FastifyInstance) {
   // List all Claude sessions with project paths
   fastify.get('/api/sessions', async () => {
-    return getAllSessions()
+    return await getAllSessions()
   })
 
   // Get a single session by ID
@@ -19,7 +19,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
     '/api/sessions/:id',
     async (request, reply) => {
       const { id } = request.params
-      const session = getSessionById(id)
+      const session = await getSessionById(id)
       if (!session) {
         return reply.status(404).send({ error: 'Session not found' })
       }
@@ -32,7 +32,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
     '/api/sessions/:id',
     async (request, reply) => {
       const { id } = request.params
-      const updated = updateSession(id, request.body)
+      const updated = await updateSession(id, request.body)
       if (!updated) {
         return reply.status(404).send({ error: 'Session not found' })
       }
@@ -45,7 +45,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
     '/api/sessions/:id',
     async (request, reply) => {
       const { id } = request.params
-      const deleted = deleteSession(id)
+      const deleted = await deleteSession(id)
       if (!deleted) {
         return reply.status(404).send({ error: 'Session not found' })
       }
@@ -61,7 +61,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
       if (!Array.isArray(ids) || ids.length === 0) {
         return reply.status(400).send({ error: 'ids array is required' })
       }
-      const deleted = deleteSessions(ids)
+      const deleted = await deleteSessions(ids)
       return { ok: true, deleted }
     },
   )
@@ -74,6 +74,6 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
     const { id } = request.params
     const limit = Math.min(Number(request.query.limit) || 30, 100)
     const offset = Number(request.query.offset) || 0
-    return getSessionMessages(id, limit, offset)
+    return await getSessionMessages(id, limit, offset)
   })
 }

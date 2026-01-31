@@ -50,7 +50,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
   // List all terminals
   fastify.get('/api/terminals', async () => {
-    const terminals = getAllTerminals()
+    const terminals = await getAllTerminals()
     return terminals.map((terminal) => ({
       ...terminal,
       orphaned: terminal.ssh_host ? false : !fs.existsSync(terminal.cwd),
@@ -75,7 +75,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ error: result.error })
         }
 
-        const terminal = createTerminal(
+        const terminal = await createTerminal(
           rawCwd?.trim() || '~',
           name?.trim() || trimmedHost,
           null,
@@ -110,7 +110,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           .send({ error: 'Permission denied: cannot access directory' })
       }
 
-      const terminal = createTerminal(cwd, name || null, shell || null)
+      const terminal = await createTerminal(cwd, name || null, shell || null)
       return reply.status(201).send(terminal)
     },
   )
@@ -124,7 +124,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid terminal id' })
       }
 
-      const terminal = getTerminalById(id)
+      const terminal = await getTerminalById(id)
       if (!terminal) {
         return reply.status(404).send({ error: 'Terminal not found' })
       }
@@ -141,7 +141,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid terminal id' })
       }
 
-      const terminal = getTerminalById(id)
+      const terminal = await getTerminalById(id)
       if (!terminal) {
         return reply.status(404).send({ error: 'Terminal not found' })
       }
@@ -172,7 +172,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
       }
 
-      const updated = updateTerminal(id, body)
+      const updated = await updateTerminal(id, body)
       return updated
     },
   )
@@ -186,7 +186,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid terminal id' })
       }
 
-      const terminal = getTerminalById(id)
+      const terminal = await getTerminalById(id)
       if (!terminal) {
         return reply.status(404).send({ error: 'Terminal not found' })
       }
@@ -197,7 +197,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         log.info(`[terminals] Killed PTY session for terminal ${id}`)
       }
 
-      deleteTerminal(id)
+      await deleteTerminal(id)
       refreshPRChecks()
       return reply.status(204).send()
     },

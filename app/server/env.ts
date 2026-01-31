@@ -12,7 +12,7 @@ dotenv.config({ path: path.join(rootDir, '.env') })
 dotenv.config({ path: path.join(rootDir, '.env.local'), override: true })
 
 const envSchema = z.object({
-  DB_NAME: z.string().default('data.db'),
+  DATABASE_URL: z.string().default('postgresql://localhost/claude_dashboard'),
   SERVER_PORT: z.coerce.number().default(5176),
   CLIENT_PORT: z.coerce.number().default(5175),
   NODE_ENV: z
@@ -31,8 +31,9 @@ if (!parsed.success) {
 export const env = {
   ...parsed.data,
   ROOT_DIR: rootDir,
-  DB_PATH: path.join(rootDir, parsed.data.DB_NAME),
 }
 
-log.info(`[env] DB_PATH: ${env.DB_PATH}`)
+log.info(
+  `[env] DATABASE_URL: ${env.DATABASE_URL.replace(/\/\/.*@/, '//*****@')}`,
+)
 log.info(`[env] SERVER_PORT: ${env.SERVER_PORT}`)

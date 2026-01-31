@@ -7,27 +7,29 @@ Processes messages concurrently with a limit of 5 at a time.
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from db import get_db
-from summary import summarize_user, summarize_assistant
+from db import get_db, get_cursor
 
 CONCURRENCY_LIMIT = 10
 
 
 def get_messages_without_summary(conn):
     """Get all messages that don't have a summary."""
-    return conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         SELECT id, body, is_user, thinking
         FROM messages
-        WHERE is_user = 0 AND body IS NOT NULL AND length(body) > 60
+        WHERE is_user = FALSE AND body IS NOT NULL AND length(body) > 60
         LIMIT 30
-    ''').fetchall()
+    ''')
+    return cur.fetchall()
 
 
 def update_message_summary(message_id: int, summary_json: str) -> None:
     """Update a message's summary."""
     conn = get_db()
-    conn.execute(
-        'UPDATE messages SET summary = ? WHERE id = ?',
+    cur = conn.cursor()
+    cur.execute(
+        'UPDATE messages SET summary = %s WHERE id = %s',
         (summary_json, message_id)
     )
     conn.commit()
@@ -96,4 +98,5 @@ def main():
 
 
 if __name__ == "__main__":
+    from summary import summarize_user, summarize_assistant
     main()

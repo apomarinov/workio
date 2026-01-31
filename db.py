@@ -1,38 +1,43 @@
 #!/usr/bin/env python3
 """
-Database utilities for the Claude Code Monitor.
+Database utilities for the Claude Code Monitor (PostgreSQL).
 """
 
 import json
-import sqlite3
-from pathlib import Path
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
 
 for env_file in [".env", ".env.local"]:
     load_dotenv(Path(__file__).parent / env_file, override=True)
 
-DB_PATH = Path(__file__).parent / os.environ.get("DB_NAME", "data.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/claude_dashboard")
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
-def get_db() -> sqlite3.Connection:
-    """Get a database connection with WAL mode and busy timeout."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA busy_timeout=5000')
-    conn.row_factory = sqlite3.Row
+def get_db():
+    """Get a database connection."""
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = False
     return conn
 
 
-def init_db() -> sqlite3.Connection:
+def get_cursor(conn):
+    """Get a cursor that returns dicts."""
+    return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+def init_db():
     """Initialize the database by running schema.sql and return a connection."""
     conn = get_db()
 
-    # Read and execute schema.sql
     if SCHEMA_PATH.exists():
         schema_sql = SCHEMA_PATH.read_text()
-        conn.executescript(schema_sql)
+        cur = conn.cursor()
+        cur.execute(schema_sql)
         conn.commit()
     else:
         raise FileNotFoundError(f"Schema file not found: {SCHEMA_PATH}")
@@ -40,170 +45,201 @@ def init_db() -> sqlite3.Connection:
     return conn
 
 
+# Notifications
+
+def notify(conn, channel: str, payload: dict) -> None:
+    """Send a PostgreSQL NOTIFY with JSON payload.
+    Must be called before conn.commit() — NOTIFY is delivered on commit."""
+    cur = conn.cursor()
+    cur.execute("SELECT pg_notify(%s, %s)", (channel, json.dumps(payload)))
+
+
 # Logs
 
-def log(conn: sqlite3.Connection, message: str, **kwargs) -> None:
+def log(conn, message: str, **kwargs) -> None:
     """Log a message with additional data to the logs table."""
     data = {"message": message, **kwargs}
-    conn.execute('INSERT INTO logs (data) VALUES (?)', (json.dumps(data),))
+    cur = conn.cursor()
+    cur.execute('INSERT INTO logs (data) VALUES (%s)', (json.dumps(data),))
 
 
 # Hooks
 
-def save_hook(conn: sqlite3.Connection, session_id: str, hook_type: str, payload: dict) -> None:
+def save_hook(conn, session_id: str, hook_type: str, payload: dict) -> None:
     """Save a hook event with its full payload."""
-    conn.execute(
-        'INSERT INTO hooks (session_id, hook_type, payload) VALUES (?, ?, ?)',
+    cur = conn.cursor()
+    cur.execute(
+        'INSERT INTO hooks (session_id, hook_type, payload) VALUES (%s, %s, %s)',
         (session_id, hook_type, json.dumps(payload))
     )
 
 
 # Projects
 
-def upsert_project(conn: sqlite3.Connection, path: str) -> int:
+def upsert_project(conn, path: str) -> int:
     """Upsert project by path, returning project ID."""
-    row = conn.execute('SELECT id FROM projects WHERE path = ?', (path,)).fetchone()
+    cur = get_cursor(conn)
+    cur.execute('SELECT id FROM projects WHERE path = %s', (path,))
+    row = cur.fetchone()
     if row:
         return row['id']
-    cursor = conn.execute('INSERT INTO projects (path) VALUES (?)', (path,))
-    return cursor.lastrowid
+    cur.execute('INSERT INTO projects (path) VALUES (%s) RETURNING id', (path,))
+    return cur.fetchone()['id']
 
 
-def update_project_path_by_session(conn: sqlite3.Connection, session_id: str, path: str) -> bool:
+def update_project_path_by_session(conn, session_id: str, path: str) -> bool:
     """Update the project path for an existing session. Returns True if updated."""
-    row = conn.execute(
-        'SELECT project_id FROM sessions WHERE session_id = ?',
+    cur = get_cursor(conn)
+    cur.execute(
+        'SELECT project_id FROM sessions WHERE session_id = %s',
         (session_id,)
-    ).fetchone()
+    )
+    row = cur.fetchone()
     if row:
-        # Check if path already exists in another project
-        existing = conn.execute(
-            'SELECT id FROM projects WHERE path = ? AND id != ?',
+        existing = cur.execute(
+            'SELECT id FROM projects WHERE path = %s AND id != %s',
             (path, row['project_id'])
-        ).fetchone()
-        if existing:
+        )
+        existing_row = cur.fetchone()
+        if existing_row:
             return False
-        conn.execute('UPDATE projects SET path = ? WHERE id = ?', (path, row['project_id']))
+        cur.execute('UPDATE projects SET path = %s WHERE id = %s', (path, row['project_id']))
         return True
     return False
 
 
 # Sessions
 
-def upsert_session(conn: sqlite3.Connection, session_id: str, project_id: int, status: str, transcript_path: str, terminal_id: int | None = None) -> None:
+def upsert_session(conn, session_id: str, project_id: int, status: str, transcript_path: str, terminal_id: int | None = None) -> None:
     """Insert or update a session. Note: project_id is only set on insert, not updated."""
-    conn.execute('''
+    cur = conn.cursor()
+    cur.execute('''
         INSERT INTO sessions (session_id, project_id, terminal_id, status, transcript_path)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT(session_id) DO UPDATE SET
-            terminal_id = COALESCE(excluded.terminal_id, sessions.terminal_id),
-            status = excluded.status,
-            transcript_path = excluded.transcript_path
+            terminal_id = COALESCE(EXCLUDED.terminal_id, sessions.terminal_id),
+            status = EXCLUDED.status,
+            transcript_path = EXCLUDED.transcript_path
     ''', (session_id, project_id, terminal_id, status, transcript_path))
 
 
-def update_session_metadata(conn: sqlite3.Connection, session_id: str, name: str | None, message_count: int | None) -> None:
+def update_session_metadata(conn, session_id: str, name: str | None, message_count: int | None) -> None:
     """Update session metadata."""
-    conn.execute('''
-        UPDATE sessions SET name = ?, message_count = ?
-        WHERE session_id = ?
+    cur = conn.cursor()
+    cur.execute('''
+        UPDATE sessions SET name = %s, message_count = %s
+        WHERE session_id = %s
     ''', (name[:200] if name else None, message_count, session_id))
 
 
-def update_session_name_if_empty(conn: sqlite3.Connection, session_id: str, name: str) -> None:
+def update_session_name_if_empty(conn, session_id: str, name: str) -> None:
     """Update session name only if the current name is empty."""
-    conn.execute('''
-        UPDATE sessions SET name = ?
-        WHERE session_id = ? AND (name IS NULL OR name = '')
+    cur = conn.cursor()
+    cur.execute('''
+        UPDATE sessions SET name = %s
+        WHERE session_id = %s AND (name IS NULL OR name = '')
     ''', (name[:200], session_id))
 
 
-def get_session(conn: sqlite3.Connection, session_id: str) -> sqlite3.Row | None:
+def get_session(conn, session_id: str):
     """Get a session by ID."""
-    return conn.execute(
-        'SELECT * FROM sessions WHERE session_id = ?',
+    cur = get_cursor(conn)
+    cur.execute(
+        'SELECT * FROM sessions WHERE session_id = %s',
         (session_id,)
-    ).fetchone()
+    )
+    return cur.fetchone()
 
 
-def get_session_project_path(conn: sqlite3.Connection, session_id: str) -> str | None:
+def get_session_project_path(conn, session_id: str) -> str | None:
     """Get the stored project path for a session."""
-    row = conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         SELECT p.path FROM sessions s
         JOIN projects p ON s.project_id = p.id
-        WHERE s.session_id = ?
-    ''', (session_id,)).fetchone()
+        WHERE s.session_id = %s
+    ''', (session_id,))
+    row = cur.fetchone()
     return row['path'] if row else None
 
 
-def get_stale_session_ids(conn: sqlite3.Connection, project_id: int, current_session_id: str) -> list[str]:
+def get_stale_session_ids(conn, project_id: int, current_session_id: str) -> list[str]:
     """Get session IDs that are stale (started but not current)."""
-    rows = conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         SELECT session_id FROM sessions
-        WHERE project_id = ?
-          AND session_id != ?
+        WHERE project_id = %s
+          AND session_id != %s
           AND status = 'started'
-    ''', (project_id, current_session_id)).fetchall()
+    ''', (project_id, current_session_id))
+    rows = cur.fetchall()
     return [row['session_id'] for row in rows]
 
 
-def delete_sessions_cascade(conn: sqlite3.Connection, session_ids: list[str]) -> None:
+def delete_sessions_cascade(conn, session_ids: list[str]) -> None:
     """Delete sessions and all related data (messages, prompts, hooks)."""
     if not session_ids:
         return
 
-    placeholders = ','.join('?' * len(session_ids))
+    cur = conn.cursor()
 
     # Delete messages for these sessions' prompts
-    conn.execute(f'''
+    cur.execute('''
         DELETE FROM messages WHERE prompt_id IN (
-            SELECT id FROM prompts WHERE session_id IN ({placeholders})
+            SELECT id FROM prompts WHERE session_id = ANY(%s)
         )
-    ''', session_ids)
+    ''', (session_ids,))
 
     # Delete prompts
-    conn.execute(f'DELETE FROM prompts WHERE session_id IN ({placeholders})', session_ids)
+    cur.execute('DELETE FROM prompts WHERE session_id = ANY(%s)', (session_ids,))
 
     # Delete hooks
-    conn.execute(f'DELETE FROM hooks WHERE session_id IN ({placeholders})', session_ids)
+    cur.execute('DELETE FROM hooks WHERE session_id = ANY(%s)', (session_ids,))
 
     # Delete sessions
-    conn.execute(f'DELETE FROM sessions WHERE session_id IN ({placeholders})', session_ids)
+    cur.execute('DELETE FROM sessions WHERE session_id = ANY(%s)', (session_ids,))
 
 
 # Prompts
 
-def create_prompt(conn: sqlite3.Connection, session_id: str, prompt_text: str | None = None) -> int:
+def create_prompt(conn, session_id: str, prompt_text: str | None = None) -> int:
     """Create a new prompt for a session."""
-    cursor = conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         INSERT INTO prompts (session_id, prompt)
-        VALUES (?, ?)
+        VALUES (%s, %s)
+        RETURNING id
     ''', (session_id, prompt_text))
-    return cursor.lastrowid
+    return cur.fetchone()['id']
 
 
-def get_latest_prompt(conn: sqlite3.Connection, session_id: str) -> sqlite3.Row | None:
+def get_latest_prompt(conn, session_id: str):
     """Get the latest prompt for a session."""
-    return conn.execute(
-        'SELECT id, prompt FROM prompts WHERE session_id = ? ORDER BY id DESC LIMIT 1',
+    cur = get_cursor(conn)
+    cur.execute(
+        'SELECT id, prompt FROM prompts WHERE session_id = %s ORDER BY id DESC LIMIT 1',
         (session_id,)
-    ).fetchone()
+    )
+    return cur.fetchone()
 
 
-def update_prompt_text(conn: sqlite3.Connection, prompt_id: int, prompt_text: str) -> None:
+def update_prompt_text(conn, prompt_id: int, prompt_text: str) -> None:
     """Update the prompt text for a prompt."""
-    conn.execute('UPDATE prompts SET prompt = ? WHERE id = ?', (prompt_text, prompt_id))
+    cur = conn.cursor()
+    cur.execute('UPDATE prompts SET prompt = %s WHERE id = %s', (prompt_text, prompt_id))
 
 
 # Messages
 
-def message_exists(conn: sqlite3.Connection, uuid: str) -> bool:
+def message_exists(conn, uuid: str) -> bool:
     """Check if a message with the given UUID exists."""
-    return conn.execute('SELECT id FROM messages WHERE uuid = ?', (uuid,)).fetchone() is not None
+    cur = conn.cursor()
+    cur.execute('SELECT id FROM messages WHERE uuid = %s', (uuid,))
+    return cur.fetchone() is not None
 
 
 def create_message(
-    conn: sqlite3.Connection,
+    conn,
     prompt_id: int,
     uuid: str,
     created_at: str,
@@ -215,11 +251,13 @@ def create_message(
     images: str | None = None
 ) -> int:
     """Create a new message."""
-    cursor = conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user, tools, todo_id, images)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
     ''', (prompt_id, uuid, created_at, body, is_thinking, is_user, tools, todo_id, images))
-    return cursor.lastrowid
+    return cur.fetchone()['id']
 
 
 def compute_todo_hash(session_id: str, todos: list[dict]) -> str:
@@ -251,7 +289,7 @@ def compute_state_key(todos: list[dict]) -> str:
 
 
 def upsert_todo_message(
-    conn: sqlite3.Connection,
+    conn,
     session_id: str,
     prompt_id: int,
     uuid: str,
@@ -272,43 +310,48 @@ def upsert_todo_message(
     todo_hash = compute_todo_hash(session_id, todos)
 
     # Check if a message with this todo_hash already exists
-    existing = conn.execute('''
-        SELECT id, todo_id, tools FROM messages WHERE todo_id = ?
-    ''', (todo_hash,)).fetchone()
+    cur = get_cursor(conn)
+    cur.execute('''
+        SELECT id, todo_id, tools FROM messages WHERE todo_id = %s
+    ''', (todo_hash,))
+    existing = cur.fetchone()
 
     if existing:
         # Check if state_key changed by comparing with stored tools JSON
-        # Only consider it a state change if old todo HAD a state_key (not empty/missing)
         state_changed = False
         try:
-            old_tools = json.loads(existing['tools']) if existing['tools'] else {}
+            old_tools = existing['tools'] if existing['tools'] else {}
+            if isinstance(old_tools, str):
+                old_tools = json.loads(old_tools)
             old_state_key = old_tools.get('state_key', '')
-            # Only emit state change if old had a state_key AND it differs
             if old_state_key and old_state_key != state_key:
                 state_changed = True
-        except (json.JSONDecodeError, TypeError):
-            pass  # No state change if we can't parse old tools
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            pass
 
-        # Only update if state changed - don't touch updated_at for no-op reprocessing
         if state_changed:
-            conn.execute('''
-                UPDATE messages SET tools = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+            cur.execute('''
+                UPDATE messages SET tools = %s, updated_at = NOW()
+                WHERE id = %s
             ''', (tools, existing['id']))
         return existing['id'], existing['todo_id'], False, state_changed
 
     # Create new todo message with hash as todo_id
-    cursor = conn.execute('''
+    cur.execute('''
         INSERT INTO messages (prompt_id, uuid, created_at, body, thinking, is_user, tools, todo_id)
-        VALUES (?, ?, ?, NULL, 0, 0, ?, ?)
+        VALUES (%s, %s, %s, NULL, FALSE, FALSE, %s, %s)
+        RETURNING id
     ''', (prompt_id, uuid, created_at, tools, todo_hash))
-    return cursor.lastrowid, todo_hash, True, False
+    new_id = cur.fetchone()['id']
+    return new_id, todo_hash, True, False
 
 
-def get_latest_user_message(conn: sqlite3.Connection, prompt_id: int) -> sqlite3.Row | None:
+def get_latest_user_message(conn, prompt_id: int):
     """Get the latest user message for a prompt."""
-    return conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         SELECT body FROM messages
-        WHERE prompt_id = ? AND is_user = 1
+        WHERE prompt_id = %s AND is_user = TRUE
         ORDER BY id DESC LIMIT 1
-    ''', (prompt_id,)).fetchone()
+    ''', (prompt_id,))
+    return cur.fetchone()

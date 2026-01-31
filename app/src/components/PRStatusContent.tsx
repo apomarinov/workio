@@ -337,7 +337,7 @@ export function PRStatusContent({
   // Merged state with header: just show a merged link
   if (hasHeader && isMerged) {
     return (
-      <div className='flex gap-1 items-center group/mr'>
+      <div className="flex gap-1 items-center group/mr">
         <a
           href={pr.prUrl}
           target="_blank"
@@ -398,8 +398,8 @@ export function PRStatusContent({
                 isApproved ||
                 hasChecks ||
                 pendingReviews.length > 0) && (
-                  <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
-                )}
+                <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
+              )}
               {hasChangesRequested ? (
                 <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
               ) : hasRunningChecks ? (

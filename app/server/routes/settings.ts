@@ -8,7 +8,7 @@ type UpdateSettingsBody = Partial<Omit<Settings, 'id'>>
 export default async function settingsRoutes(fastify: FastifyInstance) {
   // Get settings
   fastify.get('/api/settings', async () => {
-    return getSettings()
+    return await getSettings()
   })
 
   // Update settings
@@ -53,7 +53,7 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
         }
       }
 
-      const settings = updateSettings(updates)
+      const settings = await updateSettings(updates)
       return settings
     },
   )

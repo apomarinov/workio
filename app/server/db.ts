@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Database from 'better-sqlite3'
+import pg from 'pg'
 import type {
   Project,
   SessionWithProject,
@@ -14,34 +14,38 @@ import { log } from './logger'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = path.join(__dirname, '../../schema.sql')
 
-const db = new Database(env.DB_PATH)
-
-// Enable WAL mode and busy timeout (matching Python config)
-db.pragma('journal_mode = WAL')
-db.pragma('busy_timeout = 5000')
+const pool = new pg.Pool({
+  connectionString: env.DATABASE_URL,
+})
 
 // Initialize database from schema.sql
-if (fs.existsSync(SCHEMA_PATH)) {
-  const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8')
-  db.exec(schema)
-  log.info('[db] Database initialized from schema.sql')
-} else {
-  log.error(`[db] Schema file not found: ${SCHEMA_PATH}`)
-  process.exit(1)
+export async function initDb() {
+  if (fs.existsSync(SCHEMA_PATH)) {
+    const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8')
+    await pool.query(schema)
+    log.info('[db] Database initialized from schema.sql')
+  } else {
+    log.error(`[db] Schema file not found: ${SCHEMA_PATH}`)
+    process.exit(1)
+  }
 }
 
 // Project queries
 
-export function getProjectByPath(cwd: string): Project | undefined {
-  return db.prepare('SELECT * FROM projects WHERE path = ?').get(cwd) as
-    | Project
-    | undefined
+export async function getProjectByPath(
+  cwd: string,
+): Promise<Project | undefined> {
+  const { rows } = await pool.query('SELECT * FROM projects WHERE path = $1', [
+    cwd,
+  ])
+  return rows[0]
 }
 
-export function getProjectById(id: number): Project | undefined {
-  return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as
-    | Project
-    | undefined
+export async function getProjectById(id: number): Promise<Project | undefined> {
+  const { rows } = await pool.query('SELECT * FROM projects WHERE id = $1', [
+    id,
+  ])
+  return rows[0]
 }
 
 // Session queries
@@ -59,7 +63,7 @@ const SESSION_SELECT = `
       SELECT m.body FROM messages m
       JOIN prompts pr ON m.prompt_id = pr.id
       WHERE pr.session_id = s.session_id
-        AND m.is_user = 0
+        AND m.is_user = false
         AND m.tools IS NULL
       ORDER BY m.created_at DESC LIMIT 1
     ) as latest_agent_message
@@ -67,18 +71,21 @@ const SESSION_SELECT = `
   JOIN projects p ON s.project_id = p.id
 `
 
-export function getAllSessions(): SessionWithProject[] {
-  return db
-    .prepare(`${SESSION_SELECT} ORDER BY s.updated_at DESC`)
-    .all() as SessionWithProject[]
+export async function getAllSessions(): Promise<SessionWithProject[]> {
+  const { rows } = await pool.query(
+    `${SESSION_SELECT} ORDER BY s.updated_at DESC`,
+  )
+  return rows
 }
 
-export function getSessionById(
+export async function getSessionById(
   sessionId: string,
-): SessionWithProject | undefined {
-  return db
-    .prepare(`${SESSION_SELECT} WHERE s.session_id = ?`)
-    .get(sessionId) as SessionWithProject | undefined
+): Promise<SessionWithProject | undefined> {
+  const { rows } = await pool.query(
+    `${SESSION_SELECT} WHERE s.session_id = $1`,
+    [sessionId],
+  )
+  return rows[0]
 }
 
 export interface SessionMessage {
@@ -89,8 +96,8 @@ export interface SessionMessage {
   thinking: boolean
   todo_id: string | null
   body: string | null
-  tools: string | null // JSON string from SQLite
-  images: string | null // JSON string from SQLite
+  tools: Record<string, unknown> | null
+  images: unknown[] | null
   created_at: string
   updated_at: string | null
   prompt_text: string | null
@@ -102,25 +109,24 @@ export interface SessionMessagesResult {
   hasMore: boolean
 }
 
-export function getSessionMessages(
+export async function getSessionMessages(
   sessionId: string,
   limit: number,
   offset: number,
-): SessionMessagesResult {
-  const total = db
-    .prepare(
-      `
+): Promise<SessionMessagesResult> {
+  const countResult = await pool.query(
+    `
       SELECT COUNT(*) as count
       FROM messages m
       JOIN prompts p ON m.prompt_id = p.id
-      WHERE p.session_id = ?
+      WHERE p.session_id = $1
     `,
-    )
-    .get(sessionId) as { count: number }
+    [sessionId],
+  )
+  const total = Number.parseInt(countResult.rows[0].count, 10)
 
-  const messages = db
-    .prepare(
-      `
+  const { rows } = await pool.query(
+    `
       SELECT
         m.id,
         m.prompt_id,
@@ -136,38 +142,62 @@ export function getSessionMessages(
         p.prompt as prompt_text
       FROM messages m
       JOIN prompts p ON m.prompt_id = p.id
-      WHERE p.session_id = ?
+      WHERE p.session_id = $1
       ORDER BY COALESCE(m.updated_at, m.created_at) DESC
-      LIMIT ? OFFSET ?
+      LIMIT $2 OFFSET $3
     `,
-    )
-    .all(sessionId, limit, offset) as SessionMessage[]
+    [sessionId, limit, offset],
+  )
 
-  // Parse tools/images JSON and convert boolean fields
-  const parsedMessages = messages.map((m) => ({
-    ...m,
-    is_user: Boolean(m.is_user),
-    thinking: Boolean(m.thinking),
-    tools: m.tools ? JSON.parse(m.tools) : null,
-    images: m.images ? JSON.parse(m.images) : null,
-  }))
-
+  // PostgreSQL JSONB returns native objects — no JSON.parse needed
+  // PostgreSQL BOOLEAN returns native booleans — no conversion needed
   return {
-    messages: parsedMessages,
-    total: total.count,
-    hasMore: offset + parsedMessages.length < total.count,
+    messages: rows,
+    total,
+    hasMore: offset + rows.length < total,
   }
 }
 
-export function updateSession(
+export async function getMessagesByIds(
+  ids: number[],
+): Promise<SessionMessage[]> {
+  if (ids.length === 0) return []
+
+  const { rows } = await pool.query(
+    `
+      SELECT
+        m.id,
+        m.prompt_id,
+        m.uuid,
+        m.is_user,
+        m.thinking,
+        m.todo_id,
+        m.body,
+        m.tools,
+        m.images,
+        m.created_at,
+        m.updated_at,
+        p.prompt as prompt_text
+      FROM messages m
+      JOIN prompts p ON m.prompt_id = p.id
+      WHERE m.id = ANY($1)
+      ORDER BY m.id
+    `,
+    [ids],
+  )
+  return rows
+}
+
+export async function updateSession(
   sessionId: string,
   updates: { name?: string },
-): boolean {
+): Promise<boolean> {
   const setClauses: string[] = []
   const values: (string | null)[] = []
+  let paramIdx = 1
 
   if (updates.name !== undefined) {
-    setClauses.push('name = ?')
+    setClauses.push(`name = $${paramIdx++}`)
     values.push(updates.name)
   }
 
@@ -175,85 +205,86 @@ export function updateSession(
     return true
   }
 
-  setClauses.push('updated_at = CURRENT_TIMESTAMP')
+  setClauses.push('updated_at = NOW()')
   values.push(sessionId)
 
-  const result = db
-    .prepare(
-      `UPDATE sessions SET ${setClauses.join(', ')} WHERE session_id = ?`,
-    )
-    .run(...values)
-  return result.changes > 0
+  const result = await pool.query(
+    `UPDATE sessions SET ${setClauses.join(', ')} WHERE session_id = $${paramIdx}`,
+    values,
+  )
+  return (result.rowCount ?? 0) > 0
 }
 
-export function deleteSession(sessionId: string): boolean {
+export async function deleteSession(sessionId: string): Promise<boolean> {
   // Delete in order: messages (via prompts), prompts, hooks, then session
-  const promptIds = db
-    .prepare('SELECT id FROM prompts WHERE session_id = ?')
-    .all(sessionId) as { id: number }[]
+  const promptResult = await pool.query(
+    'SELECT id FROM prompts WHERE session_id = $1',
+    [sessionId],
+  )
 
-  if (promptIds.length > 0) {
-    const ids = promptIds.map((p) => p.id)
-    db.prepare(
-      `DELETE FROM messages WHERE prompt_id IN (${ids.map(() => '?').join(',')})`,
-    ).run(...ids)
+  if (promptResult.rows.length > 0) {
+    const ids = promptResult.rows.map((p: { id: number }) => p.id)
+    await pool.query('DELETE FROM messages WHERE prompt_id = ANY($1)', [ids])
   }
 
-  db.prepare('DELETE FROM prompts WHERE session_id = ?').run(sessionId)
-  db.prepare('DELETE FROM hooks WHERE session_id = ?').run(sessionId)
-  const result = db
-    .prepare('DELETE FROM sessions WHERE session_id = ?')
-    .run(sessionId)
-  return result.changes > 0
+  await pool.query('DELETE FROM prompts WHERE session_id = $1', [sessionId])
+  await pool.query('DELETE FROM hooks WHERE session_id = $1', [sessionId])
+  const result = await pool.query(
+    'DELETE FROM sessions WHERE session_id = $1',
+    [sessionId],
+  )
+  return (result.rowCount ?? 0) > 0
 }
 
-export function deleteSessions(sessionIds: string[]): number {
+export async function deleteSessions(sessionIds: string[]): Promise<number> {
   if (sessionIds.length === 0) return 0
   let deleted = 0
-  const txn = db.transaction(() => {
-    for (const sessionId of sessionIds) {
-      if (deleteSession(sessionId)) deleted++
-    }
-  })
-  txn()
+  for (const sessionId of sessionIds) {
+    if (await deleteSession(sessionId)) deleted++
+  }
   return deleted
 }
 
 // Terminal queries
 
-export function getAllTerminals(): Terminal[] {
-  return db
-    .prepare(`
+export async function getAllTerminals(): Promise<Terminal[]> {
+  const { rows } = await pool.query(`
     SELECT * FROM terminals
     ORDER BY created_at DESC
   `)
-    .all() as Terminal[]
+  return rows
 }
 
-export function getTerminalById(id: number): Terminal | undefined {
-  return db
-    .prepare(`
-    SELECT * FROM terminals WHERE id = ?
-  `)
-    .get(id) as Terminal | undefined
+export async function getTerminalById(
+  id: number,
+): Promise<Terminal | undefined> {
+  const { rows } = await pool.query(
+    `
+    SELECT * FROM terminals WHERE id = $1
+  `,
+    [id],
+  )
+  return rows[0]
 }
 
-export function createTerminal(
+export async function createTerminal(
   cwd: string,
   name: string | null,
   shell: string | null = null,
   ssh_host: string | null = null,
-): Terminal {
-  const result = db
-    .prepare(`
+): Promise<Terminal> {
+  const { rows } = await pool.query(
+    `
     INSERT INTO terminals (cwd, name, shell, ssh_host)
-    VALUES (?, ?, ?, ?)
-  `)
-    .run(cwd, name, shell, ssh_host)
-  return getTerminalById(result.lastInsertRowid as number)!
+    VALUES ($1, $2, $3, $4)
+    RETURNING *
+  `,
+    [cwd, name, shell, ssh_host],
+  )
+  return rows[0]
 }
 
-export function updateTerminal(
+export async function updateTerminal(
   id: number,
   updates: {
     name?: string
@@ -263,32 +294,33 @@ export function updateTerminal(
     active_cmd?: string | null
     git_branch?: string | null
   },
-): Terminal | undefined {
+): Promise<Terminal | undefined> {
   const setClauses: string[] = []
   const values: (string | number | null)[] = []
+  let paramIdx = 1
 
   if (updates.name !== undefined) {
-    setClauses.push('name = ?')
+    setClauses.push(`name = $${paramIdx++}`)
     values.push(updates.name)
   }
   if (updates.cwd !== undefined) {
-    setClauses.push('cwd = ?')
+    setClauses.push(`cwd = $${paramIdx++}`)
     values.push(updates.cwd)
   }
   if (updates.pid !== undefined) {
-    setClauses.push('pid = ?')
+    setClauses.push(`pid = $${paramIdx++}`)
     values.push(updates.pid)
   }
   if (updates.status !== undefined) {
-    setClauses.push('status = ?')
+    setClauses.push(`status = $${paramIdx++}`)
     values.push(updates.status)
   }
   if (updates.active_cmd !== undefined) {
-    setClauses.push('active_cmd = ?')
+    setClauses.push(`active_cmd = $${paramIdx++}`)
     values.push(updates.active_cmd)
   }
   if (updates.git_branch !== undefined) {
-    setClauses.push('git_branch = ?')
+    setClauses.push(`git_branch = $${paramIdx++}`)
     values.push(updates.git_branch)
   }
 
@@ -296,18 +328,19 @@ export function updateTerminal(
     return getTerminalById(id)
   }
 
-  setClauses.push('updated_at = CURRENT_TIMESTAMP')
+  setClauses.push('updated_at = NOW()')
   values.push(id)
 
-  db.prepare(`UPDATE terminals SET ${setClauses.join(', ')} WHERE id = ?`).run(
-    ...values,
+  await pool.query(
+    `UPDATE terminals SET ${setClauses.join(', ')} WHERE id = $${paramIdx}`,
+    values,
   )
   return getTerminalById(id)
 }
 
-export function deleteTerminal(id: number): boolean {
-  const result = db.prepare('DELETE FROM terminals WHERE id = ?').run(id)
-  return result.changes > 0
+export async function deleteTerminal(id: number): Promise<boolean> {
+  const result = await pool.query('DELETE FROM terminals WHERE id = $1', [id])
+  return (result.rowCount ?? 0) > 0
 }
 
 // Settings queries
@@ -321,38 +354,36 @@ const DEFAULT_CONFIG = {
   message_line_clamp: 5,
 }
 
-export function getSettings(): Settings {
-  const row = db.prepare('SELECT * FROM settings WHERE id = 1').get() as
-    | { id: number; config: string }
-    | undefined
+export async function getSettings(): Promise<Settings> {
+  const { rows } = await pool.query('SELECT * FROM settings WHERE id = 1')
 
-  if (!row) {
-    db.prepare('INSERT INTO settings (id, config) VALUES (1, ?)').run(
+  if (rows.length === 0) {
+    await pool.query('INSERT INTO settings (id, config) VALUES (1, $1)', [
       JSON.stringify(DEFAULT_CONFIG),
-    )
+    ])
     return { id: 1, ...DEFAULT_CONFIG }
   }
 
-  const config = JSON.parse(row.config) as Partial<typeof DEFAULT_CONFIG>
+  const config = rows[0].config as Partial<typeof DEFAULT_CONFIG>
   return {
-    id: row.id,
+    id: rows[0].id,
     ...DEFAULT_CONFIG,
     ...config,
   }
 }
 
-export function updateSettings(
+export async function updateSettings(
   updates: Partial<Omit<Settings, 'id'>>,
-): Settings {
-  const current = getSettings()
+): Promise<Settings> {
+  const current = await getSettings()
   const { id: _, ...currentConfig } = current
   const newConfig = { ...currentConfig, ...updates }
 
-  db.prepare('UPDATE settings SET config = ? WHERE id = 1').run(
+  await pool.query('UPDATE settings SET config = $1 WHERE id = 1', [
     JSON.stringify(newConfig),
-  )
+  ])
 
   return getSettings()
 }
 
-export default db
+export default pool

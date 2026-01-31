@@ -124,7 +124,7 @@ export async function detectGitBranch(
   options?: { skipPRRefresh?: boolean },
 ) {
   try {
-    const terminal = getTerminalById(terminalId)
+    const terminal = await getTerminalById(terminalId)
     if (!terminal) return
 
     let branch: string | null = null
@@ -151,7 +151,7 @@ export async function detectGitBranch(
     }
 
     if (branch) {
-      updateTerminal(terminalId, { git_branch: branch })
+      await updateTerminal(terminalId, { git_branch: branch })
       getIO()?.emit('terminal:updated', { terminalId })
       if (!options?.skipPRRefresh) {
         refreshPRChecks()
@@ -189,7 +189,7 @@ export async function createSession(
   }
 
   // Get terminal from database
-  const terminal = getTerminalById(terminalId)
+  const terminal = await getTerminalById(terminalId)
   if (!terminal) {
     log.error(`[pty] Terminal not found: ${terminalId}`)
     return null
@@ -224,7 +224,7 @@ export async function createSession(
     }
 
     // Get shell - use terminal's shell, default from settings, or fallback to SHELL env
-    const settings = getSettings()
+    const settings = await getSettings()
     let shell = terminal.shell || settings.default_shell
 
     // Fallback to environment shell if specified shell doesn't exist
@@ -301,13 +301,15 @@ export async function createSession(
         case 'prompt':
           session.isIdle = true
           session.currentCommand = null
-          updateTerminal(terminalId, { active_cmd: null })
+          updateTerminal(terminalId, { active_cmd: null }).catch(() => {})
           log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
           break
         case 'command_start':
           session.isIdle = false
           session.currentCommand = event.command || null
-          updateTerminal(terminalId, { active_cmd: event.command || null })
+          updateTerminal(terminalId, {
+            active_cmd: event.command || null,
+          }).catch(() => {})
           log.info(`[pty:${terminalId}] Command started: ${event.command}`)
           // Scan for new processes after a brief delay
           setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
@@ -339,12 +341,12 @@ export async function createSession(
       pid: null,
       status: 'stopped',
       active_cmd: null,
-    })
+    }).catch(() => {})
     session.onExit?.(exitCode)
   })
 
   // Update terminal with PID (SSH sessions have no local PID)
-  updateTerminal(terminalId, {
+  await updateTerminal(terminalId, {
     pid: backend.pid || null,
     status: 'running',
   })
@@ -382,7 +384,8 @@ export async function createSession(
     }
   } else {
     // Inject shell integration for local terminals via source
-    const shell = terminal.shell || getSettings().default_shell || '/bin/bash'
+    const shellSettings = await getSettings()
+    const shell = terminal.shell || shellSettings.default_shell || '/bin/bash'
     setTimeout(() => {
       const shellName = path.basename(shell)
       let integrationScript: string | null = null
@@ -508,8 +511,12 @@ export function destroySession(terminalId: number): boolean {
     // Process may already be dead
   }
 
-  // Update database
-  updateTerminal(terminalId, { pid: null, status: 'stopped', active_cmd: null })
+  // Update database (fire-and-forget since PTY is already killed)
+  updateTerminal(terminalId, {
+    pid: null,
+    status: 'stopped',
+    active_cmd: null,
+  }).catch(() => {})
 
   sessions.delete(terminalId)
   stopGlobalProcessPolling()

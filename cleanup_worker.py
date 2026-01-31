@@ -6,106 +6,109 @@ Cleanup worker for removing old data from the database and stale files.
 import time
 from pathlib import Path
 
-from db import init_db, log
+from db import get_db, log, get_cursor
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 LOCKS_DIR = Path(__file__).parent / "locks"
 
 # Cleanup intervals
-DATA_CLEANUP_INTERVAL = '-7 days'
-LOCKS_CLEANUP_INTERVAL = '-1 hours'
+DATA_CLEANUP_INTERVAL = '7 days'
+LOCKS_CLEANUP_INTERVAL = '1 hours'
 LOCKS_FILE_MAX_AGE = 3600  # 1 hour in seconds
 
 
 def has_recent_cleanup(conn, cleanup_type: str, interval: str) -> bool:
     """Check if there's a cleanup of this type within the interval."""
-    result = conn.execute('''
+    cur = get_cursor(conn)
+    cur.execute('''
         SELECT id FROM cleans
-        WHERE type = ? AND created_at > datetime('now', ?)
+        WHERE type = %s AND created_at > NOW() - %s::interval
         LIMIT 1
-    ''', (cleanup_type, interval)).fetchone()
-    return result is not None
+    ''', (cleanup_type, interval))
+    return cur.fetchone() is not None
 
 
 def record_cleanup(conn, cleanup_type: str) -> None:
     """Record a cleanup of a specific type."""
-    conn.execute('INSERT INTO cleans (type) VALUES (?)', (cleanup_type,))
+    cur = conn.cursor()
+    cur.execute('INSERT INTO cleans (type) VALUES (%s)', (cleanup_type,))
     conn.commit()
 
 
 def delete_old_logs_and_hooks(conn) -> int:
     """Delete logs and hooks older than a week. Returns count deleted."""
-    cursor = conn.execute('''
-        DELETE FROM logs WHERE created_at < datetime('now', '-7 days')
+    cur = conn.cursor()
+    cur.execute('''
+        DELETE FROM logs WHERE created_at < NOW() - INTERVAL '7 days'
     ''')
-    logs_deleted = cursor.rowcount
+    logs_deleted = cur.rowcount
 
-    cursor = conn.execute('''
-        DELETE FROM hooks WHERE created_at < datetime('now', '-7 days')
+    cur.execute('''
+        DELETE FROM hooks WHERE created_at < NOW() - INTERVAL '7 days'
     ''')
-    hooks_deleted = cursor.rowcount
+    hooks_deleted = cur.rowcount
 
     return logs_deleted + hooks_deleted
 
 
 def delete_old_session_data(conn) -> int:
     """Delete messages and prompts for sessions older than a week. Returns count deleted."""
+    cur = get_cursor(conn)
     # Get old session IDs
-    old_sessions = conn.execute('''
+    cur.execute('''
         SELECT session_id FROM sessions
-        WHERE updated_at < datetime('now', '-7 days')
-    ''').fetchall()
+        WHERE updated_at < NOW() - INTERVAL '7 days'
+    ''')
+    old_sessions = cur.fetchall()
 
     if not old_sessions:
         return 0
 
     session_ids = [s['session_id'] for s in old_sessions]
-    placeholders = ','.join('?' * len(session_ids))
 
     # Delete messages for old sessions' prompts
-    cursor = conn.execute(f'''
+    cur.execute('''
         DELETE FROM messages WHERE prompt_id IN (
-            SELECT id FROM prompts WHERE session_id IN ({placeholders})
+            SELECT id FROM prompts WHERE session_id = ANY(%s)
         )
-    ''', session_ids)
-    messages_deleted = cursor.rowcount
+    ''', (session_ids,))
+    messages_deleted = cur.rowcount
 
     # Delete prompts for old sessions
-    cursor = conn.execute(f'''
-        DELETE FROM prompts WHERE session_id IN ({placeholders})
-    ''', session_ids)
-    prompts_deleted = cursor.rowcount
+    cur.execute('DELETE FROM prompts WHERE session_id = ANY(%s)', (session_ids,))
+    prompts_deleted = cur.rowcount
 
     # Delete old sessions
-    cursor = conn.execute(f'''
-        DELETE FROM sessions WHERE session_id IN ({placeholders})
-    ''', session_ids)
-    sessions_deleted = cursor.rowcount
+    cur.execute('DELETE FROM sessions WHERE session_id = ANY(%s)', (session_ids,))
+    sessions_deleted = cur.rowcount
 
     return messages_deleted + prompts_deleted + sessions_deleted
 
 
 def delete_old_messages(conn) -> int:
     """Delete messages older than 3 days. Returns count deleted."""
-    cursor = conn.execute('''
-        DELETE FROM messages WHERE created_at < datetime('now', '-3 days')
+    cur = conn.cursor()
+    cur.execute('''
+        DELETE FROM messages WHERE created_at < NOW() - INTERVAL '3 days'
     ''')
-    return cursor.rowcount
+    return cur.rowcount
 
 
 def delete_orphan_projects(conn) -> int:
     """Delete projects with no sessions. Returns count deleted."""
-    cursor = conn.execute('''
+    cur = conn.cursor()
+    cur.execute('''
         DELETE FROM projects
         WHERE id NOT IN (SELECT DISTINCT project_id FROM sessions)
     ''')
-    return cursor.rowcount
+    return cur.rowcount
 
 
 def delete_empty_sessions(conn) -> int:
     """Delete sessions with no prompts, or only a single null prompt and no messages. Returns count deleted."""
+    cur = conn.cursor()
     # Find sessions that have no prompts, or exactly one null prompt with no messages
-    cursor = conn.execute('''
+    cur.execute('''
         DELETE FROM sessions WHERE session_id IN (
             SELECT s.session_id
             FROM sessions s
@@ -117,10 +120,10 @@ def delete_empty_sessions(conn) -> int:
                AND COUNT(m.id) = 0
         )
     ''')
-    sessions_deleted = cursor.rowcount
-    
+    sessions_deleted = cur.rowcount
+
     # Clean up orphaned prompts (prompts without sessions)
-    conn.execute('''
+    cur.execute('''
         DELETE FROM prompts WHERE session_id NOT IN (SELECT session_id FROM sessions)
     ''')
 
@@ -182,7 +185,7 @@ def run_locks_cleanup(conn) -> None:
 
 def run_cleanup() -> None:
     """Run all cleanup processes."""
-    conn = init_db()
+    conn = get_db()
 
     log(conn, "cleanup process start")
     run_data_cleanup(conn)

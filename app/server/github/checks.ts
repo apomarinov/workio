@@ -347,7 +347,7 @@ function fetchMergedPRsForBranches(
 
 async function refreshSSHBranch(terminalId: number): Promise<void> {
   try {
-    const terminal = getTerminalById(terminalId)
+    const terminal = await getTerminalById(terminalId)
     if (!terminal?.ssh_host) return
 
     const result = await execSSHCommand(
@@ -357,7 +357,7 @@ async function refreshSSHBranch(terminalId: number): Promise<void> {
     )
     const branch = result.stdout.trim()
     if (branch) {
-      updateTerminal(terminalId, { git_branch: branch })
+      await updateTerminal(terminalId, { git_branch: branch })
       getIO()?.emit('terminal:updated', { terminalId })
     }
   } catch (err) {
@@ -379,7 +379,7 @@ async function pollAllPRChecks(): Promise<void> {
 
   for (const [terminalId] of monitoredTerminals) {
     try {
-      const terminal = getTerminalById(terminalId)
+      const terminal = await getTerminalById(terminalId)
       if (!terminal) continue
 
       // SSH terminals lack shell integration, so refresh branch on each poll
@@ -472,7 +472,7 @@ export async function trackTerminal(terminalId: number): Promise<void> {
   }
   if (!ghAvailable) return
 
-  const terminal = getTerminalById(terminalId)
+  const terminal = await getTerminalById(terminalId)
   if (!terminal) return
 
   monitoredTerminals.set(terminalId, terminal.cwd)
@@ -645,7 +645,7 @@ export async function initGitHubChecks(): Promise<void> {
   ghAvailable = await checkGhAvailable()
   if (!ghAvailable) return
 
-  const terminals = getAllTerminals()
+  const terminals = await getAllTerminals()
   for (const terminal of terminals) {
     monitoredTerminals.set(terminal.id, terminal.cwd)
   }

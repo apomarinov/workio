@@ -12,12 +12,11 @@ from datetime import datetime
 from pathlib import Path
 
 from db import (
-    get_db, log,
+    get_db, log, notify,
     get_session, get_latest_prompt, update_prompt_text,
     message_exists, create_message, get_latest_user_message, upsert_todo_message,
     compute_state_key, compute_todo_hash
 )
-from socket_worker import emit_event
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 DEBOUNCE_SECONDS = int(os.environ.get("DEBOUNCE_SECONDS", 2))
@@ -480,8 +479,9 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
         if entry.get('type') == 'custom-title' and entry.get('customTitle'):
             custom_title = entry.get('customTitle')
     if custom_title:
-        conn.execute(
-            'UPDATE sessions SET name = ? WHERE session_id = ?',
+        cur = conn.cursor()
+        cur.execute(
+            'UPDATE sessions SET name = %s WHERE session_id = %s',
             (custom_title, session_id)
         )
 
@@ -588,8 +588,13 @@ def process_session(session_id: str, timestamp: str) -> None:
 
             if session and session['transcript_path']:
                 new_messages = process_transcript(conn, session_id, session['transcript_path'])
-                # Fire session_update event to notify frontend of new messages
-                emit_event("session_update", {"session_id": session_id, "messages": new_messages})
+                # Notify frontend of new messages via PostgreSQL NOTIFY
+                if new_messages:
+                    message_ids = [m['id'] for m in new_messages]
+                    notify(conn, "session_update", {
+                        "session_id": session_id,
+                        "message_ids": message_ids,
+                    })
             else:
                 log(conn, "No transcript path in session", session_id=session_id)
 

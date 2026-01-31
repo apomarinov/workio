@@ -84,6 +84,7 @@ def setup_hooks() -> None:
     added = []
     skipped = []
 
+    print(f"Verifying Claude hooks")
     for hook_name, config in HOOK_DEFINITIONS.items():
         # Ensure the hook type list exists
         if hook_name not in hooks:
@@ -94,7 +95,6 @@ def setup_hooks() -> None:
         # Check if hook already exists
         if hook_exists(hooks[hook_name], MONITOR_COMMAND, matcher):
             skipped.append(hook_name)
-            print(f"  [SKIP] {hook_name}: Monitor hook already exists")
         else:
             # Add the hook entry
             hook_entry = create_hook_entry(hook_name, config)
@@ -103,12 +103,13 @@ def setup_hooks() -> None:
             print(f"  [ADD]  {hook_name}: Added monitor hook")
 
     # Save settings
-    save_settings(settings)
-
-    print(f"\nSummary:")
-    print(f"  Added: {len(added)} hooks ({', '.join(added) if added else 'none'})")
-    print(f"  Skipped: {len(skipped)} hooks ({', '.join(skipped) if skipped else 'none'})")
-    print(f"\nSettings saved to: {SETTINGS_PATH}")
+    if len(added) > 0 or len(skipped) > 0:
+        if len(skipped) > 0:
+            print(f"  Skipped: {len(skipped)} hooks ({', '.join(skipped) if skipped else 'none'})")
+        if len(added) > 0:
+            save_settings(settings)
+            print(f"  Added: {len(added)} hooks ({', '.join(added) if added else 'none'})")
+            print(f"\nSettings saved to: {SETTINGS_PATH}")
 
 
 if __name__ == "__main__":
