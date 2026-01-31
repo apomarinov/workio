@@ -53,3 +53,11 @@ export interface PRCheckStatus {
 export interface PRChecksPayload {
   prs: PRCheckStatus[]
 }
+
+export interface MergedPRSummary {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  branch: string
+  repo: string
+}

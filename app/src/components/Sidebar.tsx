@@ -42,6 +42,7 @@ import type { SessionWithProject, Terminal } from '../types'
 import { CreateSSHTerminalModal } from './CreateSSHTerminalModal'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
+import { MergedPRsList } from './MergedPRsList'
 import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
@@ -697,17 +698,21 @@ export function Sidebar({ width }: SidebarProps) {
                             <Github className="w-3 h-3" />
                             <span className="truncate">{repoName}</span>
                           </button>
-                          {!isCollapsed &&
-                            repoPRs.map((pr) => (
-                              <PRStatusGroup
-                                key={`${pr.repo}:${pr.prNumber}`}
-                                pr={pr}
-                                expanded={expandedGitHubPRsSet.has(pr.branch)}
-                                onToggle={() => toggleGitHubPR(pr.branch)}
-                                hasNewActivity={hasNewActivity(pr)}
-                                onSeen={() => markPRSeen(pr)}
-                              />
-                            ))}
+                          {!isCollapsed && (
+                            <>
+                              {repoPRs.map((pr) => (
+                                <PRStatusGroup
+                                  key={`${pr.repo}:${pr.prNumber}`}
+                                  pr={pr}
+                                  expanded={expandedGitHubPRsSet.has(pr.branch)}
+                                  onToggle={() => toggleGitHubPR(pr.branch)}
+                                  hasNewActivity={hasNewActivity(pr)}
+                                  onSeen={() => markPRSeen(pr)}
+                                />
+                              ))}
+                              <MergedPRsList repo={repo} />
+                            </>
+                          )}
                         </div>
                       )
                     },

@@ -11,6 +11,7 @@ import { env } from './env'
 import {
   detectAllTerminalBranches,
   emitCachedPRChecks,
+  fetchMergedPRsByMe,
   fetchPRComments,
   initGitHubChecks,
   mergePR,
@@ -104,6 +105,17 @@ fastify.get<{
     ? request.query.exclude.split(',').filter(Boolean)
     : undefined
   return fetchPRComments(owner, repo, Number(pr), limit, offset, excludeAuthors)
+})
+
+// Merged PRs by @me for a repo
+fastify.get<{
+  Params: { owner: string; repo: string }
+  Querystring: { limit?: string; offset?: string }
+}>('/api/github/:owner/:repo/merged-prs', async (request) => {
+  const { owner, repo } = request.params
+  const limit = Math.min(Number(request.query.limit) || 5, 50)
+  const offset = Number(request.query.offset) || 0
+  return fetchMergedPRsByMe(owner, repo, limit, offset)
 })
 
 // Re-request PR review

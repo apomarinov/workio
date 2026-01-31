@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import type {
   FailedPRCheck,
+  MergedPRSummary,
   PRCheckStatus,
   PRComment,
   PRReview,
@@ -339,6 +340,63 @@ function fetchMergedPRsForBranches(
           resolve(results)
         } catch {
           resolve([])
+        }
+      },
+    )
+  })
+}
+
+/** Fetch merged PRs by @me for a repo, with pagination. */
+export function fetchMergedPRsByMe(
+  owner: string,
+  repo: string,
+  limit: number,
+  offset: number,
+): Promise<{ prs: MergedPRSummary[]; hasMore: boolean }> {
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'pr',
+        'list',
+        '--repo',
+        `${owner}/${repo}`,
+        '--author',
+        '@me',
+        '--state',
+        'merged',
+        '--limit',
+        String(offset + limit + 1),
+        '--json',
+        'number,title,headRefName,url',
+      ],
+      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+      (err, stdout) => {
+        if (err) {
+          resolve({ prs: [], hasMore: false })
+          return
+        }
+        try {
+          const all: {
+            number: number
+            title: string
+            headRefName: string
+            url: string
+          }[] = JSON.parse(stdout)
+          const sliced = all.slice(offset, offset + limit)
+          const repoKey = `${owner}/${repo}`
+          resolve({
+            prs: sliced.map((pr) => ({
+              prNumber: pr.number,
+              prTitle: pr.title,
+              prUrl: pr.url,
+              branch: pr.headRefName,
+              repo: repoKey,
+            })),
+            hasMore: all.length > offset + limit,
+          })
+        } catch {
+          resolve({ prs: [], hasMore: false })
         }
       },
     )
