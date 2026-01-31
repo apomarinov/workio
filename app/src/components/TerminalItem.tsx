@@ -68,8 +68,8 @@ export function TerminalItem({
   const ports = terminalPorts[terminal.id] ?? []
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-    ) ??
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+      ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -133,12 +133,9 @@ export function TerminalItem({
 
   const handleAddWorkspace = async () => {
     setShowMenu(false)
-    const repo = terminal.git_repo!.repo
-    const baseName = terminal.name || repo.split('/').pop()!
     try {
       const newTerminal = await createTerminal({
         cwd: '~',
-        name: `${baseName} 2`,
         source_terminal_id: terminal.id,
       })
       selectTerminal(newTerminal.id)
@@ -163,18 +160,20 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors ${isSettingUp || isDeleting
-              ? 'opacity-60 cursor-default'
-              : `cursor-pointer ${isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-              }`
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors ${
+              isSettingUp || isDeleting
+                ? 'opacity-60 cursor-default'
+                : `cursor-pointer ${
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  }`
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions &&
-            !hasProcesses &&
-            !hasGitHub &&
-            !hasPorts &&
-            'pl-2.5',
+              !hasProcesses &&
+              !hasGitHub &&
+              !hasPorts &&
+              'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
@@ -268,50 +267,52 @@ export function TerminalItem({
             </span>
           ) : (
             <div className="absolute invisible group-hover:visible top-1 right-1">
-              {(!isSettingUp && !isDeleting) && (<Popover open={showMenu} onOpenChange={setShowMenu}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleMenuClick}
-                    className="h-7 w-7 text-muted-foreground !w-[20px]"
+              {!isSettingUp && !isDeleting && (
+                <Popover open={showMenu} onOpenChange={setShowMenu}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleMenuClick}
+                      className="h-7 w-7 text-muted-foreground !w-[20px]"
+                    >
+                      <MoreVertical className="w-3 h-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="w-40 p-1"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreVertical className="w-3 h-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="end"
-                  className="w-40 p-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {terminal.git_repo && (
+                    {terminal.git_repo && (
+                      <button
+                        type="button"
+                        onClick={handleAddWorkspace}
+                        className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Add Workspace
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={handleAddWorkspace}
+                      onClick={handleEditClick}
                       className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
                     >
-                      <Copy className="w-3.5 h-3.5" />
-                      Add Workspace
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleEditClick}
-                    className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteClick}
-                    className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left text-destructive"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete
-                  </button>
-                </PopoverContent>
-              </Popover>)}
+                    <button
+                      type="button"
+                      onClick={handleDeleteClick}
+                      className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left text-destructive"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           )}
         </div>

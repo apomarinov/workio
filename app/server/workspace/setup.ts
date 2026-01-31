@@ -289,12 +289,20 @@ export interface SetupOptions {
   setupObj: SetupObj | null
   workspacesRoot?: string
   worktreeSource?: string // if set, use git worktree instead of clone
+  customName?: boolean // if true, don't override the terminal name with repo/slug
 }
 
 export async function setupTerminalWorkspace(
   options: SetupOptions,
 ): Promise<void> {
-  const { terminalId, repo, setupObj, workspacesRoot, worktreeSource } = options
+  const {
+    terminalId,
+    repo,
+    setupObj,
+    workspacesRoot,
+    worktreeSource,
+    customName,
+  } = options
   const slug = generateSlug()
 
   const gitRepoObj = workspacesRoot
@@ -339,8 +347,14 @@ export async function setupTerminalWorkspace(
       ])
     }
 
-    // Update terminal cwd to the target
-    await updateTerminal(terminalId, { cwd: targetPath })
+    // Update terminal cwd (and name if not user-provided)
+    if (customName) {
+      await updateTerminal(terminalId, { cwd: targetPath })
+    } else {
+      const terminalName = `${repoSlug(repo)}/${slug}`
+      await updateTerminal(terminalId, { cwd: targetPath, name: terminalName })
+      emitWorkspace(terminalId, { name: terminalName })
+    }
 
     // Get GitHub username and rename branch
     try {

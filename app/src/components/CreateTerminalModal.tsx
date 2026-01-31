@@ -191,17 +191,17 @@ export function CreateTerminalModal({
   // Filter repos client-side based on current search
   const filteredRepos = repoSearch.trim()
     ? repos.filter((r) =>
-      r.toLowerCase().includes(repoSearch.trim().toLowerCase()),
-    )
+        r.toLowerCase().includes(repoSearch.trim().toLowerCase()),
+      )
     : repos
 
   // Show the typed value as an option if it looks like owner/repo and isn't in the list
   const manualEntry =
     repoSearch.trim() &&
-      repoSearch.includes('/') &&
-      !filteredRepos.some(
-        (r) => r.toLowerCase() === repoSearch.trim().toLowerCase(),
-      )
+    repoSearch.includes('/') &&
+    !filteredRepos.some(
+      (r) => r.toLowerCase() === repoSearch.trim().toLowerCase(),
+    )
       ? repoSearch.trim()
       : null
 
@@ -328,60 +328,64 @@ export function CreateTerminalModal({
                       onValueChange={handleRepoSearch}
                       isLoading={isLoadingRepos}
                     />
-                    {filteredRepos.length > 0 && (<CommandList className="max-h-[300px] overflow-y-auto">
-                      {!isLoadingRepos && (
-                        <CommandEmpty>
-                          {repoSearch.trim()
-                            ? 'No repos found. Type owner/repo to add new.'
-                            : 'Loading...'}
-                        </CommandEmpty>
-                      )}
-                      <CommandGroup>
-                        {manualEntry && !isLoadingRepos && (
-                          <CommandItem
-                            value={manualEntry}
-                            onSelect={() => {
-                              setGitRepo(manualEntry)
-                              setRepoPickerOpen(false)
-                              setRepoSearch('')
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                gitRepo === manualEntry
-                                  ? 'opacity-100'
-                                  : 'opacity-0',
-                              )}
-                            />
-                            {manualEntry}
-                            <span className="ml-auto text-xs text-muted-foreground">
-                              new
-                            </span>
-                          </CommandItem>
+                    {filteredRepos.length > 0 && (
+                      <CommandList className="max-h-[300px] overflow-y-auto">
+                        {!isLoadingRepos && (
+                          <CommandEmpty>
+                            {repoSearch.trim()
+                              ? 'No repos found. Type owner/repo to add new.'
+                              : 'Loading...'}
+                          </CommandEmpty>
                         )}
-                        {filteredRepos.map((repo) => (
-                          <CommandItem
-                            key={repo}
-                            className="cursor-pointer"
-                            value={repo}
-                            onSelect={() => {
-                              setGitRepo(repo === gitRepo ? '' : repo)
-                              setRepoPickerOpen(false)
-                              setRepoSearch('')
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                gitRepo === repo ? 'opacity-100' : 'opacity-0',
-                              )}
-                            />
-                            {repo}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>)}
+                        <CommandGroup>
+                          {manualEntry && !isLoadingRepos && (
+                            <CommandItem
+                              value={manualEntry}
+                              onSelect={() => {
+                                setGitRepo(manualEntry)
+                                setRepoPickerOpen(false)
+                                setRepoSearch('')
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  gitRepo === manualEntry
+                                    ? 'opacity-100'
+                                    : 'opacity-0',
+                                )}
+                              />
+                              {manualEntry}
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                new
+                              </span>
+                            </CommandItem>
+                          )}
+                          {filteredRepos.map((repo) => (
+                            <CommandItem
+                              key={repo}
+                              className="cursor-pointer"
+                              value={repo}
+                              onSelect={() => {
+                                setGitRepo(repo === gitRepo ? '' : repo)
+                                setRepoPickerOpen(false)
+                                setRepoSearch('')
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  gitRepo === repo
+                                    ? 'opacity-100'
+                                    : 'opacity-0',
+                                )}
+                              />
+                              {repo}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    )}
                   </Command>
                 </PopoverContent>
               </Popover>

@@ -127,6 +127,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             if (t.id !== data.terminalId) return t
             return {
               ...t,
+              ...(data.name && { name: data.name }),
               ...(data.git_repo && { git_repo: data.git_repo }),
               ...(data.setup && { setup: data.setup }),
             }

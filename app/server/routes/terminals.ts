@@ -129,6 +129,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           } | null,
           workspacesRoot: sourceTerminal.git_repo.workspaces_root || undefined,
           worktreeSource: sourceTerminal.cwd,
+          customName: !!name?.trim(),
         }).catch((err) =>
           log.error(
             `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
@@ -200,6 +201,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             delete?: string
           } | null,
           workspacesRoot: workspaces_root?.trim() || undefined,
+          customName: !!name?.trim(),
         }).catch((err) =>
           log.error(
             `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
