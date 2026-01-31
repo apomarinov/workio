@@ -9,15 +9,17 @@ import { NotificationPrompt } from '../components/NotificationPrompt'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
 
-type AudioType = 'permission' | 'done'
+type AudioType = 'permission' | 'done' | 'pr-activity'
 
 const audioFiles: Record<AudioType, string> = {
   permission: '/audio/permissions.mp3',
   done: '/audio/done.mp3',
+  'pr-activity': '/audio/pr-noti.mp3',
 }
 
 interface SendNotificationOptions extends NotificationOptions {
   audio?: AudioType
+  onClick?: () => void
 }
 
 interface NotificationContextValue {
@@ -78,7 +80,7 @@ export function NotificationProvider({
         return null
       }
 
-      const { audio, ...notificationOptions } = options || {}
+      const { audio, onClick, ...notificationOptions } = options || {}
 
       if (audio) {
         const audioElement = new Audio(audioFiles[audio])
@@ -88,10 +90,20 @@ export function NotificationProvider({
         })
       }
 
-      return new Notification(title, {
+      const notification = new Notification(title, {
         icon: '/favicon.svg',
         ...notificationOptions,
       })
+
+      if (onClick) {
+        notification.onclick = () => {
+          window.focus()
+          onClick()
+          notification.close()
+        }
+      }
+
+      return notification
     },
     [permission],
   )

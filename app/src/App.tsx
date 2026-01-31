@@ -11,9 +11,9 @@ import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
 import { KeyMapProvider } from './context/KeyMapContext'
+import { useNotifications } from './context/NotificationContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
-import { useBrowserNotification } from './hooks/useBrowserNotification'
 import { useSocket } from './hooks/useSocket'
 import type { HookEvent } from './types'
 
@@ -32,7 +32,7 @@ function AppContent() {
     useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe } = useSocket()
-  const { notify } = useBrowserNotification()
+  const { sendNotification } = useNotifications()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
 
   // Example: Change favicon based on session status
@@ -95,10 +95,9 @@ function AppContent() {
       if (data.status === 'permission_needed') {
         const title = session?.name || 'Permission Required'
 
-        notify(`⚠️ ${title}`, {
+        sendNotification(`⚠️ ${title}`, {
           body: `"${terminalName}" needs permissions`,
-          audio: '/audio/permissions.mp3',
-          audioVolume: 0.5,
+          audio: 'permission',
           onClick: () => {
             if (terminal) {
               selectTerminal(terminal.id)
@@ -113,9 +112,9 @@ function AppContent() {
       } else if (data.hook_type === 'Stop') {
         const title = session?.name || 'Done'
 
-        notify(`✅ ${title}`, {
+        sendNotification(`✅ ${title}`, {
           body: `"${terminalName}" has finished`,
-          audio: '/audio/done.mp3',
+          audio: 'done',
           onClick: () => {
             if (terminal) {
               selectTerminal(terminal.id)
@@ -129,7 +128,7 @@ function AppContent() {
         })
       }
     })
-  }, [subscribe, notify, terminals, selectTerminal, sessions])
+  }, [subscribe, sendNotification, terminals, selectTerminal, sessions])
 
   if (loading) {
     return (

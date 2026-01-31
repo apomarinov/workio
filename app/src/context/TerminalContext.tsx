@@ -14,11 +14,11 @@ import type {
   PRChecksPayload,
   ProcessesPayload,
 } from '../../shared/types'
-import { useBrowserNotification } from '../hooks/useBrowserNotification'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
 import type { Terminal } from '../types'
+import { useNotifications } from './NotificationContext'
 
 interface TerminalContextValue {
   terminals: Terminal[]
@@ -109,9 +109,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   // GitHub PR checks
   const [githubPRs, setGithubPRs] = useState<PRCheckStatus[]>([])
-  const { notify } = useBrowserNotification()
-  const notifyRef = useRef(notify)
-  notifyRef.current = notify
+  const { sendNotification } = useNotifications()
+  const sendNotificationRef = useRef(sendNotification)
+  sendNotificationRef.current = sendNotification
   const [prPoll, setPrPoll] = useState(true)
   const lastDetectEmitRef = useRef(0)
 
@@ -155,9 +155,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         (pr) => pr.updatedAt && pr.updatedAt > lastNotifAt,
       ).length
       if (unseenCount > 0) {
-        const sent = notifyRef.current(
+        const sent = sendNotificationRef.current(
           `New activity on ${unseenCount} PR${unseenCount !== 1 ? 's' : ''}`,
-          { audio: '/audio/pr-noti.mp3' },
+          { audio: 'pr-activity' },
         )
         if (sent) {
           localStorage.setItem('pr-activity-notif-at', new Date().toISOString())
