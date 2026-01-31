@@ -75,18 +75,16 @@ export function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-          ) ??
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
         : undefined,
     [githubPRs, terminal.git_branch],
   )
-  const isDirty = useMemo(
-    () => gitDirtyStatus[terminal.id] === true,
-    [gitDirtyStatus, terminal.id],
-  )
+  const diffStat = gitDirtyStatus[terminal.id]
+  const isDirty = !!diffStat && (diffStat.added > 0 || diffStat.removed > 0)
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -178,10 +176,9 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
             ((!hasSessions &&
               !hasProcesses &&
@@ -190,13 +187,13 @@ export function TerminalItem({
               !isDirty) ||
               isSettingUp ||
               isDeleting) &&
-              'pl-2.5',
+            'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
           {!isSettingUp &&
-          !isDeleting &&
-          (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
+            !isDeleting &&
+            (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -397,9 +394,19 @@ export function TerminalItem({
                         Ports ({ports.length})
                       </button>
                     )}
-                    {isDirty && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded text-yellow-500/80">
-                        Changes
+                    {isDirty && diffStat && (
+                      <span className="text-[10px] tracking-wider px-1.5 py-0.5 rounded font-mono">
+                        {diffStat.added > 0 && (
+                          <span className="text-green-500/80">
+                            +{diffStat.added}
+                          </span>
+                        )}
+                        {diffStat.added > 0 && diffStat.removed > 0 && '/'}
+                        {diffStat.removed > 0 && (
+                          <span className="text-red-500/80">
+                            -{diffStat.removed}
+                          </span>
+                        )}
                       </span>
                     )}
                     {hasGitHub && prForBranch && (

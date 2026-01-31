@@ -62,8 +62,13 @@ export interface MergedPRSummary {
   repo: string
 }
 
+export interface GitDiffStat {
+  added: number
+  removed: number
+}
+
 export interface GitDirtyPayload {
-  dirtyStatus: Record<number, boolean> // terminalId -> isDirty
+  dirtyStatus: Record<number, GitDiffStat> // terminalId -> line diff stats
 }
 
 export interface WorkspacePayload {

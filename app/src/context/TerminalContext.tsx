@@ -56,7 +56,7 @@ interface TerminalContextValue {
   hasAnyUnseenPRs: boolean
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
-  gitDirtyStatus: Record<number, boolean>
+  gitDirtyStatus: Record<number, { added: number; removed: number }>
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -275,20 +275,22 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const [terminalPorts, setTerminalPorts] = useState<Record<number, number[]>>(
     {},
   )
-  const [gitDirtyStatus, setGitDirtyStatus] = useState<Record<number, boolean>>(
-    {},
-  )
+  const [gitDirtyStatus, setGitDirtyStatus] = useState<
+    Record<number, { added: number; removed: number }>
+  >({})
 
   useEffect(() => {
     return subscribe<GitDirtyPayload>('git:dirty-status', (data) => {
       setGitDirtyStatus((prev) => {
         const next = data.dirtyStatus
-        // Only update if values actually changed
         const prevKeys = Object.keys(prev)
         const nextKeys = Object.keys(next)
         if (prevKeys.length !== nextKeys.length) return next
         for (const key of nextKeys) {
-          if (prev[Number(key)] !== next[Number(key)]) return next
+          const p = prev[Number(key)]
+          const n = next[Number(key)]
+          if (!p || !n || p.added !== n.added || p.removed !== n.removed)
+            return next
         }
         return prev
       })

@@ -53,7 +53,7 @@ let globalProcessPollingId: NodeJS.Timeout | null = null
 
 // Git dirty status polling
 let gitDirtyPollingId: NodeJS.Timeout | null = null
-const lastDirtyStatus = new Map<number, boolean>()
+const lastDirtyStatus = new Map<number, { added: number; removed: number }>()
 
 function getProcessesForTerminal(
   terminalId: number,
@@ -150,37 +150,62 @@ function stopGlobalProcessPolling() {
   }
 }
 
+function parseDiffNumstat(stdout: string): { added: number; removed: number } {
+  let added = 0
+  let removed = 0
+  for (const line of stdout.trim().split('\n')) {
+    if (!line) continue
+    const parts = line.split('\t')
+    if (parts[0] !== '-') added += Number(parts[0]) || 0
+    if (parts[1] !== '-') removed += Number(parts[1]) || 0
+  }
+  return { added, removed }
+}
+
 async function checkGitDirty(
   cwd: string,
   sshHost?: string | null,
-): Promise<boolean> {
+): Promise<{ added: number; removed: number }> {
+  const zero = { added: 0, removed: 0 }
   try {
     if (sshHost) {
       const result = await execSSHCommand(
         sshHost,
-        'git status --porcelain',
+        'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
         cwd,
       )
-      return result.stdout.trim().length > 0
+      return parseDiffNumstat(result.stdout)
     }
-    return await new Promise<boolean>((resolve) => {
+    return await new Promise<{ added: number; removed: number }>((resolve) => {
       execFile(
         'git',
-        ['status', '--porcelain'],
+        ['diff', '--numstat', 'HEAD'],
         { cwd, timeout: 5000 },
         (err, stdout) => {
-          if (err) return resolve(false)
-          resolve(stdout.trim().length > 0)
+          if (err) {
+            // No HEAD yet (fresh repo) — fall back to diff without HEAD
+            execFile(
+              'git',
+              ['diff', '--numstat'],
+              { cwd, timeout: 5000 },
+              (err2, stdout2) => {
+                if (err2) return resolve(zero)
+                resolve(parseDiffNumstat(stdout2))
+              },
+            )
+            return
+          }
+          resolve(parseDiffNumstat(stdout))
         },
       )
     })
   } catch {
-    return false
+    return zero
   }
 }
 
 async function scanAndEmitGitDirty() {
-  const currentStatus: Record<number, boolean> = {}
+  const currentStatus: Record<number, { added: number; removed: number }> = {}
   const checks: Promise<void>[] = []
 
   for (const [terminalId] of sessions) {
@@ -189,8 +214,8 @@ async function scanAndEmitGitDirty() {
         try {
           const terminal = await getTerminalById(terminalId)
           if (!terminal) return
-          const isDirty = await checkGitDirty(terminal.cwd, terminal.ssh_host)
-          currentStatus[terminalId] = isDirty
+          const stat = await checkGitDirty(terminal.cwd, terminal.ssh_host)
+          currentStatus[terminalId] = stat
         } catch {
           // skip this terminal
         }
@@ -202,8 +227,8 @@ async function scanAndEmitGitDirty() {
 
   // Update cache
   lastDirtyStatus.clear()
-  for (const [id, dirty] of Object.entries(currentStatus)) {
-    lastDirtyStatus.set(Number(id), dirty)
+  for (const [id, stat] of Object.entries(currentStatus)) {
+    lastDirtyStatus.set(Number(id), stat)
   }
 
   // Always emit — the payload is small and clients may have reconnected
@@ -214,14 +239,14 @@ async function checkAndEmitSingleGitDirty(terminalId: number) {
   try {
     const terminal = await getTerminalById(terminalId)
     if (!terminal) return
-    const isDirty = await checkGitDirty(terminal.cwd, terminal.ssh_host)
+    const stat = await checkGitDirty(terminal.cwd, terminal.ssh_host)
     const prev = lastDirtyStatus.get(terminalId)
-    if (prev !== isDirty) {
-      lastDirtyStatus.set(terminalId, isDirty)
+    if (!prev || prev.added !== stat.added || prev.removed !== stat.removed) {
+      lastDirtyStatus.set(terminalId, stat)
       // Emit full status map
-      const dirtyStatus: Record<number, boolean> = {}
-      for (const [id, dirty] of lastDirtyStatus) {
-        dirtyStatus[id] = dirty
+      const dirtyStatus: Record<number, { added: number; removed: number }> = {}
+      for (const [id, s] of lastDirtyStatus) {
+        dirtyStatus[id] = s
       }
       getIO()?.emit('git:dirty-status', { dirtyStatus })
     }
