@@ -25,16 +25,30 @@ export async function getSSHHosts(): Promise<SSHHostEntry[]> {
   return res.json()
 }
 
-export async function createTerminal(
-  cwd: string,
-  name?: string,
-  shell?: string,
-  ssh_host?: string,
-): Promise<Terminal> {
+export async function getGitHubRepos(query?: string): Promise<string[]> {
+  const params = query ? `?q=${encodeURIComponent(query)}` : ''
+  const res = await fetch(`${API_BASE}/github/repos${params}`)
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.repos
+}
+
+export async function createTerminal(opts: {
+  cwd: string
+  name?: string
+  shell?: string
+  ssh_host?: string
+  git_repo?: string
+  conductor?: boolean
+  workspaces_root?: string
+  setup_script?: string
+  delete_script?: string
+  source_terminal_id?: number
+}): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cwd, name, shell, ssh_host }),
+    body: JSON.stringify(opts),
   })
   if (!res.ok) {
     const data = await res.json()

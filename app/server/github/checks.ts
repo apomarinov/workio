@@ -31,7 +31,7 @@ let lastEmittedPRs: PRCheckStatus[] = []
 const POLL_INTERVAL = 60_000 // 60 seconds
 const CACHE_TTL = 30_000 // 30 seconds
 
-function parseGitHubRemoteUrl(
+export function parseGitHubRemoteUrl(
   url: string,
 ): { owner: string; repo: string } | null {
   // SSH: git@github.com:owner/repo.git
@@ -525,13 +525,26 @@ export async function refreshPRChecks(): Promise<void> {
 }
 
 export async function trackTerminal(terminalId: number): Promise<void> {
+  const terminal = await getTerminalById(terminalId)
+  if (!terminal) return
+
+  // Auto-detect git_repo for terminals that don't have one set
+  if (!terminal.git_repo) {
+    const repo = await detectGitHubRepo(terminal.cwd, terminal.ssh_host)
+    if (repo) {
+      const gitRepoObj = {
+        repo: `${repo.owner}/${repo.repo}`,
+        status: 'done' as const,
+      }
+      await updateTerminal(terminalId, { git_repo: gitRepoObj })
+      getIO()?.emit('terminal:workspace', { terminalId, git_repo: gitRepoObj })
+    }
+  }
+
   if (ghAvailable === null) {
     ghAvailable = await checkGhAvailable()
   }
   if (!ghAvailable) return
-
-  const terminal = await getTerminalById(terminalId)
-  if (!terminal) return
 
   monitoredTerminals.set(terminalId, terminal.cwd)
 }

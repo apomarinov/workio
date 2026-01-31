@@ -148,7 +148,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </div>
 
           <div className="flex flex-col gap-3 border-t-[1px] mt-1 py-3">
-            <span className='font-semibold'>Claude Chat</span>
+            <span className="font-semibold">Claude Chat</span>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Brain className="w-4 h-4 text-muted-foreground" />

@@ -3,8 +3,10 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
+import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_FONT_SIZE } from '../constants'
+import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
 
@@ -13,6 +15,10 @@ interface TerminalProps {
 }
 
 export function Terminal({ terminalId }: TerminalProps) {
+  const { activeTerminal } = useTerminalContext()
+  const isSettingUp =
+    activeTerminal?.git_repo?.status === 'setup' ||
+    activeTerminal?.setup?.status === 'setup'
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -54,7 +60,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const plusCols = 0
   const { status, sendInput, sendResize } = useTerminalSocket({
-    terminalId,
+    terminalId: isSettingUp ? null : terminalId,
     cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
     onData: handleData,
@@ -294,6 +300,15 @@ export function Terminal({ terminalId }: TerminalProps) {
       {terminalId === null ? (
         <div className="flex-1 flex items-center justify-center text-gray-500">
           Select a terminal from the sidebar
+        </div>
+      ) : isSettingUp ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-sm">
+            {activeTerminal?.git_repo?.status === 'setup'
+              ? 'Cloning repository...'
+              : 'Running setup...'}
+          </span>
         </div>
       ) : (
         showStatus &&

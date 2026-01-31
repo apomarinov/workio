@@ -1,5 +1,6 @@
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import type * as React from 'react'
+import { useCallback } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -21,9 +22,21 @@ function PopoverContent({
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  // Callback ref: attaches wheel/touchmove stopPropagation when the
+  // element mounts. This prevents react-remove-scroll (used by Radix
+  // Dialog's overlay) from blocking scroll on Portal-rendered content.
+  // Listeners are cleaned up automatically when the element unmounts.
+  const contentRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const stop = (e: Event) => e.stopPropagation()
+    el.addEventListener('wheel', stop)
+    el.addEventListener('touchmove', stop)
+  }, [])
+
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+        ref={contentRef}
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}

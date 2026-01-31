@@ -21,7 +21,6 @@ import {
   Ellipsis,
   Folder,
   Github,
-  Globe,
   LayoutList,
   Plus,
   Settings,
@@ -39,7 +38,6 @@ import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject, Terminal } from '../types'
-import { CreateSSHTerminalModal } from './CreateSSHTerminalModal'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
 import { MergedPRsList } from './MergedPRsList'
@@ -59,8 +57,6 @@ export function Sidebar({ width }: SidebarProps) {
   const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
   const { clearSession, sessions } = useSessionContext()
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showSSHModal, setShowSSHModal] = useState(false)
-  const [createPopoverOpen, setCreatePopoverOpen] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
@@ -314,40 +310,15 @@ export function Sidebar({ width }: SidebarProps) {
     >
       <div className="px-4 py-4 border-b border-sidebar-border flex items-center justify-between">
         <div className="text-sm flex items-center gap-2">
-          <Popover open={createPopoverOpen} onOpenChange={setCreatePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                title="New Terminal"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-40 p-1 space-y-1" align="start">
-              <button
-                onClick={() => {
-                  setCreatePopoverOpen(false)
-                  setShowCreateModal(true)
-                }}
-                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-              >
-                <TerminalIcon className="w-4 h-4" />
-                Terminal
-              </button>
-              <button
-                onClick={() => {
-                  setCreatePopoverOpen(false)
-                  setShowSSHModal(true)
-                }}
-                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-              >
-                <Globe className="w-4 h-4" />
-                SSH
-              </button>
-            </PopoverContent>
-          </Popover>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="New Terminal"
+            onClick={() => setShowCreateModal(true)}
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
         {width !== undefined && width < 220 ? (
           <div className="flex items-center gap-1">
@@ -761,15 +732,6 @@ export function Sidebar({ width }: SidebarProps) {
       <CreateTerminalModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onCreated={(id) => {
-          selectTerminal(id)
-          clearSession()
-        }}
-      />
-
-      <CreateSSHTerminalModal
-        open={showSSHModal}
-        onOpenChange={setShowSSHModal}
         onCreated={(id) => {
           selectTerminal(id)
           clearSession()

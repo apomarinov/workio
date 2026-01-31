@@ -1,7 +1,6 @@
 import {
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   GitBranch,
   GitMerge,
   Loader2,

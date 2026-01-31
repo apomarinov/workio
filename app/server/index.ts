@@ -93,6 +93,47 @@ fastify.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
+// GitHub repos (for repo picker)
+fastify.get<{
+  Querystring: { q?: string }
+}>('/api/github/repos', async (request) => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const exec = promisify(execFile)
+  const query = request.query.q?.trim().toLowerCase() || ''
+
+  try {
+    const { stdout } = await exec(
+      'gh',
+      [
+        'api',
+        '--method',
+        'GET',
+        '/user/repos',
+        '-f',
+        'affiliation=owner,collaborator,organization_member',
+        '-f',
+        'sort=pushed',
+        '-f',
+        'direction=desc',
+        '-f',
+        `per_page=${query ? 100 : 10}`,
+        '--jq',
+        '.[].full_name',
+      ],
+      { timeout: 15000 },
+    )
+
+    let repos = stdout.trim().split('\n').filter(Boolean)
+    if (query) {
+      repos = repos.filter((r) => r.toLowerCase().includes(query))
+    }
+    return { repos }
+  } catch {
+    return { repos: [] }
+  }
+})
+
 // GitHub PR comments
 fastify.get<{
   Params: { owner: string; repo: string; pr: string }

@@ -13,6 +13,7 @@ import type {
   PRCheckStatus,
   PRChecksPayload,
   ProcessesPayload,
+  WorkspacePayload,
 } from '../../shared/types'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
@@ -25,12 +26,18 @@ interface TerminalContextValue {
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
-  createTerminal: (
-    cwd: string,
-    name?: string,
-    shell?: string,
-    ssh_host?: string,
-  ) => Promise<Terminal>
+  createTerminal: (opts: {
+    cwd: string
+    name?: string
+    shell?: string
+    ssh_host?: string
+    git_repo?: string
+    conductor?: boolean
+    workspaces_root?: string
+    setup_script?: string
+    delete_script?: string
+    source_terminal_id?: number
+  }) => Promise<Terminal>
   updateTerminal: (
     id: number,
     updates: { name?: string; cwd?: string },
@@ -104,6 +111,28 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return subscribe('terminal:updated', () => {
       mutate()
+    })
+  }, [subscribe, mutate])
+
+  // Handle workspace setup/archive events (merge state without refetching)
+  useEffect(() => {
+    return subscribe<WorkspacePayload>('terminal:workspace', (data) => {
+      if (data.deleted) {
+        mutate((prev) => prev?.filter((t) => t.id !== data.terminalId), false)
+        return
+      }
+      mutate(
+        (prev) =>
+          prev?.map((t) => {
+            if (t.id !== data.terminalId) return t
+            return {
+              ...t,
+              ...(data.git_repo && { git_repo: data.git_repo }),
+              ...(data.setup && { setup: data.setup }),
+            }
+          }),
+        false,
+      )
     })
   }, [subscribe, mutate])
 
@@ -260,8 +289,19 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   )
 
   const createTerminal = useCallback(
-    async (cwd: string, name?: string, shell?: string, ssh_host?: string) => {
-      const terminal = await api.createTerminal(cwd, name, shell, ssh_host)
+    async (opts: {
+      cwd: string
+      name?: string
+      shell?: string
+      ssh_host?: string
+      git_repo?: string
+      conductor?: boolean
+      workspaces_root?: string
+      setup_script?: string
+      delete_script?: string
+      source_terminal_id?: number
+    }) => {
+      const terminal = await api.createTerminal(opts)
       mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
       return terminal
     },

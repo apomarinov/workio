@@ -272,14 +272,23 @@ export async function createTerminal(
   name: string | null,
   shell: string | null = null,
   ssh_host: string | null = null,
+  git_repo: object | null = null,
+  setup: object | null = null,
 ): Promise<Terminal> {
   const { rows } = await pool.query(
     `
-    INSERT INTO terminals (cwd, name, shell, ssh_host)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO terminals (cwd, name, shell, ssh_host, git_repo, setup)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *
   `,
-    [cwd, name, shell, ssh_host],
+    [
+      cwd,
+      name,
+      shell,
+      ssh_host,
+      git_repo ? JSON.stringify(git_repo) : null,
+      setup ? JSON.stringify(setup) : null,
+    ],
   )
   return rows[0]
 }
@@ -293,6 +302,8 @@ export async function updateTerminal(
     status?: string
     active_cmd?: string | null
     git_branch?: string | null
+    git_repo?: object | null
+    setup?: object | null
   },
 ): Promise<Terminal | undefined> {
   const setClauses: string[] = []
@@ -322,6 +333,14 @@ export async function updateTerminal(
   if (updates.git_branch !== undefined) {
     setClauses.push(`git_branch = $${paramIdx++}`)
     values.push(updates.git_branch)
+  }
+  if (updates.git_repo !== undefined) {
+    setClauses.push(`git_repo = $${paramIdx++}`)
+    values.push(updates.git_repo ? JSON.stringify(updates.git_repo) : null)
+  }
+  if (updates.setup !== undefined) {
+    setClauses.push(`setup = $${paramIdx++}`)
+    values.push(updates.setup ? JSON.stringify(updates.setup) : null)
   }
 
   if (setClauses.length === 0) {

@@ -1,3 +1,18 @@
+export interface GitRepoStatus {
+  repo: string
+  status: 'setup' | 'done' | 'failed'
+  workspaces_root?: string
+  error?: string
+}
+
+export interface SetupStatus {
+  conductor?: boolean
+  setup?: string
+  delete?: string
+  status: 'setup' | 'delete' | 'done' | 'failed'
+  error?: string
+}
+
 export interface Terminal {
   id: number
   cwd: string
@@ -8,6 +23,8 @@ export interface Terminal {
   status: 'running' | 'stopped'
   active_cmd: string | null
   git_branch: string | null
+  git_repo: GitRepoStatus | null
+  setup: SetupStatus | null
   orphaned?: boolean
   created_at: string
   updated_at: string

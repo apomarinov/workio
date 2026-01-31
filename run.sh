@@ -8,6 +8,15 @@ DROP_DB=false
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        -h|--help)
+            echo "Usage: ./run.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --rebuild   Force rebuild the webapp (npm install + npm run build)"
+            echo "  --drop-db   Drop and recreate the database from schema.sql"
+            echo "  -h, --help  Show this help message and exit"
+            exit 0
+            ;;
         --rebuild)
             REBUILD=true
             shift
@@ -18,7 +27,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: ./run.sh [--rebuild] [--drop-db]"
+            echo "Usage: ./run.sh [-h] [--rebuild] [--drop-db]"
             exit 1
             ;;
     esac
@@ -146,7 +155,9 @@ echo "Setting up PostgreSQL database: $DB_NAME"
 # Drop database if requested
 if [[ "$DROP_DB" == true ]]; then
     echo "Dropping database $DB_NAME..."
-    psql "$(make_admin_url "postgres")" -c "DROP DATABASE IF EXISTS \"$DB_NAME\"" 2>/dev/null || true
+    ADMIN_URL="$(make_admin_url "postgres")"
+    psql "$ADMIN_URL" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid()" &>/dev/null || true
+    psql "$ADMIN_URL" -c "DROP DATABASE IF EXISTS \"$DB_NAME\""
 fi
 
 # Create database and run schema if it doesn't exist

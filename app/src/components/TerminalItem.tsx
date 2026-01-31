@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Command,
+  Copy,
   ExternalLink,
   GitBranch,
   Globe,
@@ -51,7 +52,8 @@ export function TerminalItem({
   onToggleGitHub,
 }: TerminalItemProps) {
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
-  const { updateTerminal, deleteTerminal } = useTerminalContext()
+  const { createTerminal, updateTerminal, deleteTerminal } =
+    useTerminalContext()
   const { clearSession } = useSessionContext()
   const cmdHeld = useCmdHeld()
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
@@ -84,6 +86,9 @@ export function TerminalItem({
     onToggleGitHub ?? (() => setLocalGitHubExpanded((v) => !v))
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
   const [portsExpanded, setPortsExpanded] = useState(false)
+  const isSettingUp =
+    terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'
+  const isDeleting = terminal.setup?.status === 'delete'
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0
   const hasProcesses = processes.length > 0
@@ -126,11 +131,31 @@ export function TerminalItem({
     deleteTerminal(terminal.id)
   }
 
+  const handleAddWorkspace = async () => {
+    setShowMenu(false)
+    const repo = terminal.git_repo!.repo
+    const baseName = terminal.name || repo.split('/').pop()!
+    try {
+      const newTerminal = await createTerminal({
+        cwd: '~',
+        name: `${baseName} 2`,
+        source_terminal_id: terminal.id,
+      })
+      selectTerminal(newTerminal.id)
+      clearSession()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to add workspace',
+      )
+    }
+  }
+
   return (
     <>
       <div>
         <div
           onClick={() => {
+            if (isSettingUp || isDeleting) return
             selectTerminal(terminal.id)
             clearSession()
             if (!sessionsExpanded) {
@@ -138,10 +163,14 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 cursor-pointer transition-colors ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors ${
+              isSettingUp || isDeleting
+                ? 'opacity-60 cursor-default'
+                : `cursor-pointer ${
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  }`
             } ${terminal.orphaned ? 'opacity-60' : ''}`,
             !hasSessions &&
               !hasProcesses &&
@@ -198,6 +227,29 @@ export function TerminalItem({
                 </span>
               )
             )}
+            {terminal.git_repo?.status === 'setup' && (
+              <span className="text-xs text-blue-400">
+                Cloning repository...
+              </span>
+            )}
+            {terminal.git_repo?.status === 'failed' && (
+              <span className="text-xs text-destructive truncate">
+                Clone failed: {terminal.git_repo.error}
+              </span>
+            )}
+            {terminal.setup?.status === 'setup' && (
+              <span className="text-xs text-blue-400">Running setup...</span>
+            )}
+            {terminal.setup?.status === 'failed' && (
+              <span className="text-xs text-destructive truncate">
+                Setup failed: {terminal.setup.error}
+              </span>
+            )}
+            {terminal.setup?.status === 'delete' && (
+              <span className="text-xs text-yellow-500">
+                Running delete script...
+              </span>
+            )}
             {gitBranch && (
               <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <GitBranch className="w-2.5 h-2.5 text-zinc-400" />
@@ -225,9 +277,19 @@ export function TerminalItem({
                 </PopoverTrigger>
                 <PopoverContent
                   align="end"
-                  className="w-36 p-1"
+                  className="w-40 p-1"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {terminal.git_repo && (
+                    <button
+                      type="button"
+                      onClick={handleAddWorkspace}
+                      className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Add Workspace
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleEditClick}

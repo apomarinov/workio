@@ -61,3 +61,21 @@ export interface MergedPRSummary {
   branch: string
   repo: string
 }
+
+export interface WorkspacePayload {
+  terminalId: number
+  git_repo?: {
+    repo: string
+    status: 'setup' | 'done' | 'failed'
+    workspaces_root?: string
+    error?: string
+  }
+  setup?: {
+    conductor?: boolean
+    setup?: string
+    delete?: string
+    status: 'setup' | 'delete' | 'done' | 'failed'
+    error?: string
+  }
+  deleted?: boolean
+}

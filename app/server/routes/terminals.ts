@@ -25,12 +25,22 @@ import { refreshPRChecks } from '../github/checks'
 import { log } from '../logger'
 import { destroySession } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
+import {
+  deleteTerminalWorkspace,
+  setupTerminalWorkspace,
+} from '../workspace/setup'
 
 interface CreateTerminalBody {
   cwd?: string
   name?: string
   shell?: string
   ssh_host?: string
+  git_repo?: string
+  conductor?: boolean
+  workspaces_root?: string
+  setup_script?: string
+  delete_script?: string
+  source_terminal_id?: number
 }
 
 interface UpdateTerminalBody {
@@ -61,10 +71,145 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateTerminalBody }>(
     '/api/terminals',
     async (request, reply) => {
-      const { cwd: rawCwd, name, shell, ssh_host } = request.body
+      const {
+        cwd: rawCwd,
+        name,
+        shell,
+        ssh_host,
+        git_repo,
+        conductor,
+        workspaces_root,
+        setup_script,
+        delete_script,
+        source_terminal_id,
+      } = request.body
+
+      // --- Worktree mode (Add Workspace from existing terminal) ---
+      if (source_terminal_id) {
+        const sourceTerminal = await getTerminalById(source_terminal_id)
+        if (!sourceTerminal?.git_repo) {
+          return reply
+            .status(400)
+            .send({ error: 'Source terminal has no git repo' })
+        }
+
+        const repo = sourceTerminal.git_repo.repo
+        // Build setup object from source terminal's setup (with status reset)
+        let setupObj: Record<string, unknown> | null = null
+        if (sourceTerminal.setup) {
+          const { status: _, error: _e, ...rest } = sourceTerminal.setup
+          setupObj = { ...rest, status: 'setup' as const }
+        }
+
+        const gitRepoData: Record<string, unknown> = {
+          repo,
+          status: 'setup' as const,
+        }
+        if (sourceTerminal.git_repo.workspaces_root) {
+          gitRepoData.workspaces_root = sourceTerminal.git_repo.workspaces_root
+        }
+
+        const terminal = await createTerminal(
+          '~',
+          name?.trim() || repo.split('/').pop()!,
+          sourceTerminal.shell,
+          sourceTerminal.ssh_host,
+          gitRepoData,
+          setupObj,
+        )
+
+        setupTerminalWorkspace({
+          terminalId: terminal.id,
+          repo,
+          setupObj: setupObj as {
+            conductor?: boolean
+            setup?: string
+            delete?: string
+          } | null,
+          workspacesRoot: sourceTerminal.git_repo.workspaces_root || undefined,
+          worktreeSource: sourceTerminal.cwd,
+        }).catch((err) =>
+          log.error(
+            `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
+          ),
+        )
+
+        return reply.status(201).send(terminal)
+      }
+
+      if (git_repo) {
+        // --- Git repo workspace creation (local or SSH) ---
+        const repo = git_repo.trim()
+        if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+          return reply
+            .status(400)
+            .send({ error: 'git_repo must be in owner/repo format' })
+        }
+
+        // Validate SSH host if provided alongside git repo
+        let trimmedHost: string | null = null
+        if (ssh_host) {
+          trimmedHost = ssh_host.trim()
+          if (trimmedHost) {
+            const result = validateSSHHost(trimmedHost)
+            if (!result.valid) {
+              return reply.status(400).send({ error: result.error })
+            }
+          }
+        }
+
+        // Build setup object
+        const hasSetup = conductor || setup_script || delete_script
+        const setupObj = hasSetup
+          ? {
+              ...(conductor ? { conductor: true } : {}),
+              ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
+              ...(delete_script?.trim()
+                ? { delete: delete_script.trim() }
+                : {}),
+              status: 'setup' as const,
+            }
+          : null
+
+        const gitRepoData: Record<string, unknown> = {
+          repo,
+          status: 'setup' as const,
+        }
+        if (workspaces_root?.trim()) {
+          gitRepoData.workspaces_root = workspaces_root.trim()
+        }
+
+        // cwd is a placeholder — setupTerminalWorkspace will update it to the clone target
+        const terminal = await createTerminal(
+          '~',
+          name?.trim() || repo.split('/').pop()!,
+          shell?.trim() || null,
+          trimmedHost,
+          gitRepoData,
+          setupObj,
+        )
+
+        // Fire-and-forget: setup workspace async
+        setupTerminalWorkspace({
+          terminalId: terminal.id,
+          repo,
+          setupObj: setupObj as {
+            conductor?: boolean
+            setup?: string
+            delete?: string
+          } | null,
+          workspacesRoot: workspaces_root?.trim() || undefined,
+        }).catch((err) =>
+          log.error(
+            `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
+          ),
+        )
+
+        return reply.status(201).send(terminal)
+      }
 
       if (ssh_host) {
-        // --- SSH terminal creation ---
+        // --- SSH terminal creation (without git repo) ---
         const trimmedHost = ssh_host.trim()
         if (!trimmedHost) {
           return reply.status(400).send({ error: 'ssh_host cannot be empty' })
@@ -195,6 +340,33 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const killed = destroySession(id)
       if (killed) {
         log.info(`[terminals] Killed PTY session for terminal ${id}`)
+      }
+
+      // Setup with delete script or conductor: run delete script async, then delete
+      const hasDeleteFlow =
+        terminal.setup &&
+        (terminal.setup.conductor || terminal.setup.delete) &&
+        terminal.git_repo?.status === 'done'
+      if (hasDeleteFlow) {
+        await updateTerminal(id, {
+          setup: { ...terminal.setup, status: 'delete' as const },
+        })
+        deleteTerminalWorkspace(id).catch((err) =>
+          log.error(
+            `[terminals] Delete workspace error: ${err instanceof Error ? err.message : err}`,
+          ),
+        )
+        refreshPRChecks()
+        return reply.status(202).send()
+      }
+
+      // Git repo without delete scripts: clean up workspace directory
+      if (terminal.git_repo) {
+        try {
+          fs.rmSync(expandPath(terminal.cwd), { recursive: true, force: true })
+        } catch {
+          // Directory may not exist if clone failed
+        }
       }
 
       await deleteTerminal(id)
