@@ -85,6 +85,14 @@ export async function deleteTerminal(
   return res.status === 202
 }
 
+export async function browseFolder(): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/browse-folder`)
+  if (res.status === 204) return null
+  if (!res.ok) throw new Error('Failed to open folder picker')
+  const data = await res.json()
+  return data.path
+}
+
 export async function getSettings(): Promise<Settings> {
   const res = await fetch(`${API_BASE}/settings`)
   if (!res.ok) throw new Error('Failed to fetch settings')

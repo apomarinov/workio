@@ -1,7 +1,9 @@
 import {
   Check,
   ChevronsUpDown,
+  CircleX,
   FolderOpen,
+  Loader2,
   Plus,
   TerminalSquare,
   XCircle,
@@ -40,7 +42,58 @@ import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
-import { getGitHubRepos, getSSHHosts, type SSHHostEntry } from '../lib/api'
+import {
+  browseFolder,
+  getGitHubRepos,
+  getSSHHosts,
+  type SSHHostEntry,
+} from '../lib/api'
+
+function FolderPicker({
+  value,
+  onSelect,
+  onClear,
+  placeholder = 'Choose folder...',
+}: {
+  value: string
+  onSelect: (path: string) => void
+  onClear: () => void
+  placeholder?: string
+}) {
+  const [loading, setLoading] = useState(false)
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        setLoading(true)
+        const path = await browseFolder()
+        setLoading(false)
+        if (path) onSelect(path)
+      }}
+      className="flex items-center justify-between gap-3 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-3 py-2 text-sm shadow-xs dark:hover:bg-input/50 hover:bg-accent transition-colors cursor-pointer text-left"
+    >
+      <div className="flex items-center gap-2">
+        <FolderOpen className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        {value ? (
+          <span className="truncate">{value}</span>
+        ) : (
+          <span className="text-muted-foreground">{placeholder}</span>
+        )}
+      </div>
+      {loading && <Loader2 className="w-5 h-5 animate-spin" />}
+      {value && (
+        <CircleX
+          onClick={(e) => {
+            e.stopPropagation()
+            onClear()
+          }}
+          className="w-4.5 h-4.5 text-muted-foreground/60 hover:text-muted-foreground cursor-pointer"
+        />
+      )}
+    </button>
+  )
+}
 
 interface CreateTerminalModalProps {
   open: boolean
@@ -78,6 +131,7 @@ export function CreateTerminalModal({
   const defaultShell = settings?.default_shell ?? '/bin/bash'
   const hasGitRepo = gitRepo.trim().length > 0
   const isSSH = sshHost.length > 0
+  const isMac = navigator.platform.startsWith('Mac')
   const [isLoadingRepos, setIsLoadingRepos] = useState(false)
 
   // Load SSH hosts when modal opens
@@ -256,6 +310,7 @@ export function CreateTerminalModal({
                   setSSHHost('')
                   return
                 }
+                setCwd('')
                 setSSHHost(v)
               }}
             >
@@ -398,20 +453,31 @@ export function CreateTerminalModal({
                 >
                   Clones via SSH into
                 </label>
-                <div className="relative">
-                  <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="workspaces-root"
-                    type="text"
+                {isSSH || !isMac ? (
+                  <div className="relative">
+                    <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="workspaces-root"
+                      type="text"
+                      value={workspacesRoot}
+                      onChange={(e) => {
+                        setWorkspacesRoot(e.target.value)
+                        setCwd('')
+                      }}
+                      placeholder="~/repo-workspaces"
+                      className="pl-10"
+                    />
+                  </div>
+                ) : (
+                  <FolderPicker
                     value={workspacesRoot}
-                    onChange={(e) => {
-                      setWorkspacesRoot(e.target.value)
+                    onSelect={(path) => {
+                      setWorkspacesRoot(path)
                       setCwd('')
                     }}
-                    placeholder="~/repo-workspaces"
-                    className="pl-10"
+                    onClear={() => setWorkspacesRoot('')}
                   />
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -493,20 +559,31 @@ export function CreateTerminalModal({
               <label htmlFor="cwd" className="text-sm font-medium">
                 Path
               </label>
-              <div className="relative">
-                <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="cwd"
-                  type="text"
+              {isSSH || !isMac ? (
+                <div className="relative">
+                  <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="cwd"
+                    type="text"
+                    value={cwd}
+                    onChange={(e) => {
+                      setCwd(e.target.value)
+                      setWorkspacesRoot('')
+                    }}
+                    placeholder="~"
+                    className="pl-10"
+                  />
+                </div>
+              ) : (
+                <FolderPicker
                   value={cwd}
-                  onChange={(e) => {
-                    setCwd(e.target.value)
+                  onSelect={(path) => {
+                    setCwd(path)
                     setWorkspacesRoot('')
                   }}
-                  placeholder="~"
-                  className="pl-10"
+                  onClear={() => setCwd('')}
                 />
-              </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 Git branch and repo will be detected in this path for PR status
               </p>

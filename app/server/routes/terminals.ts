@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -55,6 +56,27 @@ interface TerminalParams {
 }
 
 export default async function terminalRoutes(fastify: FastifyInstance) {
+  // Open native OS folder picker and return selected path
+  fastify.get('/api/browse-folder', async (_request, reply) => {
+    return new Promise<void>((resolve) => {
+      execFile(
+        'osascript',
+        ['-e', 'POSIX path of (choose folder with prompt "Select a folder")'],
+        { timeout: 60000 },
+        (err, stdout) => {
+          if (err) {
+            // User cancelled or error
+            reply.status(204).send()
+          } else {
+            const folder = stdout.trim().replace(/\/$/, '')
+            reply.send({ path: folder })
+          }
+          resolve()
+        },
+      )
+    })
+  })
+
   // List available SSH hosts from ~/.ssh/config
   fastify.get('/api/ssh/hosts', async () => {
     return listSSHHosts()
