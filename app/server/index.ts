@@ -21,6 +21,7 @@ import {
 import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
+import { startGitDirtyPolling } from './pty/manager'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
@@ -67,6 +68,7 @@ io.on('connection', (socket) => {
   log.info(`Client connected: ${socket.id}`)
   emitCachedPRChecks(socket)
   refreshPRChecks()
+  startGitDirtyPolling()
 
   socket.on('detect-branches', () => {
     detectAllTerminalBranches()
