@@ -5,8 +5,6 @@ import {
   CircleX,
   Clock,
   ExternalLink,
-  GitMerge,
-  GitPullRequestDraft,
   Loader2,
   RefreshCw,
   X,
@@ -34,6 +32,119 @@ import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRComment, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
+
+export function getPRStatusInfo(pr: PRCheckStatus) {
+  const isMerged = pr.state === 'MERGED'
+  const isApproved = pr.reviewDecision === 'APPROVED'
+  const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
+  const hasRunningChecks = pr.checks.some(
+    (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+  )
+  const hasFailedChecks = pr.checks.some(
+    (c) =>
+      c.status === 'COMPLETED' &&
+      c.conclusion !== 'SUCCESS' &&
+      c.conclusion !== 'SKIPPED' &&
+      c.conclusion !== 'NEUTRAL',
+  )
+  const hasConflicts = pr.mergeable === 'CONFLICTING'
+
+  if (isMerged)
+    return {
+      label: 'Merged',
+      colorClass: 'text-purple-400',
+      dimColorClass: 'text-purple-400/70 hover:text-purple-400',
+    }
+  if (hasChangesRequested)
+    return {
+      label: 'Change request',
+      colorClass: 'text-orange-400',
+      dimColorClass: 'text-orange-400/70 hover:text-orange-400',
+    }
+  if (hasRunningChecks)
+    return {
+      label: 'Running checks',
+      colorClass: 'text-yellow-400',
+      dimColorClass: 'text-yellow-400/70 hover:text-yellow-400',
+    }
+  if (hasFailedChecks)
+    return {
+      label: 'Failed checks',
+      colorClass: 'text-red-400',
+      dimColorClass: 'text-red-400/70 hover:text-red-400',
+    }
+  if (isApproved && hasConflicts)
+    return {
+      label: 'Conflicts',
+      colorClass: 'text-red-400',
+      dimColorClass: 'text-red-400/70 hover:text-red-400',
+    }
+  if (isApproved)
+    return {
+      label: 'Approved',
+      colorClass: 'text-green-500',
+      dimColorClass: 'text-green-500/70 hover:text-green-500',
+    }
+  if (pr.areAllChecksOk)
+    return {
+      label: 'Checks passed',
+      colorClass: '',
+      dimColorClass: '',
+    }
+  return { label: 'Pull Request', colorClass: '', dimColorClass: '' }
+}
+
+export const PRTabButton = memo(function PRTabButton({
+  pr,
+  active = false,
+  hasNewActivity,
+  onClick,
+  className
+}: {
+  pr: PRCheckStatus
+  active?: boolean
+  hasNewActivity?: boolean
+  className?: string
+  onClick?: () => void
+}) {
+  const { label, colorClass, dimColorClass } = useMemo(
+    () => getPRStatusInfo(pr),
+    [pr],
+  )
+
+  return (
+    <div className="group/pr-btn flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+          active
+            ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
+            : cn(
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
+          className
+        )}
+      >
+        {label}
+        {hasNewActivity && (
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
+        )}
+      </button>
+      <a
+        href={pr.prUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="ml-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors invisible group-hover/pr-btn:visible"
+      >
+        <ExternalLink className="w-3 h-3" />
+      </a>
+    </div>
+  )
+})
 
 interface PRStatusContentProps {
   pr: PRCheckStatus
@@ -270,25 +381,6 @@ export function PRStatusContent({
     () => pr.comments.some((c) => !hiddenAuthorsSet.has(c.author)),
     [pr.comments, hiddenAuthorsSet],
   )
-  const hasRunningChecks = useMemo(
-    () =>
-      pr.checks.some(
-        (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-      ),
-    [pr.checks],
-  )
-  const hasFailedChecks = useMemo(
-    () =>
-      pr.checks.some(
-        (c) =>
-          c.status === 'COMPLETED' &&
-          c.conclusion !== 'SUCCESS' &&
-          c.conclusion !== 'SKIPPED' &&
-          c.conclusion !== 'NEUTRAL',
-      ),
-    [pr.checks],
-  )
-
   const hasConflicts = pr.mergeable === 'CONFLICTING'
 
   const [extraComments, setExtraComments] = useState<PRComment[]>([])
@@ -376,117 +468,27 @@ export function PRStatusContent({
   // Header-only mode: if no content and no header, nothing to render
   if (!hasHeader && !hasContent) return null
 
-  // Merged state with header: just show a merged link
+  // Merged state with header: just show a merged tab
   if (hasHeader && isMerged) {
-    return (
-      <div className="flex gap-1 items-center group/mr">
-        <a
-          href={pr.prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-[10px] uppercase tracking-wider pl-2 pt-1 text-purple-400/70 group-hover/mr:text-purple-400 transition-colors"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GitMerge className="w-3 h-3" />
-          PR Merged
-        </a>
-        <a
-          href={pr.prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="ml-0.5 mt-0.5 hidden text-muted-foreground/40 group-hover/mr:block hover:text-muted-foreground transition-colors"
-        >
-          <ExternalLink className="w-3 h-3" />
-        </a>
-      </div>
-    )
+    return <PRTabButton pr={pr} active onClick={onSeen} />
   }
 
   const renderHeader = () => {
     if (!hasHeader) return null
 
     const isApproved = pr.reviewDecision === 'APPROVED'
-    const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
 
     return (
       <div className="group/header flex items-center justify-between">
-        <button
-          type="button"
+        <PRTabButton
+          pr={pr}
+          active={expanded}
+          hasNewActivity={hasNewActivity}
           onClick={() => {
             onToggle()
             onSeen?.()
           }}
-          className={cn(
-            'group/gh flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider px-2 pt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors',
-            hasChangesRequested
-              ? 'text-orange-400/70 hover:text-orange-400'
-              : hasRunningChecks
-                ? 'text-yellow-400/70 hover:text-yellow-400'
-                : hasFailedChecks
-                  ? 'text-red-400/70 hover:text-red-400'
-                  : isApproved && hasConflicts
-                    ? 'text-red-400/70 hover:text-red-400'
-                    : isApproved
-                      ? 'text-green-500/70 hover:text-green-500'
-                      : '',
-          )}
-        >
-          {expanded ? (
-            <ChevronDown className="w-3 h-3" />
-          ) : (
-            <>
-              {(hasChangesRequested ||
-                isApproved ||
-                hasChecks ||
-                pendingReviews.length > 0) && (
-                <ChevronRight className="w-3 h-3 hidden group-hover/gh:block" />
-              )}
-              {hasChangesRequested ? (
-                <RefreshCw className="w-3 h-3 text-orange-400/70 group-hover/gh:hidden" />
-              ) : hasRunningChecks ? (
-                <Loader2 className="w-3 h-3 text-yellow-500/70 animate-spin group-hover/gh:hidden" />
-              ) : hasFailedChecks ? (
-                <CircleX className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
-              ) : isApproved && hasConflicts ? (
-                <GitPullRequestDraft className="w-3 h-3 text-red-500/70 group-hover/gh:hidden" />
-              ) : isApproved ? (
-                <Check className="w-3 h-3 text-green-500/70 group-hover/gh:hidden" />
-              ) : pendingReviews.length > 0 ? (
-                <Clock className="w-3 h-3 opacity-80 group-hover/gh:hidden" />
-              ) : (
-                <ChevronRight className="w-3 h-3" />
-              )}
-            </>
-          )}
-          <span className="pt-0.5">
-            {hasChangesRequested
-              ? 'pr Change request'
-              : hasRunningChecks
-                ? 'pr running checks'
-                : hasFailedChecks
-                  ? 'pr failed checks'
-                  : isApproved && hasConflicts
-                    ? 'pr Conflicts'
-                    : isApproved
-                      ? 'pr approved'
-                      : pr.areAllChecksOk
-                        ? 'pr checks passed'
-                        : 'Pull Request'}
-          </span>
-          {hasNewActivity && (
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 ml-auto" />
-          )}
-          <a
-            href={pr.prUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="ml-1 hidden group-hover/gh:block text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </button>
+        />
         {isApproved && (
           <button
             type="button"

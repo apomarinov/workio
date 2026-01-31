@@ -75,9 +75,6 @@ export function Sidebar({ width }: SidebarProps) {
     'sidebar-collapsed-sessions',
     [],
   )
-  const [collapsedTerminalGitHub, setCollapsedTerminalGitHub] = useLocalStorage<
-    number[]
-  >('sidebar-collapsed-terminal-github', [])
   const [terminalsSectionCollapsed, setTerminalsSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-terminals-collapsed', false)
   const [githubSectionCollapsed, setGithubSectionCollapsed] =
@@ -202,20 +199,6 @@ export function Sidebar({ width }: SidebarProps) {
     })
   }
 
-  const collapsedTerminalGitHubSet = useMemo(
-    () => new Set(collapsedTerminalGitHub),
-    [collapsedTerminalGitHub],
-  )
-
-  const toggleTerminalGitHub = (terminalId: number) => {
-    setCollapsedTerminalGitHub((prev) => {
-      if (prev.includes(terminalId)) {
-        return prev.filter((id) => id !== terminalId)
-      }
-      return [...prev, terminalId]
-    })
-  }
-
   // Track expanded state for individual PRs in the sidebar GitHub section
   const [expandedGitHubPRs, setExpandedGitHubPRs] = useLocalStorage<string[]>(
     'sidebar-expanded-github-prs',
@@ -281,7 +264,6 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedFoldersArray(allFolders)
     setExpandedSessionGroups(allOrphanGroupPaths)
     setExpandedTerminalSessions(allTerminalIds)
-    setCollapsedTerminalGitHub([])
     setCollapsedSessions([])
     setCollapsedGitHubRepos([])
     setExpandedGitHubPRs(githubPRs.map((pr) => pr.branch))
@@ -291,7 +273,6 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedFoldersArray([])
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
-    setCollapsedTerminalGitHub(allTerminalIds)
     setCollapsedSessions(allSessionIds)
     setCollapsedGitHubRepos(allGitHubRepos)
     setExpandedGitHubPRs([])
@@ -575,8 +556,6 @@ export function Sidebar({ width }: SidebarProps) {
                           sessionsForTerminal={sessionsForTerminal}
                           expandedTerminalSessions={expandedTerminalSessionsSet}
                           onToggleTerminalSessions={toggleTerminalSessions}
-                          collapsedTerminalGitHub={collapsedTerminalGitHubSet}
-                          onToggleTerminalGitHub={toggleTerminalGitHub}
                         />
                       ),
                     )
@@ -606,12 +585,6 @@ export function Sidebar({ width }: SidebarProps) {
                             )}
                             onToggleSessions={() =>
                               toggleTerminalSessions(terminal.id)
-                            }
-                            githubExpanded={
-                              !collapsedTerminalGitHubSet.has(terminal.id)
-                            }
-                            onToggleGitHub={() =>
-                              toggleTerminalGitHub(terminal.id)
                             }
                           />
                         ))}

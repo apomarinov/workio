@@ -13,7 +13,7 @@ import {
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -29,7 +29,7 @@ import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
-import { PRStatusContent } from './PRStatusContent'
+import { PRStatusContent, PRTabButton } from './PRStatusContent'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
 
@@ -39,8 +39,6 @@ interface TerminalItemProps {
   sessions?: SessionWithProject[]
   sessionsExpanded?: boolean
   onToggleSessions?: () => void
-  githubExpanded?: boolean
-  onToggleGitHub?: () => void
 }
 
 export function TerminalItem({
@@ -49,8 +47,6 @@ export function TerminalItem({
   sessions = [],
   sessionsExpanded = true,
   onToggleSessions,
-  githubExpanded: githubExpandedProp,
-  onToggleGitHub,
 }: TerminalItemProps) {
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { createTerminal, updateTerminal, deleteTerminal } =
@@ -65,29 +61,33 @@ export function TerminalItem({
     processes: allProcesses,
     terminalPorts,
   } = useTerminalContext()
-  const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
+  const processes = useMemo(
+    () => allProcesses.filter((p) => p.terminalId === terminal.id),
+    [allProcesses, terminal.id],
+  )
   const ports = terminalPorts[terminal.id] ?? []
-  const prForBranch = terminal.git_branch
-    ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
-      githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
-      ))
-    : undefined
+  const prForBranch = useMemo(
+    () =>
+      terminal.git_branch
+        ? (githubPRs.find(
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
+          githubPRs.find(
+            (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
+          ))
+        : undefined,
+    [githubPRs, terminal.git_branch],
+  )
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteDirectory, setDeleteDirectory] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [processesExpanded, setProcessesExpanded] = useState(false)
-  const [localGitHubExpanded, setLocalGitHubExpanded] = useState(true)
-  const githubExpanded = githubExpandedProp ?? localGitHubExpanded
-  const toggleGitHub =
-    onToggleGitHub ?? (() => setLocalGitHubExpanded((v) => !v))
+  const [activeTab, setActiveTab] = useState<'processes' | 'ports' | 'prs'>(
+    'prs',
+  )
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
-  const [portsExpanded, setPortsExpanded] = useState(false)
   const isSettingUp =
     terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'
   const isDeleting = terminal.setup?.status === 'delete'
@@ -162,21 +162,20 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
             ((!hasSessions && !hasProcesses && !hasGitHub && !hasPorts) ||
               isSettingUp ||
               isDeleting) &&
-              'pl-2.5',
+            'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
           {!isSettingUp &&
-          !isDeleting &&
-          (hasSessions || hasProcesses || hasGitHub || hasPorts) ? (
+            !isDeleting &&
+            (hasSessions || hasProcesses || hasGitHub || hasPorts) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -246,6 +245,17 @@ export function TerminalItem({
               <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <GitBranch className="w-2.5 h-2.5 text-zinc-400" />
                 {gitBranch}
+                {hasGitHub && prForBranch && !sessionsExpanded && (
+                  <PRTabButton
+                    className='bg-transparent py-0'
+                    pr={prForBranch}
+                    hasNewActivity={hasNewActivity(prForBranch)}
+                    onClick={() => {
+                      setActiveTab('prs')
+                      markPRSeen(prForBranch)
+                    }}
+                  />
+                )}
               </span>
             )}
           </div>
@@ -323,70 +333,86 @@ export function TerminalItem({
         {(hasGitHub || hasProcesses || hasPorts || hasSessions) &&
           sessionsExpanded && (
             <div className="ml-2 space-y-0.5">
-              {hasGitHub && prForBranch && (
-                <PRStatusContent
-                  pr={prForBranch}
-                  expanded={githubExpanded}
-                  onToggle={toggleGitHub}
-                  hasNewActivity={hasNewActivity(prForBranch)}
-                  onSeen={() => markPRSeen(prForBranch)}
-                />
-              )}
-              {hasProcesses && (
+              {(hasGitHub || hasProcesses || hasPorts) && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setProcessesExpanded((v) => !v)}
-                    className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
-                  >
-                    {processesExpanded ? (
-                      <ChevronDown className="w-3 h-3" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3" />
-                    )}
-                    Processes ({processes.length})
-                  </button>
-                  {processesExpanded &&
-                    processes.map((process) => (
-                      <div
-                        key={`${process.pid}-${process.command}`}
-                        className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                  <div className="flex items-center gap-1 px-2 pt-1">
+                    {hasProcesses && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('processes')}
+                        className={cn(
+                          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+                          activeTab === 'processes'
+                            ? 'text-foreground bg-sidebar-accent'
+                            : 'text-muted-foreground/60 hover:text-muted-foreground',
+                        )}
                       >
-                        <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
-                        <span className="text-xs truncate">
-                          {process.command}
-                        </span>
-                      </div>
-                    ))}
-                </>
-              )}
-              {hasPorts && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setPortsExpanded((v) => !v)}
-                    className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1 hover:text-muted-foreground transition-colors"
-                  >
-                    {portsExpanded ? (
-                      <ChevronDown className="w-3 h-3" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3" />
+                        Processes ({processes.length})
+                      </button>
                     )}
-                    Ports ({ports.length})
-                  </button>
-                  {portsExpanded &&
-                    ports.map((port) => (
-                      <a
-                        key={port}
-                        href={`http://localhost:${port}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                    {hasPorts && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('ports')}
+                        className={cn(
+                          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+                          activeTab === 'ports'
+                            ? 'text-foreground bg-sidebar-accent'
+                            : 'text-muted-foreground/60 hover:text-muted-foreground',
+                        )}
                       >
-                        <span className="text-xs">{port}</span>
-                        <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
-                      </a>
-                    ))}
+                        Ports ({ports.length})
+                      </button>
+                    )}
+                    {hasGitHub && prForBranch && (
+                      <PRTabButton
+                        pr={prForBranch}
+                        active={activeTab === 'prs'}
+                        hasNewActivity={hasNewActivity(prForBranch)}
+                        onClick={() => {
+                          setActiveTab('prs')
+                          markPRSeen(prForBranch)
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    {activeTab === 'processes' &&
+                      hasProcesses &&
+                      processes.map((process) => (
+                        <div
+                          key={`${process.pid}-${process.command}`}
+                          className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                        >
+                          <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                          <span className="text-xs truncate">
+                            {process.command}
+                          </span>
+                        </div>
+                      ))}
+                    {activeTab === 'ports' &&
+                      hasPorts &&
+                      ports.map((port) => (
+                        <a
+                          key={port}
+                          href={`http://localhost:${port}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                        >
+                          <span className="text-xs">{port}</span>
+                          <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
+                        </a>
+                      ))}
+                    {activeTab === 'prs' && hasGitHub && prForBranch && (
+                      <PRStatusContent
+                        pr={prForBranch}
+                        expanded={true}
+                        hasNewActivity={hasNewActivity(prForBranch)}
+                        onSeen={() => markPRSeen(prForBranch)}
+                      />
+                    )}
+                  </div>
                 </>
               )}
               {sessions.length > 0 && (
