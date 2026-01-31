@@ -148,11 +148,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </div>
 
           <div className="flex flex-col gap-3 border-t-[1px] mt-1 py-3">
+            <span className='font-semibold'>Claude Chat</span>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Brain className="w-4 h-4 text-muted-foreground" />
                 <label htmlFor="show_thinking" className="text-sm font-medium">
-                  Expand Thinking
+                  Thinking
                 </label>
               </div>
               <Switch
@@ -177,14 +178,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </div>
 
             {showTools && (
-              <div className="flex items-center justify-between pl-6">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Code className="w-4 h-4 text-muted-foreground" />
                   <label
                     htmlFor="show_tool_output"
                     className="text-sm font-medium"
                   >
-                    Show tool output by default
+                    Tool Output
                   </label>
                 </div>
                 <Switch

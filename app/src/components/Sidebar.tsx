@@ -287,9 +287,6 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedTerminalSessions(allTerminalIds)
     setCollapsedTerminalGitHub([])
     setCollapsedSessions([])
-    setTerminalsSectionCollapsed(false)
-    setOtherSessionsSectionCollapsed(false)
-    setGithubSectionCollapsed(false)
     setCollapsedGitHubRepos([])
     setExpandedGitHubPRs(githubPRs.map((pr) => pr.branch))
   }
@@ -300,9 +297,6 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedTerminalSessions([])
     setCollapsedTerminalGitHub(allTerminalIds)
     setCollapsedSessions(allSessionIds)
-    setTerminalsSectionCollapsed(true)
-    setOtherSessionsSectionCollapsed(true)
-    setGithubSectionCollapsed(true)
     setCollapsedGitHubRepos(allGitHubRepos)
     setExpandedGitHubPRs([])
   }
@@ -311,9 +305,6 @@ export function Sidebar({ width }: SidebarProps) {
     allFolders.every((f) => expandedFolders.has(f)) &&
     allOrphanGroupPaths.every((p) => expandedSessionGroupsSet.has(p)) &&
     allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id)) &&
-    !terminalsSectionCollapsed &&
-    !otherSessionsSectionCollapsed &&
-    !githubSectionCollapsed &&
     allGitHubRepos.every((r) => !collapsedGitHubReposSet.has(r))
 
   return (
