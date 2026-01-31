@@ -78,10 +78,18 @@ export function SessionGroup({
       <ConfirmModal
         open={showDeleteModal}
         title="Delete Claude Sessions"
-        message={<div className='space-y-2'>
-          <p>Are you sure you want to delete all {sessions.length} sessions in this group? This will remove all messages and data associated with these sessions.</p>
-          <p>If you later resume any session from Claude, it will be restored.</p>
-        </div>}
+        message={
+          <div className="space-y-2">
+            <p>
+              Are you sure you want to delete all {sessions.length} sessions in
+              this group? This will remove all messages and data associated with
+              these sessions.
+            </p>
+            <p>
+              If you later resume any session from Claude, it will be restored.
+            </p>
+          </div>
+        }
         confirmLabel="Delete All"
         variant="danger"
         onConfirm={handleConfirmDelete}

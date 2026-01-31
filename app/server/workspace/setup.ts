@@ -7,8 +7,10 @@ import { promisify } from 'node:util'
 import { deleteTerminal, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
+import { execSSHCommand } from '../ssh/exec'
 
 const execFile = promisify(execFileCb)
+const LONG_TIMEOUT = 300_000 // 5 min for clone/setup operations
 
 // ---------------------------------------------------------------------------
 // Word lists for slug generation (~100 each, no external packages)
@@ -214,6 +216,123 @@ function cloneUrl(repo: string): string {
   return `git@github.com:${repo}.git`
 }
 
+export function emitWorkspace(
+  terminalId: number,
+  payload: Record<string, unknown>,
+): void {
+  getIO()?.emit('terminal:workspace', { terminalId, ...payload })
+}
+
+// ---------------------------------------------------------------------------
+// SSH-aware filesystem helpers
+// ---------------------------------------------------------------------------
+
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`
+}
+
+function joinPath(sshHost: string | null, ...segments: string[]): string {
+  if (!sshHost) return path.join(...segments)
+  // POSIX join: filter empty, join with /
+  return segments
+    .flatMap((s) => s.split('/'))
+    .filter(Boolean)
+    .join('/')
+    .replace(/^(?!\/)/, () => (segments[0]?.startsWith('/') ? '/' : ''))
+}
+
+function dirnamePath(sshHost: string | null, p: string): string {
+  if (!sshHost) return path.dirname(p)
+  const idx = p.lastIndexOf('/')
+  if (idx <= 0) return '/'
+  return p.slice(0, idx)
+}
+
+function resolvePath(
+  sshHost: string | null,
+  base: string,
+  rel: string,
+): string {
+  if (!sshHost) return path.resolve(base, rel)
+  if (rel.startsWith('/')) return rel
+  return `${base.replace(/\/+$/, '')}/${rel}`
+}
+
+async function getHomeDir(sshHost: string | null): Promise<string> {
+  if (!sshHost) return os.homedir()
+  const { stdout } = await execSSHCommand(sshHost, 'echo $HOME')
+  return stdout.trim()
+}
+
+async function dirExists(
+  dirPath: string,
+  sshHost: string | null,
+): Promise<boolean> {
+  if (!sshHost) return fs.existsSync(dirPath)
+  try {
+    await execSSHCommand(sshHost, `test -d ${shellQuote(dirPath)}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function mkdirp(dirPath: string, sshHost: string | null): Promise<void> {
+  if (!sshHost) {
+    fs.mkdirSync(dirPath, { recursive: true })
+    return
+  }
+  await execSSHCommand(sshHost, `mkdir -p ${shellQuote(dirPath)}`)
+}
+
+export async function rmrf(
+  dirPath: string,
+  sshHost: string | null,
+): Promise<void> {
+  if (!sshHost) {
+    fs.rmSync(dirPath, { recursive: true, force: true })
+    return
+  }
+  await execSSHCommand(sshHost, `rm -rf ${shellQuote(dirPath)}`)
+}
+
+async function readFileContent(
+  filePath: string,
+  sshHost: string | null,
+): Promise<string | null> {
+  if (!sshHost) {
+    if (!fs.existsSync(filePath)) return null
+    return fs.readFileSync(filePath, 'utf-8')
+  }
+  try {
+    const { stdout } = await execSSHCommand(
+      sshHost,
+      `cat ${shellQuote(filePath)}`,
+    )
+    return stdout
+  } catch {
+    return null
+  }
+}
+
+async function runCmd(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  sshHost: string | null,
+  timeout?: number,
+): Promise<{ stdout: string; stderr: string }> {
+  if (!sshHost) {
+    return execFile(cmd, args, { cwd, timeout })
+  }
+  const quoted = [cmd, ...args].map(shellQuote).join(' ')
+  return execSSHCommand(sshHost, quoted, { cwd, timeout })
+}
+
+// ---------------------------------------------------------------------------
+// Conductor JSON reading
+// ---------------------------------------------------------------------------
+
 interface ConductorJson {
   setup?: string
   archive?: string
@@ -226,17 +345,16 @@ interface ConductorJson {
   }
 }
 
-function readConductorJson(cwd: string): ConductorJson | null {
-  const filePath = path.join(cwd, 'conductor.json')
-  if (!fs.existsSync(filePath)) return null
-  return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-}
-
-export function emitWorkspace(
-  terminalId: number,
-  payload: Record<string, unknown>,
-): void {
-  getIO()?.emit('terminal:workspace', { terminalId, ...payload })
+async function readConductorJson(
+  cwd: string,
+  sshHost: string | null,
+): Promise<ConductorJson | null> {
+  const filePath = sshHost
+    ? `${cwd.replace(/\/+$/, '')}/conductor.json`
+    : path.join(cwd, 'conductor.json')
+  const content = await readFileContent(filePath, sshHost)
+  if (content == null) return null
+  return JSON.parse(content)
 }
 
 // ---------------------------------------------------------------------------
@@ -254,32 +372,38 @@ interface ResolvedScripts {
   deleteScript: string | null
 }
 
-function resolveScripts(
+async function resolveScripts(
   setupObj: SetupObj | null,
   cwd: string,
-): ResolvedScripts {
+  sshHost: string | null,
+): Promise<ResolvedScripts> {
   let setupScript: string | null = null
   let deleteScript: string | null = null
 
   if (setupObj?.conductor) {
-    const config = readConductorJson(cwd)
+    const config = await readConductorJson(cwd, sshHost)
     if (config) {
       const setup = config.scripts?.setup ?? config.setup
       const archive = config.scripts?.archive ?? config.archive
-      if (setup) setupScript = path.resolve(cwd, setup)
-      if (archive) deleteScript = path.resolve(cwd, archive)
+      if (setup) setupScript = resolvePath(sshHost, cwd, setup)
+      if (archive) deleteScript = resolvePath(sshHost, cwd, archive)
     }
   }
 
   // Custom scripts override conductor paths (or work standalone)
-  if (setupObj?.setup) setupScript = path.resolve(cwd, setupObj.setup)
-  if (setupObj?.delete) deleteScript = path.resolve(cwd, setupObj.delete)
+  if (setupObj?.setup) setupScript = resolvePath(sshHost, cwd, setupObj.setup)
+  if (setupObj?.delete)
+    deleteScript = resolvePath(sshHost, cwd, setupObj.delete)
 
   return { setupScript, deleteScript }
 }
 
-async function runScript(scriptPath: string, cwd: string): Promise<void> {
-  await execFile('bash', [scriptPath], { cwd })
+async function runScript(
+  scriptPath: string,
+  cwd: string,
+  sshHost: string | null,
+): Promise<void> {
+  await runCmd('bash', [scriptPath], cwd, sshHost, LONG_TIMEOUT)
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +417,7 @@ export interface SetupOptions {
   workspacesRoot?: string
   worktreeSource?: string // if set, use git worktree instead of clone
   customName?: boolean // if true, don't override the terminal name with repo/slug
+  sshHost?: string | null
 }
 
 export async function setupTerminalWorkspace(
@@ -305,19 +430,24 @@ export async function setupTerminalWorkspace(
     workspacesRoot,
     worktreeSource,
     customName,
+    sshHost = null,
   } = options
+
+  const homeDir = await getHomeDir(sshHost)
+
   // Generate a slug whose target directory doesn't already exist
   const parentDir = worktreeSource
-    ? path.dirname(worktreeSource)
-    : path.join(
+    ? dirnamePath(sshHost, worktreeSource)
+    : joinPath(
+        sshHost,
         workspacesRoot
-          ? path.resolve(workspacesRoot.replace(/^~/, os.homedir()))
-          : path.join(os.homedir(), 'repo-workspaces'),
+          ? resolvePath(sshHost, homeDir, workspacesRoot.replace(/^~\/?/, ''))
+          : joinPath(sshHost, homeDir, 'repo-workspaces'),
         repoSlug(repo),
       )
   let slug = generateSlug()
   let attempts = 0
-  while (fs.existsSync(path.join(parentDir, slug))) {
+  while (await dirExists(joinPath(sshHost, parentDir, slug), sshHost)) {
     attempts++
     if (attempts >= 10) {
       slug = crypto.randomUUID().slice(0, 8)
@@ -345,24 +475,32 @@ export async function setupTerminalWorkspace(
 
     if (worktreeSource) {
       // --- Worktree mode ---
-      targetPath = path.join(parentDir, slug)
-      await execFile(
+      targetPath = joinPath(sshHost, parentDir, slug)
+      await runCmd(
         'git',
         ['worktree', 'add', targetPath, '-b', `feature/${slug}`],
-        { cwd: worktreeSource },
+        worktreeSource,
+        sshHost,
+        LONG_TIMEOUT,
       )
     } else {
       // --- Clone mode (shallow) ---
-      targetPath = path.join(parentDir, slug)
-      fs.mkdirSync(targetPath, { recursive: true })
-      await execFile('git', [
-        'clone',
-        '--depth',
-        '1',
-        '--single-branch',
-        cloneUrl(repo),
-        targetPath,
-      ])
+      targetPath = joinPath(sshHost, parentDir, slug)
+      await mkdirp(targetPath, sshHost)
+      await runCmd(
+        'git',
+        [
+          'clone',
+          '--depth',
+          '1',
+          '--single-branch',
+          cloneUrl(repo),
+          targetPath,
+        ],
+        sshHost ? '/' : process.cwd(),
+        sshHost,
+        LONG_TIMEOUT,
+      )
     }
 
     // Update terminal cwd (and name if not user-provided)
@@ -374,21 +512,26 @@ export async function setupTerminalWorkspace(
     emitWorkspace(terminalId, { name: terminalName })
 
     // Get GitHub username and rename branch
+    // gh api runs locally (GitHub API call, gh CLI unlikely on remote)
     try {
       const { stdout } = await execFile('gh', ['api', 'user', '-q', '.login'])
       const ghUser = stdout.trim()
       if (ghUser) {
         if (worktreeSource) {
           // Rename the feature/slug branch to ghUser/slug
-          await execFile(
+          await runCmd(
             'git',
             ['branch', '-m', `feature/${slug}`, `${ghUser}/${slug}`],
-            { cwd: targetPath },
+            targetPath,
+            sshHost,
           )
         } else {
-          await execFile('git', ['checkout', '-b', `${ghUser}/${slug}`], {
-            cwd: targetPath,
-          })
+          await runCmd(
+            'git',
+            ['checkout', '-b', `${ghUser}/${slug}`],
+            targetPath,
+            sshHost,
+          )
         }
       }
     } catch (err) {
@@ -403,9 +546,13 @@ export async function setupTerminalWorkspace(
 
     // Run setup script if configured
     if (setupObj) {
-      const { setupScript } = resolveScripts(setupObj, targetPath)
+      const { setupScript } = await resolveScripts(
+        setupObj,
+        targetPath,
+        sshHost,
+      )
       if (setupScript) {
-        await runScript(setupScript, targetPath)
+        await runScript(setupScript, targetPath, sshHost)
       }
       const doneSetup = { ...setupObj, status: 'done' as const }
       await updateTerminal(terminalId, { setup: doneSetup })
@@ -444,18 +591,21 @@ export async function deleteTerminalWorkspace(
   const terminal = await getTerminalById(terminalId)
   if (!terminal) return
 
+  const sshHost = terminal.ssh_host ?? null
+
   try {
     // Run delete script if configured
-    const { deleteScript } = resolveScripts(
+    const { deleteScript } = await resolveScripts(
       terminal.setup as SetupObj | null,
       terminal.cwd,
+      sshHost,
     )
     if (deleteScript) {
-      await runScript(deleteScript, terminal.cwd)
+      await runScript(deleteScript, terminal.cwd, sshHost)
     }
 
     // Remove workspace directory
-    fs.rmSync(terminal.cwd, { recursive: true, force: true })
+    await rmrf(terminal.cwd, sshHost)
 
     // Delete terminal from DB
     await deleteTerminal(terminalId)

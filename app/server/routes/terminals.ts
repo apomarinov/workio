@@ -28,6 +28,7 @@ import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import {
   deleteTerminalWorkspace,
   emitWorkspace,
+  rmrf,
   setupTerminalWorkspace,
 } from '../workspace/setup'
 
@@ -130,6 +131,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           workspacesRoot: sourceTerminal.git_repo.workspaces_root || undefined,
           worktreeSource: sourceTerminal.cwd,
           customName: !!name?.trim(),
+          sshHost: sourceTerminal.ssh_host,
         }).catch((err) =>
           log.error(
             `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
@@ -202,6 +204,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           } | null,
           workspacesRoot: workspaces_root?.trim() || undefined,
           customName: !!name?.trim(),
+          sshHost: trimmedHost,
         }).catch((err) =>
           log.error(
             `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
@@ -371,7 +374,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     // Delete workspace directory if requested
     if (deleteDirectory && terminal.git_repo) {
       try {
-        fs.rmSync(expandPath(terminal.cwd), { recursive: true, force: true })
+        await rmrf(
+          terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd),
+          terminal.ssh_host ?? null,
+        )
       } catch {
         // Directory may not exist if clone failed
       }

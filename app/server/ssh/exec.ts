@@ -2,13 +2,23 @@ import fs from 'node:fs'
 import { Client } from 'ssh2'
 import { validateSSHHost } from './config'
 
-const EXEC_TIMEOUT = 15_000
+const DEFAULT_TIMEOUT = 15_000
+
+export interface ExecSSHOptions {
+  cwd?: string
+  timeout?: number // ms, defaults to 15_000
+}
 
 export function execSSHCommand(
   sshHost: string,
   command: string,
-  cwd?: string,
+  options?: string | ExecSSHOptions,
 ): Promise<{ stdout: string; stderr: string }> {
+  const cwd = typeof options === 'string' ? options : options?.cwd
+  const timeout =
+    (typeof options === 'object' ? options?.timeout : undefined) ??
+    DEFAULT_TIMEOUT
+
   return new Promise((resolve, reject) => {
     const result = validateSSHHost(sshHost)
     if (!result.valid) {
@@ -20,11 +30,13 @@ export function execSSHCommand(
     const conn = new Client()
     const timer = setTimeout(() => {
       conn.end()
-      reject(new Error(`SSH command timed out after ${EXEC_TIMEOUT}ms`))
-    }, EXEC_TIMEOUT)
+      reject(new Error(`SSH command timed out after ${timeout}ms`))
+    }, timeout)
 
     conn.on('ready', () => {
-      const fullCommand = cwd ? `cd ${cwd} && ${command}` : command
+      const fullCommand = cwd
+        ? `cd '${cwd.replace(/'/g, "'\\''")}' && ${command}`
+        : command
 
       conn.exec(fullCommand, (err, channel) => {
         if (err) {

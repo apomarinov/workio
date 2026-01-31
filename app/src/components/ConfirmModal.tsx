@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,7 +9,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ReactNode } from 'react'
 
 interface ConfirmModalProps {
   open: boolean
