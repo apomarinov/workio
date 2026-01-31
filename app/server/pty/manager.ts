@@ -200,31 +200,14 @@ async function scanAndEmitGitDirty() {
 
   await Promise.all(checks)
 
-  // Check if anything changed
-  let changed = false
+  // Update cache
+  lastDirtyStatus.clear()
   for (const [id, dirty] of Object.entries(currentStatus)) {
-    if (lastDirtyStatus.get(Number(id)) !== dirty) {
-      changed = true
-      break
-    }
-  }
-  // Also check if terminals were removed
-  if (!changed) {
-    for (const id of lastDirtyStatus.keys()) {
-      if (!(id in currentStatus)) {
-        changed = true
-        break
-      }
-    }
+    lastDirtyStatus.set(Number(id), dirty)
   }
 
-  if (changed) {
-    lastDirtyStatus.clear()
-    for (const [id, dirty] of Object.entries(currentStatus)) {
-      lastDirtyStatus.set(Number(id), dirty)
-    }
-    getIO()?.emit('git:dirty-status', { dirtyStatus: currentStatus })
-  }
+  // Always emit — the payload is small and clients may have reconnected
+  getIO()?.emit('git:dirty-status', { dirtyStatus: currentStatus })
 }
 
 async function checkAndEmitSingleGitDirty(terminalId: number) {
