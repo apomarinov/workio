@@ -10,6 +10,7 @@ import {
 import useSWR from 'swr'
 import type {
   ActiveProcess,
+  GitDirtyPayload,
   PRCheckStatus,
   PRChecksPayload,
   ProcessesPayload,
@@ -55,6 +56,7 @@ interface TerminalContextValue {
   hasAnyUnseenPRs: boolean
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
+  gitDirtyStatus: Record<number, boolean>
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -273,6 +275,25 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const [terminalPorts, setTerminalPorts] = useState<Record<number, number[]>>(
     {},
   )
+  const [gitDirtyStatus, setGitDirtyStatus] = useState<Record<number, boolean>>(
+    {},
+  )
+
+  useEffect(() => {
+    return subscribe<GitDirtyPayload>('git:dirty-status', (data) => {
+      setGitDirtyStatus((prev) => {
+        const next = data.dirtyStatus
+        // Only update if values actually changed
+        const prevKeys = Object.keys(prev)
+        const nextKeys = Object.keys(next)
+        if (prevKeys.length !== nextKeys.length) return next
+        for (const key of nextKeys) {
+          if (prev[Number(key)] !== next[Number(key)]) return next
+        }
+        return prev
+      })
+    })
+  }, [subscribe])
 
   useEffect(() => {
     return subscribe<ProcessesPayload>('processes', (data) => {
@@ -371,6 +392,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasAnyUnseenPRs,
       processes,
       terminalPorts,
+      gitDirtyStatus,
     }),
     [
       terminals,
@@ -388,6 +410,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasAnyUnseenPRs,
       processes,
       terminalPorts,
+      gitDirtyStatus,
     ],
   )
 

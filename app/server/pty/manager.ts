@@ -51,6 +51,10 @@ const sessions = new Map<number, PtySession>()
 // Global process polling
 let globalProcessPollingId: NodeJS.Timeout | null = null
 
+// Git dirty status polling
+let gitDirtyPollingId: NodeJS.Timeout | null = null
+const lastDirtyStatus = new Map<number, boolean>()
+
 function getProcessesForTerminal(
   terminalId: number,
   session: PtySession,
@@ -143,6 +147,116 @@ function stopGlobalProcessPolling() {
   if (globalProcessPollingId && sessions.size === 0) {
     clearInterval(globalProcessPollingId)
     globalProcessPollingId = null
+  }
+}
+
+async function checkGitDirty(
+  cwd: string,
+  sshHost?: string | null,
+): Promise<boolean> {
+  try {
+    if (sshHost) {
+      const result = await execSSHCommand(
+        sshHost,
+        'git status --porcelain',
+        cwd,
+      )
+      return result.stdout.trim().length > 0
+    }
+    return await new Promise<boolean>((resolve) => {
+      execFile(
+        'git',
+        ['status', '--porcelain'],
+        { cwd, timeout: 5000 },
+        (err, stdout) => {
+          if (err) return resolve(false)
+          resolve(stdout.trim().length > 0)
+        },
+      )
+    })
+  } catch {
+    return false
+  }
+}
+
+async function scanAndEmitGitDirty() {
+  const currentStatus: Record<number, boolean> = {}
+  const checks: Promise<void>[] = []
+
+  for (const [terminalId] of sessions) {
+    checks.push(
+      (async () => {
+        try {
+          const terminal = await getTerminalById(terminalId)
+          if (!terminal) return
+          const isDirty = await checkGitDirty(terminal.cwd, terminal.ssh_host)
+          currentStatus[terminalId] = isDirty
+        } catch {
+          // skip this terminal
+        }
+      })(),
+    )
+  }
+
+  await Promise.all(checks)
+
+  // Check if anything changed
+  let changed = false
+  for (const [id, dirty] of Object.entries(currentStatus)) {
+    if (lastDirtyStatus.get(Number(id)) !== dirty) {
+      changed = true
+      break
+    }
+  }
+  // Also check if terminals were removed
+  if (!changed) {
+    for (const id of lastDirtyStatus.keys()) {
+      if (!(id in currentStatus)) {
+        changed = true
+        break
+      }
+    }
+  }
+
+  if (changed) {
+    lastDirtyStatus.clear()
+    for (const [id, dirty] of Object.entries(currentStatus)) {
+      lastDirtyStatus.set(Number(id), dirty)
+    }
+    getIO()?.emit('git:dirty-status', { dirtyStatus: currentStatus })
+  }
+}
+
+async function checkAndEmitSingleGitDirty(terminalId: number) {
+  try {
+    const terminal = await getTerminalById(terminalId)
+    if (!terminal) return
+    const isDirty = await checkGitDirty(terminal.cwd, terminal.ssh_host)
+    const prev = lastDirtyStatus.get(terminalId)
+    if (prev !== isDirty) {
+      lastDirtyStatus.set(terminalId, isDirty)
+      // Emit full status map
+      const dirtyStatus: Record<number, boolean> = {}
+      for (const [id, dirty] of lastDirtyStatus) {
+        dirtyStatus[id] = dirty
+      }
+      getIO()?.emit('git:dirty-status', { dirtyStatus })
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function startGitDirtyPolling() {
+  if (gitDirtyPollingId) return
+  gitDirtyPollingId = setInterval(scanAndEmitGitDirty, 10000)
+}
+
+function stopGitDirtyPolling() {
+  if (gitDirtyPollingId && sessions.size === 0) {
+    clearInterval(gitDirtyPollingId)
+    gitDirtyPollingId = null
+    lastDirtyStatus.clear()
   }
 }
 
@@ -346,6 +460,7 @@ export async function createSession(
             `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
           )
           detectGitBranch(terminalId)
+          checkAndEmitSingleGitDirty(terminalId)
           // Scan for process changes after a brief delay
           setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
           break
@@ -363,7 +478,9 @@ export async function createSession(
   // Handle PTY exit
   backend.onExit(({ exitCode }) => {
     sessions.delete(terminalId)
+    lastDirtyStatus.delete(terminalId)
     stopGlobalProcessPolling()
+    stopGitDirtyPolling()
     updateTerminal(terminalId, {
       pid: null,
       status: 'stopped',
@@ -380,8 +497,9 @@ export async function createSession(
 
   sessions.set(terminalId, session)
 
-  // Start global process polling if not already running
+  // Start global polling if not already running
   startGlobalProcessPolling()
+  startGitDirtyPolling()
 
   if (terminal.ssh_host) {
     // Inject shell integration for SSH terminals inline via heredoc
@@ -546,7 +664,9 @@ export function destroySession(terminalId: number): boolean {
   }).catch(() => {})
 
   sessions.delete(terminalId)
+  lastDirtyStatus.delete(terminalId)
   stopGlobalProcessPolling()
+  stopGitDirtyPolling()
   untrackTerminal(terminalId)
   return true
 }

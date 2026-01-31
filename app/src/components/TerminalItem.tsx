@@ -29,7 +29,7 @@ import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
-import { PRStatusContent, PRTabButton } from './PRStatusContent'
+import { getPRStatusInfo, PRStatusContent, PRTabButton } from './PRStatusContent'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
 
@@ -60,6 +60,7 @@ export function TerminalItem({
     markPRSeen,
     processes: allProcesses,
     terminalPorts,
+    gitDirtyStatus,
   } = useTerminalContext()
   const processes = useMemo(
     () => allProcesses.filter((p) => p.terminalId === terminal.id),
@@ -77,6 +78,10 @@ export function TerminalItem({
           ))
         : undefined,
     [githubPRs, terminal.git_branch],
+  )
+  const isDirty = useMemo(
+    () => gitDirtyStatus[terminal.id] === true,
+    [gitDirtyStatus, terminal.id],
   )
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
@@ -150,6 +155,16 @@ export function TerminalItem({
     }
   }
 
+  const handleOpenCursor = () => {
+    setShowMenu(false)
+    window.open(`cursor://file/${terminal.cwd}`)
+  }
+
+  const prColors = useMemo(
+    () => getPRStatusInfo(prForBranch),
+    [prForBranch],
+  )
+
   return (
     <>
       <div>
@@ -166,7 +181,11 @@ export function TerminalItem({
               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
               : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
-            ((!hasSessions && !hasProcesses && !hasGitHub && !hasPorts) ||
+            ((!hasSessions &&
+              !hasProcesses &&
+              !hasGitHub &&
+              !hasPorts &&
+              !isDirty) ||
               isSettingUp ||
               isDeleting) &&
             'pl-2.5',
@@ -175,7 +194,7 @@ export function TerminalItem({
         >
           {!isSettingUp &&
             !isDeleting &&
-            (hasSessions || hasProcesses || hasGitHub || hasPorts) ? (
+            (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -243,19 +262,8 @@ export function TerminalItem({
             )}
             {gitBranch && terminal.setup?.status !== 'delete' && (
               <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <GitBranch className="w-2.5 h-2.5 text-zinc-400" />
+                <GitBranch className={cn("w-2.5 h-2.5", prColors.colorClass || 'text-zinc-400')} />
                 {gitBranch}
-                {hasGitHub && prForBranch && !sessionsExpanded && (
-                  <PRTabButton
-                    className='bg-transparent py-0'
-                    pr={prForBranch}
-                    hasNewActivity={hasNewActivity(prForBranch)}
-                    onClick={() => {
-                      setActiveTab('prs')
-                      markPRSeen(prForBranch)
-                    }}
-                  />
-                )}
               </span>
             )}
           </div>
@@ -288,6 +296,23 @@ export function TerminalItem({
                     className="w-40 p-1"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    {!terminal.ssh_host && (
+                      <button
+                        type="button"
+                        onClick={handleOpenCursor}
+                        className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+                      >
+                        <svg
+                          fill="currentColor"
+                          fillRule="evenodd"
+                          viewBox="0 0 24 24"
+                          className="w-3.5 h-3.5"
+                        >
+                          <path d="M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z" />
+                        </svg>
+                        Cursor
+                      </button>
+                    )}
                     {terminal.git_repo && (
                       <button
                         type="button"
@@ -298,6 +323,7 @@ export function TerminalItem({
                         Add Workspace
                       </button>
                     )}
+
                     <button
                       type="button"
                       onClick={handleEditClick}
@@ -330,12 +356,12 @@ export function TerminalItem({
             Clone failed: {terminal.git_repo.error}
           </div>
         )}
-        {(hasGitHub || hasProcesses || hasPorts || hasSessions) &&
+        {(hasGitHub || hasProcesses || hasPorts || isDirty || hasSessions) &&
           sessionsExpanded && (
             <div className="ml-2 space-y-0.5">
-              {(hasGitHub || hasProcesses || hasPorts) && (
+              {(hasGitHub || hasProcesses || hasPorts || isDirty) && (
                 <>
-                  <div className="flex items-center gap-1 px-2 pt-1">
+                  <div className="flex items-center gap-1 px-2 pt-1 flex-wrap">
                     {hasProcesses && (
                       <button
                         type="button"
@@ -364,10 +390,16 @@ export function TerminalItem({
                         Ports ({ports.length})
                       </button>
                     )}
+                    {isDirty && (
+                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded text-yellow-500/80">
+                        Changes
+                      </span>
+                    )}
                     {hasGitHub && prForBranch && (
                       <PRTabButton
                         pr={prForBranch}
                         active={activeTab === 'prs'}
+                        className="whitespace-nowrap"
                         hasNewActivity={hasNewActivity(prForBranch)}
                         onClick={() => {
                           setActiveTab('prs')

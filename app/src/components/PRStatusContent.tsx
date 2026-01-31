@@ -33,7 +33,15 @@ import type { PRCheckStatus, PRComment, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
 
-export function getPRStatusInfo(pr: PRCheckStatus) {
+export function getPRStatusInfo(pr?: PRCheckStatus) {
+  if (!pr) {
+    return {
+      label: '',
+      colorClass: 'hidden',
+      dimColorClass: '',
+    }
+  }
+
   const isMerged = pr.state === 'MERGED'
   const isApproved = pr.reviewDecision === 'APPROVED'
   const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
@@ -99,7 +107,7 @@ export const PRTabButton = memo(function PRTabButton({
   active = false,
   hasNewActivity,
   onClick,
-  className
+  className,
 }: {
   pr: PRCheckStatus
   active?: boolean
@@ -125,7 +133,7 @@ export const PRTabButton = memo(function PRTabButton({
               dimColorClass ||
               'text-muted-foreground/60 hover:text-muted-foreground',
             ),
-          className
+          className,
         )}
       >
         {label}

@@ -62,6 +62,10 @@ export interface MergedPRSummary {
   repo: string
 }
 
+export interface GitDirtyPayload {
+  dirtyStatus: Record<number, boolean> // terminalId -> isDirty
+}
+
 export interface WorkspacePayload {
   terminalId: number
   name: string
