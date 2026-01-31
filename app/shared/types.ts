@@ -64,7 +64,7 @@ export interface MergedPRSummary {
 
 export interface WorkspacePayload {
   terminalId: number
-  name?: string
+  name: string
   git_repo?: {
     repo: string
     status: 'setup' | 'done' | 'failed'

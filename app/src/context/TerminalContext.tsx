@@ -42,7 +42,10 @@ interface TerminalContextValue {
     id: number,
     updates: { name?: string; cwd?: string },
   ) => Promise<Terminal>
-  deleteTerminal: (id: number) => Promise<void>
+  deleteTerminal: (
+    id: number,
+    opts?: { deleteDirectory?: boolean },
+  ) => Promise<void>
   setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
   refetch: () => void
   githubPRs: PRCheckStatus[]
@@ -118,8 +121,26 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return subscribe<WorkspacePayload>('terminal:workspace', (data) => {
       if (data.deleted) {
+        sendNotificationRef.current(`✅ ${data.name} deleted`, {
+          audio: 'pr-activity',
+        })
         mutate((prev) => prev?.filter((t) => t.id !== data.terminalId), false)
         return
+      }
+      if (data.setup?.status === 'done') {
+        sendNotificationRef.current(`✅ ${data.name} is ready`, {
+          audio: 'pr-activity',
+        })
+      }
+      if (data.setup?.status === 'failed') {
+        sendNotificationRef.current(`❌ ${data.name} failed`, {
+          audio: 'pr-activity',
+        })
+      }
+      if (data.git_repo?.status === 'failed') {
+        sendNotificationRef.current(`❌ ${data.name} failed repo init`, {
+          audio: 'pr-activity',
+        })
       }
       mutate(
         (prev) =>
@@ -319,8 +340,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   )
 
   const deleteTerminal = useCallback(
-    async (id: number) => {
-      const isAsync = await api.deleteTerminal(id)
+    async (id: number, opts?: { deleteDirectory?: boolean }) => {
+      const isAsync = await api.deleteTerminal(id, opts)
       if (!isAsync) {
         mutate((prev) => prev?.filter((t) => t.id !== id), false)
       }

@@ -326,56 +326,59 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   )
 
   // Delete terminal
-  fastify.delete<{ Params: TerminalParams }>(
-    '/api/terminals/:id',
-    async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
+  fastify.delete<{
+    Params: TerminalParams
+    Querystring: { deleteDirectory?: string }
+  }>('/api/terminals/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
 
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
 
-      // Kill PTY session if running
-      const killed = destroySession(id)
-      if (killed) {
-        log.info(`[terminals] Killed PTY session for terminal ${id}`)
-      }
+    const deleteDirectory = !!request.query.deleteDirectory
 
-      // Setup with delete script or conductor: run delete script async, then delete
-      const hasDeleteFlow =
-        terminal.setup &&
-        terminal.setup.status !== 'failed' &&
-        (terminal.setup.conductor || terminal.setup.delete) &&
-        terminal.git_repo?.status === 'done'
-      if (hasDeleteFlow) {
-        const deleteSetup = { ...terminal.setup, status: 'delete' as const }
-        await updateTerminal(id, { setup: deleteSetup })
-        emitWorkspace(id, { setup: deleteSetup })
-        deleteTerminalWorkspace(id).catch((err) =>
-          log.error(
-            `[terminals] Delete workspace error: ${err instanceof Error ? err.message : err}`,
-          ),
-        )
-        refreshPRChecks()
-        return reply.status(202).send()
-      }
+    // Kill PTY session if running
+    const killed = destroySession(id)
+    if (killed) {
+      log.info(`[terminals] Killed PTY session for terminal ${id}`)
+    }
 
-      // Git repo without delete scripts: clean up workspace directory
-      if (terminal.git_repo) {
-        try {
-          fs.rmSync(expandPath(terminal.cwd), { recursive: true, force: true })
-        } catch {
-          // Directory may not exist if clone failed
-        }
-      }
-
-      await deleteTerminal(id)
+    // Setup with delete script or conductor: run delete script async, then delete
+    const hasDeleteFlow =
+      deleteDirectory &&
+      terminal.setup &&
+      terminal.setup.status !== 'failed' &&
+      (terminal.setup.conductor || terminal.setup.delete) &&
+      terminal.git_repo?.status === 'done'
+    if (hasDeleteFlow) {
+      const deleteSetup = { ...terminal.setup, status: 'delete' as const }
+      await updateTerminal(id, { setup: deleteSetup })
+      emitWorkspace(id, { setup: deleteSetup })
+      deleteTerminalWorkspace(id).catch((err) =>
+        log.error(
+          `[terminals] Delete workspace error: ${err instanceof Error ? err.message : err}`,
+        ),
+      )
       refreshPRChecks()
-      return reply.status(204).send()
-    },
-  )
+      return reply.status(202).send()
+    }
+
+    // Delete workspace directory if requested
+    if (deleteDirectory && terminal.git_repo) {
+      try {
+        fs.rmSync(expandPath(terminal.cwd), { recursive: true, force: true })
+      } catch {
+        // Directory may not exist if clone failed
+      }
+    }
+
+    await deleteTerminal(id)
+    refreshPRChecks()
+    return reply.status(204).send()
+  })
 }

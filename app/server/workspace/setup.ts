@@ -1,4 +1,5 @@
 import { execFile as execFileCb } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -92,6 +93,7 @@ const ADJECTIVES = [
   'thirsty',
   'tight',
   'tiny',
+  'jesus',
   'twilight',
   'wandering',
   'warm',
@@ -135,6 +137,7 @@ const NOUNS = [
   'glade',
   'grass',
   'haze',
+  'christ',
   'hill',
   'lake',
   'leaf',
@@ -303,7 +306,26 @@ export async function setupTerminalWorkspace(
     worktreeSource,
     customName,
   } = options
-  const slug = generateSlug()
+  // Generate a slug whose target directory doesn't already exist
+  const parentDir = worktreeSource
+    ? path.dirname(worktreeSource)
+    : path.join(
+        workspacesRoot
+          ? path.resolve(workspacesRoot.replace(/^~/, os.homedir()))
+          : path.join(os.homedir(), 'repo-workspaces'),
+        repoSlug(repo),
+      )
+  let slug = generateSlug()
+  let attempts = 0
+  while (fs.existsSync(path.join(parentDir, slug))) {
+    attempts++
+    if (attempts >= 10) {
+      slug = crypto.randomUUID().slice(0, 8)
+      break
+    }
+    slug = generateSlug()
+  }
+  const terminalName = `${repoSlug(repo)}/${slug}`
 
   const gitRepoObj = workspacesRoot
     ? { repo, status: 'done' as const, workspaces_root: workspacesRoot }
@@ -323,7 +345,6 @@ export async function setupTerminalWorkspace(
 
     if (worktreeSource) {
       // --- Worktree mode ---
-      const parentDir = path.dirname(worktreeSource)
       targetPath = path.join(parentDir, slug)
       await execFile(
         'git',
@@ -332,10 +353,7 @@ export async function setupTerminalWorkspace(
       )
     } else {
       // --- Clone mode (shallow) ---
-      const base = workspacesRoot
-        ? path.resolve(workspacesRoot.replace(/^~/, os.homedir()))
-        : path.join(os.homedir(), 'repo-workspaces')
-      targetPath = path.join(base, repoSlug(repo), slug)
+      targetPath = path.join(parentDir, slug)
       fs.mkdirSync(targetPath, { recursive: true })
       await execFile('git', [
         'clone',
@@ -351,10 +369,9 @@ export async function setupTerminalWorkspace(
     if (customName) {
       await updateTerminal(terminalId, { cwd: targetPath })
     } else {
-      const terminalName = `${repoSlug(repo)}/${slug}`
       await updateTerminal(terminalId, { cwd: targetPath, name: terminalName })
-      emitWorkspace(terminalId, { name: terminalName })
     }
+    emitWorkspace(terminalId, { name: terminalName })
 
     // Get GitHub username and rename branch
     try {
@@ -382,7 +399,7 @@ export async function setupTerminalWorkspace(
 
     // Mark git_repo as done
     await updateTerminal(terminalId, { git_repo: gitRepoObj })
-    emitWorkspace(terminalId, { git_repo: gitRepoObj })
+    emitWorkspace(terminalId, { name: terminalName, git_repo: gitRepoObj })
 
     // Run setup script if configured
     if (setupObj) {
@@ -392,7 +409,7 @@ export async function setupTerminalWorkspace(
       }
       const doneSetup = { ...setupObj, status: 'done' as const }
       await updateTerminal(terminalId, { setup: doneSetup })
-      emitWorkspace(terminalId, { setup: doneSetup })
+      emitWorkspace(terminalId, { name: terminalName, setup: doneSetup })
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -404,7 +421,7 @@ export async function setupTerminalWorkspace(
     if (terminal?.git_repo?.status === 'setup') {
       const failed = gitRepoFailed(errorMsg)
       await updateTerminal(terminalId, { git_repo: failed })
-      emitWorkspace(terminalId, { git_repo: failed })
+      emitWorkspace(terminalId, { name: terminalName, git_repo: failed })
     } else if (setupObj) {
       const failedSetup = {
         ...setupObj,
@@ -412,7 +429,7 @@ export async function setupTerminalWorkspace(
         error: errorMsg,
       }
       await updateTerminal(terminalId, { setup: failedSetup })
-      emitWorkspace(terminalId, { setup: failedSetup })
+      emitWorkspace(terminalId, { name: terminalName, setup: failedSetup })
     }
   }
 }
@@ -444,7 +461,7 @@ export async function deleteTerminalWorkspace(
     await deleteTerminal(terminalId)
 
     // Notify clients
-    emitWorkspace(terminalId, { deleted: true })
+    emitWorkspace(terminalId, { name: terminal.name, deleted: true })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
     log.error(
@@ -457,6 +474,6 @@ export async function deleteTerminalWorkspace(
       error: errorMsg,
     }
     await updateTerminal(terminalId, { setup: failedSetup })
-    emitWorkspace(terminalId, { setup: failedSetup })
+    emitWorkspace(terminalId, { name: terminal.name, setup: failedSetup })
   }
 }

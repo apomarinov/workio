@@ -73,10 +73,14 @@ export async function updateTerminal(
   return res.json()
 }
 
-export async function deleteTerminal(id: number): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/terminals/${id}`, {
-    method: 'DELETE',
-  })
+export async function deleteTerminal(
+  id: number,
+  opts?: { deleteDirectory?: boolean },
+): Promise<boolean> {
+  const url = opts?.deleteDirectory
+    ? `${API_BASE}/terminals/${id}?deleteDirectory=1`
+    : `${API_BASE}/terminals/${id}`
+  const res = await fetch(url, { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete terminal')
   return res.status === 202
 }

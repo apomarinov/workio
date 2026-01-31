@@ -8,16 +8,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ReactNode } from 'react'
 
 interface ConfirmModalProps {
   open: boolean
   title: string
-  message: string
+  message: string | ReactNode
   confirmLabel?: string
   cancelLabel?: string
   variant?: 'danger' | 'default'
   onConfirm: () => void
   onCancel: () => void
+  children?: React.ReactNode
 }
 
 export function ConfirmModal({
@@ -29,6 +31,7 @@ export function ConfirmModal({
   variant = 'default',
   onConfirm,
   onCancel,
+  children,
 }: ConfirmModalProps) {
   return (
     <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
@@ -37,6 +40,7 @@ export function ConfirmModal({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{message}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>
             {cancelLabel}

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Popover,
   PopoverContent,
@@ -77,6 +78,7 @@ export function TerminalItem({
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteDirectory, setDeleteDirectory] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [processesExpanded, setProcessesExpanded] = useState(false)
@@ -123,12 +125,13 @@ export function TerminalItem({
 
   const handleDeleteClick = () => {
     setShowMenu(false)
+    setDeleteDirectory(false)
     setShowDeleteModal(true)
   }
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false)
-    deleteTerminal(terminal.id)
+    deleteTerminal(terminal.id, { deleteDirectory })
   }
 
   const handleAddWorkspace = async () => {
@@ -152,32 +155,28 @@ export function TerminalItem({
       <div>
         <div
           onClick={() => {
-            if (isSettingUp || isDeleting) return
             selectTerminal(terminal.id)
             clearSession()
-            if (!sessionsExpanded) {
+            if (!sessionsExpanded && !isSettingUp && !isDeleting) {
               onToggleSessions?.()
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors ${
-              isSettingUp || isDeleting
-                ? 'opacity-60 cursor-default'
-                : `cursor-pointer ${
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                  }`
-            } ${terminal.orphaned ? 'opacity-60' : ''}`,
-            !hasSessions &&
-              !hasProcesses &&
-              !hasGitHub &&
-              !hasPorts &&
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
+            ((!hasSessions && !hasProcesses && !hasGitHub && !hasPorts) ||
+              isSettingUp ||
+              isDeleting) &&
               'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
-          {hasSessions || hasProcesses || hasGitHub || hasPorts ? (
+          {!isSettingUp &&
+          !isDeleting &&
+          (hasSessions || hasProcesses || hasGitHub || hasPorts) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -229,21 +228,11 @@ export function TerminalItem({
                 Cloning repository...
               </div>
             )}
-            {terminal.git_repo?.status === 'failed' && (
-              <div className="text-[10px] text-destructive break-all">
-                Clone failed: {terminal.git_repo.error}
-              </div>
-            )}
             {terminal.git_repo?.status === 'done' && (
               <>
                 {terminal.setup?.status === 'setup' && (
                   <div className="text-[10px] text-blue-400">
                     Running setup...
-                  </div>
-                )}
-                {terminal.setup?.status === 'failed' && (
-                  <div className="text-[10px] text-destructive break-all">
-                    {terminal.setup.error}
                   </div>
                 )}
                 {terminal.setup?.status === 'delete' && (
@@ -274,7 +263,12 @@ export function TerminalItem({
                       variant="secondary"
                       size="icon"
                       onClick={handleMenuClick}
-                      className="h-7 w-7 text-muted-foreground !w-[20px]"
+                      className={cn(
+                        'h-7 w-7 text-muted-foreground !bg-transparent !w-[20px]',
+                        isActive
+                          ? 'hover:!bg-zinc-700/60'
+                          : 'hover:!bg-zinc-800',
+                      )}
                     >
                       <MoreVertical className="w-3 h-3" />
                     </Button>
@@ -316,7 +310,16 @@ export function TerminalItem({
             </div>
           )}
         </div>
-
+        {terminal.setup?.status === 'failed' && (
+          <div className="ml-5 text-[11px] text-destructive break-all">
+            {terminal.setup.error}
+          </div>
+        )}
+        {terminal.git_repo?.status === 'failed' && (
+          <div className="ml-5 text-[11px] text-destructive break-all">
+            Clone failed: {terminal.git_repo.error}
+          </div>
+        )}
         {(hasGitHub || hasProcesses || hasPorts || hasSessions) &&
           sessionsExpanded && (
             <div className="ml-2 space-y-0.5">
@@ -414,8 +417,7 @@ export function TerminalItem({
 
       <EditTerminalModal
         open={showEditModal}
-        currentName={terminal.name || ''}
-        currentCwd={terminal.cwd}
+        terminal={terminal}
         onSave={handleEditSave}
         onCancel={() => setShowEditModal(false)}
       />
@@ -428,7 +430,18 @@ export function TerminalItem({
         variant="danger"
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteModal(false)}
-      />
+      >
+        {terminal.git_repo && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={deleteDirectory}
+              onCheckedChange={(v) => setDeleteDirectory(v === true)}
+              className="w-5 h-5"
+            />
+            Also delete workspace directory
+          </label>
+        )}
+      </ConfirmModal>
     </>
   )
 }

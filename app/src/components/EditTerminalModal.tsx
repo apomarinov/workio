@@ -1,5 +1,5 @@
 import { FolderOpen } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,29 +9,35 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import type { Terminal } from '@/types'
 
 interface EditTerminalModalProps {
   open: boolean
-  currentName: string
-  currentCwd: string
+  terminal: Terminal
   onSave: (updates: { name: string; cwd?: string }) => void
   onCancel: () => void
 }
 
 export function EditTerminalModal({
   open,
-  currentName,
-  currentCwd,
+  terminal,
   onSave,
   onCancel,
 }: EditTerminalModalProps) {
-  const [name, setName] = useState(currentName)
-  const [cwd, setCwd] = useState(currentCwd)
+  const [name, setName] = useState(terminal.name ?? '')
+  const [cwd, setCwd] = useState(terminal.cwd ?? '')
+
+  useEffect(() => {
+    if (open) {
+      setName(terminal.name ?? '')
+      setCwd(terminal.cwd ?? '')
+    }
+  }, [open, terminal.name, terminal.cwd])
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
     const updates: { name: string; cwd?: string } = { name: name.trim() }
-    if (cwd.trim() !== currentCwd) {
+    if (cwd.trim() !== terminal.cwd) {
       updates.cwd = cwd.trim()
     }
     onSave(updates)
@@ -56,21 +62,23 @@ export function EditTerminalModal({
               autoFocus
             />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="edit-cwd" className="text-sm font-medium">
-              Path
-            </label>
-            <div className="relative">
-              <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="edit-cwd"
-                value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
-                placeholder="~"
-                className="pl-10"
-              />
+          {!terminal.git_repo && (
+            <div className="space-y-2">
+              <label htmlFor="edit-cwd" className="text-sm font-medium">
+                Path
+              </label>
+              <div className="relative">
+                <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-cwd"
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                  placeholder="~"
+                  className="pl-10"
+                />
+              </div>
             </div>
-          </div>
+          )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onCancel}>
               Cancel

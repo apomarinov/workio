@@ -135,31 +135,31 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             )}
             {(session.status === 'active' ||
               (!isSmall && session.status === 'permission_needed')) && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 300 150"
-                className="w-3.5 h-3.5"
-              >
-                <path
-                  fill="none"
-                  stroke="#D97757"
-                  strokeWidth="40"
-                  strokeLinecap="round"
-                  strokeDasharray="300 385"
-                  strokeDashoffset="0"
-                  d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 300 150"
+                  className="w-3.5 h-3.5"
                 >
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    calcMode="spline"
-                    dur="2s"
-                    values="685;-685"
-                    keySplines="0 0 1 1"
-                    repeatCount="indefinite"
-                  />
-                </path>
-              </svg>
-            )}
+                  <path
+                    fill="none"
+                    stroke="#D97757"
+                    strokeWidth="40"
+                    strokeLinecap="round"
+                    strokeDasharray="300 385"
+                    strokeDashoffset="0"
+                    d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      calcMode="spline"
+                      dur="2s"
+                      values="685;-685"
+                      keySplines="0 0 1 1"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                </svg>
+              )}
             {session.status === 'permission_needed' && (
               <AlertTriangle
                 className={cn(
@@ -170,11 +170,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
             {!['active', 'permission_needed', 'done'].includes(
               session.status,
             ) && (
-              <Bot
-                className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-                aria-label={session.status}
-              />
-            )}
+                <Bot
+                  className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
+                  aria-label={session.status}
+                />
+              )}
           </div>
           <button
             type="button"
@@ -298,8 +298,11 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
 
       <ConfirmModal
         open={showDeleteModal}
-        title="Delete Session"
-        message={`Are you sure you want to delete "${displayName}"? This will remove all messages and data associated with this session.`}
+        title="Delete Claude Session"
+        message={<div className='space-y-2'>
+          <p>Are you sure you want to delete "{displayName}"? This will remove all messages and data associated with this session.</p>
+          <p>If you later resume the session from Claude, it will be restored.</p>
+        </div>}
         confirmLabel="Delete"
         variant="danger"
         onConfirm={handleConfirmDelete}
