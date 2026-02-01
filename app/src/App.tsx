@@ -28,8 +28,13 @@ function setFavicon(href: string) {
 }
 
 function AppContent() {
-  const { terminals, loading, activeTerminal, selectTerminal } =
-    useTerminalContext()
+  const {
+    terminals,
+    loading,
+    activeTerminal,
+    selectTerminal,
+    selectPreviousTerminal,
+  } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe } = useSocket()
   const { sendNotification } = useNotifications()
@@ -45,6 +50,10 @@ function AppContent() {
         selectTerminal(terminal.id)
         clearSession()
       }
+    },
+    goToLastTab: () => {
+      selectPreviousTerminal()
+      clearSession()
     },
     palette: () => {
       window.dispatchEvent(new Event('open-palette'))

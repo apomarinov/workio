@@ -136,6 +136,7 @@ export function useModifiersHeld() {
 interface KeymapHandlers {
   palette?: (e: KeyboardEvent) => void
   goToTab?: (index: number) => void
+  goToLastTab?: () => void
 }
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
@@ -147,6 +148,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
 
   const paletteBinding = settings?.keymap?.palette ?? DEFAULT_KEYMAP.palette
   const goToTabBinding = settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab
+  const goToLastTabBinding =
+    settings?.keymap?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab
 
   useEffect(() => {
     let modifierBuffer: ModifierBuffer = {
@@ -271,13 +274,23 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       }
       if (!active) return
 
-      // When all modifiers released, reset the sequence
+      // When all modifiers released, check for modifier-only goToLastTab
       if (
         !heldState.meta &&
         !heldState.ctrl &&
         !heldState.alt &&
         !heldState.shift
       ) {
+        if (
+          !consumed &&
+          keyBuffer.length === 0 &&
+          digitBuffer.length === 0 &&
+          modifiersMatchBinding(modifierBuffer, goToLastTabBinding) &&
+          handlersRef.current.goToLastTab
+        ) {
+          handlersRef.current.goToLastTab()
+          suppressModifiers()
+        }
         reset()
       }
     }
@@ -294,5 +307,5 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleBlur)
     }
-  }, [paletteBinding, goToTabBinding])
+  }, [paletteBinding, goToTabBinding, goToLastTabBinding])
 }

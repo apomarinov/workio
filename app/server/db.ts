@@ -8,6 +8,7 @@ import type {
   Settings,
   Terminal,
 } from '../src/types'
+import { DEFAULT_KEYMAP } from '../src/types'
 import { env } from './env'
 import { log } from './logger'
 
@@ -371,10 +372,7 @@ const DEFAULT_CONFIG = {
   show_tools: true,
   show_tool_output: false,
   message_line_clamp: 5,
-  keymap: {
-    palette: { metaKey: true, key: 'k' },
-    goToTab: { metaKey: true },
-  },
+  keymap: DEFAULT_KEYMAP,
 }
 
 export async function getSettings(): Promise<Settings> {

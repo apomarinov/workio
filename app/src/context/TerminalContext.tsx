@@ -27,6 +27,7 @@ interface TerminalContextValue {
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
+  selectPreviousTerminal: () => void
   createTerminal: (opts: {
     cwd: string
     name?: string
@@ -97,6 +98,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [raw, terminalOrder])
 
   const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
+  const previousTerminalIdRef = useRef<number | null>(null)
 
   // Auto-select first terminal when terminals load
   useEffect(() => {
@@ -328,6 +330,22 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe])
 
+  const selectTerminal = useCallback((id: number) => {
+    setActiveTerminalId((prev) => {
+      if (prev !== null && prev !== id) {
+        previousTerminalIdRef.current = prev
+      }
+      return id
+    })
+  }, [])
+
+  const selectPreviousTerminal = useCallback(() => {
+    const prevId = previousTerminalIdRef.current
+    if (prevId !== null && terminals.some((t) => t.id === prevId)) {
+      selectTerminal(prevId)
+    }
+  }, [terminals, selectTerminal])
+
   const activeTerminal = useMemo(
     () => terminals.find((t) => t.id === activeTerminalId) ?? null,
     [terminals, activeTerminalId],
@@ -381,7 +399,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       terminals,
       loading: isLoading,
       activeTerminal,
-      selectTerminal: setActiveTerminalId,
+      selectTerminal,
+      selectPreviousTerminal,
       createTerminal,
       updateTerminal,
       deleteTerminal,
@@ -400,6 +419,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       terminals,
       isLoading,
       activeTerminal,
+      selectTerminal,
+      selectPreviousTerminal,
       createTerminal,
       updateTerminal,
       deleteTerminal,

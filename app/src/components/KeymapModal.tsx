@@ -85,7 +85,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const [goToTab, setGoToTab] = useState<ShortcutBinding>(
     DEFAULT_KEYMAP.goToTab,
   )
-  const [recording, setRecording] = useState<'palette' | 'goToTab' | null>(null)
+  const [goToLastTab, setGoToLastTab] = useState<ShortcutBinding>(
+    DEFAULT_KEYMAP.goToLastTab,
+  )
+  const [recording, setRecording] = useState<
+    'palette' | 'goToTab' | 'goToLastTab' | null
+  >(null)
   const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -93,6 +98,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     if (settings?.keymap) {
       setPalette(settings.keymap.palette)
       setGoToTab(settings.keymap.goToTab)
+      if (settings.keymap.goToLastTab) {
+        setGoToLastTab(settings.keymap.goToLastTab)
+      }
     }
   }, [settings?.keymap])
 
@@ -118,8 +126,10 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           binding.key = keyBuffer.join('')
         }
         setPalette(binding)
-      } else {
+      } else if (recording === 'goToTab') {
         setGoToTab(binding)
+      } else {
+        setGoToLastTab(binding)
       }
 
       setRecording(null)
@@ -153,8 +163,10 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         setRecordingKeys([e.key])
         if (recording === 'palette') {
           setPalette({ key: e.key.toLowerCase() })
-        } else {
+        } else if (recording === 'goToTab') {
           setGoToTab({})
+        } else {
+          setGoToLastTab({})
         }
         setRecording(null)
         return
@@ -198,7 +210,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await updateSettings({ keymap: { palette, goToTab } })
+      await updateSettings({ keymap: { palette, goToTab, goToLastTab } })
       toast.success('Keyboard shortcuts saved')
       onOpenChange(false)
     } catch (err) {
@@ -213,6 +225,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const handleReset = () => {
     setPalette(DEFAULT_KEYMAP.palette)
     setGoToTab(DEFAULT_KEYMAP.goToTab)
+    setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)
     setRecording(null)
   }
 
@@ -246,6 +259,16 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               setRecording(recording === 'goToTab' ? null : 'goToTab')
             }
             display={formatBinding(goToTab, '1 - NN')}
+          />
+          <ShortcutRow
+            label="Go to Last Tab"
+            binding={goToLastTab}
+            isRecording={recording === 'goToLastTab'}
+            recordingKeys={recording === 'goToLastTab' ? recordingKeys : []}
+            onRecord={() =>
+              setRecording(recording === 'goToLastTab' ? null : 'goToLastTab')
+            }
+            display={formatBinding(goToLastTab)}
           />
           {hasConflict && (
             <p className="text-sm text-amber-500">
