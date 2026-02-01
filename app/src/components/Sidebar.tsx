@@ -23,6 +23,7 @@ import {
   Github,
   LayoutList,
   Plus,
+  Search,
   Settings,
   Terminal as TerminalIcon,
 } from 'lucide-react'
@@ -531,6 +532,15 @@ export function Sidebar({ width }: SidebarProps) {
                   {allExpanded ? 'Collapse all' : 'Expand all'}
                 </button>
                 <button
+                  onClick={() =>
+                    window.dispatchEvent(new Event('open-palette'))
+                  }
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                >
+                  <Search className="w-4 h-4" />
+                  Search
+                </button>
+                <button
                   onClick={() => setShowSettingsModal(true)}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
                 >
@@ -604,6 +614,15 @@ export function Sidebar({ width }: SidebarProps) {
               ) : (
                 <ChevronsUpDown className="w-4 h-4" />
               )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => window.dispatchEvent(new Event('open-palette'))}
+              title="Search"
+            >
+              <Search className="w-4 h-4" />
             </Button>
             <Button
               variant="ghost"

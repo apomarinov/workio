@@ -5,6 +5,7 @@ import {
   CircleX,
   Clock,
   ExternalLink,
+  GitMerge,
   Loader2,
   RefreshCw,
   X,
@@ -34,6 +35,7 @@ import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
 
 export function getPRStatusInfo(pr?: PRCheckStatus) {
+  const iconClass = 'w-5 h-5'
   if (!pr) {
     return {
       label: '',
@@ -62,44 +64,112 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       label: 'Merged',
       colorClass: 'text-purple-400',
       dimColorClass: 'text-purple-400/60 hover:text-purple-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <GitMerge
+          className={cn(
+            iconClass,
+            `text-purple-400/70 ${props?.group ? `${props.group}:text-purple-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
     }
   if (hasChangesRequested)
     return {
       label: 'Change request',
       colorClass: 'text-orange-400',
       dimColorClass: 'text-orange-400/60 hover:text-orange-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <GitMerge
+          className={cn(
+            iconClass,
+            `text-orange-400/70 ${props?.group ? `${props.group}:text-orange-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
     }
   if (hasRunningChecks)
     return {
       label: 'Running checks',
       colorClass: 'text-yellow-400',
       dimColorClass: 'text-yellow-400/60 hover:text-yellow-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <RefreshCw
+          className={cn(
+            iconClass,
+            `text-yellow-400 animate-spin/70 ${props?.group ? `${props.group}:text-yellow-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
     }
   if (hasFailedChecks)
     return {
       label: 'Failed checks',
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <CircleX
+          className={cn(
+            iconClass,
+            `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
     }
   if (isApproved && hasConflicts)
     return {
       label: 'Conflicts',
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <CircleX
+          className={cn(
+            iconClass,
+            `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
     }
   if (isApproved)
     return {
       label: 'Approved',
       colorClass: 'text-green-500',
       dimColorClass: 'text-green-500/60 hover:text-green-500',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <Check
+          className={cn(
+            iconClass,
+            `text-green-500/70 ${props?.group ? `${props.group}:text-green-500` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
     }
   if (pr.areAllChecksOk)
     return {
       label: 'Checks passed',
       colorClass: '',
       dimColorClass: '',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <GitMerge
+          className={cn(iconClass, `text-muted-foreground`, props?.cls)}
+        />
+      ),
     }
-  return { label: 'Pull Request', colorClass: '', dimColorClass: '' }
+  return {
+    label: 'Pull Request',
+    colorClass: '',
+    dimColorClass: '',
+    icon: (props?: { cls?: string; group?: string }) => (
+      <GitMerge
+        className={cn(iconClass, `text-muted-foreground`, props?.cls)}
+      />
+    ),
+  }
 }
 
 export const PRTabButton = memo(function PRTabButton({
@@ -130,9 +200,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
@@ -149,7 +219,7 @@ export const PRTabButton = memo(function PRTabButton({
             'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
           )}
         >
-          <ExternalLink className="w-3 h-3" />
+          <ExternalLink className="w-3 h-3 max-w-3 max-h-3" />
         </a>
       </button>
     </div>
@@ -205,13 +275,19 @@ const ReviewRow = memo(function ReviewRow({
   icon,
   prUrl,
   showReReview,
+  isApproved,
+  hasConflicts,
   onReReview,
+  onMerge,
 }: {
   review: PRReview
   icon: React.ReactNode
   prUrl: string
   showReReview?: boolean
+  isApproved?: boolean
+  hasConflicts?: boolean
   onReReview: (author: string) => void
+  onMerge?: () => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
 
@@ -248,6 +324,22 @@ const ReviewRow = memo(function ReviewRow({
             className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
           >
             Re-review
+          </button>
+        )}
+        {isApproved && onMerge && (
+          <button
+            type="button"
+            onClick={() => onMerge()}
+            disabled={hasConflicts}
+            className={cn(
+              'text-[10px] flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity pr-2 pt-1',
+              hasConflicts
+                ? 'text-muted-foreground/30 cursor-not-allowed'
+                : 'text-muted-foreground/50 hover:text-muted-foreground cursor-pointer',
+            )}
+            title={hasConflicts ? 'Cannot merge: PR has conflicts' : undefined}
+          >
+            Merge PR
           </button>
         )}
       </div>
@@ -353,7 +445,6 @@ export function PRStatusContent({
   pr,
   expanded: expandedProp,
   onToggle,
-  hasNewActivity,
   onSeen,
 }: PRStatusContentProps) {
   const isMerged = pr.state === 'MERGED'
@@ -483,45 +574,8 @@ export function PRStatusContent({
     return <PRTabButton pr={pr} active onClick={onSeen} />
   }
 
-  const renderHeader = () => {
-    if (!hasHeader) return null
-
-    const isApproved = pr.reviewDecision === 'APPROVED'
-
-    return (
-      <div className="group/header flex items-center justify-between">
-        <PRTabButton
-          pr={pr}
-          active={expanded}
-          hasNewActivity={hasNewActivity}
-          onClick={() => {
-            onToggle()
-            onSeen?.()
-          }}
-        />
-        {isApproved && (
-          <button
-            type="button"
-            onClick={() => setMergeOpen(true)}
-            disabled={hasConflicts}
-            className={cn(
-              'text-[10px] flex-shrink-0 opacity-0 group-hover/header:opacity-100 transition-opacity pr-2 pt-1',
-              hasConflicts
-                ? 'text-muted-foreground/30 cursor-not-allowed'
-                : 'text-muted-foreground/50 hover:text-muted-foreground cursor-pointer',
-            )}
-            title={hasConflicts ? 'Cannot merge: PR has conflicts' : undefined}
-          >
-            Merge
-          </button>
-        )}
-      </div>
-    )
-  }
-
   return (
     <>
-      {renderHeader()}
       {expanded && hasContent && (
         <div className="space-y-0.5">
           {/* Reviews */}
@@ -531,7 +585,10 @@ export function PRStatusContent({
               review={review}
               icon={<Check className="w-3 h-3 flex-shrink-0 text-green-500" />}
               prUrl={pr.prUrl}
+              isApproved
+              hasConflicts={hasConflicts}
               onReReview={handleReReview}
+              onMerge={() => setMergeOpen(true)}
             />
           ))}
           {changesRequestedReviews.map((review) => (

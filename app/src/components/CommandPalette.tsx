@@ -9,7 +9,6 @@ import {
   ExternalLink,
   FolderOpen,
   GitBranch,
-  GitPullRequest,
   TerminalSquare,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -26,7 +25,7 @@ import { useTerminalContext } from '@/context/TerminalContext'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import type { SessionWithProject, Terminal } from '../types'
-import { getPRStatusInfo } from './PRStatusContent'
+import { getPRStatusInfo, PRTabButton } from './PRStatusContent'
 
 type Mode = 'search' | 'actions'
 
@@ -130,15 +129,13 @@ export function CommandPalette() {
   }, [githubPRs])
 
   // Build item map keyed by simple IDs
-  const { itemMap, standalonePRs, firstId } = useMemo(() => {
+  const { itemMap, firstId } = useMemo(() => {
     const map = new Map<string, ItemInfo>()
 
-    const terminalPRKeys = new Set<string>()
     let first: string | null = null
 
     for (const t of terminals) {
       const pr = t.git_branch ? (branchToPR.get(t.git_branch) ?? null) : null
-      if (pr) terminalPRKeys.add(`${pr.repo}#${pr.prNumber}`)
 
       const id = `t:${t.id}`
       if (!first) first = id
@@ -150,10 +147,7 @@ export function CommandPalette() {
       })
     }
 
-    const standalone = openPRs.filter(
-      (pr) => !terminalPRKeys.has(`${pr.repo}#${pr.prNumber}`),
-    )
-    for (const pr of standalone) {
+    for (const pr of openPRs) {
       const id = `pr:${pr.prNumber}:${pr.repo}`
       if (!first) first = id
       map.set(id, { type: 'pr', pr, actionHint: 'Open PR in new tab' })
@@ -165,7 +159,7 @@ export function CommandPalette() {
       map.set(id, { type: 'session', session: s, actionHint: null })
     }
 
-    return { itemMap: map, standalonePRs: standalone, firstId: first }
+    return { itemMap: map, firstId: first }
   }, [terminals, openPRs, sessions, branchToPR])
 
   // Resolve the currently highlighted item
@@ -325,7 +319,7 @@ export function CommandPalette() {
             {mode === 'search' ? (
               <SearchView
                 terminals={terminals}
-                standalonePRs={standalonePRs}
+                openPRs={openPRs}
                 sessions={sessions}
                 branchToPR={branchToPR}
                 onSelectTerminal={handleSelectTerminal}
@@ -371,7 +365,7 @@ export function CommandPalette() {
 
 function SearchView({
   terminals,
-  standalonePRs,
+  openPRs,
   sessions,
   branchToPR,
   onSelectTerminal,
@@ -379,7 +373,7 @@ function SearchView({
   onSelectPR,
 }: {
   terminals: Terminal[]
-  standalonePRs: PRCheckStatus[]
+  openPRs: PRCheckStatus[]
   sessions: SessionWithProject[]
   branchToPR: Map<string, PRCheckStatus>
   onSelectTerminal: (id: number) => void
@@ -401,7 +395,6 @@ function SearchView({
               const matchedPR = t.git_branch
                 ? (branchToPR.get(t.git_branch) ?? null)
                 : null
-              const prInfo = getPRStatusInfo(matchedPR ?? undefined)
               return (
                 <CommandItem
                   className="cursor-pointer"
@@ -421,17 +414,17 @@ function SearchView({
                       {t.name || getLastPathSegment(t.cwd)}
                     </span>
                     {t.git_branch && (
-                      <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
-                        <GitBranch
-                          className={cn(
-                            'max-h-3 max-w-3 shrink-0',
-                            prInfo.colorClass === 'hidden'
-                              ? 'text-zinc-400'
-                              : prInfo.colorClass || 'text-zinc-400',
-                          )}
-                        />
-                        {t.git_branch}
-                      </span>
+                      <div className="flex justify-between">
+                        <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
+                          <GitBranch
+                            className={cn(
+                              'max-h-3 max-w-3 shrink-0 text-zinc-400',
+                            )}
+                          />
+                          {t.git_branch}
+                        </span>
+                        {matchedPR && <PRTabButton pr={matchedPR} />}
+                      </div>
                     )}
                   </div>
                 </CommandItem>
@@ -440,39 +433,32 @@ function SearchView({
           </CommandGroup>
         )}
 
-        {standalonePRs.length > 0 && (
+        {openPRs.length > 0 && (
           <CommandGroup heading="Pull Requests">
-            {standalonePRs.map((pr) => {
+            {openPRs.map((pr) => {
               const prInfo = getPRStatusInfo(pr)
               return (
                 <CommandItem
-                  className="cursor-pointer"
+                  className="cursor-pointer group/cmd-pr"
                   key={`${pr.repo}-${pr.prNumber}`}
                   value={`pr:${pr.prNumber}:${pr.repo}`}
                   keywords={[pr.prTitle, pr.branch]}
                   onSelect={() => onSelectPR(pr)}
                 >
-                  <GitPullRequest
-                    className={cn(
-                      'h-4 w-4 shrink-0',
-                      prInfo.colorClass === 'hidden'
-                        ? 'text-zinc-400'
-                        : prInfo.colorClass || 'text-zinc-400',
-                    )}
-                  />
+                  {prInfo.icon?.()}
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium">{pr.prTitle}</span>
-                    <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
-                      <GitBranch
-                        className={cn(
-                          'max-h-3 max-w-3 shrink-0',
-                          prInfo.colorClass === 'hidden'
-                            ? 'text-zinc-400'
-                            : prInfo.colorClass || 'text-zinc-400',
-                        )}
-                      />
-                      {pr.branch}
-                    </span>
+                    <div className="flex justify-between">
+                      <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
+                        <GitBranch
+                          className={cn(
+                            'max-h-3 max-w-3 shrink-0 text-zinc-400',
+                          )}
+                        />
+                        {pr.branch}
+                      </span>
+                      <PRTabButton pr={pr} />
+                    </div>
                   </div>
                 </CommandItem>
               )

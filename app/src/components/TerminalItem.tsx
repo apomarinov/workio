@@ -28,11 +28,7 @@ import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditTerminalModal } from './EditTerminalModal'
-import {
-  getPRStatusInfo,
-  PRStatusContent,
-  PRTabButton,
-} from './PRStatusContent'
+import { PRStatusContent, PRTabButton } from './PRStatusContent'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
 
@@ -74,8 +70,8 @@ export function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-        ) ??
+            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+          ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
@@ -90,9 +86,17 @@ export function TerminalItem({
   const [deleteDirectory, setDeleteDirectory] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [activeTab, setActiveTab] = useState<'processes' | 'ports' | 'prs'>(
-    'prs',
-  )
+  const [activeTab, _setActiveTab] = useState<
+    'processes' | 'ports' | 'prs' | null
+  >(null)
+  const setActiveTab = (v: typeof activeTab) => {
+    _setActiveTab((o) => {
+      if (o === v) {
+        return null
+      }
+      return v
+    })
+  }
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
   const isSettingUp =
     terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'
@@ -161,8 +165,6 @@ export function TerminalItem({
     window.open(`cursor://file/${terminal.cwd}`)
   }
 
-  const prColors = useMemo(() => getPRStatusInfo(prForBranch), [prForBranch])
-
   return (
     <>
       <div>
@@ -176,9 +178,10 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
             ((!hasSessions &&
               !hasProcesses &&
@@ -187,13 +190,13 @@ export function TerminalItem({
               !isDirty) ||
               isSettingUp ||
               isDeleting) &&
-            'pl-2.5',
+              'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
           {!isSettingUp &&
-            !isDeleting &&
-            (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
+          !isDeleting &&
+          (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -261,14 +264,7 @@ export function TerminalItem({
             )}
             {gitBranch && terminal.setup?.status !== 'delete' && (
               <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <GitBranch
-                  className={cn(
-                    'w-2.5 h-2.5',
-                    prColors.colorClass === 'hidden'
-                      ? 'text-zinc-400'
-                      : prColors.colorClass || 'text-zinc-400',
-                  )}
-                />
+                <GitBranch className={cn('w-2.5 h-2.5 text-zinc-400')} />
                 {gitBranch}
               </span>
             )}
@@ -364,7 +360,19 @@ export function TerminalItem({
             <div className="ml-2 space-y-0.5">
               {(hasGitHub || hasProcesses || hasPorts || isDirty) && (
                 <>
-                  <div className="flex items-center gap-1 px-2 pt-1 flex-wrap">
+                  <div className="flex items-center px-2 pt-1 flex-wrap">
+                    {hasGitHub && prForBranch && (
+                      <PRTabButton
+                        pr={prForBranch}
+                        active={activeTab === 'prs' && isActive}
+                        className="whitespace-nowrap"
+                        hasNewActivity={hasNewActivity(prForBranch)}
+                        onClick={() => {
+                          setActiveTab('prs')
+                          markPRSeen(prForBranch)
+                        }}
+                      />
+                    )}
                     {hasProcesses && (
                       <button
                         type="button"
@@ -394,7 +402,12 @@ export function TerminalItem({
                       </button>
                     )}
                     {isDirty && diffStat && (
-                      <span className={cn("text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono", isActive && 'opacity-80')}>
+                      <span
+                        className={cn(
+                          'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono',
+                          isActive && 'opacity-80',
+                        )}
+                      >
                         {diffStat.added > 0 && (
                           <span className="text-green-500/80">
                             +{diffStat.added}
@@ -407,18 +420,6 @@ export function TerminalItem({
                           </span>
                         )}
                       </span>
-                    )}
-                    {hasGitHub && prForBranch && (
-                      <PRTabButton
-                        pr={prForBranch}
-                        active={activeTab === 'prs' && isActive}
-                        className="whitespace-nowrap"
-                        hasNewActivity={hasNewActivity(prForBranch)}
-                        onClick={() => {
-                          setActiveTab('prs')
-                          markPRSeen(prForBranch)
-                        }}
-                      />
                     )}
                   </div>
                   <div>

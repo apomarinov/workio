@@ -119,7 +119,7 @@ fastify.get<{
         '-f',
         'direction=desc',
         '-f',
-        `per_page=${query ? 100 : 10}`,
+        `per_page=${query ? 100 : 15}`,
         '--jq',
         '.[].full_name',
       ],
