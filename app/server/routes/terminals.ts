@@ -1,8 +1,31 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
+
+// Walk up the process tree to find the parent macOS .app (e.g. Terminal, iTerm2, VS Code)
+function getParentAppName(): string | null {
+  if (process.platform !== 'darwin') return null
+  try {
+    let pid = process.ppid
+    while (pid > 1) {
+      const comm = execFileSync('ps', ['-o', 'comm=', '-p', String(pid)], {
+        encoding: 'utf-8',
+      }).trim()
+      const match = comm.match(/\/([^/]+)\.app\//)
+      if (match) return match[1]
+      const ppidStr = execFileSync('ps', ['-o', 'ppid=', '-p', String(pid)], {
+        encoding: 'utf-8',
+      }).trim()
+      pid = Number.parseInt(ppidStr, 10)
+      if (Number.isNaN(pid)) break
+    }
+  } catch {}
+  return null
+}
+
+const parentAppName = getParentAppName()
 
 // Expand ~ to home directory
 function expandPath(p: string): string {
@@ -91,6 +114,29 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           } else {
             const folder = stdout.trim().replace(/\/$/, '')
             reply.send({ path: folder })
+          }
+          resolve()
+        },
+      )
+    })
+  })
+
+  // Open macOS System Settings to Full Disk Access
+  fastify.post('/api/open-full-disk-access', async (_request, reply) => {
+    if (process.platform !== 'darwin') {
+      return reply.status(404).send()
+    }
+    return new Promise<void>((resolve) => {
+      execFile(
+        'open',
+        [
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+        ],
+        (err) => {
+          if (err) {
+            reply.status(500).send({ error: 'Failed to open System Settings' })
+          } else {
+            reply.status(204).send()
           }
           resolve()
         },
@@ -187,9 +233,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               }
             }
           } catch (err) {
+            const isPermissionError =
+              err instanceof Error &&
+              (err as NodeJS.ErrnoException).code === 'EPERM'
             results[rawPath] = {
-              error:
-                err instanceof Error ? err.message : 'Failed to list directory',
+              error: isPermissionError
+                ? `permission_denied:${parentAppName ?? ''}`
+                : err instanceof Error
+                  ? err.message
+                  : 'Failed to list directory',
             }
           }
         }),

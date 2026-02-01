@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, Loader2 } from 'lucide-react'
+import { ChevronRight, File, Folder, Loader2, ShieldAlert } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { type DirEntry, listDirectories } from '../lib/api'
+import { type DirEntry, listDirectories, openFullDiskAccess } from '../lib/api'
 
 interface Column {
   path: string
@@ -333,9 +333,31 @@ function BrowserColumn({
   }
 
   if (error) {
+    const isPermissionError = error.startsWith('permission_denied')
+    const parentApp = isPermissionError ? error.split(':')[1] || null : null
     return (
-      <div className="w-[300px] min-w-[300px] h-full border-r flex items-center justify-center px-4">
-        <p className="text-sm text-muted-foreground text-center">{error}</p>
+      <div className="w-[300px] min-w-[300px] h-full border-r flex flex-col items-center justify-center gap-3 px-6">
+        {isPermissionError ? (
+          <>
+            <ShieldAlert className="w-5 h-5 text-muted-foreground" />
+            <div className="text-sm text-muted-foreground text-center">
+              {parentApp
+                ? <div>
+                  Grant Full Disk Access to <span className="font-bold">{parentApp}</span> to browse this folder.
+                </div>
+                : 'Your terminal app needs Full Disk Access to browse this folder.'}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openFullDiskAccess()}
+            >
+              Open System Settings
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center">{error}</p>
+        )}
       </div>
     )
   }
@@ -362,6 +384,7 @@ function BrowserColumn({
               ? 'cursor-pointer hover:bg-accent/50'
               : 'cursor-default text-muted-foreground',
             entry.isDir && selectedDir === entry.name && 'bg-accent',
+            entry.name.startsWith('.') && 'opacity-50',
           )}
           onClick={entry.isDir ? () => onSelectDir(entry.name) : undefined}
         >

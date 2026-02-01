@@ -93,6 +93,10 @@ export async function browseFolder(): Promise<string | null> {
   return data.path
 }
 
+export async function openFullDiskAccess(): Promise<void> {
+  await fetch(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
+}
+
 export interface DirEntry {
   name: string
   isDir: boolean
