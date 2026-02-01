@@ -26,6 +26,7 @@ import { refreshPRChecks } from '../github/checks'
 import { log } from '../logger'
 import { destroySession } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
+import { execSSHCommand } from '../ssh/exec'
 import {
   deleteTerminalWorkspace,
   emitWorkspace,
@@ -55,6 +56,26 @@ interface TerminalParams {
   id: string
 }
 
+interface ListDirectoriesBody {
+  paths: string[]
+  page?: number
+  hidden?: boolean
+  ssh_host?: string
+}
+
+interface DirEntry {
+  name: string
+  isDir: boolean
+}
+
+interface DirResult {
+  entries?: DirEntry[]
+  hasMore?: boolean
+  error?: string | null
+}
+
+const PAGE_SIZE = 100
+
 export default async function terminalRoutes(fastify: FastifyInstance) {
   // Open native OS folder picker and return selected path
   fastify.get('/api/browse-folder', async (_request, reply) => {
@@ -76,6 +97,107 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       )
     })
   })
+
+  // List directory contents for the column browser
+  fastify.post<{ Body: ListDirectoriesBody }>(
+    '/api/list-directories',
+    async (request) => {
+      const { paths, page = 0, hidden = false, ssh_host } = request.body
+      const results: Record<string, DirResult> = {}
+
+      // Validate SSH host if provided
+      if (ssh_host) {
+        const validation = validateSSHHost(ssh_host)
+        if (!validation.valid) {
+          return {
+            results: Object.fromEntries(
+              paths.map((p) => [p, { error: validation.error }]),
+            ),
+          }
+        }
+      }
+
+      await Promise.all(
+        paths.map(async (rawPath) => {
+          try {
+            if (ssh_host) {
+              // Remote directory listing via SSH
+              // Use ls -1 -p to get entries with / suffix on directories
+              const flags = hidden ? '-1ap' : '-1p'
+              const { stdout } = await execSSHCommand(
+                ssh_host,
+                `ls ${flags} ${rawPath.replace(/'/g, "'\\''")}`,
+              )
+              const lines = stdout
+                .split('\n')
+                .filter((l) => l && l !== './' && l !== '../')
+
+              const allEntries: DirEntry[] = lines.map((line) => {
+                const isDir = line.endsWith('/')
+                return {
+                  name: isDir ? line.slice(0, -1) : line,
+                  isDir,
+                }
+              })
+
+              // Sort: directories first, then files, alphabetical within each
+              allEntries.sort((a, b) => {
+                const aDir = a.isDir ? 0 : 1
+                const bDir = b.isDir ? 0 : 1
+                if (aDir !== bDir) return aDir - bDir
+                return a.name.localeCompare(b.name)
+              })
+
+              const start = page * PAGE_SIZE
+              const paged = allEntries.slice(start, start + PAGE_SIZE)
+              const hasMore = start + PAGE_SIZE < allEntries.length
+
+              results[rawPath] = { entries: paged, hasMore, error: null }
+            } else {
+              // Local directory listing
+              const dirPath = expandPath(rawPath)
+              const entries = await fs.promises.readdir(dirPath, {
+                withFileTypes: true,
+              })
+
+              const filtered = entries.filter((e) => {
+                if (!hidden && e.name.startsWith('.')) return false
+                return true
+              })
+
+              // Sort: directories first, then files, alphabetical within each
+              filtered.sort((a, b) => {
+                const aDir = a.isDirectory() ? 0 : 1
+                const bDir = b.isDirectory() ? 0 : 1
+                if (aDir !== bDir) return aDir - bDir
+                return a.name.localeCompare(b.name)
+              })
+
+              const start = page * PAGE_SIZE
+              const paged = filtered.slice(start, start + PAGE_SIZE)
+              const hasMore = start + PAGE_SIZE < filtered.length
+
+              results[rawPath] = {
+                entries: paged.map((e) => ({
+                  name: e.name,
+                  isDir: e.isDirectory(),
+                })),
+                hasMore,
+                error: null,
+              }
+            }
+          } catch (err) {
+            results[rawPath] = {
+              error:
+                err instanceof Error ? err.message : 'Failed to list directory',
+            }
+          }
+        }),
+      )
+
+      return { results }
+    },
+  )
 
   // List available SSH hosts from ~/.ssh/config
   fastify.get('/api/ssh/hosts', async () => {

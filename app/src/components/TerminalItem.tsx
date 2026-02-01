@@ -265,7 +265,9 @@ export function TerminalItem({
                 <GitBranch
                   className={cn(
                     'w-2.5 h-2.5',
-                    prColors.colorClass || 'text-zinc-400',
+                    prColors.colorClass === 'hidden'
+                      ? 'text-zinc-400'
+                      : prColors.colorClass || 'text-zinc-400',
                   )}
                 />
                 {gitBranch}

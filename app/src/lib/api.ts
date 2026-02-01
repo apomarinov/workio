@@ -93,6 +93,42 @@ export async function browseFolder(): Promise<string | null> {
   return data.path
 }
 
+export interface DirEntry {
+  name: string
+  isDir: boolean
+}
+
+export interface DirResult {
+  entries?: DirEntry[]
+  hasMore?: boolean
+  error?: string | null
+}
+
+export interface ListDirectoriesResponse {
+  results: Record<string, DirResult>
+}
+
+export async function listDirectories(
+  paths: string[],
+  page?: number,
+  hidden?: boolean,
+  sshHost?: string,
+): Promise<ListDirectoriesResponse> {
+  const body: Record<string, unknown> = {
+    paths,
+    page: page ?? 0,
+    hidden: hidden ?? false,
+  }
+  if (sshHost) body.ssh_host = sshHost
+  const res = await fetch(`${API_BASE}/list-directories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error('Failed to list directories')
+  return res.json()
+}
+
 export async function getSettings(): Promise<Settings> {
   const res = await fetch(`${API_BASE}/settings`)
   if (!res.ok) throw new Error('Failed to fetch settings')
