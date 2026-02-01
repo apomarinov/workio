@@ -13,7 +13,7 @@ import {
   Loader2,
   TerminalSquare,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Command,
   CommandEmpty,
@@ -33,6 +33,16 @@ interface ActionTarget {
   terminal: Terminal
   pr: PRCheckStatus | null
 }
+
+type ItemInfo =
+  | {
+    type: 'terminal'
+    terminal: Terminal
+    pr: PRCheckStatus | null
+    actionHint: string | null
+  }
+  | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
+  | { type: 'session'; session: SessionWithProject; actionHint: null }
 
 function getLastPathSegment(cwd: string) {
   return cwd.split('/').filter(Boolean).pop() ?? cwd
@@ -73,31 +83,77 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<Mode>('search')
   const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
   const { terminals, selectTerminal, githubPRs } = useTerminalContext()
   const { sessions, selectSession, clearSession } = useSessionContext()
 
   const openPRs = githubPRs.filter((pr) => pr.state === 'OPEN')
 
-  // Build a map of branch -> PR for matching terminals to PRs
-  const branchToPR = new Map<string, PRCheckStatus>()
-  for (const pr of openPRs) {
-    branchToPR.set(pr.branch, pr)
-  }
+  const branchToPR = useMemo(() => {
+    const map = new Map<string, PRCheckStatus>()
+    for (const pr of openPRs) {
+      map.set(pr.branch, pr)
+    }
+    return map
+  }, [openPRs])
 
-  // Listen for the open-palette event
+  // Build item map keyed by simple IDs
+  const { itemMap, standalonePRs, firstId } = useMemo(() => {
+    const map = new Map<string, ItemInfo>()
+
+    const terminalPRKeys = new Set<string>()
+    let first: string | null = null
+
+    for (const t of terminals) {
+      const pr = t.git_branch ? (branchToPR.get(t.git_branch) ?? null) : null
+      if (pr) terminalPRKeys.add(`${pr.repo}#${pr.prNumber}`)
+
+      const id = `t:${t.id}`
+      if (!first) first = id
+      map.set(id, {
+        type: 'terminal',
+        terminal: t,
+        pr,
+        actionHint: t.ssh_host ? null : pr ? 'For actions' : 'Open in Cursor',
+      })
+    }
+
+    const standalone = openPRs.filter(
+      (pr) => !terminalPRKeys.has(`${pr.repo}#${pr.prNumber}`),
+    )
+    for (const pr of standalone) {
+      const id = `pr:${pr.prNumber}:${pr.repo}`
+      if (!first) first = id
+      map.set(id, { type: 'pr', pr, actionHint: 'Open PR in new tab' })
+    }
+
+    for (const s of sessions) {
+      const id = `s:${s.session_id}`
+      if (!first) first = id
+      map.set(id, { type: 'session', session: s, actionHint: null })
+    }
+
+    return { itemMap: map, standalonePRs: standalone, firstId: first }
+  }, [terminals, openPRs, sessions, branchToPR])
+
+  // Resolve the currently highlighted item
+  const highlightedItem = highlightedId
+    ? (itemMap.get(highlightedId) ?? null)
+    : null
+
   useEffect(() => {
     const handler = () => setOpen(true)
     window.addEventListener('open-palette', handler)
     return () => window.removeEventListener('open-palette', handler)
   }, [])
 
-  // Reset state when closing
   const handleOpenChange = useCallback((value: boolean) => {
     setOpen(value)
     if (!value) {
       setMode('search')
       setActionTarget(null)
+      setHighlightedId(null)
     }
   }, [])
 
@@ -105,7 +161,6 @@ export function CommandPalette() {
     handleOpenChange(false)
   }, [handleOpenChange])
 
-  // Scroll to the selected item in the sidebar after palette closes
   const scrollToSidebarItem = useCallback((selector: string) => {
     requestAnimationFrame(() => {
       const el = document.querySelector(selector)
@@ -113,7 +168,6 @@ export function CommandPalette() {
     })
   }, [])
 
-  // Primary action handlers
   const handleSelectTerminal = useCallback(
     (id: number) => {
       selectTerminal(id)
@@ -153,7 +207,6 @@ export function CommandPalette() {
     [closePalette],
   )
 
-  // Secondary action: open in cursor
   const handleOpenInCursor = useCallback(
     (terminal: Terminal) => {
       window.open(`cursor://file/${terminal.cwd}`, '_blank')
@@ -162,96 +215,66 @@ export function CommandPalette() {
     [closePalette],
   )
 
-  // Read the currently highlighted cmdk item's value from the DOM
-  const getSelectedValue = useCallback(() => {
-    const el = document.querySelector<HTMLElement>(
-      '[cmdk-item][data-selected="true"]',
-    )
-    return el?.getAttribute('data-value') ?? ''
+  // onValueChange now receives our simple ID directly
+  const handleValueChange = useCallback((id: string) => {
+    setHighlightedId(id)
   }, [])
 
-  // Escape in actions mode: go back to search instead of closing
   const handleEscapeKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (mode === 'actions') {
         e.preventDefault()
         setMode('search')
         setActionTarget(null)
+        setHighlightedId(null)
       }
     },
     [mode],
   )
 
-  // Keyboard handler for Cmd+Enter
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Cmd+Enter for secondary actions
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         e.stopPropagation()
 
-        if (mode === 'actions') {
-          // In actions mode, just let the normal item selection happen
-          return
-        }
+        if (mode === 'actions') return
 
-        const val = getSelectedValue()
+        if (!highlightedItem) return
 
-        if (val.startsWith('terminal::')) {
-          const id = Number(val.slice('terminal::'.length).split(' ')[0])
-          const terminal = terminals.find((t) => t.id === id)
-          if (!terminal || terminal.ssh_host) return
-          const pr = terminal.git_branch
-            ? (branchToPR.get(terminal.git_branch) ?? null)
-            : null
-          if (pr) {
-            setActionTarget({ terminal, pr })
+        if (highlightedItem.type === 'terminal') {
+          if (highlightedItem.terminal.ssh_host) return
+          if (highlightedItem.pr) {
+            setActionTarget({
+              terminal: highlightedItem.terminal,
+              pr: highlightedItem.pr,
+            })
+            setHighlightedId(null)
             setMode('actions')
           } else {
-            handleOpenInCursor(terminal)
+            handleOpenInCursor(highlightedItem.terminal)
           }
           return
         }
 
-        if (val.startsWith('pr::')) {
-          const rest = val.slice('pr::'.length)
-          const prNumber = Number(rest.split('::')[0])
-          const repo = rest.split('::')[1]?.split(' ')[0]
-          const pr = openPRs.find(
-            (p) => p.prNumber === prNumber && p.repo === repo,
-          )
-          if (pr) {
-            window.open(pr.prUrl, '_blank')
-            closePalette()
-          }
+        if (highlightedItem.type === 'pr') {
+          window.open(highlightedItem.pr.prUrl, '_blank')
+          closePalette()
           return
         }
-
-        // Session: no-op for Cmd+Enter
       }
     },
-    [
-      mode,
-      getSelectedValue,
-      terminals,
-      branchToPR,
-      openPRs,
-      handleOpenInCursor,
-      closePalette,
-    ],
+    [mode, highlightedItem, handleOpenInCursor, closePalette],
   )
 
-  // Terminal items with deduplication against standalone PRs
-  const terminalPRNumbers = new Set<string>()
-  for (const t of terminals) {
-    if (t.git_branch) {
-      const pr = branchToPR.get(t.git_branch)
-      if (pr) terminalPRNumbers.add(`${pr.repo}#${pr.prNumber}`)
-    }
-  }
-  const standalonePRs = openPRs.filter(
-    (pr) => !terminalPRNumbers.has(`${pr.repo}#${pr.prNumber}`),
-  )
+  const actionHint =
+    mode === 'actions'
+      ? null
+      : highlightedItem
+        ? highlightedItem.actionHint
+        : firstId
+          ? (itemMap.get(firstId)?.actionHint ?? null)
+          : null
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
@@ -265,7 +288,12 @@ export function CommandPalette() {
           <DialogPrimitive.Title className="sr-only">
             Command Palette
           </DialogPrimitive.Title>
-          <Command key={mode} className="bg-transparent">
+          <Command
+            key={mode}
+            className="bg-transparent"
+            value={highlightedId ?? ''}
+            onValueChange={handleValueChange}
+          >
             {mode === 'search' ? (
               <SearchView
                 terminals={terminals}
@@ -282,6 +310,7 @@ export function CommandPalette() {
                 onBack={() => {
                   setMode('search')
                   setActionTarget(null)
+                  setHighlightedId(null)
                 }}
                 onOpenInCursor={handleOpenInCursor}
                 onOpenPR={handleOpenPR}
@@ -296,13 +325,15 @@ export function CommandPalette() {
               </kbd>
               to select
             </span>
-            <span className="flex items-center gap-1.5">
-              <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
-                <CommandIcon className="h-3 w-3" />
-                <CornerDownLeft className="h-3 w-3" />
-              </kbd>
-              for actions
-            </span>
+            {actionHint && (
+              <span className="flex items-center gap-1.5">
+                {actionHint}
+                <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
+                  <CommandIcon className="h-3 w-3" />
+                  <CornerDownLeft className="h-3 w-3" />
+                </kbd>
+              </span>
+            )}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
@@ -329,7 +360,7 @@ function SearchView({
 }) {
   return (
     <>
-      <CommandInput placeholder="Search terminals, PRs, sessions…" autoFocus />
+      <CommandInput placeholder="Search terminals, PRs, Claude sessions..." autoFocus />
       <CommandList className="max-h-[360px]">
         <CommandEmpty>No results found.</CommandEmpty>
 
@@ -341,9 +372,10 @@ function SearchView({
                 : null
               return (
                 <CommandItem
-                  className='cursor-pointer'
-                  key={`terminal-${t.id}`}
-                  value={`terminal::${t.id} ${t.name ?? ''} ${t.cwd} ${t.git_branch ?? ''}`}
+                  className="cursor-pointer"
+                  key={t.id}
+                  value={`t:${t.id}`}
+                  keywords={[t.name ?? '', t.cwd, t.git_branch ?? '']}
                   onSelect={() => onSelectTerminal(t.id)}
                 >
                   <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
@@ -375,9 +407,10 @@ function SearchView({
           <CommandGroup heading="Pull Requests">
             {standalonePRs.map((pr) => (
               <CommandItem
-                className='cursor-pointer'
-                key={`pr-${pr.repo}-${pr.prNumber}`}
-                value={`pr::${pr.prNumber}::${pr.repo} ${pr.prTitle} ${pr.branch}`}
+                className="cursor-pointer"
+                key={`${pr.repo}-${pr.prNumber}`}
+                value={`pr:${pr.prNumber}:${pr.repo}`}
+                keywords={[pr.prTitle, pr.branch]}
                 onSelect={() => onSelectPR(pr)}
               >
                 <GitPullRequest
@@ -404,9 +437,14 @@ function SearchView({
           <CommandGroup heading="Sessions">
             {sessions.map((s) => (
               <CommandItem
-                className='cursor-pointer'
-                key={`session-${s.session_id}`}
-                value={`session::${s.session_id} ${s.name ?? ''} ${s.latest_user_message ?? ''} ${s.latest_agent_message ?? ''}`}
+                className="cursor-pointer"
+                key={s.session_id}
+                value={`s:${s.session_id}`}
+                keywords={[
+                  s.name ?? '',
+                  s.latest_user_message ?? '',
+                  s.latest_agent_message ?? '',
+                ]}
                 onSelect={() => onSelectSession(s.session_id)}
               >
                 <SessionIcon status={s.status} />
@@ -463,8 +501,8 @@ function ActionsView({
         <CommandGroup>
           {!target.terminal.ssh_host && (
             <CommandItem
-              className='cursor-pointer'
-              value="action::cursor"
+              className="cursor-pointer"
+              value="action:cursor"
               onSelect={() => {
                 onOpenInCursor(target.terminal)
               }}
@@ -475,8 +513,8 @@ function ActionsView({
           )}
           {target.pr && (
             <CommandItem
-              className='cursor-pointer'
-              value="action::open-pr"
+              className="cursor-pointer"
+              value="action:open-pr"
               onSelect={() => {
                 onOpenPR(target.pr!)
                 onClose()
