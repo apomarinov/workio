@@ -299,13 +299,112 @@ export function Sidebar({ width }: SidebarProps) {
         const row = el.firstElementChild as HTMLElement | null
         if (row) {
           row.classList.add('animate-flash')
-          setTimeout(() => row.classList.remove('animate-flash'), 2800)
+          setTimeout(() => row.classList.remove('animate-flash'), 2100)
         }
       })
     }
     window.addEventListener('reveal-pr', handler)
     return () => window.removeEventListener('reveal-pr', handler)
   }, [setGithubSectionCollapsed, setCollapsedGitHubRepos, setExpandedGitHubPRs])
+
+  // Listen for reveal-terminal events from the command palette
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { id } = (e as CustomEvent).detail as { id: number }
+      const terminal = terminals.find((t) => t.id === id)
+      if (!terminal) return
+
+      // Expand the terminals section
+      setTerminalsSectionCollapsed(false)
+
+      // If in folder mode, expand the terminal's folder
+      if (groupingMode === 'folder') {
+        setExpandedFoldersArray((prev) =>
+          prev.includes(terminal.cwd) ? prev : [...prev, terminal.cwd],
+        )
+      }
+
+      // Expand the terminal itself
+      setExpandedTerminalSessions((prev) =>
+        prev.includes(id) ? prev : [...prev, id],
+      )
+
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-terminal-id="${id}"]`)
+        if (!el) return
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        el.classList.add('animate-flash')
+        setTimeout(() => el.classList.remove('animate-flash'), 2100)
+      })
+    }
+    window.addEventListener('reveal-terminal', handler)
+    return () => window.removeEventListener('reveal-terminal', handler)
+  }, [
+    terminals,
+    groupingMode,
+    setTerminalsSectionCollapsed,
+    setExpandedFoldersArray,
+    setExpandedTerminalSessions,
+  ])
+
+  // Listen for reveal-session events from the command palette
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { sessionId } = (e as CustomEvent).detail as { sessionId: string }
+      const session = sessions.find((s) => s.session_id === sessionId)
+      if (!session) return
+
+      // Check if this session belongs to a terminal or is an orphan
+      const parentTerminal = session.terminal_id
+        ? terminals.find((t) => t.id === session.terminal_id)
+        : undefined
+
+      if (parentTerminal) {
+        // Session is under a terminal - expand terminals section, folder, and terminal sessions
+        setTerminalsSectionCollapsed(false)
+        if (groupingMode === 'folder') {
+          setExpandedFoldersArray((prev) =>
+            prev.includes(parentTerminal.cwd)
+              ? prev
+              : [...prev, parentTerminal.cwd],
+          )
+        }
+        setExpandedTerminalSessions((prev) =>
+          prev.includes(parentTerminal.id)
+            ? prev
+            : [...prev, parentTerminal.id],
+        )
+      } else {
+        // Orphan session - expand the "other sessions" section and session group
+        setOtherSessionsSectionCollapsed(false)
+        setExpandedSessionGroups((prev) =>
+          prev.includes(session.project_path)
+            ? prev
+            : [...prev, session.project_path],
+        )
+      }
+
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-session-id="${sessionId}"]`)
+        if (!el) return
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        window.dispatchEvent(
+          new CustomEvent('flash-session', { detail: { sessionId } }),
+        )
+      })
+    }
+    window.addEventListener('reveal-session', handler)
+    return () => window.removeEventListener('reveal-session', handler)
+  }, [
+    sessions,
+    terminals,
+    groupingMode,
+    setTerminalsSectionCollapsed,
+    setExpandedFoldersArray,
+    setExpandedTerminalSessions,
+    setOtherSessionsSectionCollapsed,
+    setExpandedSessionGroups,
+  ])
 
   const allExpanded =
     allFolders.every((f) => expandedFolders.has(f)) &&

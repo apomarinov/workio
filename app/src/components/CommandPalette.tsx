@@ -37,11 +37,11 @@ interface ActionTarget {
 
 type ItemInfo =
   | {
-    type: 'terminal'
-    terminal: Terminal
-    pr: PRCheckStatus | null
-    actionHint: string | null
-  }
+      type: 'terminal'
+      terminal: Terminal
+      pr: PRCheckStatus | null
+      actionHint: string | null
+    }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: null }
 
@@ -192,30 +192,27 @@ export function CommandPalette() {
     handleOpenChange(false)
   }, [handleOpenChange])
 
-  const scrollToSidebarItem = useCallback((selector: string) => {
-    requestAnimationFrame(() => {
-      const el = document.querySelector(selector)
-      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-    })
-  }, [])
-
   const handleSelectTerminal = useCallback(
     (id: number) => {
       selectTerminal(id)
       clearSession()
       closePalette()
-      scrollToSidebarItem(`[data-terminal-id="${id}"]`)
+      window.dispatchEvent(
+        new CustomEvent('reveal-terminal', { detail: { id } }),
+      )
     },
-    [selectTerminal, clearSession, closePalette, scrollToSidebarItem],
+    [selectTerminal, clearSession, closePalette],
   )
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {
       selectSession(sessionId)
       closePalette()
-      scrollToSidebarItem(`[data-session-id="${sessionId}"]`)
+      window.dispatchEvent(
+        new CustomEvent('reveal-session', { detail: { sessionId } }),
+      )
     },
-    [selectSession, closePalette, scrollToSidebarItem],
+    [selectSession, closePalette],
   )
 
   const handleSelectPR = useCallback(
@@ -410,7 +407,12 @@ function SearchView({
                   className="cursor-pointer"
                   key={t.id}
                   value={`t:${t.id}`}
-                  keywords={[t.name ?? '', t.cwd, t.git_branch ?? '', t.git_repo?.repo ?? '']}
+                  keywords={[
+                    t.name ?? '',
+                    t.cwd,
+                    t.git_branch ?? '',
+                    t.git_repo?.repo ?? '',
+                  ]}
                   onSelect={() => onSelectTerminal(t.id)}
                 >
                   <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
