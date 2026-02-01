@@ -22,8 +22,8 @@ export default defineConfig(({ mode }) => {
         },
         includeAssets: ['favicon.svg', 'favicon-active.svg', 'favicon-warning.svg'],
         manifest: {
-          name: 'Claude Dashboard',
-          short_name: 'Claude',
+          name: 'WorkIO',
+          short_name: 'WorkIO',
           description: 'Terminal session manager for Claude Code',
           theme_color: '#09090b',
           background_color: '#09090b',

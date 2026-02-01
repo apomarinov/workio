@@ -12,7 +12,7 @@ dotenv.config({ path: path.join(rootDir, '.env') })
 dotenv.config({ path: path.join(rootDir, '.env.local'), override: true })
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().default('postgresql://localhost/claude_dashboard'),
+  DATABASE_URL: z.string().default('postgresql://localhost/workio'),
   SERVER_PORT: z.coerce.number().default(5176),
   CLIENT_PORT: z.coerce.number().default(5175),
   NODE_ENV: z

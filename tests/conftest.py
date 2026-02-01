@@ -1,5 +1,5 @@
 """
-Shared test fixtures for Claude Dashboard tests.
+Shared test fixtures for WorkIO tests.
 """
 
 import json

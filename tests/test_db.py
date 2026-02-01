@@ -120,8 +120,8 @@ class TestSessions:
         the original path from session creation.
         """
         # Create two projects with different paths
-        original_path = "/Users/apo/code/claude-dashboard"
-        new_path = "/Users/apo/code/claude-dashboard/app"
+        original_path = "/Users/apo/code/workio"
+        new_path = "/Users/apo/code/workio/app"
 
         original_project_id = upsert_project(db_conn, original_path)
         new_project_id = upsert_project(db_conn, new_path)

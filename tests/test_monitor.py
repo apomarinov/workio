@@ -152,7 +152,7 @@ class TestMonitorMain:
              patch('db.DB_PATH', db_path), \
              patch('monitor.upsert_project', side_effect=raise_error):
 
-            with pytest.raises(RuntimeError, match="Claude Dashboard Error"):
+            with pytest.raises(RuntimeError, match="WorkIO Error"):
                 from monitor import main
                 main()
 
@@ -223,7 +223,7 @@ class TestProjectPathStability:
     """Tests for project path stability when cwd changes during a session.
 
     When Claude Code changes working directory during a session (e.g., from
-    /Users/apo/code/claude-dashboard to /Users/apo/code/claude-dashboard/app),
+    /Users/apo/code/workio to /Users/apo/code/workio/app),
     the session's project_path should remain stable at the original path.
     """
 
@@ -231,8 +231,8 @@ class TestProjectPathStability:
         """Test that changing cwd doesn't change the session's project.
 
         Scenario:
-        1. SessionStart with cwd=/Users/apo/code/claude-dashboard
-        2. UserPromptSubmit with cwd=/Users/apo/code/claude-dashboard/app
+        1. SessionStart with cwd=/Users/apo/code/workio
+        2. UserPromptSubmit with cwd=/Users/apo/code/workio/app
 
         Expected:
         - Session's project_id stays the same (original project)
@@ -240,8 +240,8 @@ class TestProjectPathStability:
         """
         from db import upsert_project, upsert_session, get_session_project_path
 
-        original_path = "/Users/apo/code/claude-dashboard"
-        subdir_path = "/Users/apo/code/claude-dashboard/app"
+        original_path = "/Users/apo/code/workio"
+        subdir_path = "/Users/apo/code/workio/app"
 
         # Create two projects with different paths
         original_project_id = upsert_project(db_conn, original_path)

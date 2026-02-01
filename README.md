@@ -1,4 +1,4 @@
-# Claude Dashboard
+# WorkIO
 
 A developer dashboard that brings together your terminals, Claude AI sessions, and GitHub pull requests into a single interface. Manage multiple projects, monitor what Claude is doing, track PRs, and connect to remote machines -- all from one place.
 
@@ -6,7 +6,7 @@ A developer dashboard that brings together your terminals, Claude AI sessions, a
 
 ## Prerequisites
 
-Before running Claude Dashboard, make sure the following are installed on your machine:
+Before running WorkIO, make sure the following are installed on your machine:
 
 - **Node.js** (version specified in `app/.nvmrc`)
 - **PostgreSQL** (server running, with `psql` client available)
@@ -18,7 +18,7 @@ Before running Claude Dashboard, make sure the following are installed on your m
 You also need a `DATABASE_URL` environment variable pointing to your PostgreSQL instance. Set it in `.env.local` file in the project root:
 
 ```
-DATABASE_URL=postgresql://localhost/claude_dashboard
+DATABASE_URL=postgresql://localhost/workio
 ```
 
 ---
@@ -72,7 +72,7 @@ Create and manage multiple terminals from the dashboard. Each terminal runs a re
 
 ### SSH Terminals
 
-Connect to remote machines directly from the dashboard. Claude Dashboard reads your `~/.ssh/config` file and lets you pick a host when creating a new terminal. You can browse remote directories, run commands, and work with remote git repos -- all without leaving the dashboard.
+Connect to remote machines directly from the dashboard. WorkIO reads your `~/.ssh/config` file and lets you pick a host when creating a new terminal. You can browse remote directories, run commands, and work with remote git repos -- all without leaving the dashboard.
 
 ### Claude Sessions
 

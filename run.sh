@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🤖 Claude Dashboard"
+echo "🤖 WorkIO"
 echo ""
 echo "Options:"
 echo "  --rebuild   Force rebuild the webapp (npm install + npm run build)"
@@ -56,7 +56,7 @@ load_env() {
 # Require DATABASE_URL to be set
 if [[ -z "${DATABASE_URL:-}" ]]; then
     echo "❌ Error: DATABASE_URL is not set."
-    echo "Set it in .env or .env.local, e.g.: DATABASE_URL=postgresql://localhost/claude_dashboard"
+    echo "Set it in .env or .env.local, e.g.: DATABASE_URL=postgresql://localhost/workio"
     exit 1
 fi
 

@@ -1,4 +1,4 @@
--- Claude Dashboard Database Schema (PostgreSQL)
+-- WorkIO Database Schema (PostgreSQL)
 -- This file is run on startup to ensure the database schema is complete.
 -- All statements use IF NOT EXISTS / OR REPLACE for idempotent runs.
 

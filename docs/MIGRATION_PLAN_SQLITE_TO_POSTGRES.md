@@ -77,7 +77,7 @@ All tables translated from SQLite to PostgreSQL. Key differences:
 - SQLite `datetime('now', '-7 days')` → `NOW() - INTERVAL '7 days'`
 
 ```sql
--- PostgreSQL Schema for Claude Dashboard
+-- PostgreSQL Schema for WorkIO
 
 -- Projects table
 CREATE TABLE IF NOT EXISTS projects (
@@ -420,7 +420,7 @@ def get_db() -> sqlite3.Connection:
 import psycopg2
 import psycopg2.extras
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/claude_dashboard")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/workio")
 
 def get_db():
     conn = psycopg2.connect(DATABASE_URL)
@@ -665,7 +665,7 @@ export async function getMessagesByIds(ids: number[]): Promise<SessionMessage[]>
 
 ```typescript
 const envSchema = z.object({
-    DATABASE_URL: z.string().default('postgresql://localhost/claude_dashboard'),
+    DATABASE_URL: z.string().default('postgresql://localhost/workio'),
     // DB_NAME removed
     SERVER_PORT: z.coerce.number().default(5176),
     CLIENT_PORT: z.coerce.number().default(5175),
@@ -799,7 +799,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "Claude Dashboard"
+echo "WorkIO"
 echo ""
 
 # Load environment variables
@@ -811,7 +811,7 @@ if [[ -f "$SCRIPT_DIR/.env.local" ]]; then
 fi
 
 # Default DATABASE_URL if not set
-DATABASE_URL="${DATABASE_URL:-postgresql://localhost/claude_dashboard}"
+DATABASE_URL="${DATABASE_URL:-postgresql://localhost/workio}"
 
 # ---- Dependency checks ----
 
@@ -942,7 +942,7 @@ SERVER_PORT=5176
 CLIENT_PORT=5175
 
 # After:
-DATABASE_URL=postgresql://localhost/claude_dashboard
+DATABASE_URL=postgresql://localhost/workio
 SERVER_PORT=5176
 CLIENT_PORT=5175
 ```

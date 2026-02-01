@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 for env_file in [".env", ".env.local"]:
     load_dotenv(Path(__file__).parent / env_file, override=True)
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/claude_dashboard")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/workio")
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
