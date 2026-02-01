@@ -10,7 +10,6 @@ import {
   FolderOpen,
   GitBranch,
   GitPullRequest,
-  Loader2,
   TerminalSquare,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -24,8 +23,10 @@ import {
 } from '@/components/ui/command'
 import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
+import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import type { SessionWithProject, Terminal } from '../types'
+import { getPRStatusInfo } from './PRStatusContent'
 
 type Mode = 'search' | 'actions'
 
@@ -48,35 +49,60 @@ function getLastPathSegment(cwd: string) {
   return cwd.split('/').filter(Boolean).pop() ?? cwd
 }
 
-function getPRStatusLabel(pr: PRCheckStatus) {
-  if (!pr.areAllChecksOk) return 'Failing'
-  if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'Changes'
-  if (pr.reviewDecision === 'APPROVED') return 'Ready'
-  return 'Open'
-}
-
-function getPRStatusColor(pr: PRCheckStatus) {
-  if (!pr.areAllChecksOk) return 'text-red-400'
-  if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'text-yellow-400'
-  if (pr.reviewDecision === 'APPROVED') return 'text-green-400'
-  return 'text-blue-400'
-}
-
-function getPRIconColor(pr: PRCheckStatus) {
-  if (pr.state === 'MERGED') return 'text-purple-400'
-  if (pr.reviewDecision === 'APPROVED') return 'text-green-400'
-  if (!pr.areAllChecksOk) return 'text-red-400'
-  return 'text-blue-400'
+const sessionStatusColor: Record<string, string> = {
+  started: 'text-green-500',
+  active: 'text-[#D97757]',
+  done: 'text-gray-500',
+  ended: 'text-gray-500',
+  permission_needed: 'text-[#D97757]',
+  idle: 'text-gray-400',
 }
 
 function SessionIcon({ status }: { status: string }) {
-  if (status === 'active')
-    return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-400" />
-  if (status === 'permission_needed')
-    return <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
-  if (status === 'done' || status === 'ended')
-    return <Check className="h-4 w-4 shrink-0 text-green-400" />
-  return <Bot className="h-4 w-4 shrink-0 text-zinc-400" />
+  if (status === 'done')
+    return <Check className="h-4 w-4 shrink-0 text-green-500/70" />
+  if (status === 'active' || status === 'permission_needed')
+    return (
+      <>
+        {(status === 'active' || status === 'permission_needed') && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 300 150"
+            className="h-4 w-4 shrink-0"
+          >
+            <path
+              fill="none"
+              stroke="#D97757"
+              strokeWidth="40"
+              strokeLinecap="round"
+              strokeDasharray="300 385"
+              strokeDashoffset="0"
+              d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+            >
+              <animate
+                attributeName="stroke-dashoffset"
+                calcMode="spline"
+                dur="2s"
+                values="685;-685"
+                keySplines="0 0 1 1"
+                repeatCount="indefinite"
+              />
+            </path>
+          </svg>
+        )}
+        {status === 'permission_needed' && (
+          <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-500 animate-pulse" />
+        )}
+      </>
+    )
+  return (
+    <Bot
+      className={cn(
+        'h-4 w-4 shrink-0',
+        sessionStatusColor[status] ?? 'text-gray-400',
+      )}
+    />
+  )
 }
 
 export function CommandPalette() {
@@ -90,13 +116,18 @@ export function CommandPalette() {
 
   const openPRs = githubPRs.filter((pr) => pr.state === 'OPEN')
 
+  // Match TerminalItem logic: prefer OPEN, fall back to MERGED
   const branchToPR = useMemo(() => {
     const map = new Map<string, PRCheckStatus>()
-    for (const pr of openPRs) {
-      map.set(pr.branch, pr)
+    for (const pr of githubPRs) {
+      if (pr.state !== 'OPEN' && pr.state !== 'MERGED') continue
+      const existing = map.get(pr.branch)
+      if (!existing || (existing.state !== 'OPEN' && pr.state === 'OPEN')) {
+        map.set(pr.branch, pr)
+      }
     }
     return map
-  }, [openPRs])
+  }, [githubPRs])
 
   // Build item map keyed by simple IDs
   const { itemMap, standalonePRs, firstId } = useMemo(() => {
@@ -360,7 +391,10 @@ function SearchView({
 }) {
   return (
     <>
-      <CommandInput placeholder="Search terminals, PRs, Claude sessions..." autoFocus />
+      <CommandInput
+        placeholder="Search terminals, PRs, Claude sessions..."
+        autoFocus
+      />
       <CommandList className="max-h-[360px]">
         <CommandEmpty>No results found.</CommandEmpty>
 
@@ -370,12 +404,13 @@ function SearchView({
               const matchedPR = t.git_branch
                 ? (branchToPR.get(t.git_branch) ?? null)
                 : null
+              const prInfo = getPRStatusInfo(matchedPR ?? undefined)
               return (
                 <CommandItem
                   className="cursor-pointer"
                   key={t.id}
                   value={`t:${t.id}`}
-                  keywords={[t.name ?? '', t.cwd, t.git_branch ?? '']}
+                  keywords={[t.name ?? '', t.cwd, t.git_branch ?? '', t.git_repo?.repo ?? '']}
                   onSelect={() => onSelectTerminal(t.id)}
                 >
                   <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
@@ -385,18 +420,18 @@ function SearchView({
                     </span>
                     {t.git_branch && (
                       <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
-                        <GitBranch className="max-h-3 max-w-3 shrink-0" />
+                        <GitBranch
+                          className={cn(
+                            'max-h-3 max-w-3 shrink-0',
+                            prInfo.colorClass === 'hidden'
+                              ? 'text-zinc-400'
+                              : prInfo.colorClass || 'text-zinc-400',
+                          )}
+                        />
                         {t.git_branch}
                       </span>
                     )}
                   </div>
-                  {matchedPR && (
-                    <span
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${getPRStatusColor(matchedPR)} bg-zinc-800`}
-                    >
-                      PR
-                    </span>
-                  )}
                 </CommandItem>
               )
             })}
@@ -405,31 +440,41 @@ function SearchView({
 
         {standalonePRs.length > 0 && (
           <CommandGroup heading="Pull Requests">
-            {standalonePRs.map((pr) => (
-              <CommandItem
-                className="cursor-pointer"
-                key={`${pr.repo}-${pr.prNumber}`}
-                value={`pr:${pr.prNumber}:${pr.repo}`}
-                keywords={[pr.prTitle, pr.branch]}
-                onSelect={() => onSelectPR(pr)}
-              >
-                <GitPullRequest
-                  className={`h-4 w-4 shrink-0 ${getPRIconColor(pr)}`}
-                />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium">{pr.prTitle}</span>
-                  <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
-                    <GitBranch className="max-h-3 max-w-3 shrink-0" />
-                    {pr.branch}
-                  </span>
-                </div>
-                <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${getPRStatusColor(pr)} bg-zinc-800`}
+            {standalonePRs.map((pr) => {
+              const prInfo = getPRStatusInfo(pr)
+              return (
+                <CommandItem
+                  className="cursor-pointer"
+                  key={`${pr.repo}-${pr.prNumber}`}
+                  value={`pr:${pr.prNumber}:${pr.repo}`}
+                  keywords={[pr.prTitle, pr.branch]}
+                  onSelect={() => onSelectPR(pr)}
                 >
-                  {getPRStatusLabel(pr)}
-                </span>
-              </CommandItem>
-            ))}
+                  <GitPullRequest
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      prInfo.colorClass === 'hidden'
+                        ? 'text-zinc-400'
+                        : prInfo.colorClass || 'text-zinc-400',
+                    )}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium">{pr.prTitle}</span>
+                    <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
+                      <GitBranch
+                        className={cn(
+                          'max-h-3 max-w-3 shrink-0',
+                          prInfo.colorClass === 'hidden'
+                            ? 'text-zinc-400'
+                            : prInfo.colorClass || 'text-zinc-400',
+                        )}
+                      />
+                      {pr.branch}
+                    </span>
+                  </div>
+                </CommandItem>
+              )
+            })}
           </CommandGroup>
         )}
 
