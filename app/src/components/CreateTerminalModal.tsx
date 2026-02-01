@@ -244,17 +244,17 @@ export function CreateTerminalModal({
   // Filter repos client-side based on current search
   const filteredRepos = repoSearch.trim()
     ? repos.filter((r) =>
-      r.toLowerCase().includes(repoSearch.trim().toLowerCase()),
-    )
+        r.toLowerCase().includes(repoSearch.trim().toLowerCase()),
+      )
     : repos
 
   // Show the typed value as an option if it looks like owner/repo and isn't in the list
   const manualEntry =
     repoSearch.trim() &&
-      repoSearch.includes('/') &&
-      !filteredRepos.some(
-        (r) => r.toLowerCase() === repoSearch.trim().toLowerCase(),
-      )
+    repoSearch.includes('/') &&
+    !filteredRepos.some(
+      (r) => r.toLowerCase() === repoSearch.trim().toLowerCase(),
+    )
       ? repoSearch.trim()
       : null
 
@@ -476,7 +476,8 @@ export function CreateTerminalModal({
                     Conductor
                   </label>
                   <p className="text-xs text-muted-foreground">
-                    Runs setup and archive scripts from conductor.json in repo root
+                    Runs setup and archive scripts from conductor.json in repo
+                    root
                   </p>
                 </div>
                 <Switch

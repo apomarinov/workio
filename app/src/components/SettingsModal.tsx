@@ -2,6 +2,7 @@ import {
   AlignLeft,
   Brain,
   Code,
+  Keyboard,
   TerminalSquare,
   Type,
   Wrench,
@@ -20,6 +21,7 @@ import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
+import { KeymapModal } from './KeymapModal'
 
 interface SettingsModalProps {
   open: boolean
@@ -35,6 +37,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [showToolOutput, setShowToolOutput] = useState(false)
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [saving, setSaving] = useState(false)
+  const [showKeymapModal, setShowKeymapModal] = useState(false)
 
   useEffect(() => {
     if (settings) {
@@ -196,6 +199,28 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
             )}
           </div>
+
+          <div className="flex flex-col gap-3 border-t-[1px] mt-1 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Keyboard className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Keyboard Shortcuts</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowKeymapModal(true)}
+              >
+                Configure
+              </Button>
+            </div>
+          </div>
+
+          <KeymapModal
+            open={showKeymapModal}
+            onOpenChange={setShowKeymapModal}
+          />
 
           <DialogFooter>
             <Button

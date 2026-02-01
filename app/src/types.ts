@@ -220,6 +220,24 @@ export interface HookEvent {
   terminal_id: number | null
 }
 
+export interface ShortcutBinding {
+  metaKey?: boolean
+  ctrlKey?: boolean
+  altKey?: boolean
+  shiftKey?: boolean
+  key?: string
+}
+
+export interface Keymap {
+  palette: ShortcutBinding
+  goToTab: ShortcutBinding
+}
+
+export const DEFAULT_KEYMAP: Keymap = {
+  palette: { metaKey: true, key: 'k' },
+  goToTab: { metaKey: true },
+}
+
 export interface Settings {
   id: number
   default_shell: string
@@ -228,4 +246,5 @@ export interface Settings {
   show_tools: boolean
   show_tool_output: boolean
   message_line_clamp: number
+  keymap?: Keymap
 }

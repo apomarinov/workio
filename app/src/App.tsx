@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
 import {
   Group,
@@ -33,8 +33,23 @@ function AppContent() {
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe } = useSocket()
   const { sendNotification } = useNotifications()
+  const { clearSession } = useSessionContext()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
-  useKeyboardShortcuts()
+  const terminalsRef = useRef(terminals)
+  terminalsRef.current = terminals
+
+  useKeyboardShortcuts({
+    goToTab: (e) => {
+      const terminal = terminalsRef.current[Number.parseInt(e.key, 10) - 1]
+      if (terminal) {
+        selectTerminal(terminal.id)
+        clearSession()
+      }
+    },
+    palette: () => {
+      window.dispatchEvent(new Event('open-palette'))
+    },
+  })
 
   // Example: Change favicon based on session status
   useEffect(() => {

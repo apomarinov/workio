@@ -341,11 +341,15 @@ function BrowserColumn({
           <>
             <ShieldAlert className="w-5 h-5 text-muted-foreground" />
             <div className="text-sm text-muted-foreground text-center">
-              {parentApp
-                ? <div>
-                  Grant Full Disk Access to <span className="font-bold">{parentApp}</span> to browse this folder.
+              {parentApp ? (
+                <div>
+                  Grant Full Disk Access to{' '}
+                  <span className="font-bold">{parentApp}</span> to browse this
+                  folder.
                 </div>
-                : 'Your terminal app needs Full Disk Access to browse this folder.'}
+              ) : (
+                'Your terminal app needs Full Disk Access to browse this folder.'
+              )}
             </div>
             <Button
               variant="outline"

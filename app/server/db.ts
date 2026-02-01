@@ -371,6 +371,10 @@ const DEFAULT_CONFIG = {
   show_tools: true,
   show_tool_output: false,
   message_line_clamp: 5,
+  keymap: {
+    palette: { metaKey: true, key: 'k' },
+    goToTab: { metaKey: true },
+  },
 }
 
 export async function getSettings(): Promise<Settings> {
