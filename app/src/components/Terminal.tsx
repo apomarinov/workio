@@ -3,19 +3,21 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
+import { CreateTerminalModal } from './CreateTerminalModal'
 
 interface TerminalProps {
   terminalId: number | null
 }
 
 export function Terminal({ terminalId }: TerminalProps) {
-  const { activeTerminal } = useTerminalContext()
+  const { activeTerminal, selectTerminal } = useTerminalContext()
   const isSettingUp =
     activeTerminal?.git_repo?.status === 'setup' ||
     activeTerminal?.setup?.status === 'setup' ||
@@ -24,6 +26,7 @@ export function Terminal({ terminalId }: TerminalProps) {
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const [dimensions, setDimensions] = useState({ cols: 80, rows: 24 })
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [pendingCopy, setPendingCopy] = useState<string | null>(null)
   const pendingCopyRef = useRef<string | null>(null)
   const copyBtnRef = useRef<HTMLButtonElement>(null)
@@ -117,7 +120,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const handleCopyClick = useCallback(() => {
     if (pendingCopyRef.current) {
-      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => {})
+      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => { })
     }
     pendingCopyRef.current = null
     setPendingCopy(null)
@@ -299,8 +302,21 @@ export function Terminal({ terminalId }: TerminalProps) {
   return (
     <div className="h-full flex flex-col bg-[#1a1a1a]">
       {terminalId === null ? (
-        <div className="flex-1 flex items-center justify-center text-gray-500">
-          Select a terminal from the sidebar
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="lg"
+            className="gap-2 text-base"
+            onClick={() => setCreateModalOpen(true)}
+          >
+            <Plus className="w-5 h-5" />
+            Create New Terminal
+          </Button>
+          <CreateTerminalModal
+            open={createModalOpen}
+            onOpenChange={setCreateModalOpen}
+            onCreated={(id) => selectTerminal(id)}
+          />
         </div>
       ) : isSettingUp ? (
         <div className="flex-1 flex flex-col items-center justify-center w-full h-full gap-3 text-gray-400">
@@ -320,13 +336,12 @@ export function Terminal({ terminalId }: TerminalProps) {
         status !== 'connected' && (
           <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
             <span
-              className={`w-2 h-2 rounded-full ${
-                status === 'connecting'
+              className={`w-2 h-2 rounded-full ${status === 'connecting'
                   ? 'bg-yellow-400 animate-pulse'
                   : status === 'error'
                     ? 'bg-red-400'
                     : 'bg-gray-400'
-              }`}
+                }`}
             />
             {status === 'connecting' && 'Connecting...'}
             {status === 'disconnected' && 'Disconnected - Reconnecting...'}

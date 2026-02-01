@@ -61,37 +61,37 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
     return {
       label: 'Merged',
       colorClass: 'text-purple-400',
-      dimColorClass: 'text-purple-400/70 hover:text-purple-400',
+      dimColorClass: 'text-purple-400/60 hover:text-purple-400',
     }
   if (hasChangesRequested)
     return {
       label: 'Change request',
       colorClass: 'text-orange-400',
-      dimColorClass: 'text-orange-400/70 hover:text-orange-400',
+      dimColorClass: 'text-orange-400/60 hover:text-orange-400',
     }
   if (hasRunningChecks)
     return {
       label: 'Running checks',
       colorClass: 'text-yellow-400',
-      dimColorClass: 'text-yellow-400/70 hover:text-yellow-400',
+      dimColorClass: 'text-yellow-400/60 hover:text-yellow-400',
     }
   if (hasFailedChecks)
     return {
       label: 'Failed checks',
       colorClass: 'text-red-400',
-      dimColorClass: 'text-red-400/70 hover:text-red-400',
+      dimColorClass: 'text-red-400/60 hover:text-red-400',
     }
   if (isApproved && hasConflicts)
     return {
       label: 'Conflicts',
       colorClass: 'text-red-400',
-      dimColorClass: 'text-red-400/70 hover:text-red-400',
+      dimColorClass: 'text-red-400/60 hover:text-red-400',
     }
   if (isApproved)
     return {
       label: 'Approved',
       colorClass: 'text-green-500',
-      dimColorClass: 'text-green-500/70 hover:text-green-500',
+      dimColorClass: 'text-green-500/60 hover:text-green-500',
     }
   if (pr.areAllChecksOk)
     return {
@@ -121,18 +121,18 @@ export const PRTabButton = memo(function PRTabButton({
   )
 
   return (
-    <div className="group/pr-btn flex items-center gap-1">
+    <div className="group/pr-btn">
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+          'text-[10px] flex uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -140,16 +140,18 @@ export const PRTabButton = memo(function PRTabButton({
         {hasNewActivity && (
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
         )}
+        <a
+          href={pr.prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
+          )}
+        >
+          <ExternalLink className="w-3 h-3" />
+        </a>
       </button>
-      <a
-        href={pr.prUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="ml-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors invisible group-hover/pr-btn:visible"
-      >
-        <ExternalLink className="w-3 h-3" />
-      </a>
     </div>
   )
 })
