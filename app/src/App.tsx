@@ -8,9 +8,11 @@ import {
 } from 'react-resizable-panels'
 import { Toaster } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
+import { PinnedSessionsPip } from './components/PinnedSessionsPip'
 import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
+import { DocumentPipProvider } from './context/DocumentPipContext'
 import { useNotifications } from './context/NotificationContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
@@ -195,17 +197,20 @@ function AppContent() {
       </Group>
       <Toaster />
       <CommandPalette />
+      <PinnedSessionsPip />,
     </>
   )
 }
 
 function App() {
   return (
-    <TerminalProvider>
-      <SessionProvider>
-        <AppContent />
-      </SessionProvider>
-    </TerminalProvider>
+    <DocumentPipProvider>
+      <TerminalProvider>
+        <SessionProvider>
+          <AppContent />
+        </SessionProvider>
+      </TerminalProvider>
+    </DocumentPipProvider>
   )
 }
 

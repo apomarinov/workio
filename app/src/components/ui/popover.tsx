@@ -20,8 +20,11 @@ function PopoverContent({
   className,
   align = 'center',
   sideOffset = 4,
+  container,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {
+  container?: HTMLElement | null
+}) {
   // Callback ref: attaches wheel/touchmove stopPropagation when the
   // element mounts. This prevents react-remove-scroll (used by Radix
   // Dialog's overlay) from blocking scroll on Portal-rendered content.
@@ -34,7 +37,7 @@ function PopoverContent({
   }, [])
 
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         ref={contentRef}
         data-slot="popover-content"

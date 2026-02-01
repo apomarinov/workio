@@ -9,10 +9,12 @@ import {
   Globe,
   MoreVertical,
   Pencil,
+  Pin,
+  PinOff,
   TerminalSquare as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -23,6 +25,7 @@ import {
 import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
@@ -82,6 +85,10 @@ export function TerminalItem({
   const isDirty = !!diffStat && (diffStat.added > 0 || diffStat.removed > 0)
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
+  const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
+    number[]
+  >('sidebar-pinned-terminal-sessions', [])
+  const isTerminalPinned = pinnedTerminalSessions.includes(terminal.id)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteDirectory, setDeleteDirectory] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -89,13 +96,23 @@ export function TerminalItem({
   const [activeTab, _setActiveTab] = useState<
     'processes' | 'ports' | 'prs' | null
   >(null)
+  const pendingTabRef = useRef<typeof activeTab>(null)
+
+  // Apply pending tab after terminal becomes active
+  useEffect(() => {
+    if (isActive && pendingTabRef.current) {
+      _setActiveTab(pendingTabRef.current)
+      pendingTabRef.current = null
+    }
+  }, [isActive])
+
   const setActiveTab = (v: typeof activeTab) => {
-    _setActiveTab((o) => {
-      if (o === v) {
-        return null
-      }
-      return v
-    })
+    if (!isActive) {
+      pendingTabRef.current = v
+      selectTerminal(terminal.id)
+      return
+    }
+    _setActiveTab((o) => (o === v ? null : v))
   }
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
   const isSettingUp =
@@ -115,6 +132,15 @@ export function TerminalItem({
 
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+  }
+
+  const handlePinTerminalClick = () => {
+    setShowMenu(false)
+    setPinnedTerminalSessions((prev) =>
+      prev.includes(terminal.id)
+        ? prev.filter((id) => id !== terminal.id)
+        : [...prev, terminal.id],
+    )
   }
 
   const handleEditClick = () => {
@@ -269,6 +295,9 @@ export function TerminalItem({
               </span>
             )}
           </div>
+          {isTerminalPinned && !isGoToTabModifierHeld && (
+            <Pin className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:invisible" />
+          )}
           {isGoToTabModifierHeld && shortcutIndex >= 1 ? (
             <span className="text-sm flex items-center gap-1 text-muted-foreground font-medium tabular-nums font-mono">
               {modifierIcons.goToTab('w-3 h-3')}
@@ -323,6 +352,18 @@ export function TerminalItem({
                       </button>
                     )}
 
+                    <button
+                      type="button"
+                      onClick={handlePinTerminalClick}
+                      className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+                    >
+                      {isTerminalPinned ? (
+                        <PinOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Pin className="w-3.5 h-3.5" />
+                      )}
+                      {isTerminalPinned ? 'Unpin Latest' : 'Pin Latest'}
+                    </button>
                     <button
                       type="button"
                       onClick={handleEditClick}

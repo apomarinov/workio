@@ -22,6 +22,7 @@ import {
   Folder,
   Github,
   LayoutList,
+  PictureInPicture2,
   Plus,
   Search,
   Settings,
@@ -35,6 +36,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -42,6 +44,7 @@ import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
 import { MergedPRsList } from './MergedPRsList'
+import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
@@ -55,8 +58,15 @@ interface SidebarProps {
 }
 
 export function Sidebar({ width }: SidebarProps) {
+  const pip = useDocumentPip()
   const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
   const { clearSession, sessions } = useSessionContext()
+  const { pinnedSessions, totalCount: pinnedCount } = usePinnedSessionsData()
+  const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(
+    'pip-layout',
+    'horizontal',
+  )
+  const hasPinnedItems = pinnedCount > 0
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
@@ -279,6 +289,23 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedGitHubPRs([])
   }
 
+  const handlePipToggle = useCallback(() => {
+    if (pip.isOpen) {
+      pip.closeAll()
+      return
+    }
+    if (pinnedSessions.length === 0) return
+
+    const dims = getPipDimensions(pipLayout)
+    pip.open({
+      width: dims?.width ?? 400,
+      height: dims?.height ?? 300,
+      left: dims?.left,
+      top: dims?.top,
+      elementId: 'pinned-sessions-pip',
+    })
+  }, [pip, pinnedSessions.length, pipLayout])
+
   // Listen for reveal-pr events from the command palette
   useEffect(() => {
     const handler = (e: Event) => {
@@ -487,9 +514,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Terminals
@@ -499,9 +525,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -511,9 +536,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -540,6 +564,15 @@ export function Sidebar({ width }: SidebarProps) {
                   <Search className="w-4 h-4" />
                   Search
                 </button>
+                {hasPinnedItems && pip.isSupported && (
+                  <button
+                    onClick={handlePipToggle}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                  >
+                    <PictureInPicture2 className="w-4 h-4" />
+                    {pip.isOpen ? 'Close PiP' : 'Open PiP'}
+                  </button>
+                )}
                 <button
                   onClick={() => setShowSettingsModal(true)}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
@@ -569,9 +602,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Terminals
@@ -581,9 +613,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -593,9 +624,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -624,6 +654,17 @@ export function Sidebar({ width }: SidebarProps) {
             >
               <Search className="w-4 h-4" />
             </Button>
+            {hasPinnedItems && pip.isSupported && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('h-7 w-7', pip.isOpen && 'text-[#D97757]')}
+                onClick={handlePipToggle}
+                title={pip.isOpen ? 'Close PiP' : 'Open PiP'}
+              >
+                <PictureInPicture2 className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -748,8 +789,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button

@@ -7,6 +7,8 @@ import {
   Folder,
   MoreVertical,
   Pencil,
+  Pin,
+  PinOff,
   Trash2,
 } from 'lucide-react'
 import { memo, useEffect, useState } from 'react'
@@ -29,11 +31,15 @@ import { TruncatedPath } from './TruncatedPath'
 interface SessionItemProps {
   session: SessionWithProject
   showGitBranch?: boolean
+  popoverContainer?: HTMLElement | null
+  onClick?: () => void
 }
 
 export const SessionItem = memo(function SessionItem({
   session,
   showGitBranch,
+  popoverContainer,
+  onClick,
 }: SessionItemProps) {
   const { deleteSession, updateSession, activeSessionId, selectSession } =
     useSessionContext()
@@ -42,11 +48,17 @@ export const SessionItem = memo(function SessionItem({
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [isFlashing, setIsFlashing] = useState(false)
+  const [pinnedSessions, setPinnedSessions] = useLocalStorage<string[]>(
+    'sidebar-pinned-sessions',
+    [],
+  )
+  const isPinned = pinnedSessions.includes(session.session_id)
   const [collapsedSessions, setCollapsedSessions] = useLocalStorage<string[]>(
     'sidebar-collapsed-sessions',
     [],
   )
-  const isExpanded = !collapsedSessions.includes(session.session_id)
+  const isExpanded =
+    !collapsedSessions.includes(session.session_id) || !!popoverContainer
   const displayName = session.name || 'Untitled'
   const isSelected = activeSessionId === session.session_id
 
@@ -65,7 +77,11 @@ export const SessionItem = memo(function SessionItem({
         prev.filter((id) => id !== session.session_id),
       )
     }
-    selectSession(session.session_id)
+    if (onClick) {
+      onClick()
+    } else {
+      selectSession(session.session_id)
+    }
   }
 
   useEffect(() => {
@@ -88,6 +104,15 @@ export const SessionItem = memo(function SessionItem({
     permission_needed: 'text-[#D97757]',
     idle: 'text-gray-400',
   }[session.status]
+
+  const handlePinClick = () => {
+    setShowMenu(false)
+    setPinnedSessions((prev) => {
+      return prev.includes(session.session_id)
+        ? prev.filter((id) => id !== session.session_id)
+        : [...prev, session.session_id]
+    })
+  }
 
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -183,6 +208,7 @@ export const SessionItem = memo(function SessionItem({
           <button
             type="button"
             onClick={toggleExpanded}
+            disabled={!!popoverContainer}
             className="hidden cursor-pointer group-hover:block"
           >
             {isExpanded ? (
@@ -252,6 +278,11 @@ export const SessionItem = memo(function SessionItem({
             isSelected ? 'bg-[#1f1f1f]' : '',
           )}
         ></div>
+        {isPinned && (
+          <div className="absolute top-1 right-1 group-hover:invisible">
+            <Pin className="w-3 h-3 text-muted-foreground" />
+          </div>
+        )}
         <div className="absolute invisible group-hover:visible top-1 right-1">
           <Popover open={showMenu} onOpenChange={setShowMenu}>
             <PopoverTrigger asChild>
@@ -270,8 +301,21 @@ export const SessionItem = memo(function SessionItem({
             <PopoverContent
               align="end"
               className="w-36 p-1"
+              container={popoverContainer}
               onClick={(e) => e.stopPropagation()}
             >
+              <button
+                type="button"
+                onClick={handlePinClick}
+                className="flex session-pin-btn cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+              >
+                {isPinned ? (
+                  <PinOff className="w-3.5 h-3.5" />
+                ) : (
+                  <Pin className="w-3.5 h-3.5" />
+                )}
+                {isPinned ? 'Unpin' : 'Pin'}
+              </button>
               <button
                 type="button"
                 onClick={handleRenameClick}
