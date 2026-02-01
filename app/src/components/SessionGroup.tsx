@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Folder, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useSessionContext } from '../context/SessionContext'
 import type { SessionWithProject } from '../types'
@@ -14,7 +14,7 @@ interface SessionGroupProps {
   onToggle: () => void
 }
 
-export function SessionGroup({
+export const SessionGroup = memo(function SessionGroup({
   projectPath,
   sessions,
   expanded,
@@ -97,4 +97,4 @@ export function SessionGroup({
       />
     </>
   )
-}
+})

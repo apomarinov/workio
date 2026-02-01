@@ -9,7 +9,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -31,7 +31,10 @@ interface SessionItemProps {
   showGitBranch?: boolean
 }
 
-export function SessionItem({ session, showGitBranch }: SessionItemProps) {
+export const SessionItem = memo(function SessionItem({
+  session,
+  showGitBranch,
+}: SessionItemProps) {
   const { deleteSession, updateSession, activeSessionId, selectSession } =
     useSessionContext()
   const { settings } = useSettings()
@@ -318,4 +321,4 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
       />
     </>
   )
-}
+})

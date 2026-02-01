@@ -11,6 +11,7 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react'
+import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import { PRStatusContent } from './PRStatusContent'
@@ -24,7 +25,7 @@ interface PRStatusGroupProps {
   onSeen?: () => void
 }
 
-export function PRStatusGroup({
+export const PRStatusGroup = memo(function PRStatusGroup({
   pr,
   expanded,
   onToggle,
@@ -132,4 +133,4 @@ export function PRStatusGroup({
       )}
     </div>
   )
-}
+})
