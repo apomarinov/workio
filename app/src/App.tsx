@@ -7,6 +7,7 @@ import {
   useDefaultLayout,
 } from 'react-resizable-panels'
 import { Toaster } from '@/components/ui/sonner'
+import { CommandPalette } from './components/CommandPalette'
 import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
@@ -193,6 +194,7 @@ function AppContent() {
         </Panel>
       </Group>
       <Toaster />
+      <CommandPalette />
     </>
   )
 }

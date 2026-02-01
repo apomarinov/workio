@@ -121,6 +121,7 @@ export function SessionItem({ session, showGitBranch }: SessionItemProps) {
   return (
     <>
       <div
+        data-session-id={session.session_id}
         onClick={handleClick}
         className={cn(
           'group flex overflow-hidden items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer relative',

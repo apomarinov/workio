@@ -26,7 +26,7 @@ import {
   Settings,
   Terminal as TerminalIcon,
 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -277,6 +277,35 @@ export function Sidebar({ width }: SidebarProps) {
     setCollapsedGitHubRepos(allGitHubRepos)
     setExpandedGitHubPRs([])
   }
+
+  // Listen for reveal-pr events from the command palette
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { branch, repo } = (e as CustomEvent).detail as {
+        branch: string
+        repo: string
+      }
+      // Ensure the GitHub section, repo, and PR are all expanded
+      setGithubSectionCollapsed(false)
+      setCollapsedGitHubRepos((prev) => prev.filter((r) => r !== repo))
+      setExpandedGitHubPRs((prev) =>
+        prev.includes(branch) ? prev : [...prev, branch],
+      )
+      // Scroll to the PR and flash it after state updates flush
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-pr-branch="${branch}"]`)
+        if (!el) return
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        const row = el.firstElementChild as HTMLElement | null
+        if (row) {
+          row.classList.add('animate-flash')
+          setTimeout(() => row.classList.remove('animate-flash'), 2800)
+        }
+      })
+    }
+    window.addEventListener('reveal-pr', handler)
+    return () => window.removeEventListener('reveal-pr', handler)
+  }, [setGithubSectionCollapsed, setCollapsedGitHubRepos, setExpandedGitHubPRs])
 
   const allExpanded =
     allFolders.every((f) => expandedFolders.has(f)) &&

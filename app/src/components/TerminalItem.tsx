@@ -167,6 +167,7 @@ export function TerminalItem({
     <>
       <div>
         <div
+          data-terminal-id={terminal.id}
           onClick={() => {
             selectTerminal(terminal.id)
             clearSession()

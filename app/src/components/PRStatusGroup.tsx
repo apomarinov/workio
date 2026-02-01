@@ -49,7 +49,7 @@ export function PRStatusGroup({
     pr.reviews.filter((r) => r.state === 'PENDING').length > 0
 
   return (
-    <div>
+    <div data-pr-branch={pr.branch}>
       <div
         onClick={
           isMerged
