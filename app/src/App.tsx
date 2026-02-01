@@ -39,8 +39,8 @@ function AppContent() {
   terminalsRef.current = terminals
 
   useKeyboardShortcuts({
-    goToTab: (e) => {
-      const terminal = terminalsRef.current[Number.parseInt(e.key, 10) - 1]
+    goToTab: (index) => {
+      const terminal = terminalsRef.current[index - 1]
       if (terminal) {
         selectTerminal(terminal.id)
         clearSession()

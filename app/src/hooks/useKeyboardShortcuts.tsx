@@ -4,19 +4,29 @@ import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { DEFAULT_KEYMAP, type Keymap, type ShortcutBinding } from '../types'
 import { useSettings } from './useSettings'
 
-function matchesBinding(e: KeyboardEvent, binding: ShortcutBinding): boolean {
-  if (!!binding.metaKey !== e.metaKey) return false
-  if (!!binding.ctrlKey !== e.ctrlKey) return false
-  if (!!binding.altKey !== e.altKey) return false
-  if (!!binding.shiftKey !== e.shiftKey) return false
-  if (binding.key !== undefined && e.key.toLowerCase() !== binding.key)
-    return false
+type ModifierBuffer = {
+  meta: boolean
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+}
+
+function modifiersMatchBinding(
+  buf: ModifierBuffer,
+  binding: ShortcutBinding,
+): boolean {
+  if (buf.meta !== !!binding.metaKey) return false
+  if (buf.ctrl !== !!binding.ctrlKey) return false
+  if (buf.alt !== !!binding.altKey) return false
+  if (buf.shift !== !!binding.shiftKey) return false
   return true
 }
 
 // --- Module-level modifier tracking ---
 
 let heldState = { meta: false, ctrl: false, alt: false, shift: false }
+let suppressHeld = false
+const EMPTY_HELD = { meta: false, ctrl: false, alt: false, shift: false }
 const heldListeners = new Set<() => void>()
 
 function emitHeld() {
@@ -32,23 +42,39 @@ const KEY_TO_MOD: Record<string, keyof typeof heldState> = {
 
 function handleModKeyDown(e: KeyboardEvent) {
   const mod = KEY_TO_MOD[e.key]
-  if (mod && !heldState[mod]) {
-    heldState = { ...heldState, [mod]: true }
-    emitHeld()
-  }
+  if (!mod || heldState[mod]) return
+  heldState = { ...heldState, [mod]: true }
+  if (!suppressHeld) emitHeld()
 }
 
 function handleModKeyUp(e: KeyboardEvent) {
   const mod = KEY_TO_MOD[e.key]
   if (mod && heldState[mod]) {
     heldState = { ...heldState, [mod]: false }
-    emitHeld()
+    if (!suppressHeld) emitHeld()
+  }
+  if (
+    suppressHeld &&
+    !heldState.meta &&
+    !heldState.ctrl &&
+    !heldState.alt &&
+    !heldState.shift
+  ) {
+    suppressHeld = false
   }
 }
 
 function handleModBlur() {
+  suppressHeld = false
   if (heldState.meta || heldState.ctrl || heldState.alt || heldState.shift) {
     heldState = { meta: false, ctrl: false, alt: false, shift: false }
+    emitHeld()
+  }
+}
+
+function suppressModifiers() {
+  if (!suppressHeld) {
+    suppressHeld = true
     emitHeld()
   }
 }
@@ -63,7 +89,7 @@ function subscribeHeld(listener: () => void) {
 }
 
 function getHeldSnapshot() {
-  return heldState
+  return suppressHeld ? EMPTY_HELD : heldState
 }
 
 // --- Modifier icons ---
@@ -107,7 +133,12 @@ export function useModifiersHeld() {
 
 // --- useKeyboardShortcuts: registers handlers, no store subscription ---
 
-type KeymapHandlers = Partial<Record<keyof Keymap, (e: KeyboardEvent) => void>>
+interface KeymapHandlers {
+  palette?: (e: KeyboardEvent) => void
+  goToTab?: (index: number) => void
+}
+
+const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
 
 export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const { settings } = useSettings()
@@ -118,32 +149,106 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const goToTabBinding = settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const h = handlersRef.current
+    let modifierBuffer: ModifierBuffer = {
+      meta: false,
+      ctrl: false,
+      alt: false,
+      shift: false,
+    }
+    let digitBuffer: string[] = []
+    let keyBuffer: string[] = []
+    const heldNonModKeys = new Set<string>()
+    let active = false
 
-      // Go to tab: modifier(s) + digit 1-9
-      if (
-        h.goToTab &&
-        e.key >= '1' &&
-        e.key <= '9' &&
-        matchesBinding(e, { ...goToTabBinding, key: undefined })
-      ) {
-        e.preventDefault()
-        e.stopPropagation()
-        h.goToTab(e)
+    function reset() {
+      modifierBuffer = { meta: false, ctrl: false, alt: false, shift: false }
+      digitBuffer = []
+      keyBuffer = []
+      heldNonModKeys.clear()
+      active = false
+      consumed = false
+    }
+
+    let consumed = false // true after a shortcut fires; blocks until all modifiers released
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (MODIFIER_KEYS.has(e.key)) {
+        const mod = KEY_TO_MOD[e.key]
+        if (mod && !modifierBuffer[mod]) {
+          modifierBuffer = { ...modifierBuffer, [mod]: true }
+          active = true
+        }
         return
       }
 
-      // Command palette
+      // Non-modifier key while a modifier sequence is active
+      if (active) {
+        if (consumed || heldNonModKeys.has(e.code)) return
+        heldNonModKeys.add(e.code)
+
+        const h = handlersRef.current
+        const key = e.key.toLowerCase()
+        keyBuffer.push(key)
+
+        // Check palette: modifiers + accumulated keys match binding
+        if (
+          h.palette &&
+          paletteBinding.key &&
+          modifiersMatchBinding(modifierBuffer, paletteBinding) &&
+          keyBuffer.join('') === paletteBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.palette(new KeyboardEvent('keydown'))
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check goToTab: modifiers match + physical digit key pressed
+        // Use e.code for digit detection (Shift+3 gives e.key='#' but e.code='Digit3')
+        const digit =
+          e.code >= 'Digit0' && e.code <= 'Digit9' ? e.code[5] : null
+        if (
+          h.goToTab &&
+          digit &&
+          modifiersMatchBinding(modifierBuffer, goToTabBinding)
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          digitBuffer.push(digit)
+          h.goToTab(Number.parseInt(digitBuffer.join(''), 10))
+          consumed = true
+          suppressModifiers()
+        }
+
+        return
+      }
+
+      // Plain key with no modifiers held: check for modifier-free palette binding
+      const h = handlersRef.current
       if (
         h.palette &&
         paletteBinding.key &&
-        matchesBinding(e, paletteBinding)
+        !paletteBinding.metaKey &&
+        !paletteBinding.ctrlKey &&
+        !paletteBinding.altKey &&
+        !paletteBinding.shiftKey &&
+        e.key.toLowerCase() === paletteBinding.key
       ) {
-        e.preventDefault()
-        e.stopPropagation()
-        h.palette(e)
-        return
+        const el = e.target as HTMLElement
+        const tag = el?.tagName
+        if (
+          tag !== 'INPUT' &&
+          tag !== 'SELECT' &&
+          tag !== 'TEXTAREA' &&
+          !el?.isContentEditable
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.palette(new KeyboardEvent('keydown'))
+          return
+        }
       }
 
       // Tab focuses the terminal when it's not already focused
@@ -160,7 +265,34 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       }
     }
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!MODIFIER_KEYS.has(e.key)) {
+        heldNonModKeys.delete(e.code)
+      }
+      if (!active) return
+
+      // When all modifiers released, reset the sequence
+      if (
+        !heldState.meta &&
+        !heldState.ctrl &&
+        !heldState.alt &&
+        !heldState.shift
+      ) {
+        reset()
+      }
+    }
+
+    const handleBlur = () => {
+      reset()
+    }
+
     window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
+    window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('blur', handleBlur)
+    }
   }, [paletteBinding, goToTabBinding])
 }

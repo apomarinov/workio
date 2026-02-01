@@ -1,6 +1,6 @@
 import { ArrowBigUp, ChevronUp, Command, Option, RotateCcw } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,20 +10,45 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import { DEFAULT_KEYMAP, type ShortcutBinding } from '../types'
-import { cn } from '@/lib/utils'
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
+const MOD_MAP: Record<string, 'meta' | 'ctrl' | 'alt' | 'shift'> = {
+  Meta: 'meta',
+  Control: 'ctrl',
+  Alt: 'alt',
+  Shift: 'shift',
+}
+
+// Apple convention: Control → Option → Shift → Command, then non-modifiers
+const KEY_ORDER: Record<string, number> = {
+  Control: 0,
+  Alt: 1,
+  Shift: 2,
+  Meta: 3,
+}
 
 const ICON_CLASS = 'inline-block w-3 h-3 align-[-2px]'
+
+function renderKey(key: string): ReactNode {
+  const cls = cn(ICON_CLASS, 'stroke-3')
+  if (key === 'Meta') return <Command className={cls} />
+  if (key === 'Control') return <ChevronUp className={cls} />
+  if (key === 'Alt') return <Option className={cls} />
+  if (key === 'Shift') return <ArrowBigUp className={cls} />
+  return <span>{key.toUpperCase()}</span>
+}
 
 function formatBinding(binding: ShortcutBinding, suffix?: string): ReactNode {
   return (
     <span className="inline-flex items-center gap-1">
       {binding.ctrlKey && <ChevronUp className={cn(ICON_CLASS, 'stroke-3')} />}
       {binding.altKey && <Option className={cn(ICON_CLASS, 'stroke-3')} />}
-      {binding.shiftKey && <ArrowBigUp className={cn(ICON_CLASS, 'stroke-3')} />}
+      {binding.shiftKey && (
+        <ArrowBigUp className={cn(ICON_CLASS, 'stroke-3')} />
+      )}
       {binding.metaKey && <Command className={cn(ICON_CLASS, 'stroke-3')} />}
       {binding.key && <span>{binding.key.toUpperCase()}</span>}
       {suffix && <span>{suffix}</span>}
@@ -36,8 +61,8 @@ function bindingsConflict(
   goToTab: ShortcutBinding,
 ): boolean {
   if (!palette.key) return false
-  const isDigit = palette.key >= '1' && palette.key <= '9'
-  if (!isDigit) return false
+  const isAllDigits = palette.key.split('').every((c) => c >= '0' && c <= '9')
+  if (!isAllDigits) return false
   return (
     !!palette.metaKey === !!goToTab.metaKey &&
     !!palette.ctrlKey === !!goToTab.ctrlKey &&
@@ -61,6 +86,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     DEFAULT_KEYMAP.goToTab,
   )
   const [recording, setRecording] = useState<'palette' | 'goToTab' | null>(null)
+  const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -70,42 +96,104 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     }
   }, [settings?.keymap])
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!recording) return
-      e.preventDefault()
-      e.stopPropagation()
+  useEffect(() => {
+    if (!recording) return
+    setRecordingKeys([])
 
-      if (e.key === 'Escape') {
-        setRecording(null)
-        return
-      }
+    const heldMods = new Set<string>()
+    const heldNonModKeys = new Set<string>()
+    let modifierBuffer = { meta: false, ctrl: false, alt: false, shift: false }
+    const keyBuffer: string[] = []
+    let active = false
 
-      if (MODIFIER_KEYS.has(e.key) && DEFAULT_KEYMAP[recording].key) return
-
+    function finalize() {
       const binding: ShortcutBinding = {}
-      if (e.metaKey) binding.metaKey = true
-      if (e.ctrlKey) binding.ctrlKey = true
-      if (e.altKey) binding.altKey = true
-      if (e.shiftKey) binding.shiftKey = true
+      if (modifierBuffer.meta) binding.metaKey = true
+      if (modifierBuffer.ctrl) binding.ctrlKey = true
+      if (modifierBuffer.alt) binding.altKey = true
+      if (modifierBuffer.shift) binding.shiftKey = true
 
       if (recording === 'palette') {
-        binding.key = e.key.toLowerCase()
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
         setPalette(binding)
       } else {
         setGoToTab(binding)
       }
 
       setRecording(null)
-    },
-    [recording],
-  )
+    }
 
-  useEffect(() => {
-    if (!recording) return
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [recording, handleKeyDown])
+    const onKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (e.repeat) return
+
+      if (e.key === 'Escape') {
+        setRecording(null)
+        return
+      }
+
+      if (MODIFIER_KEYS.has(e.key)) {
+        if (heldMods.has(e.key)) return
+        heldMods.add(e.key)
+        const mod = MOD_MAP[e.key]
+        if (mod) {
+          modifierBuffer = { ...modifierBuffer, [mod]: true }
+          active = true
+        }
+        setRecordingKeys((prev) => [...prev, e.key])
+        return
+      }
+
+      // Non-modifier key with no modifiers held: record immediately
+      if (!active) {
+        setRecordingKeys([e.key])
+        if (recording === 'palette') {
+          setPalette({ key: e.key.toLowerCase() })
+        } else {
+          setGoToTab({})
+        }
+        setRecording(null)
+        return
+      }
+
+      // Non-modifier key while modifiers are held: buffer if not already held
+      if (heldNonModKeys.has(e.key)) return
+      heldNonModKeys.add(e.key)
+      keyBuffer.push(e.key.toLowerCase())
+      setRecordingKeys((prev) => [...prev, e.key])
+    }
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (MODIFIER_KEYS.has(e.key)) {
+        heldMods.delete(e.key)
+      } else {
+        heldNonModKeys.delete(e.key)
+      }
+      setRecordingKeys((prev) => prev.filter((k) => k !== e.key))
+      if (active && heldMods.size === 0) {
+        finalize()
+      }
+    }
+
+    const onBlur = () => {
+      if (active) {
+        setRecording(null)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [recording])
 
   const handleSave = async () => {
     setSaving(true)
@@ -142,6 +230,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             label="Command Palette"
             binding={palette}
             isRecording={recording === 'palette'}
+            recordingKeys={recording === 'palette' ? recordingKeys : []}
             onRecord={() =>
               setRecording(recording === 'palette' ? null : 'palette')
             }
@@ -152,10 +241,11 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             label="Go to Tab"
             binding={goToTab}
             isRecording={recording === 'goToTab'}
+            recordingKeys={recording === 'goToTab' ? recordingKeys : []}
             onRecord={() =>
               setRecording(recording === 'goToTab' ? null : 'goToTab')
             }
-            display={formatBinding(goToTab, '1-9')}
+            display={formatBinding(goToTab, '1 - NN')}
           />
           {hasConflict && (
             <p className="text-sm text-amber-500">
@@ -182,6 +272,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
 function ShortcutRow({
   label,
   isRecording,
+  recordingKeys,
   onRecord,
   binding,
   display,
@@ -190,28 +281,48 @@ function ShortcutRow({
   label: string
   binding: ShortcutBinding
   isRecording: boolean
+  recordingKeys: string[]
   onRecord: () => void
   display: ReactNode
   hasConflict?: boolean
 }) {
-
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm font-medium flex flex-col gap-0">
         {label}
-        {!binding.key && <span className="text-xs font-normal text-muted-foreground">Modifier only</span>}
+        {!binding.key && (
+          <span className="text-xs font-normal text-muted-foreground">
+            Modifier only
+          </span>
+        )}
       </span>
       <button
         type="button"
         onClick={onRecord}
-        className={`px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors ${isRecording
-          ? 'border-primary bg-primary/10 text-primary animate-pulse'
-          : hasConflict
-            ? 'border-amber-500/50 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
-            : 'border-border bg-zinc-800 hover:bg-zinc-700/70'
-          }`}
+        className={`px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors ${
+          isRecording
+            ? 'border-primary bg-primary/10 text-primary animate-pulse'
+            : hasConflict
+              ? 'border-amber-500/50 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
+              : 'border-border bg-zinc-800 hover:bg-zinc-700/70'
+        }`}
       >
-        {isRecording ? 'Press shortcut...' : display}
+        {isRecording ? (
+          recordingKeys.length > 0 ? (
+            <span className="inline-flex items-center gap-1">
+              {[...recordingKeys]
+                .sort((a, b) => (KEY_ORDER[a] ?? 4) - (KEY_ORDER[b] ?? 4))
+                .map((key, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: stable sorted list
+                  <span key={i}>{renderKey(key)}</span>
+                ))}
+            </span>
+          ) : (
+            'Press shortcut...'
+          )
+        ) : (
+          display
+        )}
       </button>
     </div>
   )

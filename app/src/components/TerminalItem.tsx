@@ -272,7 +272,7 @@ export function TerminalItem({
               </span>
             )}
           </div>
-          {isGoToTabModifierHeld && shortcutIndex >= 1 && shortcutIndex <= 9 ? (
+          {isGoToTabModifierHeld && shortcutIndex >= 1 ? (
             <span className="text-sm flex items-center gap-1 text-muted-foreground font-medium tabular-nums font-mono">
               {modifierIcons.goToTab('w-3 h-3')}
               {shortcutIndex}
@@ -287,13 +287,10 @@ export function TerminalItem({
                       size="icon"
                       onClick={handleMenuClick}
                       className={cn(
-                        'h-7 w-7 text-muted-foreground !bg-transparent !w-[20px]',
-                        isActive
-                          ? 'hover:!bg-zinc-700/60'
-                          : 'hover:!bg-zinc-800',
+                        'h-7 w-7 text-muted-foreground !bg-transparent group-hover:!bg-zinc-800/80 !w-[20px] hover:!bg-zinc-800',
                       )}
                     >
-                      <MoreVertical className="w-3 h-3" />
+                      <MoreVertical className="w-3 h-3 stroke-3" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent
