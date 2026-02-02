@@ -1,9 +1,12 @@
-import { execSync } from 'node:child_process'
+import { execFile as execFileCb } from 'node:child_process'
 import fs from 'node:fs'
+import { promisify } from 'node:util'
 import type { ActiveProcess } from '../../shared/types'
 import { log } from '../logger'
 
-export function getChildPids(pid: number): number[] {
+const execFileAsync = promisify(execFileCb)
+
+export async function getChildPids(pid: number): Promise<number[]> {
   try {
     // Try Linux /proc first (faster, no process spawn)
     const childrenPath = `/proc/${pid}/task/${pid}/children`
@@ -17,17 +20,18 @@ export function getChildPids(pid: number): number[] {
 
   // Fallback to pgrep (macOS + Linux)
   try {
-    const output = execSync(`pgrep -P ${pid}`, {
+    const { stdout } = await execFileAsync('pgrep', ['-P', String(pid)], {
       encoding: 'utf8',
       timeout: 500,
-    }).trim()
+    })
+    const output = stdout.trim()
     return output ? output.split('\n').map(Number) : []
   } catch {
     return []
   }
 }
 
-export function getProcessComm(pid: number): string | null {
+export async function getProcessComm(pid: number): Promise<string | null> {
   try {
     // Try Linux /proc first
     const commPath = `/proc/${pid}/comm`
@@ -40,22 +44,32 @@ export function getProcessComm(pid: number): string | null {
 
   // Fallback to ps
   try {
-    return execSync(`ps -o comm= -p ${pid}`, {
-      encoding: 'utf8',
-      timeout: 500,
-    }).trim()
+    const { stdout } = await execFileAsync(
+      'ps',
+      ['-o', 'comm=', '-p', String(pid)],
+      {
+        encoding: 'utf8',
+        timeout: 500,
+      },
+    )
+    return stdout.trim()
   } catch {
     return null
   }
 }
 
 // Get full command line with arguments
-function getProcessArgs(pid: number): string | null {
+async function getProcessArgs(pid: number): Promise<string | null> {
   try {
-    return execSync(`ps -o args= -p ${pid}`, {
-      encoding: 'utf8',
-      timeout: 500,
-    }).trim()
+    const { stdout } = await execFileAsync(
+      'ps',
+      ['-o', 'args=', '-p', String(pid)],
+      {
+        encoding: 'utf8',
+        timeout: 500,
+      },
+    )
+    return stdout.trim()
   } catch {
     return null
   }
@@ -105,12 +119,17 @@ function shouldIgnoreProcess(name: string): boolean {
 }
 
 // Get the TTY of a process
-function getProcessTty(pid: number): string | null {
+async function getProcessTty(pid: number): Promise<string | null> {
   try {
-    const output = execSync(`ps -o tty= -p ${pid}`, {
-      encoding: 'utf8',
-      timeout: 500,
-    }).trim()
+    const { stdout } = await execFileAsync(
+      'ps',
+      ['-o', 'tty=', '-p', String(pid)],
+      {
+        encoding: 'utf8',
+        timeout: 500,
+      },
+    )
+    const output = stdout.trim()
     return output || null
   } catch {
     return null
@@ -118,16 +137,20 @@ function getProcessTty(pid: number): string | null {
 }
 
 // Get all processes on a specific TTY
-function getProcessesOnTty(tty: string): Map<number, string> {
+async function getProcessesOnTty(tty: string): Promise<Map<number, string>> {
   const pidToName = new Map<number, string>()
   try {
     // ps -t <tty> -o pid=,comm= gives all processes on that TTY
-    const output = execSync(`ps -t ${tty} -o pid=,comm=`, {
-      encoding: 'utf8',
-      timeout: 1000,
-    })
+    const { stdout } = await execFileAsync(
+      'ps',
+      ['-t', tty, '-o', 'pid=,comm='],
+      {
+        encoding: 'utf8',
+        timeout: 1000,
+      },
+    )
 
-    for (const line of output.trim().split('\n')) {
+    for (const line of stdout.trim().split('\n')) {
       try {
         const match = line.trim().match(/^(\d+)\s+(.+)$/)
         if (match) {
@@ -155,13 +178,20 @@ export interface ZellijPaneProcess {
 }
 
 // Find Zellij server PID for a given session name
-function findZellijServerForSession(sessionName: string): number | null {
+async function findZellijServerForSession(
+  sessionName: string,
+): Promise<number | null> {
   try {
     // Get all Zellij server PIDs (PPID=1)
-    const output = execSync(
-      "ps -axo pid,ppid,comm | awk '$3 ~ /zellij/ && $2 == 1 {print $1}'",
+    const { stdout } = await execFileAsync(
+      'sh',
+      [
+        '-c',
+        "ps -axo pid,ppid,comm | awk '$3 ~ /zellij/ && $2 == 1 {print $1}'",
+      ],
       { encoding: 'utf8', timeout: 1000 },
-    ).trim()
+    )
+    const output = stdout.trim()
 
     if (!output) return null
 
@@ -170,10 +200,11 @@ function findZellijServerForSession(sessionName: string): number | null {
     for (const serverPid of serverPids) {
       try {
         // Check socket path to get session name
-        const lsofOutput = execSync(`lsof -p ${serverPid} 2>/dev/null`, {
-          encoding: 'utf8',
-          timeout: 2000,
-        })
+        const { stdout: lsofOutput } = await execFileAsync(
+          'lsof',
+          ['-p', String(serverPid)],
+          { encoding: 'utf8', timeout: 2000 },
+        )
 
         // Look for unix socket with session name in path
         const match = lsofOutput.match(/unix.*zellij-\d+[^\s]*\/([^\s]+)/)
@@ -191,34 +222,31 @@ function findZellijServerForSession(sessionName: string): number | null {
 }
 
 // Get running commands in all panes of a Zellij session
-export function getZellijSessionProcesses(
+export async function getZellijSessionProcesses(
   sessionName: string,
   terminalId?: number,
-): ZellijPaneProcess[] {
+): Promise<ZellijPaneProcess[]> {
   try {
-    const serverPid = findZellijServerForSession(sessionName)
+    const serverPid = await findZellijServerForSession(sessionName)
     if (!serverPid) return []
 
     const results: ZellijPaneProcess[] = []
 
     // Get all pane shells (direct children of server)
-    const paneShells = getChildPids(serverPid)
+    const paneShells = await getChildPids(serverPid)
 
     for (const shellPid of paneShells) {
-      const shellComm = getProcessComm(shellPid)
-      const shellArgs = getProcessArgs(shellPid)
+      const shellComm = await getProcessComm(shellPid)
+      const shellArgs = await getProcessArgs(shellPid)
 
       // Get first child of the shell (the running command)
-      const cmdPids = getChildPids(shellPid)
+      const cmdPids = await getChildPids(shellPid)
 
       if (cmdPids.length > 0) {
         for (const cmdPid of cmdPids) {
           try {
-            const cmdArgs = execSync(`ps -o args= -p ${cmdPid}`, {
-              encoding: 'utf8',
-              timeout: 500,
-            }).trim()
-            if (!shouldIgnoreProcess(cmdArgs)) {
+            const cmdArgs = await getProcessArgs(cmdPid)
+            if (cmdArgs && !shouldIgnoreProcess(cmdArgs)) {
               results.push({ command: cmdArgs, isIdle: false, terminalId })
             }
           } catch {
@@ -243,39 +271,42 @@ export function getZellijSessionProcesses(
 }
 
 // Check if a Zellij session exists for a terminal
-export function hasZellijSession(terminalId: number): boolean {
+export async function hasZellijSession(terminalId: number): Promise<boolean> {
   const sessionName = `terminal-${terminalId}`
-  return findZellijServerForSession(sessionName) !== null
+  return (await findZellijServerForSession(sessionName)) !== null
 }
 
 // Get all descendant PIDs of a process (recursive)
-export function getDescendantPids(pid: number): Set<number> {
+export async function getDescendantPids(pid: number): Promise<Set<number>> {
   const descendants = new Set<number>()
-  const visit = (p: number) => {
+  const visit = async (p: number) => {
     if (descendants.has(p)) return
     descendants.add(p)
-    for (const child of getChildPids(p)) {
-      visit(child)
+    for (const child of await getChildPids(p)) {
+      await visit(child)
     }
   }
-  for (const child of getChildPids(pid)) {
-    visit(child)
+  for (const child of await getChildPids(pid)) {
+    await visit(child)
   }
   return descendants
 }
 
 // Get all TCP listening ports on the system, grouped by PID
 // Returns Map<pid, port[]>
-export function getSystemListeningPorts(): Map<number, number[]> {
+export async function getSystemListeningPorts(): Promise<
+  Map<number, number[]>
+> {
   const pidPorts = new Map<number, number[]>()
   try {
-    const output = execSync('lsof -iTCP -sTCP:LISTEN -P -n -Fpn', {
-      encoding: 'utf8',
-      timeout: 3000,
-    })
+    const { stdout } = await execFileAsync(
+      'lsof',
+      ['-iTCP', '-sTCP:LISTEN', '-P', '-n', '-Fpn'],
+      { encoding: 'utf8', timeout: 3000 },
+    )
 
     let currentPid: number | null = null
-    for (const line of output.split('\n')) {
+    for (const line of stdout.split('\n')) {
       if (line.startsWith('p')) {
         currentPid = Number.parseInt(line.slice(1), 10)
       } else if (line.startsWith('n') && currentPid !== null) {
@@ -302,18 +333,18 @@ export function getSystemListeningPorts(): Map<number, number[]> {
 // with the system-wide listening ports map.
 // shellPid: the terminal's shell PID (0 for SSH)
 // zellijSessionName: optional Zellij session name to also check server descendants
-export function getListeningPortsForTerminal(
+export async function getListeningPortsForTerminal(
   shellPid: number,
   zellijSessionName: string | null,
   systemPorts: Map<number, number[]>,
-): number[] {
+): Promise<number[]> {
   if (systemPorts.size === 0) return []
 
   const allPids = new Set<number>()
 
   // Collect descendants from the shell process tree
   if (shellPid > 0) {
-    for (const pid of getDescendantPids(shellPid)) {
+    for (const pid of await getDescendantPids(shellPid)) {
       allPids.add(pid)
     }
   }
@@ -321,9 +352,9 @@ export function getListeningPortsForTerminal(
   // Also collect descendants from Zellij server (processes run under the
   // server daemon, not the client terminal)
   if (zellijSessionName) {
-    const serverPid = findZellijServerForSession(zellijSessionName)
+    const serverPid = await findZellijServerForSession(zellijSessionName)
     if (serverPid) {
-      for (const pid of getDescendantPids(serverPid)) {
+      for (const pid of await getDescendantPids(serverPid)) {
         allPids.add(pid)
       }
     }
@@ -344,36 +375,36 @@ export function getListeningPortsForTerminal(
   return [...ports].sort((a, b) => a - b)
 }
 
-export function getChildProcesses(
+export async function getChildProcesses(
   shellPid: number,
   terminalId?: number,
-): ActiveProcess[] {
+): Promise<ActiveProcess[]> {
   try {
     const pidToName = new Map<number, string>()
 
     // Method 1: Get all descendants of our shell (follows through multiplexers)
-    const collectDescendants = (
+    const collectDescendants = async (
       pid: number,
       visited = new Set<number>(),
-    ): void => {
+    ): Promise<void> => {
       if (visited.has(pid)) return
       visited.add(pid)
-      for (const childPid of getChildPids(pid)) {
+      for (const childPid of await getChildPids(pid)) {
         try {
-          const name = getProcessComm(childPid)
+          const name = await getProcessComm(childPid)
           if (name) pidToName.set(childPid, name)
-          collectDescendants(childPid, visited)
+          await collectDescendants(childPid, visited)
         } catch {
           // Skip
         }
       }
     }
-    collectDescendants(shellPid)
+    await collectDescendants(shellPid)
 
     // Method 2: Also get processes on our TTY (catches things that might not be direct descendants)
-    const tty = getProcessTty(shellPid)
+    const tty = await getProcessTty(shellPid)
     if (tty && tty !== '??') {
-      const ttyProcesses = getProcessesOnTty(tty)
+      const ttyProcesses = await getProcessesOnTty(tty)
       for (const [pid, name] of ttyProcesses) {
         if (!pidToName.has(pid)) {
           pidToName.set(pid, name)
@@ -390,7 +421,7 @@ export function getChildProcesses(
       if (pid === shellPid) continue
       if (shouldIgnoreProcess(name)) continue
 
-      const command = getProcessArgs(pid) || name
+      const command = (await getProcessArgs(pid)) || name
       if (shouldIgnoreProcess(command)) continue
 
       if (!seen.has(command)) {

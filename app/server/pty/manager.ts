@@ -62,10 +62,10 @@ let globalProcessPollingId: NodeJS.Timeout | null = null
 let gitDirtyPollingId: NodeJS.Timeout | null = null
 const lastDirtyStatus = new Map<number, { added: number; removed: number }>()
 
-function getProcessesForTerminal(
+async function getProcessesForTerminal(
   terminalId: number,
   session: PtySession,
-): ActiveProcess[] {
+): Promise<ActiveProcess[]> {
   const processes: ActiveProcess[] = []
 
   try {
@@ -83,7 +83,7 @@ function getProcessesForTerminal(
     }
 
     // Check Zellij session (terminal-<ID>)
-    const zellijProcs = getZellijSessionProcesses(
+    const zellijProcs = await getZellijSessionProcesses(
       `terminal-${terminalId}`,
       terminalId,
     )
@@ -103,23 +103,27 @@ function getProcessesForTerminal(
   return processes
 }
 
-function getPortsForTerminal(
+async function getPortsForTerminal(
   terminalId: number,
   session: PtySession,
   systemPorts: Map<number, number[]>,
-): number[] {
+): Promise<number[]> {
   const shellPid = session.pty.pid
   const zellijSessionName = `terminal-${terminalId}`
-  return getListeningPortsForTerminal(shellPid, zellijSessionName, systemPorts)
+  return await getListeningPortsForTerminal(
+    shellPid,
+    zellijSessionName,
+    systemPorts,
+  )
 }
 
-function scanAndEmitProcessesForTerminal(terminalId: number) {
+async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const session = sessions.get(terminalId)
   if (!session) return
 
-  const processes = getProcessesForTerminal(terminalId, session)
-  const systemPorts = getSystemListeningPorts()
-  const ports = getPortsForTerminal(terminalId, session, systemPorts)
+  const processes = await getProcessesForTerminal(terminalId, session)
+  const systemPorts = await getSystemListeningPorts()
+  const ports = await getPortsForTerminal(terminalId, session, systemPorts)
   const terminalPorts: Record<number, number[]> = {}
   if (ports.length > 0) {
     terminalPorts[terminalId] = ports
@@ -127,16 +131,16 @@ function scanAndEmitProcessesForTerminal(terminalId: number) {
   getIO()?.emit('processes', { terminalId, processes, ports: terminalPorts })
 }
 
-function scanAndEmitAllProcesses() {
+async function scanAndEmitAllProcesses() {
   const allProcesses: ActiveProcess[] = []
-  const systemPorts = getSystemListeningPorts()
+  const systemPorts = await getSystemListeningPorts()
   const terminalPorts: Record<number, number[]> = {}
 
   for (const [terminalId, session] of sessions) {
-    const procs = getProcessesForTerminal(terminalId, session)
+    const procs = await getProcessesForTerminal(terminalId, session)
     allProcesses.push(...procs)
 
-    const ports = getPortsForTerminal(terminalId, session, systemPorts)
+    const ports = await getPortsForTerminal(terminalId, session, systemPorts)
     if (ports.length > 0) {
       terminalPorts[terminalId] = ports
     }
@@ -473,8 +477,7 @@ export async function createSession(
             active_cmd: event.command || null,
           }).catch(() => {})
           log.info(`[pty:${terminalId}] Command started: ${event.command}`)
-          // Scan for new processes after a brief delay
-          setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
+          scanAndEmitProcessesForTerminal(terminalId)
           break
         case 'command_end':
           log.info(
@@ -482,8 +485,7 @@ export async function createSession(
           )
           detectGitBranch(terminalId)
           checkAndEmitSingleGitDirty(terminalId)
-          // Scan for process changes after a brief delay
-          setTimeout(() => scanAndEmitProcessesForTerminal(terminalId), 200)
+          scanAndEmitProcessesForTerminal(terminalId)
           break
       }
       // Forward event to callback

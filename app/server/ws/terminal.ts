@@ -71,28 +71,24 @@ function sendMessage(ws: WebSocket, message: ServerMessage): void {
   }
 }
 
-// Coalesce rapid PTY output chunks into fewer WebSocket messages.
-// TUI apps like Zellij emit many small chunks per redraw; sending each
-// as a separate JSON frame floods the client and causes visible stutter.
-const OUTPUT_BATCH_MS = 4
-
+// Batch rapid output chunks into a single message to reduce WebSocket overhead
+// (helps with TUI apps that emit many small writes)
 function createOutputBatcher(ws: WebSocket): (data: string) => void {
-  let pending: string[] = []
+  let pending = ''
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  function flush() {
+  const flush = () => {
     timer = null
-    if (pending.length > 0) {
-      const data = pending.join('')
-      pending = []
-      sendMessage(ws, { type: 'output', data })
+    if (pending) {
+      sendMessage(ws, { type: 'output', data: pending })
+      pending = ''
     }
   }
 
   return (data: string) => {
-    pending.push(data)
-    if (timer === null) {
-      timer = setTimeout(flush, OUTPUT_BATCH_MS)
+    pending += data
+    if (!timer) {
+      timer = setTimeout(flush, 4)
     }
   }
 }

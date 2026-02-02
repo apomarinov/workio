@@ -20,7 +20,11 @@ export default defineConfig(({ mode }) => {
         devOptions: {
           enabled: true,
         },
-        includeAssets: ['favicon.svg', 'favicon-active.svg', 'favicon-warning.svg'],
+        includeAssets: [
+          'favicon.svg',
+          'favicon-active.svg',
+          'favicon-warning.svg',
+        ],
         manifest: {
           name: 'WorkIO',
           short_name: 'WorkIO',
