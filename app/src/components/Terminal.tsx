@@ -234,6 +234,14 @@ export function Terminal({ terminalId }: TerminalProps) {
       // Block all input during setup/teardown
       if (isBusyRef.current) return false
 
+      // Shift+Enter → send kitty keyboard protocol sequence so CLI apps
+      // (e.g. Claude Code) can distinguish it from plain Enter and insert a newline.
+      if (event.shiftKey && event.key === 'Enter') {
+        event.preventDefault()
+        sendInputRef.current('\x1b[13;2u')
+        return false
+      }
+
       // Option+Arrow word jumping (macOS) — send Meta-b / Meta-f / ESC-backspace
       if (event.altKey) {
         if (event.key === 'ArrowLeft') {
