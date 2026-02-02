@@ -17,6 +17,7 @@ A developer dashboard that brings together your projects, temrinals, Claude AI s
   - view PR list of all the repos you have projects in
   - view reviews, comments, running/failed checks
   - re request reviews from change requests
+  - re run failed checks
   - merge PRs
 - **Claude**
   - view all running Claude sessions on your system

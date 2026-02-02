@@ -17,6 +17,7 @@ import {
   mergePR,
   refreshPRChecks,
   requestPRReview,
+  rerunFailedCheck,
 } from './github/checks'
 import { setIO } from './io'
 import { initPgListener } from './listen'
@@ -187,6 +188,24 @@ fastify.post<{
   const { owner, repo, pr } = request.params
   const method = request.body?.method || 'squash'
   const result = await mergePR(owner, repo, Number(pr), method)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  refreshPRChecks()
+  return { ok: true }
+})
+
+// Re-run failed check
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { checkUrl: string }
+}>('/api/github/:owner/:repo/pr/:pr/rerun-check', async (request, reply) => {
+  const { owner, repo } = request.params
+  const { checkUrl } = request.body
+  if (!checkUrl) {
+    return reply.status(400).send({ error: 'checkUrl is required' })
+  }
+  const result = await rerunFailedCheck(owner, repo, checkUrl)
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }

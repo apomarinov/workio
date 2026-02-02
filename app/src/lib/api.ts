@@ -283,6 +283,26 @@ export async function mergePR(
   }
 }
 
+export async function rerunFailedCheck(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  checkUrl: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-check`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checkUrl }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to rerun check')
+  }
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,

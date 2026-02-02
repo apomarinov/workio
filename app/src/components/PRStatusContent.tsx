@@ -524,6 +524,11 @@ export function PRStatusContent({
     'squash',
   )
   const [mergeLoading, setMergeLoading] = useState(false)
+  const [rerunCheck, setRerunCheck] = useState<{
+    name: string
+    url: string
+  } | null>(null)
+  const [rerunLoading, setRerunLoading] = useState(false)
 
   const handleMerge = async () => {
     setMergeLoading(true)
@@ -558,6 +563,20 @@ export function PRStatusContent({
     (author: string) => setReReviewAuthor(author),
     [],
   )
+
+  const handleRerunCheck = async () => {
+    if (!rerunCheck) return
+    setRerunLoading(true)
+    try {
+      await api.rerunFailedCheck(owner, repo, pr.prNumber, rerunCheck.url)
+      toast.success('Re-running failed jobs')
+      setRerunCheck(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rerun check')
+    } finally {
+      setRerunLoading(false)
+    }
+  }
 
   const handleHideComment = useCallback(
     (author: string) => setHideAuthor(author),
@@ -616,20 +635,39 @@ export function PRStatusContent({
           <div className="relative flex flex-col gap-0 pl-[13px]">
             <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
             {pr.checks.map((check) => (
-              <a
+              <div
                 key={check.name}
-                href={check.detailsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
+                className="group/check flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors"
               >
-                {check.status === 'IN_PROGRESS' || check.status === 'QUEUED' ? (
-                  <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
-                ) : (
-                  <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+                <a
+                  href={check.detailsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+                >
+                  {check.status === 'IN_PROGRESS' ||
+                  check.status === 'QUEUED' ? (
+                    <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
+                  ) : (
+                    <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+                  )}
+                  <span className="text-xs truncate">{check.name}</span>
+                </a>
+                {check.status === 'COMPLETED' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRerunCheck({
+                        name: check.name,
+                        url: check.detailsUrl,
+                      })
+                    }
+                    className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    Re-run
+                  </button>
                 )}
-                <span className="text-xs truncate">{check.name}</span>
-              </a>
+              </div>
             ))}
 
             {/* Comments */}
@@ -734,6 +772,39 @@ export function PRStatusContent({
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     'Merge'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={rerunCheck !== null}
+            onOpenChange={(open) => {
+              if (!open) setRerunCheck(null)
+            }}
+          >
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Re-run failed check</DialogTitle>
+                <DialogDescription>
+                  Re-run failed jobs for{' '}
+                  <span className="font-medium">{rerunCheck?.name}</span>?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setRerunCheck(null)}
+                  disabled={rerunLoading}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleRerunCheck} disabled={rerunLoading}>
+                  {rerunLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Re-run'
                   )}
                 </Button>
               </DialogFooter>
