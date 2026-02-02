@@ -3,7 +3,6 @@ import {
   ChevronRight,
   ExternalLink,
   GitBranch,
-  GitMerge,
 } from 'lucide-react'
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
@@ -35,9 +34,9 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.isMerged
             ? undefined
             : () => {
-              onToggle()
-              onSeen?.()
-            }
+                onToggle()
+                onSeen?.()
+              }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
@@ -49,6 +48,8 @@ export const PRStatusGroup = memo(function PRStatusGroup({
         ) : prInfo.hasChangesRequested ||
           prInfo.hasRunningChecks ||
           prInfo.hasFailedChecks ||
+          prInfo.isMerged ||
+          prInfo.areAllChecksOk ||
           (prInfo.isApproved && prInfo.hasConflicts) ||
           prInfo.isApproved ||
           prInfo.hasPendingReviews ? (
@@ -86,7 +87,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => { }}
+            onToggle={() => {}}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />
