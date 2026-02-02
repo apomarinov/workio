@@ -37,6 +37,7 @@ export interface PRCheckStatus {
   prNumber: number
   prTitle: string
   prUrl: string
+  prBody: string
   branch: string
   repo: string
   state: 'OPEN' | 'MERGED' | 'CLOSED'

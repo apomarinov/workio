@@ -7,7 +7,11 @@ import {
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
-import { getPRStatusInfo, PRStatusContent, PRTabButton } from './PRStatusContent'
+import {
+  getPRStatusInfo,
+  PRStatusContent,
+  PRTabButton,
+} from './PRStatusContent'
 import { TruncatedPath } from './TruncatedPath'
 
 interface PRStatusGroupProps {
@@ -34,9 +38,9 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.isMerged
             ? undefined
             : () => {
-              onToggle()
-              onSeen?.()
-            }
+                onToggle()
+                onSeen?.()
+              }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
@@ -88,7 +92,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => { }}
+            onToggle={() => {}}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />

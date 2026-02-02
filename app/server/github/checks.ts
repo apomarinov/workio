@@ -103,6 +103,7 @@ async function detectGitHubRepo(
 interface GhPR {
   number: number
   title: string
+  body: string
   headRefName: string
   url: string
   createdAt: string
@@ -147,7 +148,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
         '--state',
         'open',
         '--json',
-        'number,title,headRefName,url,createdAt,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments,mergeable',
+        'number,title,body,headRefName,url,createdAt,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments,mergeable',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -260,6 +261,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
               prNumber: pr.number,
               prTitle: pr.title,
               prUrl: pr.url,
+              prBody: pr.body || '',
               branch: pr.headRefName,
               repo: repoKey,
               state: 'OPEN',
@@ -328,6 +330,7 @@ function fetchMergedPRsForBranches(
               prNumber: pr.number,
               prTitle: pr.title,
               prUrl: pr.url,
+              prBody: '',
               branch: pr.headRefName,
               repo: repoKey,
               state: 'MERGED' as const,

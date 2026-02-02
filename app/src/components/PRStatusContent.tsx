@@ -604,7 +604,10 @@ export function PRStatusContent({
     [],
   )
 
-  const hasContent = hasReviews || hasChecks || hasComments
+  const hasBody = !!pr.prBody
+  const [bodyModalOpen, setBodyModalOpen] = useState(false)
+
+  const hasContent = hasBody || hasReviews || hasChecks || hasComments
 
   // Header-only mode: if no content and no header, nothing to render
   if (!hasHeader && !hasContent) return null
@@ -618,6 +621,24 @@ export function PRStatusContent({
     <>
       {expanded && hasContent && (
         <div className="space-y-0.5">
+          {/* PR Body */}
+          {hasBody && (
+            <div
+              onClick={() => setBodyModalOpen(true)}
+              className="px-2 py-1 text-xs text-sidebar-foreground/70 line-clamp-2 cursor-pointer hover:bg-sidebar-accent/30 rounded transition-colors"
+            >
+              <MarkdownContent content={pr.prBody} />
+            </div>
+          )}
+          {hasBody && (
+            <ContentDialog
+              author={`#${pr.prNumber} ${pr.prTitle}`}
+              content={pr.prBody}
+              open={bodyModalOpen}
+              onOpenChange={setBodyModalOpen}
+            />
+          )}
+
           {/* Reviews */}
           {approvedReviews.map((review) => (
             <ReviewRow
