@@ -17,6 +17,10 @@ interface SessionUpdateEvent {
   messages: unknown[]
 }
 
+interface SessionsDeletedEvent {
+  session_ids: string[]
+}
+
 interface SessionContextValue {
   activeSessionId: string | null
   selectSession: (id: string) => void
@@ -109,6 +113,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       debouncedMerge(data.session_id)
     })
   }, [subscribe, debouncedMerge])
+
+  useEffect(() => {
+    return subscribe<SessionsDeletedEvent>('sessions_deleted', (data) => {
+      const deletedSet = new Set(data.session_ids)
+      mutate((prev) => prev?.filter((s) => !deletedSet.has(s.session_id)), {
+        revalidate: false,
+      })
+      setActiveSessionId((prev) => (prev && deletedSet.has(prev) ? null : prev))
+    })
+  }, [subscribe, mutate])
 
   // Cleanup on unmount
   useEffect(() => {

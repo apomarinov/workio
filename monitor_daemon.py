@@ -116,6 +116,8 @@ def clean_sessions(conn, project_id: int, current_session_id: str) -> None:
     """Remove stale sessions in 'started' status for this project."""
     session_ids = get_stale_session_ids(conn, project_id, current_session_id)
     delete_sessions_cascade(conn, session_ids)
+    if session_ids:
+        notify(conn, "sessions_deleted", {"session_ids": session_ids})
 
 
 def start_debounced_worker(session_id: str) -> None:

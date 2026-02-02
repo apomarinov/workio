@@ -14,6 +14,7 @@ export async function initPgListener(
 
   await listenerClient.query('LISTEN hook')
   await listenerClient.query('LISTEN session_update')
+  await listenerClient.query('LISTEN sessions_deleted')
 
   listenerClient.on('notification', async (msg) => {
     if (!msg.payload) return
@@ -36,6 +37,13 @@ export async function initPgListener(
           `LISTEN: session_update session=${payload.session_id} messages=${messages.length}`,
         )
       }
+
+      if (msg.channel === 'sessions_deleted') {
+        io.emit('sessions_deleted', payload)
+        log.info(
+          `LISTEN: sessions_deleted count=${payload.session_ids?.length}`,
+        )
+      }
     } catch (err) {
       log.error(
         { err, channel: msg.channel },
@@ -51,6 +59,6 @@ export async function initPgListener(
   })
 
   log.info(
-    'LISTEN: connected to PostgreSQL, listening on [hook, session_update]',
+    'LISTEN: connected to PostgreSQL, listening on [hook, session_update, sessions_deleted]',
   )
 }

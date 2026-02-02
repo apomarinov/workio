@@ -6,7 +6,7 @@ Cleanup worker for removing old data from the database and stale files.
 import time
 from pathlib import Path
 
-from db import get_db, log, get_cursor
+from db import get_db, log, get_cursor, notify
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
 LOCKS_DIR = Path(__file__).parent / "locks"
@@ -51,8 +51,8 @@ def delete_old_logs_and_hooks(conn) -> int:
     return logs_deleted + hooks_deleted
 
 
-def delete_old_session_data(conn) -> int:
-    """Delete messages and prompts for sessions older than a week. Returns count deleted."""
+def delete_old_session_data(conn) -> tuple[int, list[str]]:
+    """Delete messages and prompts for sessions older than a week. Returns (count deleted, deleted session IDs)."""
     cur = get_cursor(conn)
     # Get old session IDs
     cur.execute('''
@@ -62,7 +62,7 @@ def delete_old_session_data(conn) -> int:
     old_sessions = cur.fetchall()
 
     if not old_sessions:
-        return 0
+        return 0, []
 
     session_ids = [s['session_id'] for s in old_sessions]
 
@@ -82,7 +82,7 @@ def delete_old_session_data(conn) -> int:
     cur.execute('DELETE FROM sessions WHERE session_id = ANY(%s)', (session_ids,))
     sessions_deleted = cur.rowcount
 
-    return messages_deleted + prompts_deleted + sessions_deleted
+    return messages_deleted + prompts_deleted + sessions_deleted, session_ids
 
 
 def delete_old_messages(conn) -> int:
@@ -104,9 +104,9 @@ def delete_orphan_projects(conn) -> int:
     return cur.rowcount
 
 
-def delete_empty_sessions(conn) -> int:
-    """Delete sessions with no prompts, or only a single null prompt and no messages. Returns count deleted."""
-    cur = conn.cursor()
+def delete_empty_sessions(conn) -> tuple[int, list[str]]:
+    """Delete sessions with no prompts, or only a single null prompt and no messages. Returns (count deleted, deleted session IDs)."""
+    cur = get_cursor(conn)
     # Find sessions that have no prompts, or exactly one null prompt with no messages
     cur.execute('''
         DELETE FROM sessions WHERE session_id IN (
@@ -119,15 +119,16 @@ def delete_empty_sessions(conn) -> int:
                AND MAX(p.prompt) IS NULL
                AND COUNT(m.id) = 0
         )
+        RETURNING session_id
     ''')
-    sessions_deleted = cur.rowcount
+    deleted_ids = [row['session_id'] for row in cur.fetchall()]
 
     # Clean up orphaned prompts (prompts without sessions)
     cur.execute('''
         DELETE FROM prompts WHERE session_id NOT IN (SELECT session_id FROM sessions)
     ''')
 
-    return sessions_deleted
+    return len(deleted_ids), deleted_ids
 
 
 def end_stale_sessions(conn) -> int:
@@ -163,15 +164,18 @@ def cleanup_stale_files(directory: Path, max_age: int) -> int:
 
 def run_data_cleanup(conn) -> None:
     """Run database data cleanup (weekly)."""
-
+    deleted_session_ids: list[str] = []
 
     log(conn, "cleanup empty")
     end_stale_sessions(conn)
-    delete_empty_sessions(conn)
+    _, empty_ids = delete_empty_sessions(conn)
+    deleted_session_ids.extend(empty_ids)
     delete_orphan_projects(conn)
 
     if has_recent_cleanup(conn, 'data', DATA_CLEANUP_INTERVAL):
         log(conn, "skip old cleanup")
+        if deleted_session_ids:
+            notify(conn, "sessions_deleted", {"session_ids": deleted_session_ids})
         conn.commit()
         return
 
@@ -180,8 +184,11 @@ def run_data_cleanup(conn) -> None:
 
     delete_old_messages(conn)
     delete_old_logs_and_hooks(conn)
-    delete_old_session_data(conn)
+    _, old_ids = delete_old_session_data(conn)
+    deleted_session_ids.extend(old_ids)
 
+    if deleted_session_ids:
+        notify(conn, "sessions_deleted", {"session_ids": deleted_session_ids})
     conn.commit()
 
 

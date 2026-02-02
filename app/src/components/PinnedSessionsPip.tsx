@@ -249,7 +249,7 @@ export function PinnedSessionsPip() {
       const dims = getPipDimensions(l)
       if (!dims) return
       try {
-        pip.resize({ width: dims.width, height: dims.height })
+        pip.resize({ width: dims.width, height: dims.height + 34 })
         if (dims.left !== undefined) {
           pip.moveTo(dims.left, dims.top ?? 0)
         }
@@ -350,7 +350,10 @@ export function PinnedSessionsPip() {
                 <div
                   key={session.session_id}
                   className="flex-shrink-0 max-w-[100vw] pinned-sessions"
-                  style={{ width: PIP_CARD_WIDTH[layout] }}
+                  style={{
+                    width: layout === 'vertical' ? '100vw' : PIP_CARD_WIDTH[layout],
+                    maxWidth: '100vw'
+                  }}
                 >
                   <SessionItem
                     session={session}
