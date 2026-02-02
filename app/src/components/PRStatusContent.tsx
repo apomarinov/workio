@@ -41,6 +41,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       label: '',
       colorClass: 'hidden',
       dimColorClass: '',
+      icon: () => <div className="hidden"></div>,
     }
   }
 
@@ -58,9 +59,12 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       c.conclusion !== 'NEUTRAL',
   ).length
   const hasConflicts = pr.mergeable === 'CONFLICTING'
+  const hasPendingReviews =
+    pr.reviews.filter((r) => r.state === 'PENDING').length > 0
 
   if (isMerged)
     return {
+      isMerged,
       label: 'Merged',
       colorClass: 'text-purple-400',
       dimColorClass: 'text-purple-400/60 hover:text-purple-400',
@@ -76,6 +80,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
     }
   if (hasChangesRequested)
     return {
+      hasChangesRequested,
       label: 'Change request',
       colorClass: 'text-orange-400',
       dimColorClass: 'text-orange-400/60 hover:text-orange-400',
@@ -91,6 +96,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
     }
   if (runningChecks > 0)
     return {
+      hasRunningChecks: true,
       label: `Running checks (${runningChecks})`,
       colorClass: 'text-yellow-400',
       dimColorClass: 'text-yellow-400/60 hover:text-yellow-400',
@@ -104,23 +110,10 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (failedChecks > 0)
-    return {
-      label: `Failed checks (${failedChecks})`,
-      colorClass: 'text-red-400',
-      dimColorClass: 'text-red-400/60 hover:text-red-400',
-      icon: (props?: { cls?: string; group?: string }) => (
-        <CircleX
-          className={cn(
-            iconClass,
-            `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
-            props?.cls,
-          )}
-        />
-      ),
-    }
   if (isApproved && hasConflicts)
     return {
+      isApproved,
+      hasConflicts,
       label: 'Conflicts',
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
@@ -136,6 +129,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
     }
   if (isApproved)
     return {
+      isApproved,
       label: 'Approved',
       colorClass: 'text-green-500',
       dimColorClass: 'text-green-500/60 hover:text-green-500',
@@ -149,8 +143,25 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
+  if (failedChecks > 0)
+    return {
+      hasFailedChecks: true,
+      label: `Failed checks (${failedChecks})`,
+      colorClass: 'text-red-400',
+      dimColorClass: 'text-red-400/60 hover:text-red-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <CircleX
+          className={cn(
+            iconClass,
+            `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
+    }
   if (pr.areAllChecksOk)
     return {
+      areAllChecksOk: true,
       label: 'Checks passed',
       colorClass: '',
       dimColorClass: '',
@@ -158,6 +169,16 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         <GitMerge
           className={cn(iconClass, `text-muted-foreground`, props?.cls)}
         />
+      ),
+    }
+  if (hasPendingReviews)
+    return {
+      hasPendingReviews,
+      label: 'Pending Reviews',
+      colorClass: '',
+      dimColorClass: '',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <Clock className={cn(iconClass, `text-muted-foreground`, props?.cls)} />
       ),
     }
   return {

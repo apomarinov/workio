@@ -1,20 +1,14 @@
 import {
-  Check,
   ChevronDown,
   ChevronRight,
-  CircleX,
-  Clock,
   ExternalLink,
   GitBranch,
   GitMerge,
-  GitPullRequestDraft,
-  Loader2,
-  RefreshCw,
 } from 'lucide-react'
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
-import { PRStatusContent } from './PRStatusContent'
+import { getPRStatusInfo, PRStatusContent } from './PRStatusContent'
 import { TruncatedPath } from './TruncatedPath'
 
 interface PRStatusGroupProps {
@@ -32,68 +26,35 @@ export const PRStatusGroup = memo(function PRStatusGroup({
   hasNewActivity,
   onSeen,
 }: PRStatusGroupProps) {
-  const isMerged = pr.state === 'MERGED'
-  const hasRunningChecks = pr.checks.some(
-    (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-  )
-  const hasFailedChecks = pr.checks.some(
-    (c) =>
-      c.status === 'COMPLETED' &&
-      c.conclusion !== 'SUCCESS' &&
-      c.conclusion !== 'SKIPPED' &&
-      c.conclusion !== 'NEUTRAL',
-  )
-  const isApproved = pr.reviewDecision === 'APPROVED'
-  const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
-  const hasConflicts = pr.mergeable === 'CONFLICTING'
-  const hasPendingReviews =
-    pr.reviews.filter((r) => r.state === 'PENDING').length > 0
+  const prInfo = getPRStatusInfo(pr)
 
   return (
     <div data-pr-branch={pr.branch}>
       <div
         onClick={
-          isMerged
+          prInfo.isMerged
             ? undefined
             : () => {
-                onToggle()
-                onSeen?.()
-              }
+              onToggle()
+              onSeen?.()
+            }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
-          !isMerged && 'cursor-pointer',
+          !prInfo.isMerged && 'cursor-pointer',
         )}
       >
-        {isMerged ? (
-          <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-400" />
-        ) : expanded ? (
+        {expanded ? (
           <ChevronDown className="w-4 h-4 flex-shrink-0" />
+        ) : prInfo.hasChangesRequested ||
+          prInfo.hasRunningChecks ||
+          prInfo.hasFailedChecks ||
+          (prInfo.isApproved && prInfo.hasConflicts) ||
+          prInfo.isApproved ||
+          prInfo.hasPendingReviews ? (
+          prInfo.icon({ cls: 'w-4 h-4' })
         ) : (
-          <>
-            {(hasChangesRequested ||
-              hasRunningChecks ||
-              isApproved ||
-              hasFailedChecks ||
-              hasPendingReviews) && (
-              <ChevronRight className="w-4 h-4 flex-shrink-0 hidden group-hover/pr:block" />
-            )}
-            {hasChangesRequested ? (
-              <RefreshCw className="w-4 h-4 flex-shrink-0 text-orange-400/70 group-hover/pr:hidden" />
-            ) : hasRunningChecks ? (
-              <Loader2 className="w-4 h-4 flex-shrink-0 text-yellow-500/70 animate-spin group-hover/pr:hidden" />
-            ) : hasFailedChecks ? (
-              <CircleX className="w-4 h-4 flex-shrink-0 text-red-500/70 group-hover/pr:hidden" />
-            ) : isApproved && hasConflicts ? (
-              <GitPullRequestDraft className="w-4 h-4 flex-shrink-0 text-red-500/70 group-hover/pr:hidden" />
-            ) : isApproved ? (
-              <Check className="w-4 h-4 flex-shrink-0 text-green-500/70 group-hover/pr:hidden" />
-            ) : hasPendingReviews ? (
-              <Clock className="w-4 h-4 opacity-70 group-hover/pr:hidden" />
-            ) : (
-              <ChevronRight className="w-4 h-4 flex-shrink-0" />
-            )}
-          </>
+          <ChevronRight className="w-4 h-4 flex-shrink-0" />
         )}
         <div className="flex-1 min-w-0">
           <span className="text-xs font-medium truncate block">
@@ -120,12 +81,12 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
         )}
       </div>
-      {!isMerged && expanded && (
+      {!prInfo.isMerged && expanded && (
         <div className="ml-4">
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => {}}
+            onToggle={() => { }}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />
