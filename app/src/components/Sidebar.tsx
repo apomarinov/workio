@@ -60,7 +60,7 @@ interface SidebarProps {
 export function Sidebar({ width }: SidebarProps) {
   const pip = useDocumentPip()
   const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
-  const { clearSession, sessions } = useSessionContext()
+  const { clearSession, selectSession, sessions } = useSessionContext()
   const { pinnedSessions, totalCount: pinnedCount } = usePinnedSessionsData()
   const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(
     'pip-layout',
@@ -394,7 +394,9 @@ export function Sidebar({ width }: SidebarProps) {
         ? terminals.find((t) => t.id === session.terminal_id)
         : undefined
 
+
       if (parentTerminal) {
+        selectTerminal(parentTerminal.id)
         // Session is under a terminal - expand terminals section, folder, and terminal sessions
         setTerminalsSectionCollapsed(false)
         if (groupingMode === 'folder') {
@@ -410,6 +412,7 @@ export function Sidebar({ width }: SidebarProps) {
             : [...prev, parentTerminal.id],
         )
       } else {
+        selectSession(session.session_id)
         // Orphan session - expand the "other sessions" section and session group
         setOtherSessionsSectionCollapsed(false)
         setExpandedSessionGroups((prev) =>
@@ -521,9 +524,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Projects
@@ -533,9 +535,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -545,9 +546,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -612,9 +612,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Projects
@@ -624,9 +623,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -636,9 +634,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -802,8 +799,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button

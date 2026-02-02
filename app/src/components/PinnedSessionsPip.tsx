@@ -249,7 +249,7 @@ export function PinnedSessionsPip() {
       const dims = getPipDimensions(l)
       if (!dims) return
       try {
-        pip.resize({ width: dims.width, height: dims.height + 34 })
+        pip.resize({ width: dims.width, height: dims.height })
         if (dims.left !== undefined) {
           pip.moveTo(dims.left, dims.top ?? 0)
         }
@@ -296,7 +296,7 @@ export function PinnedSessionsPip() {
       >
         <div
           className={cn(
-            'flex gap-2 pt-8 px-2',
+            'flex gap-2 px-2',
             layout === 'horizontal' ? 'flex-row' : 'flex-col',
           )}
         >
@@ -319,28 +319,32 @@ export function PinnedSessionsPip() {
       {/* PiP portal content */}
       {pipContainer &&
         createPortal(
-          <div className="relative h-full w-full max-w-[100vw] max-h-[100vh]">
-            <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-zinc-400 hover:text-zinc-200"
-                onClick={handleFit}
-                title="Fit to content"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-              </Button>
-              <SettingsMenu
-                layout={layout}
-                setLayout={handleSetLayout}
-                maxSessions={maxSessions}
-                setMaxSessions={handleSetMaxSessions}
-                portalContainer={pipContainer}
-              />
+          <div className="relative h-full w-full flex max-w-[100vw] max-h-[100vh]">
+            <div className='group/pip rounded-tl-md w-10 h-16 absolute bottom-0 right-0 z-30'>
+              <div className="group-hover/pip:flex group-hover/pip:translate-x-0 transition-all translate-x-[40px]">
+                <div className='flex-col rounded-tl-lg p-2 w-fit h-fit items-start gap-0.5 bg-sidebar'>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-zinc-400 hover:text-zinc-200"
+                    onClick={handleFit}
+                    title="Fit to content"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <SettingsMenu
+                    layout={layout}
+                    setLayout={handleSetLayout}
+                    maxSessions={maxSessions}
+                    setMaxSessions={handleSetMaxSessions}
+                    portalContainer={pipContainer}
+                  />
+                </div>
+              </div>
             </div>
             <div
               className={cn(
-                'flex gap-2 h-full w-full pt-8',
+                'flex gap-2 h-full w-full',
                 layout === 'horizontal'
                   ? 'flex-row overflow-x-auto items-stretch'
                   : 'flex-col overflow-y-auto',
@@ -360,11 +364,9 @@ export function PinnedSessionsPip() {
                     popoverContainer={pipContainer}
                     terminalName={getTerminalName(session.terminal_id)}
                     onClick={() => {
-                      if (session.terminal_id) {
-                        selectTerminal(session.terminal_id)
-                      } else {
-                        selectSession(session.session_id)
-                      }
+                      window.dispatchEvent(
+                        new CustomEvent('reveal-session', { detail: { sessionId: session.session_id } })
+                      )
                     }}
                   />
                 </div>
