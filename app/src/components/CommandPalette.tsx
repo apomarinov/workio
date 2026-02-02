@@ -5,13 +5,19 @@ import {
   Bot,
   Check,
   Command as CommandIcon,
+  Copy,
   CornerDownLeft,
   ExternalLink,
   FolderOpen,
   GitBranch,
+  Pencil,
+  Pin,
+  PinOff,
   TerminalSquare,
+  Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Command,
   CommandEmpty,
@@ -20,19 +26,23 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import type { SessionWithProject, Terminal } from '../types'
+import { ConfirmModal } from './ConfirmModal'
+import { EditSessionModal } from './EditSessionModal'
+import { EditTerminalModal } from './EditTerminalModal'
 import { getPRStatusInfo, PRTabButton } from './PRStatusContent'
 
 type Mode = 'search' | 'actions'
 
-interface ActionTarget {
-  terminal: Terminal
-  pr: PRCheckStatus | null
-}
+type ActionTarget =
+  | { type: 'terminal'; terminal: Terminal; pr: PRCheckStatus | null }
+  | { type: 'session'; session: SessionWithProject }
 
 type ItemInfo =
   | {
@@ -42,7 +52,7 @@ type ItemInfo =
       actionHint: string | null
     }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
-  | { type: 'session'; session: SessionWithProject; actionHint: null }
+  | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
 function getLastPathSegment(cwd: string) {
   return cwd.split('/').filter(Boolean).pop() ?? cwd
@@ -110,8 +120,41 @@ export function CommandPalette() {
   const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
-  const { terminals, selectTerminal, githubPRs } = useTerminalContext()
-  const { sessions, selectSession, clearSession } = useSessionContext()
+  const {
+    terminals,
+    selectTerminal,
+    githubPRs,
+    createTerminal,
+    updateTerminal,
+    deleteTerminal,
+  } = useTerminalContext()
+  const {
+    sessions,
+    selectSession,
+    clearSession,
+    updateSession,
+    deleteSession,
+  } = useSessionContext()
+
+  // Pin state (shared localStorage keys with sidebar)
+  const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
+    number[]
+  >('sidebar-pinned-terminal-sessions', [])
+  const [pinnedSessions, setPinnedSessions] = useLocalStorage<string[]>(
+    'sidebar-pinned-sessions',
+    [],
+  )
+
+  // Modal state for actions that need modals after palette closes
+  const [editTerminal, setEditTerminal] = useState<Terminal | null>(null)
+  const [deleteTerminalTarget, setDeleteTerminalTarget] =
+    useState<Terminal | null>(null)
+  const [deleteDirectory, setDeleteDirectory] = useState(false)
+  const [renameSession, setRenameSession] = useState<SessionWithProject | null>(
+    null,
+  )
+  const [deleteSessionTarget, setDeleteSessionTarget] =
+    useState<SessionWithProject | null>(null)
 
   const openPRs = githubPRs.filter((pr) => pr.state === 'OPEN')
 
@@ -143,7 +186,7 @@ export function CommandPalette() {
         type: 'terminal',
         terminal: t,
         pr,
-        actionHint: t.ssh_host ? null : pr ? 'For actions' : 'Open in Cursor',
+        actionHint: t.ssh_host ? null : 'For actions',
       })
     }
 
@@ -156,7 +199,7 @@ export function CommandPalette() {
     for (const s of sessions) {
       const id = `s:${s.session_id}`
       if (!first) first = id
-      map.set(id, { type: 'session', session: s, actionHint: null })
+      map.set(id, { type: 'session', session: s, actionHint: 'For actions' })
     }
 
     return { itemMap: map, firstId: first }
@@ -256,6 +299,14 @@ export function CommandPalette() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && mode === 'actions') {
+        e.preventDefault()
+        setMode('search')
+        setActionTarget(null)
+        setHighlightedId(null)
+        return
+      }
+
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         e.stopPropagation()
@@ -266,16 +317,23 @@ export function CommandPalette() {
 
         if (highlightedItem.type === 'terminal') {
           if (highlightedItem.terminal.ssh_host) return
-          if (highlightedItem.pr) {
-            setActionTarget({
-              terminal: highlightedItem.terminal,
-              pr: highlightedItem.pr,
-            })
-            setHighlightedId(null)
-            setMode('actions')
-          } else {
-            handleOpenInCursor(highlightedItem.terminal)
-          }
+          setActionTarget({
+            type: 'terminal',
+            terminal: highlightedItem.terminal,
+            pr: highlightedItem.pr,
+          })
+          setHighlightedId(null)
+          setMode('actions')
+          return
+        }
+
+        if (highlightedItem.type === 'session') {
+          setActionTarget({
+            type: 'session',
+            session: highlightedItem.session,
+          })
+          setHighlightedId(null)
+          setMode('actions')
           return
         }
 
@@ -286,7 +344,7 @@ export function CommandPalette() {
         }
       }
     },
-    [mode, highlightedItem, handleOpenInCursor, closePalette],
+    [mode, highlightedItem, closePalette],
   )
 
   const actionHint =
@@ -299,68 +357,187 @@ export function CommandPalette() {
           : null
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <DialogPrimitive.Content
-          aria-description="asd"
-          className="fixed left-[50%] top-[20%] z-50 w-full max-w-xl translate-x-[-50%] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
-          onKeyDownCapture={handleKeyDown}
-          onEscapeKeyDown={handleEscapeKeyDown}
-        >
-          <DialogPrimitive.Title className="sr-only">
-            Command Palette
-          </DialogPrimitive.Title>
-          <Command
-            key={mode}
-            className="bg-transparent"
-            value={highlightedId ?? ''}
-            onValueChange={handleValueChange}
+    <>
+      <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <DialogPrimitive.Content
+            aria-description="asd"
+            className="fixed left-[50%] top-[20%] z-50 w-full max-w-xl translate-x-[-50%] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+            onKeyDownCapture={handleKeyDown}
+            onEscapeKeyDown={handleEscapeKeyDown}
           >
-            {mode === 'search' ? (
-              <SearchView
-                terminals={terminals}
-                openPRs={openPRs}
-                sessions={sessions}
-                branchToPR={branchToPR}
-                onSelectTerminal={handleSelectTerminal}
-                onSelectSession={handleSelectSession}
-                onSelectPR={handleSelectPR}
-              />
-            ) : (
-              <ActionsView
-                target={actionTarget!}
-                onBack={() => {
-                  setMode('search')
-                  setActionTarget(null)
-                  setHighlightedId(null)
-                }}
-                onOpenInCursor={handleOpenInCursor}
-                onOpenPR={handleOpenPR}
-                onClose={closePalette}
-              />
-            )}
-          </Command>
-          <div className="flex items-center justify-between border-t border-zinc-700 px-3 py-2 text-xs text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
-                <CornerDownLeft className="h-3 w-3" />
-              </kbd>
-              to select
-            </span>
-            {actionHint && (
+            <DialogPrimitive.Title className="sr-only">
+              Command Palette
+            </DialogPrimitive.Title>
+            <Command
+              key={mode}
+              className="bg-transparent"
+              value={highlightedId ?? ''}
+              onValueChange={handleValueChange}
+            >
+              {mode === 'search' ? (
+                <SearchView
+                  terminals={terminals}
+                  openPRs={openPRs}
+                  sessions={sessions}
+                  branchToPR={branchToPR}
+                  onSelectTerminal={handleSelectTerminal}
+                  onSelectSession={handleSelectSession}
+                  onSelectPR={handleSelectPR}
+                />
+              ) : (
+                <ActionsView
+                  target={actionTarget!}
+                  onBack={() => {
+                    setMode('search')
+                    setActionTarget(null)
+                    setHighlightedId(null)
+                  }}
+                  onOpenInCursor={handleOpenInCursor}
+                  onOpenPR={handleOpenPR}
+                  onClose={closePalette}
+                  pinnedTerminalSessions={pinnedTerminalSessions}
+                  setPinnedTerminalSessions={setPinnedTerminalSessions}
+                  pinnedSessions={pinnedSessions}
+                  setPinnedSessions={setPinnedSessions}
+                  onAddWorkspace={async (terminal) => {
+                    closePalette()
+                    try {
+                      const newTerminal = await createTerminal({
+                        cwd: '~',
+                        source_terminal_id: terminal.id,
+                      })
+                      selectTerminal(newTerminal.id)
+                      clearSession()
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error
+                          ? err.message
+                          : 'Failed to add workspace',
+                      )
+                    }
+                  }}
+                  onEditTerminal={(terminal) => {
+                    closePalette()
+                    setTimeout(() => setEditTerminal(terminal), 150)
+                  }}
+                  onDeleteTerminal={(terminal) => {
+                    closePalette()
+                    setDeleteDirectory(false)
+                    setTimeout(() => setDeleteTerminalTarget(terminal), 150)
+                  }}
+                  onRenameSession={(session) => {
+                    closePalette()
+                    setTimeout(() => setRenameSession(session), 150)
+                  }}
+                  onDeleteSession={(session) => {
+                    closePalette()
+                    setTimeout(() => setDeleteSessionTarget(session), 150)
+                  }}
+                />
+              )}
+            </Command>
+            <div className="flex items-center justify-between border-t border-zinc-700 px-3 py-2 text-xs text-zinc-500">
               <span className="flex items-center gap-1.5">
-                {actionHint}
-                <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
-                  <CommandIcon className="h-3 w-3" />
+                <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
                   <CornerDownLeft className="h-3 w-3" />
                 </kbd>
+                to select
               </span>
-            )}
-          </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+              {actionHint && (
+                <span className="flex items-center gap-1.5">
+                  {actionHint}
+                  <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
+                    <CommandIcon className="h-3 w-3" />
+                    <CornerDownLeft className="h-3 w-3" />
+                  </kbd>
+                </span>
+              )}
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+
+      {editTerminal && (
+        <EditTerminalModal
+          open={!!editTerminal}
+          terminal={editTerminal}
+          onSave={async (updates) => {
+            try {
+              await updateTerminal(editTerminal.id, updates)
+              setEditTerminal(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error
+                  ? err.message
+                  : 'Failed to update terminal',
+              )
+            }
+          }}
+          onCancel={() => setEditTerminal(null)}
+        />
+      )}
+
+      {deleteTerminalTarget && (
+        <ConfirmModal
+          open={!!deleteTerminalTarget}
+          title="Delete Project"
+          message={`Are you sure you want to delete "${deleteTerminalTarget.name || deleteTerminalTarget.cwd}"?`}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => {
+            deleteTerminal(deleteTerminalTarget.id, { deleteDirectory })
+            setDeleteTerminalTarget(null)
+          }}
+          onCancel={() => setDeleteTerminalTarget(null)}
+        >
+          {deleteTerminalTarget.git_repo && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={deleteDirectory}
+                onCheckedChange={(v) => setDeleteDirectory(v === true)}
+                className="w-5 h-5"
+              />
+              Also delete workspace directory
+            </label>
+          )}
+        </ConfirmModal>
+      )}
+
+      {renameSession && (
+        <EditSessionModal
+          open={!!renameSession}
+          currentName={renameSession.name ?? ''}
+          onSave={async (name) => {
+            try {
+              await updateSession(renameSession.session_id, { name })
+              setRenameSession(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to rename session',
+              )
+            }
+          }}
+          onCancel={() => setRenameSession(null)}
+        />
+      )}
+
+      {deleteSessionTarget && (
+        <ConfirmModal
+          open={!!deleteSessionTarget}
+          title="Delete Session"
+          message={`Are you sure you want to delete this session?`}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => {
+            deleteSession(deleteSessionTarget.session_id)
+            setDeleteSessionTarget(null)
+          }}
+          onCancel={() => setDeleteSessionTarget(null)}
+        />
+      )}
+    </>
   )
 }
 
@@ -507,13 +684,40 @@ function ActionsView({
   onOpenInCursor,
   onOpenPR,
   onClose,
+  pinnedTerminalSessions,
+  setPinnedTerminalSessions,
+  pinnedSessions,
+  setPinnedSessions,
+  onAddWorkspace,
+  onEditTerminal,
+  onDeleteTerminal,
+  onRenameSession,
+  onDeleteSession,
 }: {
   target: ActionTarget
   onBack: () => void
   onOpenInCursor: (terminal: Terminal) => void
   onOpenPR: (pr: PRCheckStatus) => void
   onClose: () => void
+  pinnedTerminalSessions: number[]
+  setPinnedTerminalSessions: (
+    value: number[] | ((prev: number[]) => number[]),
+  ) => void
+  pinnedSessions: string[]
+  setPinnedSessions: (value: string[] | ((prev: string[]) => string[])) => void
+  onAddWorkspace: (terminal: Terminal) => void
+  onEditTerminal: (terminal: Terminal) => void
+  onDeleteTerminal: (terminal: Terminal) => void
+  onRenameSession: (session: SessionWithProject) => void
+  onDeleteSession: (session: SessionWithProject) => void
 }) {
+  const title =
+    target.type === 'terminal'
+      ? target.terminal.name || getLastPathSegment(target.terminal.cwd)
+      : target.session.name ||
+        target.session.latest_user_message ||
+        target.session.session_id
+
   return (
     <>
       <div className="h-0 overflow-hidden">
@@ -527,39 +731,194 @@ function ActionsView({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="text-sm font-medium text-zinc-200">
-          {target.terminal.name || getLastPathSegment(target.terminal.cwd)}
+        <span className="truncate text-sm font-medium text-zinc-200">
+          {title}
         </span>
       </div>
       <CommandList>
         <CommandGroup>
-          {!target.terminal.ssh_host && (
-            <CommandItem
-              className="cursor-pointer"
-              value="action:cursor"
-              onSelect={() => {
-                onOpenInCursor(target.terminal)
-              }}
-            >
-              <FolderOpen className="h-4 w-4 shrink-0 text-zinc-400" />
-              <span>Open in Cursor</span>
-            </CommandItem>
+          {target.type === 'terminal' && (
+            <TerminalActions
+              target={target}
+              onOpenInCursor={onOpenInCursor}
+              onOpenPR={onOpenPR}
+              onClose={onClose}
+              pinnedTerminalSessions={pinnedTerminalSessions}
+              setPinnedTerminalSessions={setPinnedTerminalSessions}
+              onAddWorkspace={onAddWorkspace}
+              onEditTerminal={onEditTerminal}
+              onDeleteTerminal={onDeleteTerminal}
+            />
           )}
-          {target.pr && (
-            <CommandItem
-              className="cursor-pointer"
-              value="action:open-pr"
-              onSelect={() => {
-                onOpenPR(target.pr!)
-                onClose()
-              }}
-            >
-              <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
-              <span>Open PR in new tab</span>
-            </CommandItem>
+          {target.type === 'session' && (
+            <SessionActions
+              target={target}
+              onClose={onClose}
+              pinnedSessions={pinnedSessions}
+              setPinnedSessions={setPinnedSessions}
+              onRenameSession={onRenameSession}
+              onDeleteSession={onDeleteSession}
+            />
           )}
         </CommandGroup>
       </CommandList>
+    </>
+  )
+}
+
+function TerminalActions({
+  target,
+  onOpenInCursor,
+  onOpenPR,
+  onClose,
+  pinnedTerminalSessions,
+  setPinnedTerminalSessions,
+  onAddWorkspace,
+  onEditTerminal,
+  onDeleteTerminal,
+}: {
+  target: { type: 'terminal'; terminal: Terminal; pr: PRCheckStatus | null }
+  onOpenInCursor: (terminal: Terminal) => void
+  onOpenPR: (pr: PRCheckStatus) => void
+  onClose: () => void
+  pinnedTerminalSessions: number[]
+  setPinnedTerminalSessions: (
+    value: number[] | ((prev: number[]) => number[]),
+  ) => void
+  onAddWorkspace: (terminal: Terminal) => void
+  onEditTerminal: (terminal: Terminal) => void
+  onDeleteTerminal: (terminal: Terminal) => void
+}) {
+  const isPinned = pinnedTerminalSessions.includes(target.terminal.id)
+
+  return (
+    <>
+      {!target.terminal.ssh_host && (
+        <CommandItem
+          className="cursor-pointer"
+          value="action:cursor"
+          onSelect={() => onOpenInCursor(target.terminal)}
+        >
+          <FolderOpen className="h-4 w-4 shrink-0 text-zinc-400" />
+          <span>Open in Cursor</span>
+        </CommandItem>
+      )}
+      {target.pr && (
+        <CommandItem
+          className="cursor-pointer"
+          value="action:open-pr"
+          onSelect={() => {
+            onOpenPR(target.pr!)
+            onClose()
+          }}
+        >
+          <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
+          <span>Open PR in new tab</span>
+        </CommandItem>
+      )}
+      {target.terminal.git_repo && (
+        <CommandItem
+          className="cursor-pointer"
+          value="action:add-workspace"
+          onSelect={() => onAddWorkspace(target.terminal)}
+        >
+          <Copy className="h-4 w-4 shrink-0 text-zinc-400" />
+          <span>Add Workspace</span>
+        </CommandItem>
+      )}
+      <CommandItem
+        className="cursor-pointer"
+        value="action:pin"
+        onSelect={() => {
+          setPinnedTerminalSessions((prev) =>
+            prev.includes(target.terminal.id)
+              ? prev.filter((id) => id !== target.terminal.id)
+              : [...prev, target.terminal.id],
+          )
+          onClose()
+        }}
+      >
+        {isPinned ? (
+          <PinOff className="h-4 w-4 shrink-0 text-zinc-400" />
+        ) : (
+          <Pin className="h-4 w-4 shrink-0 text-zinc-400" />
+        )}
+        <span>{isPinned ? 'Unpin Latest Claude' : 'Pin Latest Claude'}</span>
+      </CommandItem>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:edit"
+        onSelect={() => onEditTerminal(target.terminal)}
+      >
+        <Pencil className="h-4 w-4 shrink-0 text-zinc-400" />
+        <span>Edit</span>
+      </CommandItem>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:delete"
+        onSelect={() => onDeleteTerminal(target.terminal)}
+      >
+        <Trash2 className="h-4 w-4 shrink-0 text-red-400" />
+        <span className="text-red-400">Delete</span>
+      </CommandItem>
+    </>
+  )
+}
+
+function SessionActions({
+  target,
+  onClose,
+  pinnedSessions,
+  setPinnedSessions,
+  onRenameSession,
+  onDeleteSession,
+}: {
+  target: { type: 'session'; session: SessionWithProject }
+  onClose: () => void
+  pinnedSessions: string[]
+  setPinnedSessions: (value: string[] | ((prev: string[]) => string[])) => void
+  onRenameSession: (session: SessionWithProject) => void
+  onDeleteSession: (session: SessionWithProject) => void
+}) {
+  const isPinned = pinnedSessions.includes(target.session.session_id)
+
+  return (
+    <>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:pin"
+        onSelect={() => {
+          setPinnedSessions((prev) =>
+            prev.includes(target.session.session_id)
+              ? prev.filter((id) => id !== target.session.session_id)
+              : [...prev, target.session.session_id],
+          )
+          onClose()
+        }}
+      >
+        {isPinned ? (
+          <PinOff className="h-4 w-4 shrink-0 text-zinc-400" />
+        ) : (
+          <Pin className="h-4 w-4 shrink-0 text-zinc-400" />
+        )}
+        <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+      </CommandItem>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:rename"
+        onSelect={() => onRenameSession(target.session)}
+      >
+        <Pencil className="h-4 w-4 shrink-0 text-zinc-400" />
+        <span>Rename</span>
+      </CommandItem>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:delete"
+        onSelect={() => onDeleteSession(target.session)}
+      >
+        <Trash2 className="h-4 w-4 shrink-0 text-red-400" />
+        <span className="text-red-400">Delete</span>
+      </CommandItem>
     </>
   )
 }
