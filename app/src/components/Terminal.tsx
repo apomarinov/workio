@@ -98,17 +98,25 @@ export function Terminal({ terminalId }: TerminalProps) {
     sendResizeRef.current = sendResize
   }, [sendInput, sendResize])
 
-  // Track cursor position for clipboard copy button
+  // Track cursor position for clipboard copy button (throttled to once per frame)
   useEffect(() => {
+    let rafId: number | null = null
     const handler = (e: MouseEvent) => {
-      cursorRef.current = { x: e.clientX, y: e.clientY }
-      if (copyBtnRef.current) {
-        copyBtnRef.current.style.left = `${e.clientX}px`
-        copyBtnRef.current.style.top = `${e.clientY}px`
-      }
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        cursorRef.current = { x: e.clientX, y: e.clientY }
+        if (copyBtnRef.current) {
+          copyBtnRef.current.style.left = `${e.clientX}px`
+          copyBtnRef.current.style.top = `${e.clientY}px`
+        }
+        rafId = null
+      })
     }
     document.addEventListener('mousemove', handler)
-    return () => document.removeEventListener('mousemove', handler)
+    return () => {
+      document.removeEventListener('mousemove', handler)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
   }, [])
 
   // Dismiss clipboard button on Escape (window-level for when terminal loses focus)
@@ -267,21 +275,27 @@ export function Terminal({ terminalId }: TerminalProps) {
       sendInputRef.current(data)
     })
 
-    // Handle resize
+    // Handle resize (debounced via rAF to avoid hammering during drag/layout)
+    let resizeRafId: number | null = null
     const resizeObserver = new ResizeObserver(() => {
-      if (fitAddonRef.current && terminalRef.current) {
-        fitAddonRef.current.fit()
-        // Add extra row and column for better coverage
-        const cols = terminalRef.current.cols + plusCols
-        const rows = terminalRef.current.rows
-        terminalRef.current.resize(cols, rows)
-        setDimensions({ cols, rows })
-        sendResizeRef.current(cols, rows)
-      }
+      if (resizeRafId !== null) cancelAnimationFrame(resizeRafId)
+      resizeRafId = requestAnimationFrame(() => {
+        resizeRafId = null
+        if (fitAddonRef.current && terminalRef.current) {
+          fitAddonRef.current.fit()
+          // Add extra row and column for better coverage
+          const cols = terminalRef.current.cols + plusCols
+          const rows = terminalRef.current.rows
+          terminalRef.current.resize(cols, rows)
+          setDimensions({ cols, rows })
+          sendResizeRef.current(cols, rows)
+        }
+      })
     })
     resizeObserver.observe(containerRef.current)
 
     return () => {
+      if (resizeRafId !== null) cancelAnimationFrame(resizeRafId)
       resizeObserver.disconnect()
       terminal.dispose()
       terminalRef.current = null

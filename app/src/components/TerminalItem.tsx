@@ -27,6 +27,7 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
+import { useProcessContext } from '../context/ProcessContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
@@ -56,14 +57,12 @@ export function TerminalItem({
   const { clearSession } = useSessionContext()
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
+  const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
   const {
-    githubPRs,
-    hasNewActivity,
-    markPRSeen,
     processes: allProcesses,
     terminalPorts,
     gitDirtyStatus,
-  } = useTerminalContext()
+  } = useProcessContext()
   const processes = useMemo(
     () => allProcesses.filter((p) => p.terminalId === terminal.id),
     [allProcesses, terminal.id],

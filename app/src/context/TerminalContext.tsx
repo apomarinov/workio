@@ -9,11 +9,8 @@ import {
 } from 'react'
 import useSWR from 'swr'
 import type {
-  ActiveProcess,
-  GitDirtyPayload,
   PRCheckStatus,
   PRChecksPayload,
-  ProcessesPayload,
   WorkspacePayload,
 } from '../../shared/types'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -55,9 +52,6 @@ interface TerminalContextValue {
   markPRSeen: (pr: PRCheckStatus) => void
   markAllPRsSeen: () => void
   hasAnyUnseenPRs: boolean
-  processes: ActiveProcess[]
-  terminalPorts: Record<number, number[]>
-  gitDirtyStatus: Record<number, { added: number; removed: number }>
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -284,64 +278,6 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [githubPRs, prSeenTimes],
   )
 
-  // Process & port tracking (moved from useProcesses hook)
-  const [processes, setProcesses] = useState<ActiveProcess[]>([])
-  const [terminalPorts, setTerminalPorts] = useState<Record<number, number[]>>(
-    {},
-  )
-  const [gitDirtyStatus, setGitDirtyStatus] = useState<
-    Record<number, { added: number; removed: number }>
-  >({})
-
-  useEffect(() => {
-    return subscribe<GitDirtyPayload>('git:dirty-status', (data) => {
-      setGitDirtyStatus((prev) => {
-        const next = data.dirtyStatus
-        const prevKeys = Object.keys(prev)
-        const nextKeys = Object.keys(next)
-        if (prevKeys.length !== nextKeys.length) return next
-        for (const key of nextKeys) {
-          const p = prev[Number(key)]
-          const n = next[Number(key)]
-          if (!p || !n || p.added !== n.added || p.removed !== n.removed)
-            return next
-        }
-        return prev
-      })
-    })
-  }, [subscribe])
-
-  useEffect(() => {
-    return subscribe<ProcessesPayload>('processes', (data) => {
-      if (data.terminalId !== undefined) {
-        setProcesses((prev) => [
-          ...prev.filter((p) => p.terminalId !== data.terminalId),
-          ...data.processes,
-        ])
-      } else {
-        setProcesses(data.processes)
-      }
-
-      if (data.ports) {
-        setTerminalPorts((prev) => {
-          if (data.terminalId !== undefined) {
-            // Partial update: merge ports for this terminal
-            const next = { ...prev }
-            const ports = data.ports?.[data.terminalId]
-            if (ports && ports.length > 0) {
-              next[data.terminalId] = ports
-            } else {
-              delete next[data.terminalId]
-            }
-            return next
-          }
-          // Full update: replace all ports
-          return data.ports ?? {}
-        })
-      }
-    })
-  }, [subscribe])
-
   const selectTerminal = useCallback((id: number) => {
     setActiveTerminalId((prev) => {
       if (prev !== null && prev !== id) {
@@ -423,9 +359,6 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRSeen,
       markAllPRsSeen,
       hasAnyUnseenPRs,
-      processes,
-      terminalPorts,
-      gitDirtyStatus,
     }),
     [
       terminals,
@@ -443,9 +376,6 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRSeen,
       markAllPRsSeen,
       hasAnyUnseenPRs,
-      processes,
-      terminalPorts,
-      gitDirtyStatus,
     ],
   )
 

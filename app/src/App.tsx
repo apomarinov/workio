@@ -14,6 +14,7 @@ import { Sidebar } from './components/Sidebar'
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
 import { useNotifications } from './context/NotificationContext'
+import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -209,9 +210,11 @@ function App() {
   return (
     <DocumentPipProvider>
       <TerminalProvider>
-        <SessionProvider>
-          <AppContent />
-        </SessionProvider>
+        <ProcessProvider>
+          <SessionProvider>
+            <AppContent />
+          </SessionProvider>
+        </ProcessProvider>
       </TerminalProvider>
     </DocumentPipProvider>
   )
