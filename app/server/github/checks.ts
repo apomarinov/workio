@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 import type {
   FailedPRCheck,
   MergedPRSummary,
@@ -538,6 +540,32 @@ export async function trackTerminal(terminalId: number): Promise<void> {
       }
       await updateTerminal(terminalId, { git_repo: gitRepoObj })
       getIO()?.emit('terminal:workspace', { terminalId, git_repo: gitRepoObj })
+    }
+  }
+
+  // Auto-detect conductor.json for terminals that don't have setup set
+  if (!terminal.setup) {
+    let hasConductor = false
+    if (terminal.ssh_host) {
+      try {
+        const conductorPath = `${terminal.cwd.replace(/\/+$/, '')}/conductor.json`
+        const result = await execSSHCommand(
+          terminal.ssh_host,
+          `test -f "${conductorPath}" && echo "yes"`,
+          terminal.cwd,
+        )
+        hasConductor = result.stdout.trim() === 'yes'
+      } catch {
+        // ignore
+      }
+    } else {
+      hasConductor = fs.existsSync(path.join(terminal.cwd, 'conductor.json'))
+    }
+
+    if (hasConductor) {
+      const setupObj = { conductor: true, status: 'done' as const }
+      await updateTerminal(terminalId, { setup: setupObj })
+      getIO()?.emit('terminal:workspace', { terminalId, setup: setupObj })
     }
   }
 

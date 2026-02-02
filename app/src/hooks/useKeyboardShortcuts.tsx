@@ -1,9 +1,9 @@
 import { ArrowBigUp, ChevronUp, Command, Option } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useDocumentPip } from '@/context/DocumentPipContext'
 import { DEFAULT_KEYMAP, type Keymap, type ShortcutBinding } from '../types'
 import { useSettings } from './useSettings'
-import { useDocumentPip } from '@/context/DocumentPipContext'
 
 type ModifierBuffer = {
   meta: boolean
@@ -156,6 +156,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const togglePipBinding =
     settings?.keymap?.togglePip ?? DEFAULT_KEYMAP.togglePip
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pip.window is needed to re-attach listeners when PiP window changes
   useEffect(() => {
     let modifierBuffer: ModifierBuffer = {
       meta: false,
@@ -326,5 +327,11 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleBlur)
     }
-  }, [paletteBinding, goToTabBinding, goToLastTabBinding, togglePipBinding, pip.window])
+  }, [
+    paletteBinding,
+    goToTabBinding,
+    goToLastTabBinding,
+    togglePipBinding,
+    pip.window,
+  ])
 }

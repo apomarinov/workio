@@ -120,7 +120,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const handleCopyClick = useCallback(() => {
     if (pendingCopyRef.current) {
-      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => { })
+      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => {})
     }
     pendingCopyRef.current = null
     setPendingCopy(null)
@@ -336,12 +336,13 @@ export function Terminal({ terminalId }: TerminalProps) {
         status !== 'connected' && (
           <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
             <span
-              className={`w-2 h-2 rounded-full ${status === 'connecting'
+              className={`w-2 h-2 rounded-full ${
+                status === 'connecting'
                   ? 'bg-yellow-400 animate-pulse'
                   : status === 'error'
                     ? 'bg-red-400'
                     : 'bg-gray-400'
-                }`}
+              }`}
             />
             {status === 'connecting' && 'Connecting...'}
             {status === 'disconnected' && 'Disconnected - Reconnecting...'}
