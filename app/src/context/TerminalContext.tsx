@@ -210,9 +210,16 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         (pr) =>
           pr.updatedAt &&
           pr.updatedAt > lastNotifAt &&
-          !pr.checks.some(
+          (!pr.checks.some(
             (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-          ),
+          ) ||
+            pr.checks.some(
+              (c) =>
+                c.status === 'COMPLETED' &&
+                c.conclusion !== 'SUCCESS' &&
+                c.conclusion !== 'SKIPPED' &&
+                c.conclusion !== 'NEUTRAL',
+            )),
       ).length
       if (unseenCount > 0) {
         const sent = sendNotificationRef.current(

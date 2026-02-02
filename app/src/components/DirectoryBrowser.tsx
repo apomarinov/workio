@@ -1,5 +1,5 @@
 import { ChevronRight, File, Folder, Loader2, ShieldAlert } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -142,7 +142,10 @@ export function DirectoryBrowser({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-sidebar sm:max-w-[90vw] p-0 gap-0 flex flex-col">
+      <DialogContent
+        className="bg-sidebar sm:max-w-[90vw] p-0 gap-0 flex flex-col"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-6 pt-6 pb-3">
           <DialogTitle>Select Folder</DialogTitle>
         </DialogHeader>
@@ -191,6 +194,42 @@ export function DirectoryBrowser({
   )
 }
 
+function ColumnResizeHandle({ onDrag }: { onDrag: (delta: number) => void }) {
+  const [dragging, setDragging] = useState(false)
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      let lastX = e.clientX
+      const saved = document.body.style.userSelect
+      document.body.style.userSelect = 'none'
+      setDragging(true)
+
+      const onMove = (ev: PointerEvent) => {
+        onDrag(ev.clientX - lastX)
+        lastX = ev.clientX
+      }
+      const onUp = () => {
+        document.body.style.userSelect = saved
+        setDragging(false)
+        document.removeEventListener('pointermove', onMove)
+        document.removeEventListener('pointerup', onUp)
+      }
+      document.addEventListener('pointermove', onMove)
+      document.addEventListener('pointerup', onUp)
+    },
+    [onDrag],
+  )
+
+  return (
+    <div
+      className="panel-resize-handle shrink-0 cursor-col-resize"
+      data-resize-handle-state={dragging ? 'drag' : undefined}
+      onPointerDown={handlePointerDown}
+    />
+  )
+}
+
 function ColumnView({
   columns,
   showHidden,
@@ -205,6 +244,16 @@ function ColumnView({
   onSelect: (colIndex: number, dirName: string) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [columnWidths, setColumnWidths] = useState<number[]>([])
+
+  // Sync widths array with columns
+  useEffect(() => {
+    setColumnWidths((prev) => {
+      const next = [...prev]
+      while (next.length < columns.length) next.push(300)
+      return next.slice(0, columns.length)
+    })
+  }, [columns.length])
 
   // Auto-scroll rightmost column into view
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when column count changes
@@ -214,22 +263,37 @@ function ColumnView({
     }
   }, [columns.length])
 
+  const handleDrag = useCallback((colIndex: number, delta: number) => {
+    setColumnWidths((prev) => {
+      const next = [...prev]
+      next[colIndex] = Math.max(150, (next[colIndex] || 300) + delta)
+      return next
+    })
+  }, [])
+
   return (
     <div
       ref={containerRef}
       className="flex overflow-x-auto h-[70vh] border-t border-b"
     >
       {columns.map((col, i) => (
-        <BrowserColumn
-          key={`${col.path}-${hiddenVersion}`}
-          path={col.path}
-          selectedDir={col.selectedDir}
-          showHidden={showHidden}
-          sshHost={sshHost}
-          initialEntries={col.initialEntries}
-          initialHasMore={col.initialHasMore}
-          onSelectDir={(dirName) => onSelect(i, dirName)}
-        />
+        <Fragment key={`${col.path}-${hiddenVersion}`}>
+          <div
+            className="h-full shrink-0"
+            style={{ width: columnWidths[i] || 300 }}
+          >
+            <BrowserColumn
+              path={col.path}
+              selectedDir={col.selectedDir}
+              showHidden={showHidden}
+              sshHost={sshHost}
+              initialEntries={col.initialEntries}
+              initialHasMore={col.initialHasMore}
+              onSelectDir={(dirName) => onSelect(i, dirName)}
+            />
+          </div>
+          <ColumnResizeHandle onDrag={(delta) => handleDrag(i, delta)} />
+        </Fragment>
       ))}
     </div>
   )
@@ -326,7 +390,7 @@ function BrowserColumn({
 
   if (loading) {
     return (
-      <div className="w-[300px] min-w-[300px] h-full border-r flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     )
@@ -336,7 +400,7 @@ function BrowserColumn({
     const isPermissionError = error.startsWith('permission_denied')
     const parentApp = isPermissionError ? error.split(':')[1] || null : null
     return (
-      <div className="w-[300px] min-w-[300px] h-full border-r flex flex-col items-center justify-center gap-3 px-6">
+      <div className="h-full flex flex-col items-center justify-center gap-3 px-6">
         {isPermissionError ? (
           <>
             <ShieldAlert className="w-5 h-5 text-muted-foreground" />
@@ -368,17 +432,14 @@ function BrowserColumn({
 
   if (entries.length === 0) {
     return (
-      <div className="w-[300px] min-w-[300px] h-full border-r flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <p className="text-sm text-muted-foreground">Empty</p>
       </div>
     )
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="w-[300px] min-w-[300px] h-full border-r overflow-y-auto"
-    >
+    <div ref={containerRef} className="h-full overflow-y-auto">
       {entries.map((entry) => (
         <div
           key={entry.name}

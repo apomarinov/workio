@@ -200,9 +200,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
