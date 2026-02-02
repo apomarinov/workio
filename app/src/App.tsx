@@ -61,6 +61,9 @@ function AppContent() {
     palette: () => {
       window.dispatchEvent(new Event('open-palette'))
     },
+    togglePip: () => {
+      window.dispatchEvent(new Event('toggle-pip'))
+    },
   })
 
   // Example: Change favicon based on session status

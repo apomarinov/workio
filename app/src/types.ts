@@ -232,12 +232,14 @@ export interface Keymap {
   palette: ShortcutBinding
   goToTab: ShortcutBinding
   goToLastTab: ShortcutBinding
+  togglePip: ShortcutBinding
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
   palette: { metaKey: true, key: 'k' },
   goToTab: { metaKey: true },
   goToLastTab: { metaKey: true, shiftKey: true },
+  togglePip: { metaKey: true, key: 'p' },
 }
 
 export interface Settings {

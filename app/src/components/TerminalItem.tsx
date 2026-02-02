@@ -73,8 +73,8 @@ export function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-          ) ??
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
@@ -204,10 +204,9 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
             ((!hasSessions &&
               !hasProcesses &&
@@ -216,13 +215,13 @@ export function TerminalItem({
               !isDirty) ||
               isSettingUp ||
               isDeleting) &&
-              'pl-2.5',
+            'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
           {!isSettingUp &&
-          !isDeleting &&
-          (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
+            !isDeleting &&
+            (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -271,7 +270,7 @@ export function TerminalItem({
             )}
             {terminal.git_repo?.status === 'setup' && (
               <div className="text-[10px] text-blue-400">
-                Cloning repository...
+                Preparing workspace...
               </div>
             )}
             {terminal.git_repo?.status === 'done' && (

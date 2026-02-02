@@ -210,6 +210,20 @@ export function PinnedSessionsPip() {
     }
   }, [totalCount, pip.isOpen, pip.close])
 
+  // Close PiP on Escape key press inside the PiP window
+  useEffect(() => {
+    const pipWin = pip.window
+    if (!pipWin) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        pip.closeAll()
+      }
+    }
+    pipWin.addEventListener('keydown', handleKeyDown)
+    return () => pipWin.removeEventListener('keydown', handleKeyDown)
+  }, [pip.window, pip.closeAll])
+
   const cappedSessions = useMemo(() => {
     if (maxSessions > 0) return pinnedSessions.slice(0, maxSessions)
     return pinnedSessions

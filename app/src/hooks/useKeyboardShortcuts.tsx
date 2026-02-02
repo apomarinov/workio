@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { DEFAULT_KEYMAP, type Keymap, type ShortcutBinding } from '../types'
 import { useSettings } from './useSettings'
+import { useDocumentPip } from '@/context/DocumentPipContext'
 
 type ModifierBuffer = {
   meta: boolean
@@ -137,12 +138,14 @@ interface KeymapHandlers {
   palette?: (e: KeyboardEvent) => void
   goToTab?: (index: number) => void
   goToLastTab?: () => void
+  togglePip?: () => void
 }
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
 
 export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const { settings } = useSettings()
+  const pip = useDocumentPip()
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
 
@@ -150,6 +153,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const goToTabBinding = settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab
   const goToLastTabBinding =
     settings?.keymap?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab
+  const togglePipBinding =
+    settings?.keymap?.togglePip ?? DEFAULT_KEYMAP.togglePip
 
   useEffect(() => {
     let modifierBuffer: ModifierBuffer = {
@@ -183,7 +188,6 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
         }
         return
       }
-
       // Non-modifier key while a modifier sequence is active
       if (active) {
         if (consumed || heldNonModKeys.has(e.code)) return
@@ -203,6 +207,21 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           e.preventDefault()
           e.stopPropagation()
           h.palette(new KeyboardEvent('keydown'))
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check togglePip: modifiers + accumulated keys match binding
+        if (
+          h.togglePip &&
+          togglePipBinding.key &&
+          modifiersMatchBinding(modifierBuffer, togglePipBinding) &&
+          keyBuffer.join('') === togglePipBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.togglePip()
           consumed = true
           suppressModifiers()
           return
@@ -307,5 +326,5 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleBlur)
     }
-  }, [paletteBinding, goToTabBinding, goToLastTabBinding])
+  }, [paletteBinding, goToTabBinding, goToLastTabBinding, togglePipBinding, pip.window])
 }
