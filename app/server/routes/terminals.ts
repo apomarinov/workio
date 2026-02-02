@@ -541,13 +541,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
     const deleteDirectory = !!request.query.deleteDirectory
 
-    // Kill PTY session if running
-    const killed = destroySession(id)
-    if (killed) {
-      log.info(`[terminals] Killed PTY session for terminal ${id}`)
-    }
-
     // Setup with delete script or conductor: run delete script async, then delete
+    // Don't destroy session — teardown script will run in it
     const hasDeleteFlow =
       deleteDirectory &&
       terminal.setup &&
@@ -565,6 +560,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       )
       refreshPRChecks()
       return reply.status(202).send()
+    }
+
+    // Kill PTY session for non-delete-flow paths
+    const killed = destroySession(id)
+    if (killed) {
+      log.info(`[terminals] Killed PTY session for terminal ${id}`)
     }
 
     // Delete workspace directory if requested

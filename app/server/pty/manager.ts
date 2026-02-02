@@ -32,6 +32,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const MAX_BUFFER_LINES = 5000
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+const LONG_TIMEOUT = 300_000 // 5 min for setup/teardown operations
 
 const COMMAND_IGNORE_LIST = ['claude']
 
@@ -48,6 +49,7 @@ export interface PtySession {
   currentCommand: string | null
   isIdle: boolean
   lastActiveProcesses: string // For change detection
+  onDoneMarker: ((exitCode: number) => void) | null
 }
 
 // In-memory map of active PTY sessions
@@ -433,6 +435,7 @@ export async function createSession(
     currentCommand: null,
     isIdle: true,
     lastActiveProcesses: '',
+    onDoneMarker: null,
   }
 
   // Create OSC parser to intercept command events
@@ -455,6 +458,13 @@ export async function createSession(
           session.currentCommand = null
           updateTerminal(terminalId, { active_cmd: null }).catch(() => {})
           log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
+          break
+        case 'done_marker':
+          if (session.onDoneMarker) {
+            const cb = session.onDoneMarker
+            session.onDoneMarker = null
+            cb(event.exitCode ?? 0)
+          }
           break
         case 'command_start':
           session.isIdle = false
@@ -700,4 +710,53 @@ export function attachSession(
     session.onCommandEvent = onCommandEvent
   }
   return true
+}
+
+export function waitForMarker(terminalId: number): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const session = sessions.get(terminalId)
+    if (!session) {
+      resolve(0)
+      return
+    }
+    const timeout = setTimeout(() => {
+      session.onDoneMarker = null
+      reject(new Error(`waitForMarker timed out for terminal ${terminalId}`))
+    }, LONG_TIMEOUT)
+    session.onDoneMarker = (exitCode: number) => {
+      clearTimeout(timeout)
+      resolve(exitCode)
+    }
+  })
+}
+
+export function waitForSession(
+  terminalId: number,
+  timeoutMs: number,
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    if (sessions.has(terminalId)) {
+      resolve(true)
+      return
+    }
+    const start = Date.now()
+    const interval = setInterval(() => {
+      if (sessions.has(terminalId)) {
+        clearInterval(interval)
+        resolve(true)
+        return
+      }
+      if (Date.now() - start >= timeoutMs) {
+        clearInterval(interval)
+        resolve(false)
+      }
+    }, 500)
+  })
+}
+
+export function interruptSession(terminalId: number): void {
+  const session = sessions.get(terminalId)
+  if (session) {
+    session.pty.write('\x03')
+  }
 }

@@ -7,6 +7,14 @@ import { promisify } from 'node:util'
 import { deleteTerminal, getTerminalById, updateTerminal } from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
+import {
+  destroySession,
+  getSession,
+  interruptSession,
+  waitForMarker,
+  waitForSession,
+  writeToSession,
+} from '../pty/manager'
 import { execSSHCommand } from '../ssh/exec'
 
 const execFile = promisify(execFileCb)
@@ -398,14 +406,6 @@ async function resolveScripts(
   return { setupScript, deleteScript }
 }
 
-async function runScript(
-  scriptPath: string,
-  cwd: string,
-  sshHost: string | null,
-): Promise<void> {
-  await runCmd('bash', [scriptPath], cwd, sshHost, LONG_TIMEOUT)
-}
-
 // ---------------------------------------------------------------------------
 // Setup workspace (fire-and-forget from route handler)
 // ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ export async function setupTerminalWorkspace(
     await updateTerminal(terminalId, { git_repo: gitRepoObj })
     emitWorkspace(terminalId, { name: terminalName, git_repo: gitRepoObj })
 
-    // Run setup script if configured
+    // Run setup script if configured — inject into PTY so output is visible
     if (setupObj) {
       const { setupScript } = await resolveScripts(
         setupObj,
@@ -552,7 +552,17 @@ export async function setupTerminalWorkspace(
         sshHost,
       )
       if (setupScript) {
-        await runScript(setupScript, targetPath, sshHost)
+        const hasSession = await waitForSession(terminalId, 30_000)
+        if (hasSession) {
+          writeToSession(
+            terminalId,
+            `cd "${targetPath}" && bash "${setupScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
+          )
+          const exitCode = await waitForMarker(terminalId)
+          if (exitCode !== 0) {
+            throw new Error(`Setup script exited with code ${exitCode}`)
+          }
+        }
       }
       const doneSetup = { ...setupObj, status: 'done' as const }
       await updateTerminal(terminalId, { setup: doneSetup })
@@ -594,20 +604,31 @@ export async function deleteTerminalWorkspace(
   const sshHost = terminal.ssh_host ?? null
 
   try {
-    // Run delete script if configured
+    // Run delete script if configured — inject into PTY so output is visible
     const { deleteScript } = await resolveScripts(
       terminal.setup as SetupObj | null,
       terminal.cwd,
       sshHost,
     )
     if (deleteScript) {
-      await runScript(deleteScript, terminal.cwd, sshHost)
+      const session = getSession(terminalId)
+      if (session) {
+        interruptSession(terminalId)
+        await new Promise((r) => setTimeout(r, 300))
+        writeToSession(
+          terminalId,
+          `cd "${terminal.cwd}" && bash "${deleteScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
+        )
+        const exitCode = await waitForMarker(terminalId)
+        if (exitCode !== 0) {
+          throw new Error(`Teardown script exited with code ${exitCode}`)
+        }
+      }
     }
 
-    // Remove workspace directory
+    // Cleanup: destroy session, remove files, delete from DB
+    destroySession(terminalId)
     await rmrf(terminal.cwd, sshHost)
-
-    // Delete terminal from DB
     await deleteTerminal(terminalId)
 
     // Notify clients

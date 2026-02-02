@@ -2,7 +2,7 @@
 // Parses OSC escape sequences from terminal output to extract command events
 
 export interface CommandEvent {
-  type: 'prompt' | 'command_start' | 'command_end'
+  type: 'prompt' | 'command_start' | 'command_end' | 'done_marker'
   command?: string // For command_start
   exitCode?: number // For command_end
 }
@@ -72,7 +72,12 @@ export function createOscParser(
       if (typePos >= data.length) break
 
       const typeChar = data[typePos]
-      if (typeChar !== 'A' && typeChar !== 'C' && typeChar !== 'D') {
+      if (
+        typeChar !== 'A' &&
+        typeChar !== 'C' &&
+        typeChar !== 'D' &&
+        typeChar !== 'Z'
+      ) {
         pos = escPos + 1
         continue
       }
@@ -131,6 +136,12 @@ export function createOscParser(
         case 'D':
           onCommandEvent({
             type: 'command_end',
+            exitCode: payload ? Number.parseInt(payload, 10) : 0,
+          })
+          break
+        case 'Z':
+          onCommandEvent({
+            type: 'done_marker',
             exitCode: payload ? Number.parseInt(payload, 10) : 0,
           })
           break

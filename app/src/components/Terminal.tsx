@@ -3,7 +3,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { Loader2, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DEFAULT_FONT_SIZE } from '../constants'
@@ -18,10 +18,11 @@ interface TerminalProps {
 
 export function Terminal({ terminalId }: TerminalProps) {
   const { activeTerminal, selectTerminal } = useTerminalContext()
-  const isSettingUp =
-    activeTerminal?.git_repo?.status === 'setup' ||
-    activeTerminal?.setup?.status === 'setup' ||
-    activeTerminal?.setup?.status === 'delete'
+  const isCloning = activeTerminal?.git_repo?.status === 'setup'
+  const isSettingUp = activeTerminal?.setup?.status === 'setup'
+  const isDeleting = activeTerminal?.setup?.status === 'delete'
+  const isBusy = isCloning || isSettingUp || isDeleting
+  const isBusyRef = useRef(isBusy)
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -41,6 +42,11 @@ export function Terminal({ terminalId }: TerminalProps) {
   useEffect(() => {
     fontSizeRef.current = fontSize
   }, [fontSize])
+
+  // Keep isBusyRef in sync so the onData closure can read it
+  useEffect(() => {
+    isBusyRef.current = isBusy
+  }, [isBusy])
 
   const handleData = useCallback((data: string) => {
     terminalRef.current?.write(data)
@@ -64,7 +70,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
   const plusCols = 0
   const { status, sendInput, sendResize } = useTerminalSocket({
-    terminalId: isSettingUp ? null : terminalId,
+    terminalId: isCloning ? null : terminalId,
     cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
     onData: handleData,
@@ -217,6 +223,9 @@ export function Terminal({ terminalId }: TerminalProps) {
         return false
       }
 
+      // Block all input during setup/teardown
+      if (isBusyRef.current) return false
+
       // Option+Arrow word jumping (macOS) — send Meta-b / Meta-f / ESC-backspace
       if (event.altKey) {
         if (event.key === 'ArrowLeft') {
@@ -254,6 +263,7 @@ export function Terminal({ terminalId }: TerminalProps) {
 
     // Handle input - use ref to avoid stale closure
     terminal.onData((data) => {
+      if (isBusyRef.current) return
       sendInputRef.current(data)
     })
 
@@ -318,19 +328,6 @@ export function Terminal({ terminalId }: TerminalProps) {
             onCreated={(id) => selectTerminal(id)}
           />
         </div>
-      ) : isSettingUp ? (
-        <div className="flex-1 flex flex-col items-center justify-center w-full h-full gap-3 text-gray-400">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span className="text-sm">
-            {activeTerminal?.git_repo?.status === 'setup'
-              ? 'Preparing workspace...'
-              : activeTerminal?.setup?.status === 'setup'
-                ? 'Running setup...'
-                : activeTerminal?.setup?.status === 'delete'
-                  ? 'Running teardown...'
-                  : ''}
-          </span>
-        </div>
       ) : (
         showStatus &&
         status !== 'connected' && (
@@ -352,7 +349,7 @@ export function Terminal({ terminalId }: TerminalProps) {
       )}
       <div
         ref={containerRef}
-        className={`flex-1 min-h-0 overflow-hidden ${terminalId === null || isSettingUp ? 'hidden' : ''}`}
+        className={`flex-1 min-h-0 overflow-hidden ${terminalId === null ? 'hidden' : ''}`}
       />
       {pendingCopy !== null && (
         <button
