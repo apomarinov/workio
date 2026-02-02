@@ -36,11 +36,11 @@ interface ActionTarget {
 
 type ItemInfo =
   | {
-      type: 'terminal'
-      terminal: Terminal
-      pr: PRCheckStatus | null
-      actionHint: string | null
-    }
+    type: 'terminal'
+    terminal: Terminal
+    pr: PRCheckStatus | null
+    actionHint: string | null
+  }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: null }
 
@@ -383,14 +383,14 @@ function SearchView({
   return (
     <>
       <CommandInput
-        placeholder="Search terminals, PRs, Claude sessions..."
+        placeholder="Search projects, PRs, Claude sessions..."
         autoFocus
       />
       <CommandList className="max-h-[360px]">
         <CommandEmpty>No results found.</CommandEmpty>
 
         {terminals.length > 0 && (
-          <CommandGroup heading="Terminals">
+          <CommandGroup heading="Projects">
             {terminals.map((t) => {
               const matchedPR = t.git_branch
                 ? (branchToPR.get(t.git_branch) ?? null)
@@ -467,7 +467,7 @@ function SearchView({
         )}
 
         {sessions.length > 0 && (
-          <CommandGroup heading="Sessions">
+          <CommandGroup heading="Claude Sessions">
             {sessions.map((s) => (
               <CommandItem
                 className="cursor-pointer"

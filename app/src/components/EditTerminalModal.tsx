@@ -47,7 +47,7 @@ export function EditTerminalModal({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <DialogContent className="bg-sidebar">
         <DialogHeader>
-          <DialogTitle>Edit Terminal</DialogTitle>
+          <DialogTitle>Edit Project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="space-y-2">
@@ -58,7 +58,7 @@ export function EditTerminalModal({
               id="edit-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Terminal name"
+              placeholder="Name"
               autoFocus
             />
           </div>

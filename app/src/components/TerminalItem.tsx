@@ -536,7 +536,7 @@ export function TerminalItem({
 
       <ConfirmModal
         open={showDeleteModal}
-        title="Delete Terminal"
+        title="Delete Project"
         message={`Are you sure you want to delete "${displayName}"?`}
         confirmLabel="Delete"
         variant="danger"

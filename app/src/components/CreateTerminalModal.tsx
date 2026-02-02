@@ -234,7 +234,7 @@ export function CreateTerminalModal({
       onCreated?.(terminal.id)
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Failed to create terminal',
+        err instanceof Error ? err.message : 'Failed to create project',
       )
     } finally {
       setCreating(false)
@@ -244,17 +244,17 @@ export function CreateTerminalModal({
   // Filter repos client-side based on current search
   const filteredRepos = repoSearch.trim()
     ? repos.filter((r) =>
-        r.toLowerCase().includes(repoSearch.trim().toLowerCase()),
-      )
+      r.toLowerCase().includes(repoSearch.trim().toLowerCase()),
+    )
     : repos
 
   // Show the typed value as an option if it looks like owner/repo and isn't in the list
   const manualEntry =
     repoSearch.trim() &&
-    repoSearch.includes('/') &&
-    !filteredRepos.some(
-      (r) => r.toLowerCase() === repoSearch.trim().toLowerCase(),
-    )
+      repoSearch.includes('/') &&
+      !filteredRepos.some(
+        (r) => r.toLowerCase() === repoSearch.trim().toLowerCase(),
+      )
       ? repoSearch.trim()
       : null
 
@@ -262,7 +262,7 @@ export function CreateTerminalModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="bg-sidebar max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Terminal</DialogTitle>
+          <DialogTitle>New Project</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

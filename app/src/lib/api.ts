@@ -52,7 +52,7 @@ export async function createTerminal(opts: {
   })
   if (!res.ok) {
     const data = await res.json()
-    throw new Error(data.error || 'Failed to create terminal')
+    throw new Error(data.error || 'Failed to create project')
   }
   return res.json()
 }
