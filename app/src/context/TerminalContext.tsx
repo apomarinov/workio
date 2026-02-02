@@ -37,10 +37,7 @@ interface TerminalContextValue {
     delete_script?: string
     source_terminal_id?: number
   }) => Promise<Terminal>
-  updateTerminal: (
-    id: number,
-    updates: { name?: string; cwd?: string },
-  ) => Promise<Terminal>
+  updateTerminal: (id: number, updates: { name?: string }) => Promise<Terminal>
   deleteTerminal: (
     id: number,
     opts?: { deleteDirectory?: boolean },
@@ -320,7 +317,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   )
 
   const updateTerminal = useCallback(
-    async (id: number, updates: { name?: string; cwd?: string }) => {
+    async (id: number, updates: { name?: string }) => {
       const updated = await api.updateTerminal(id, updates)
       mutate((prev) => prev?.map((t) => (t.id === id ? updated : t)), false)
       return updated

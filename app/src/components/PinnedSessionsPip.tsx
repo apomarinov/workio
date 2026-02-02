@@ -191,8 +191,7 @@ function SettingsMenu({
 
 export function PinnedSessionsPip() {
   const pip = useDocumentPip()
-  const { selectTerminal, terminals } = useTerminalContext()
-  const { selectSession } = useSessionContext()
+  const { terminals } = useTerminalContext()
   const { pinnedSessions, totalCount } = usePinnedSessionsData()
 
   const getTerminalName = useCallback(
@@ -320,9 +319,9 @@ export function PinnedSessionsPip() {
       {pipContainer &&
         createPortal(
           <div className="relative h-full w-full flex max-w-[100vw] max-h-[100vh]">
-            <div className='group/pip rounded-tl-md w-10 h-16 absolute bottom-0 right-0 z-30'>
+            <div className="group/pip rounded-tl-md w-10 h-16 absolute bottom-0 right-0 z-30">
               <div className="group-hover/pip:flex group-hover/pip:translate-x-0 transition-all translate-x-[40px]">
-                <div className='flex-col rounded-tl-lg p-2 w-fit h-fit items-start gap-0.5 bg-sidebar'>
+                <div className="flex-col rounded-tl-lg p-2 w-fit h-fit items-start gap-0.5 bg-sidebar">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -355,8 +354,9 @@ export function PinnedSessionsPip() {
                   key={session.session_id}
                   className="flex-shrink-0 max-w-[100vw] pinned-sessions"
                   style={{
-                    width: layout === 'vertical' ? '100vw' : PIP_CARD_WIDTH[layout],
-                    maxWidth: '100vw'
+                    width:
+                      layout === 'vertical' ? '100vw' : PIP_CARD_WIDTH[layout],
+                    maxWidth: '100vw',
                   }}
                 >
                   <SessionItem
@@ -365,7 +365,9 @@ export function PinnedSessionsPip() {
                     terminalName={getTerminalName(session.terminal_id)}
                     onClick={() => {
                       window.dispatchEvent(
-                        new CustomEvent('reveal-session', { detail: { sessionId: session.session_id } })
+                        new CustomEvent('reveal-session', {
+                          detail: { sessionId: session.session_id },
+                        }),
                       )
                     }}
                   />

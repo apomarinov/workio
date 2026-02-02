@@ -59,7 +59,7 @@ export async function createTerminal(opts: {
 
 export async function updateTerminal(
   id: number,
-  updates: { name?: string; cwd?: string },
+  updates: { name?: string },
 ): Promise<Terminal> {
   const res = await fetch(`${API_BASE}/terminals/${id}`, {
     method: 'PATCH',
