@@ -130,6 +130,17 @@ def delete_empty_sessions(conn) -> int:
     return sessions_deleted
 
 
+def end_stale_sessions(conn) -> int:
+    """Set active sessions to 'ended' if not updated in 10 minutes. Returns count updated."""
+    cur = conn.cursor()
+    cur.execute('''
+        UPDATE sessions SET status = 'ended'
+        WHERE (status = 'started' or status = 'active')
+          AND updated_at < NOW() - INTERVAL '10 minutes'
+    ''')
+    return cur.rowcount
+
+
 def cleanup_stale_files(directory: Path, max_age: int) -> int:
     """Delete files older than max_age seconds. Returns count deleted."""
     if not directory.exists():
@@ -153,7 +164,9 @@ def cleanup_stale_files(directory: Path, max_age: int) -> int:
 def run_data_cleanup(conn) -> None:
     """Run database data cleanup (weekly)."""
 
+
     log(conn, "cleanup empty")
+    end_stale_sessions(conn)
     delete_empty_sessions(conn)
     delete_orphan_projects(conn)
 
