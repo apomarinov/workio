@@ -207,7 +207,12 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       // Browser notification for new PR activity
       const lastNotifAt = localStorage.getItem('pr-activity-notif-at') ?? ''
       const unseenCount = data.prs.filter(
-        (pr) => pr.updatedAt && pr.updatedAt > lastNotifAt,
+        (pr) =>
+          pr.updatedAt &&
+          pr.updatedAt > lastNotifAt &&
+          !pr.checks.some(
+            (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+          ),
       ).length
       if (unseenCount > 0) {
         const sent = sendNotificationRef.current(

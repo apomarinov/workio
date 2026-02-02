@@ -191,9 +191,18 @@ function SettingsMenu({
 
 export function PinnedSessionsPip() {
   const pip = useDocumentPip()
-  const { selectTerminal } = useTerminalContext()
+  const { selectTerminal, terminals } = useTerminalContext()
   const { selectSession } = useSessionContext()
   const { pinnedSessions, totalCount } = usePinnedSessionsData()
+
+  const getTerminalName = useCallback(
+    (terminalId: number | null) => {
+      if (!terminalId) return null
+      const t = terminals.find((t) => t.id === terminalId)
+      return t ? t.name || t.cwd || null : null
+    },
+    [terminals],
+  )
   const [layout, setLayout] = useLocalStorage<'horizontal' | 'vertical'>(
     'pip-layout',
     'horizontal',
@@ -297,7 +306,11 @@ export function PinnedSessionsPip() {
               className="flex-shrink-0"
               style={{ width: PIP_CARD_WIDTH[layout] }}
             >
-              <SessionItem session={session} popoverContainer={document.body} />
+              <SessionItem
+                session={session}
+                terminalName={getTerminalName(session.terminal_id)}
+                popoverContainer={document.body}
+              />
             </div>
           ))}
         </div>
@@ -342,6 +355,7 @@ export function PinnedSessionsPip() {
                   <SessionItem
                     session={session}
                     popoverContainer={pipContainer}
+                    terminalName={getTerminalName(session.terminal_id)}
                     onClick={() => {
                       if (session.terminal_id) {
                         selectTerminal(session.terminal_id)

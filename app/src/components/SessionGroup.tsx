@@ -11,6 +11,7 @@ interface SessionGroupProps {
   projectPath: string
   sessions: SessionWithProject[]
   expanded: boolean
+  defaultCollapsed?: boolean
   onToggle: () => void
 }
 
@@ -18,6 +19,7 @@ export const SessionGroup = memo(function SessionGroup({
   projectPath,
   sessions,
   expanded,
+  defaultCollapsed,
   onToggle,
 }: SessionGroupProps) {
   const { deleteSessions } = useSessionContext()
@@ -69,7 +71,11 @@ export const SessionGroup = memo(function SessionGroup({
         {expanded && (
           <div className="ml-4 mt-1 space-y-0.5">
             {sessions.map((session) => (
-              <SessionItem key={session.session_id} session={session} />
+              <SessionItem
+                key={session.session_id}
+                session={session}
+                defaultCollapsed={defaultCollapsed}
+              />
             ))}
           </div>
         )}

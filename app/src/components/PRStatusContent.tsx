@@ -47,16 +47,16 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
   const isMerged = pr.state === 'MERGED'
   const isApproved = pr.reviewDecision === 'APPROVED'
   const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
-  const hasRunningChecks = pr.checks.some(
+  const runningChecks = pr.checks.filter(
     (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-  )
-  const hasFailedChecks = pr.checks.some(
+  ).length
+  const failedChecks = pr.checks.filter(
     (c) =>
       c.status === 'COMPLETED' &&
       c.conclusion !== 'SUCCESS' &&
       c.conclusion !== 'SKIPPED' &&
       c.conclusion !== 'NEUTRAL',
-  )
+  ).length
   const hasConflicts = pr.mergeable === 'CONFLICTING'
 
   if (isMerged)
@@ -89,24 +89,24 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (hasRunningChecks)
+  if (runningChecks > 0)
     return {
-      label: 'Running checks',
+      label: `Running checks (${runningChecks})`,
       colorClass: 'text-yellow-400',
       dimColorClass: 'text-yellow-400/60 hover:text-yellow-400',
       icon: (props?: { cls?: string; group?: string }) => (
-        <RefreshCw
+        <Loader2
           className={cn(
             iconClass,
-            `text-yellow-400 animate-spin/70 ${props?.group ? `${props.group}:text-yellow-400` : ''}`,
+            `text-yellow-400 animate-spin ${props?.group ? `${props.group}:text-yellow-400` : ''}`,
             props?.cls,
           )}
         />
       ),
     }
-  if (hasFailedChecks)
+  if (failedChecks > 0)
     return {
-      label: 'Failed checks',
+      label: `Failed checks (${failedChecks})`,
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
       icon: (props?: { cls?: string; group?: string }) => (
@@ -196,13 +196,13 @@ export const PRTabButton = memo(function PRTabButton({
         type="button"
         onClick={onClick}
         className={cn(
-          'text-[10px] flex uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+          'text-[10px] flex items-center uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -249,7 +249,7 @@ function ContentDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {avatarUrl && (
@@ -615,12 +615,6 @@ export function PRStatusContent({
 
           <div className="relative flex flex-col gap-0 pl-[13px]">
             <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
-            {/* Checks */}
-            {hasChecks && (
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
-                Checks ({pr.checks.length})
-              </p>
-            )}
             {pr.checks.map((check) => (
               <a
                 key={check.name}

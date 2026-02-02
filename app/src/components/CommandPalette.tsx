@@ -36,11 +36,11 @@ interface ActionTarget {
 
 type ItemInfo =
   | {
-    type: 'terminal'
-    terminal: Terminal
-    pr: PRCheckStatus | null
-    actionHint: string | null
-  }
+      type: 'terminal'
+      terminal: Terminal
+      pr: PRCheckStatus | null
+      actionHint: string | null
+    }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: null }
 

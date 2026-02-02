@@ -31,12 +31,16 @@ import { TruncatedPath } from './TruncatedPath'
 interface SessionItemProps {
   session: SessionWithProject
   showGitBranch?: boolean
+  defaultCollapsed?: boolean
+  terminalName?: string | null
   popoverContainer?: HTMLElement | null
   onClick?: () => void
 }
 
 export const SessionItem = memo(function SessionItem({
   session,
+  terminalName,
+  defaultCollapsed,
   showGitBranch,
   popoverContainer,
   onClick,
@@ -57,9 +61,9 @@ export const SessionItem = memo(function SessionItem({
     'sidebar-collapsed-sessions',
     [],
   )
-  const isExpanded =
-    !collapsedSessions.includes(session.session_id) || !!popoverContainer
-  const displayName = session.name || 'Untitled'
+  const inList = collapsedSessions.includes(session.session_id)
+  const isExpanded = (defaultCollapsed ? inList : !inList) || !!popoverContainer
+  const displayName = terminalName || session.name || 'Untitled'
   const isSelected = activeSessionId === session.session_id
 
   const toggleExpanded = (e: React.MouseEvent) => {
@@ -252,7 +256,7 @@ export const SessionItem = memo(function SessionItem({
                 <div className="relative w-fit h-fit">
                   {isExpanded && (
                     <div className="absolute top-1/2 left-[-15px]">
-                      <div className="w-[15px] border-l-[1px] border-b-[1px] h-[220px] -translate-y-full"></div>
+                      <div className="w-[15px] border-l-[1px] border-b-[1px] h-[1220px] -translate-y-full"></div>
                     </div>
                   )}
                   <div
