@@ -216,7 +216,7 @@ The PTY is spawned with:
 |----------|-------|
 | `TERM` | `xterm-256color` |
 | `COLORTERM` | `truecolor` |
-| `CLAUDE_TERMINAL_ID` | Terminal's numeric ID |
+| `WORKIO_TERMINAL_ID` | Terminal's numeric ID |
 
 Plus all inherited parent process env vars.
 

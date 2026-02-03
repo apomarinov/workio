@@ -83,7 +83,9 @@ export function TerminalItem({
     [githubPRs, terminal.git_branch],
   )
   const diffStat = gitDirtyStatus[terminal.id]
-  const isDirty = !!diffStat && (diffStat.added > 0 || diffStat.removed > 0)
+  const isDirty =
+    !!diffStat &&
+    (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
   const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
@@ -417,7 +419,7 @@ export function TerminalItem({
             <div className="ml-2 space-y-0.5">
               {(hasGitHub || hasProcesses || hasPorts || isDirty) && (
                 <>
-                  <div className="flex items-center px-2 pt-1 flex-wrap">
+                  <div className="flex items-center px-2 pl-1 pt-1 flex-wrap">
                     {hasGitHub && prForBranch && (
                       <PRTabButton
                         pr={prForBranch}
@@ -474,6 +476,14 @@ export function TerminalItem({
                         {diffStat.removed > 0 && (
                           <span className="text-red-500/80">
                             -{diffStat.removed}
+                          </span>
+                        )}
+                        {diffStat.untracked > 0 &&
+                          (diffStat.added > 0 || diffStat.removed > 0) &&
+                          '/'}
+                        {diffStat.untracked > 0 && (
+                          <span className="text-yellow-500/80">
+                            ?{diffStat.untracked}
                           </span>
                         )}
                       </span>

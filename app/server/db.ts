@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
@@ -14,6 +16,7 @@ import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = path.join(__dirname, '../../schema.sql')
+const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
 
 const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
@@ -307,6 +310,13 @@ export async function updateTerminal(
     setup?: object | null
   },
 ): Promise<Terminal | undefined> {
+  // Get old terminal if name is changing (for zellij session rename)
+  let oldName: string | null = null
+  if (updates.name !== undefined) {
+    const oldTerminal = await getTerminalById(id)
+    oldName = oldTerminal?.name || null
+  }
+
   const setClauses: string[] = []
   const values: (string | number | null)[] = []
   let paramIdx = 1
@@ -355,6 +365,35 @@ export async function updateTerminal(
     `UPDATE terminals SET ${setClauses.join(', ')} WHERE id = $${paramIdx}`,
     values,
   )
+
+  // Handle name change: update file and rename zellij session
+  if (updates.name !== undefined) {
+    const newName = updates.name
+    // Write new name to file
+    try {
+      if (!fs.existsSync(WORKIO_TERMINALS_DIR)) {
+        fs.mkdirSync(WORKIO_TERMINALS_DIR, { recursive: true })
+      }
+      fs.writeFileSync(path.join(WORKIO_TERMINALS_DIR, String(id)), newName)
+    } catch (err) {
+      log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
+    }
+    // Rename zellij session if it exists
+    if (oldName && oldName !== newName) {
+      execFile(
+        'zellij',
+        ['--session', oldName, 'action', 'rename-session', newName],
+        { timeout: 5000 },
+        (err) => {
+          if (!err) {
+            log.info(`[db] Renamed zellij session ${oldName} to ${newName}`)
+          }
+          // Session might not exist or not be running, that's ok - silently ignore errors
+        },
+      )
+    }
+  }
+
   return getTerminalById(id)
 }
 

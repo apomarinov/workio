@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as pty from 'node-pty'
@@ -60,7 +61,41 @@ let globalProcessPollingId: NodeJS.Timeout | null = null
 
 // Git dirty status polling
 let gitDirtyPollingId: NodeJS.Timeout | null = null
-const lastDirtyStatus = new Map<number, { added: number; removed: number }>()
+const lastDirtyStatus = new Map<
+  number,
+  { added: number; removed: number; untracked: number }
+>()
+
+// Terminal name file helpers for dynamic zellij session naming
+const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
+
+export function writeTerminalNameFile(terminalId: number, name: string): void {
+  try {
+    if (!fs.existsSync(WORKIO_TERMINALS_DIR)) {
+      fs.mkdirSync(WORKIO_TERMINALS_DIR, { recursive: true })
+    }
+    fs.writeFileSync(path.join(WORKIO_TERMINALS_DIR, String(terminalId)), name)
+  } catch (err) {
+    log.error(
+      { err },
+      `[pty] Failed to write terminal name file for ${terminalId}`,
+    )
+  }
+}
+
+export function renameZellijSession(oldName: string, newName: string): void {
+  execFile(
+    'zellij',
+    ['--session', oldName, 'action', 'rename-session', newName],
+    { timeout: 5000 },
+    (err) => {
+      if (!err) {
+        log.info(`[pty] Renamed zellij session ${oldName} to ${newName}`)
+      }
+      // Session might not exist or not be running, that's ok - silently ignore errors
+    },
+  )
+}
 
 async function getProcessesForTerminal(
   terminalId: number,
@@ -173,21 +208,47 @@ function parseDiffNumstat(stdout: string): { added: number; removed: number } {
   return { added, removed }
 }
 
+function countUntracked(stdout: string): number {
+  if (!stdout.trim()) return 0
+  return stdout.trim().split('\n').length
+}
+
 async function checkGitDirty(
   cwd: string,
   sshHost?: string | null,
-): Promise<{ added: number; removed: number }> {
-  const zero = { added: 0, removed: 0 }
+): Promise<{ added: number; removed: number; untracked: number }> {
+  const zero = { added: 0, removed: 0, untracked: 0 }
   try {
     if (sshHost) {
-      const result = await execSSHCommand(
-        sshHost,
-        'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
-        cwd,
-      )
-      return parseDiffNumstat(result.stdout)
+      const [diffResult, untrackedResult] = await Promise.all([
+        execSSHCommand(
+          sshHost,
+          'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
+          cwd,
+        ),
+        execSSHCommand(
+          sshHost,
+          'git ls-files --others --exclude-standard',
+          cwd,
+        ),
+      ])
+      const diff = parseDiffNumstat(diffResult.stdout)
+      return { ...diff, untracked: countUntracked(untrackedResult.stdout) }
     }
-    return await new Promise<{ added: number; removed: number }>((resolve) => {
+    return await new Promise<{
+      added: number
+      removed: number
+      untracked: number
+    }>((resolve) => {
+      // Run diff and untracked count in parallel
+      let diff = { added: 0, removed: 0 }
+      let untracked = 0
+      let completed = 0
+      const checkDone = () => {
+        if (++completed === 2) resolve({ ...diff, untracked })
+      }
+
+      // Get diff stats
       execFile(
         'git',
         ['diff', '--numstat', 'HEAD'],
@@ -200,13 +261,25 @@ async function checkGitDirty(
               ['diff', '--numstat'],
               { cwd, timeout: 5000 },
               (err2, stdout2) => {
-                if (err2) return resolve(zero)
-                resolve(parseDiffNumstat(stdout2))
+                if (!err2) diff = parseDiffNumstat(stdout2)
+                checkDone()
               },
             )
-            return
+          } else {
+            diff = parseDiffNumstat(stdout)
+            checkDone()
           }
-          resolve(parseDiffNumstat(stdout))
+        },
+      )
+
+      // Get untracked count
+      execFile(
+        'git',
+        ['ls-files', '--others', '--exclude-standard'],
+        { cwd, timeout: 5000 },
+        (err, stdout) => {
+          if (!err) untracked = countUntracked(stdout)
+          checkDone()
         },
       )
     })
@@ -216,7 +289,10 @@ async function checkGitDirty(
 }
 
 async function scanAndEmitGitDirty() {
-  const currentStatus: Record<number, { added: number; removed: number }> = {}
+  const currentStatus: Record<
+    number,
+    { added: number; removed: number; untracked: number }
+  > = {}
   const checks: Promise<void>[] = []
 
   try {
@@ -286,10 +362,18 @@ async function checkAndEmitSingleGitDirty(terminalId: number) {
     if (!terminal) return
     const stat = await checkGitDirty(terminal.cwd, terminal.ssh_host)
     const prev = lastDirtyStatus.get(terminalId)
-    if (!prev || prev.added !== stat.added || prev.removed !== stat.removed) {
+    if (
+      !prev ||
+      prev.added !== stat.added ||
+      prev.removed !== stat.removed ||
+      prev.untracked !== stat.untracked
+    ) {
       lastDirtyStatus.set(terminalId, stat)
       // Emit full status map
-      const dirtyStatus: Record<number, { added: number; removed: number }> = {}
+      const dirtyStatus: Record<
+        number,
+        { added: number; removed: number; untracked: number }
+      > = {}
       for (const [id, s] of lastDirtyStatus) {
         dirtyStatus[id] = s
       }
@@ -446,7 +530,7 @@ export async function createSession(
           ...process.env,
           TERM: 'xterm-256color',
           COLORTERM: 'truecolor',
-          CLAUDE_TERMINAL_ID: String(terminalId),
+          WORKIO_TERMINAL_ID: String(terminalId),
         } as Record<string, string>,
       })
     } catch (err) {
@@ -551,6 +635,13 @@ export async function createSession(
   // Start global polling if not already running
   startGlobalProcessPolling()
 
+  // Write terminal name file for dynamic zellij session naming
+  const terminalName = terminal.name || `terminal-${terminalId}`
+  writeTerminalNameFile(terminalId, terminalName)
+
+  // wioname function to read current terminal name (for zellij session naming)
+  const wionameFunc = `wioname() { cat "${WORKIO_TERMINALS_DIR}/${terminalId}" 2>/dev/null || echo "terminal-${terminalId}"; }`
+
   if (terminal.ssh_host) {
     // Inject shell integration for SSH terminals inline via heredoc
     try {
@@ -562,6 +653,7 @@ export async function createSession(
         // Use heredoc + eval so the script is interpreted with real newlines
         const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
         backend.write(injection)
+        backend.write(`${wionameFunc}\n`)
         if (terminal.cwd && terminal.cwd !== '~') {
           backend.write(`cd ${terminal.cwd}\n`)
         }
@@ -594,9 +686,12 @@ export async function createSession(
       if (integrationScript && fs.existsSync(integrationScript)) {
         // Source the integration silently, then reset and position cursor at top
         backend.write(
-          `source "${integrationScript}"; printf '\\033c\\x1b[1;1H'\n`,
+          `source "${integrationScript}"; ${wionameFunc}; printf '\\033c\\x1b[1;1H'\n`,
         )
         backend.write('clear\n')
+      } else {
+        // Still inject wioname even without shell integration
+        backend.write(`${wionameFunc}\n`)
       }
     }, 100)
   }

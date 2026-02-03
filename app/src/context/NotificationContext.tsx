@@ -91,7 +91,7 @@ export function NotificationProvider({
       }
 
       const notification = new Notification(title, {
-        icon: '/favicon.svg',
+        icon: '/icon.png',
         ...notificationOptions,
       })
 

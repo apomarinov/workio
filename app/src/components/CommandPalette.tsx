@@ -1606,7 +1606,7 @@ function BranchActionsView({
               <CommandItem
                 value="action:push"
                 className="cursor-pointer"
-                disabled={isDirty || isLoading}
+                disabled={canPush}
                 onSelect={onPush}
               >
                 <ArrowUp className="h-4 w-4 shrink-0 text-zinc-400" />
@@ -1623,7 +1623,7 @@ function BranchActionsView({
               <CommandItem
                 value="action:force-push"
                 className="cursor-pointer"
-                disabled={isDirty || isLoading}
+                disabled={canPush}
                 onSelect={onForcePush}
               >
                 <ArrowUp className="h-4 w-4 shrink-0 text-red-400" />

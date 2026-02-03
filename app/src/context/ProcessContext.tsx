@@ -9,7 +9,10 @@ import { useSocket } from '../hooks/useSocket'
 interface ProcessContextValue {
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
-  gitDirtyStatus: Record<number, { added: number; removed: number }>
+  gitDirtyStatus: Record<
+    number,
+    { added: number; removed: number; untracked: number }
+  >
 }
 
 const ProcessContext = createContext<ProcessContextValue | null>(null)
@@ -22,7 +25,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     {},
   )
   const [gitDirtyStatus, setGitDirtyStatus] = useState<
-    Record<number, { added: number; removed: number }>
+    Record<number, { added: number; removed: number; untracked: number }>
   >({})
 
   useEffect(() => {
@@ -35,7 +38,13 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
         for (const key of nextKeys) {
           const p = prev[Number(key)]
           const n = next[Number(key)]
-          if (!p || !n || p.added !== n.added || p.removed !== n.removed)
+          if (
+            !p ||
+            !n ||
+            p.added !== n.added ||
+            p.removed !== n.removed ||
+            p.untracked !== n.untracked
+          )
             return next
         }
         return prev

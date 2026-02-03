@@ -27,7 +27,7 @@ def main() -> None:
     message = json.dumps({
         "event": event,
         "env": {
-            "CLAUDE_TERMINAL_ID": os.environ.get("CLAUDE_TERMINAL_ID", ""),
+            "WORKIO_TERMINAL_ID": os.environ.get("WORKIO_TERMINAL_ID", ""),
         }
     })
 

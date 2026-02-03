@@ -181,7 +181,7 @@ def process_event(event: dict, env: dict) -> dict:
             transcript_path = event.get('transcript_path', '')
             project_path = derive_project_path(transcript_path) or event.get('cwd', '')
             hook_type = event.get('hook_event_name', '')
-            terminal_id_str = env.get('CLAUDE_TERMINAL_ID')
+            terminal_id_str = env.get('WORKIO_TERMINAL_ID')
             terminal_id = int(terminal_id_str) if terminal_id_str else None
 
             log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=terminal_id_str)

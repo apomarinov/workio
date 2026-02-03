@@ -160,12 +160,13 @@ body {
   width: 1px;
   background: var(--sidebar-border);
   transition: background 0.15s, width 0.15s;
+  outline: #3b82f6;
 }
 
 .panel-resize-handle:hover,
 .panel-resize-handle[data-resize-handle-state="drag"] {
   width: 3px;
-  background: var(--sidebar-ring);
+  background: #3b82f6; /* blue-500 */
 }
 
 /* Flash animation for session items */

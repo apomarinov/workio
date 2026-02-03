@@ -67,6 +67,7 @@ export interface MergedPRSummary {
 export interface GitDiffStat {
   added: number
   removed: number
+  untracked: number
 }
 
 export interface GitDirtyPayload {
