@@ -27,6 +27,7 @@ const checksCache = new Map<
 const monitoredTerminals = new Map<number, string>()
 
 let ghAvailable: boolean | null = null
+let ghUsername: string | null = null
 let globalChecksPollingId: NodeJS.Timeout | null = null
 let lastEmittedPRs: PRCheckStatus[] = []
 
@@ -48,6 +49,23 @@ function checkGhAvailable(): Promise<boolean> {
     execFile('gh', ['--version'], { timeout: 5000 }, (err) => {
       resolve(!err)
     })
+  })
+}
+
+function fetchGhUsername(): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      ['api', 'user', '--jq', '.login'],
+      { timeout: 5000 },
+      (err, stdout) => {
+        if (err || !stdout) {
+          resolve(null)
+          return
+        }
+        resolve(stdout.trim())
+      },
+    )
   })
 }
 
@@ -140,7 +158,6 @@ function fetchOpenPRs(
       return
     }
 
-    console.log({ FETCH_OPEN_PR: 1 })
     execFile(
       'gh',
       [
@@ -211,7 +228,7 @@ function fetchOpenPRs(
                 // If reviewer has a pending re-review request, mark as PENDING
                 state:
                   r.state === 'CHANGES_REQUESTED' &&
-                    pendingReviewers.has(r.author.login)
+                  pendingReviewers.has(r.author.login)
                     ? 'PENDING'
                     : r.state,
                 body: r.body || '',
@@ -502,8 +519,13 @@ async function pollAllPRChecks(force = false): Promise<void> {
     }
   }
 
+  // Fetch GitHub username if not cached
+  if (ghUsername === null) {
+    ghUsername = await fetchGhUsername()
+  }
+
   lastEmittedPRs = allPRs
-  getIO()?.emit('github:pr-checks', { prs: allPRs })
+  getIO()?.emit('github:pr-checks', { prs: allPRs, username: ghUsername })
 
   // Log GraphQL rate limit after fetching PRs
   execFile(

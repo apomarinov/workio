@@ -53,6 +53,7 @@ export interface PRCheckStatus {
 
 export interface PRChecksPayload {
   prs: PRCheckStatus[]
+  username: string | null
 }
 
 export interface MergedPRSummary {

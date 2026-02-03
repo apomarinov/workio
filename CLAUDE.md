@@ -14,6 +14,23 @@
 - `lint:fix` runs Biome auto-fix on `src/` and `server/`.
 - `check` runs Biome lint + TypeScript typecheck (both `tsconfig.json` and `tsconfig.node.json`).
 
+## Server Code
+
+- **Never use `execSync` or `execFileSync`** — they block the event loop and cause choppy terminal input.
+- Always use async `execFile` wrapped in a Promise or via `promisify`:
+  ```typescript
+  import { execFile } from 'node:child_process'
+
+  function myCommand(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFile('cmd', ['arg1', 'arg2'], { timeout: 5000 }, (err, stdout) => {
+        if (err) return reject(err)
+        resolve(stdout.trim())
+      })
+    })
+  }
+  ```
+
 ## UI
 
 - Always use available shadcn components from `src/components/ui/` (Dialog, Button, Input, Popover, Card, Switch, etc.).

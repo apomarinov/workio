@@ -261,6 +261,24 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
               onClick: () => revealPR(pr),
             })
           }
+
+          // New comments (skip if from current user)
+          if (prev && pr.comments.length > 0) {
+            const prevCommentKeys = new Set(
+              prev.comments.map((c) => `${c.author}:${c.createdAt}`),
+            )
+            for (const comment of pr.comments) {
+              if (data.username && comment.author === data.username) continue
+              const commentKey = `${comment.author}:${comment.createdAt}`
+              if (!prevCommentKeys.has(commentKey)) {
+                sendNotificationRef.current(`💬 ${comment.author} commented`, {
+                  body: comment.body,
+                  audio: 'pr-activity',
+                  onClick: () => window.open(pr.prUrl, '_blank'),
+                })
+              }
+            }
+          }
         }
       }
 
