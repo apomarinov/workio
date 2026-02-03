@@ -843,6 +843,37 @@ export function rerunFailedCheck(
   })
 }
 
+export function addPRComment(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'pr',
+        'comment',
+        String(prNumber),
+        '--repo',
+        `${owner}/${repo}`,
+        '-b',
+        body,
+      ],
+      { timeout: 15000 },
+      (err, _stdout, stderr) => {
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        checksCache.delete(`${owner}/${repo}`)
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
 /** Send the last polled PR data to a specific socket (e.g. on connect). */
 export function emitCachedPRChecks(socket: {
   emit: (ev: string, data: unknown) => void

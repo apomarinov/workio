@@ -330,6 +330,7 @@ const ReviewRow = memo(function ReviewRow({
   hasConflicts,
   onReReview,
   onMerge,
+  onReply,
 }: {
   review: PRReview
   icon: React.ReactNode
@@ -339,12 +340,18 @@ const ReviewRow = memo(function ReviewRow({
   hasConflicts?: boolean
   onReReview: (author: string) => void
   onMerge?: () => void
+  onReply: (author: string) => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
 
   const handleReReview = useCallback(
     () => onReReview(review.author),
     [onReReview, review.author],
+  )
+
+  const handleReply = useCallback(
+    () => onReply(review.author),
+    [onReply, review.author],
   )
 
   const reviewUrl = review.id
@@ -372,6 +379,13 @@ const ReviewRow = memo(function ReviewRow({
           )}
           <span className="text-xs truncate">{review.author}</span>
         </a>
+        <button
+          type="button"
+          onClick={handleReply}
+          className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+        >
+          Reply
+        </button>
         {showReReview && (
           <button
             type="button"
@@ -423,6 +437,7 @@ const CommentItem = memo(function CommentItem({
   comment,
   prUrl,
   onHide,
+  onReply,
 }: {
   comment: {
     url?: string
@@ -433,6 +448,7 @@ const CommentItem = memo(function CommentItem({
   }
   prUrl: string
   onHide: (author: string) => void
+  onReply: (author: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -440,6 +456,11 @@ const CommentItem = memo(function CommentItem({
   const handleHide = useCallback(
     () => onHide(comment.author),
     [onHide, comment.author],
+  )
+
+  const handleReply = useCallback(
+    () => onReply(comment.author),
+    [onReply, comment.author],
   )
 
   const commentUrl = comment.url || prUrl
@@ -478,6 +499,13 @@ const CommentItem = memo(function CommentItem({
               {comment.author}
             </span>
           </a>
+          <button
+            type="button"
+            onClick={handleReply}
+            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+          >
+            Reply
+          </button>
           <button
             type="button"
             onClick={handleHide}
@@ -601,6 +629,9 @@ export function PRStatusContent({
     url: string
   } | null>(null)
   const [rerunLoading, setRerunLoading] = useState(false)
+  const [replyAuthor, setReplyAuthor] = useState<string | null>(null)
+  const [replyBody, setReplyBody] = useState('')
+  const [replyLoading, setReplyLoading] = useState(false)
 
   const handleMerge = async () => {
     setMergeLoading(true)
@@ -635,6 +666,26 @@ export function PRStatusContent({
     (author: string) => setReReviewAuthor(author),
     [],
   )
+
+  const handleReply = useCallback((author: string) => {
+    setReplyAuthor(author)
+    setReplyBody(`@${author} `)
+  }, [])
+
+  const handleSendReply = async () => {
+    if (!replyBody.trim()) return
+    setReplyLoading(true)
+    try {
+      await api.addPRComment(owner, repo, pr.prNumber, replyBody)
+      toast.success('Comment posted')
+      setReplyAuthor(null)
+      setReplyBody('')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to post comment')
+    } finally {
+      setReplyLoading(false)
+    }
+  }
 
   const handleRerunCheck = async () => {
     if (!rerunCheck) return
@@ -706,6 +757,7 @@ export function PRStatusContent({
               hasConflicts={hasConflicts}
               onReReview={handleReReview}
               onMerge={() => setMergeOpen(true)}
+              onReply={handleReply}
             />
           ))}
           {changesRequestedReviews.map((review) => (
@@ -718,6 +770,7 @@ export function PRStatusContent({
               prUrl={pr.prUrl}
               showReReview
               onReReview={handleReReview}
+              onReply={handleReply}
             />
           ))}
           {pendingReviews.map((review) => (
@@ -727,6 +780,7 @@ export function PRStatusContent({
               icon={<Clock className="w-3 h-3 flex-shrink-0 text-zinc-500" />}
               prUrl={pr.prUrl}
               onReReview={handleReReview}
+              onReply={handleReply}
             />
           ))}
           {commentedReviews.map((review) => (
@@ -738,6 +792,7 @@ export function PRStatusContent({
               }
               prUrl={pr.prUrl}
               onReReview={handleReReview}
+              onReply={handleReply}
             />
           ))}
 
@@ -791,6 +846,7 @@ export function PRStatusContent({
                 comment={comment}
                 prUrl={pr.prUrl}
                 onHide={handleHideComment}
+                onReply={handleReply}
               />
             ))}
 
@@ -977,6 +1033,61 @@ export function PRStatusContent({
                   }}
                 >
                   Hide
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={replyAuthor !== null}
+            onOpenChange={(open) => {
+              if (!open && replyLoading) return
+              if (!open) {
+                setReplyAuthor(null)
+                setReplyBody('')
+              }
+            }}
+          >
+            <DialogContent
+              className="sm:max-w-md"
+              showCloseButton={false}
+              onPointerDownOutside={(e) => replyLoading && e.preventDefault()}
+              onEscapeKeyDown={(e) => replyLoading && e.preventDefault()}
+            >
+              <DialogHeader>
+                <DialogTitle>Reply to {replyAuthor}</DialogTitle>
+                <DialogDescription>
+                  Add a comment to this pull request
+                </DialogDescription>
+              </DialogHeader>
+              <textarea
+                value={replyBody}
+                onChange={(e) => setReplyBody(e.target.value)}
+                placeholder="Write your comment..."
+                rows={4}
+                className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-none"
+                disabled={replyLoading}
+              />
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setReplyAuthor(null)
+                    setReplyBody('')
+                  }}
+                  disabled={replyLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSendReply}
+                  disabled={replyLoading || !replyBody.trim()}
+                >
+                  {replyLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Send'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>

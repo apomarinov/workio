@@ -9,6 +9,7 @@ import { Server as SocketIOServer } from 'socket.io'
 import { initDb } from './db'
 import { env } from './env'
 import {
+  addPRComment,
   detectAllTerminalBranches,
   emitCachedPRChecks,
   fetchMergedPRsByMe,
@@ -203,6 +204,24 @@ fastify.post<{
     prNumber: Number(pr),
     until: (pr) => !pr || pr.state === 'MERGED',
   })
+  return { ok: true }
+})
+
+// Add PR comment
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { body: string }
+}>('/api/github/:owner/:repo/pr/:pr/comment', async (request, reply) => {
+  const { owner, repo, pr } = request.params
+  const { body } = request.body
+  if (!body) {
+    return reply.status(400).send({ error: 'body is required' })
+  }
+  const result = await addPRComment(owner, repo, Number(pr), body)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  await refreshPRChecks(true)
   return { ok: true }
 })
 

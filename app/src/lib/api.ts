@@ -303,6 +303,26 @@ export async function rerunFailedCheck(
   }
 }
 
+export async function addPRComment(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to add comment')
+  }
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,
