@@ -6,10 +6,10 @@ import {
   ArrowUp,
   Bot,
   Check,
-  Command as CommandIcon,
   Copy,
   CornerDownLeft,
   ExternalLink,
+  Eye,
   FolderOpen,
   GitBranch,
   GitFork,
@@ -211,17 +211,12 @@ export function CommandPalette() {
   }, [githubPRs])
 
   // Build item map keyed by simple IDs
-  const { itemMap, firstId } = useMemo(() => {
+  const itemMap = useMemo(() => {
     const map = new Map<string, ItemInfo>()
-
-    let first: string | null = null
 
     for (const t of terminals) {
       const pr = t.git_branch ? (branchToPR.get(t.git_branch) ?? null) : null
-
-      const id = `t:${t.id}`
-      if (!first) first = id
-      map.set(id, {
+      map.set(`t:${t.id}`, {
         type: 'terminal',
         terminal: t,
         pr,
@@ -230,18 +225,22 @@ export function CommandPalette() {
     }
 
     for (const pr of openPRs) {
-      const id = `pr:${pr.prNumber}:${pr.repo}`
-      if (!first) first = id
-      map.set(id, { type: 'pr', pr, actionHint: 'Open PR in new tab' })
+      map.set(`pr:${pr.prNumber}:${pr.repo}`, {
+        type: 'pr',
+        pr,
+        actionHint: 'Open PR in new tab',
+      })
     }
 
     for (const s of sessions) {
-      const id = `s:${s.session_id}`
-      if (!first) first = id
-      map.set(id, { type: 'session', session: s, actionHint: 'For actions' })
+      map.set(`s:${s.session_id}`, {
+        type: 'session',
+        session: s,
+        actionHint: 'For actions',
+      })
     }
 
-    return { itemMap: map, firstId: first }
+    return map
   }, [terminals, openPRs, sessions, branchToPR])
 
   // Resolve the currently highlighted item
@@ -364,17 +363,6 @@ export function CommandPalette() {
       )
     },
     [selectTerminal, clearSession, closePalette],
-  )
-
-  const handleSelectSession = useCallback(
-    (sessionId: string) => {
-      selectSession(sessionId)
-      closePalette()
-      window.dispatchEvent(
-        new CustomEvent('reveal-session', { detail: { sessionId } }),
-      )
-    },
-    [selectSession, closePalette],
   )
 
   const handleSelectPR = useCallback(
@@ -526,7 +514,12 @@ export function CommandPalette() {
         e.preventDefault()
         e.stopPropagation()
 
-        if (mode === 'actions' || mode === 'branch-actions') return
+        if (
+          mode === 'actions' ||
+          mode === 'branch-actions' ||
+          mode === 'search'
+        )
+          return
 
         // Handle cmd+enter in branches mode to open branch-actions
         if (mode === 'branches' && highlightedId?.startsWith('branch:')) {
@@ -545,56 +538,10 @@ export function CommandPalette() {
           setHighlightedId(null)
           return
         }
-
-        if (!highlightedItem) return
-
-        if (highlightedItem.type === 'terminal') {
-          if (highlightedItem.terminal.ssh_host) return
-          setActionTarget({
-            type: 'terminal',
-            terminal: highlightedItem.terminal,
-            pr: highlightedItem.pr,
-          })
-          setHighlightedId(null)
-          setMode('actions')
-          return
-        }
-
-        if (highlightedItem.type === 'session') {
-          setActionTarget({
-            type: 'session',
-            session: highlightedItem.session,
-          })
-          setHighlightedId(null)
-          setMode('actions')
-          return
-        }
-
-        if (highlightedItem.type === 'pr') {
-          window.open(highlightedItem.pr.prUrl, '_blank')
-          closePalette()
-          return
-        }
       }
     },
-    [
-      mode,
-      highlightedItem,
-      closePalette,
-      highlightedId,
-      branches,
-      actionTarget,
-    ],
+    [mode, highlightedItem, highlightedId, branches, actionTarget],
   )
-
-  const actionHint =
-    mode === 'actions' || mode === 'branches' || mode === 'branch-actions'
-      ? null
-      : highlightedItem
-        ? highlightedItem.actionHint
-        : firstId
-          ? (itemMap.get(firstId)?.actionHint ?? null)
-          : null
 
   // Compute dirty state for the terminal if we're in branches mode
   const terminalDirtyStatus =
@@ -747,7 +694,16 @@ export function CommandPalette() {
                   sessions={sessions}
                   branchToPR={branchToPR}
                   onSelectTerminal={handleSelectTerminal}
-                  onSelectSession={handleSelectSession}
+                  onOpenTerminalActions={(terminal, pr) => {
+                    setActionTarget({ type: 'terminal', terminal, pr })
+                    setHighlightedId(null)
+                    setMode('actions')
+                  }}
+                  onOpenSessionActions={(session) => {
+                    setActionTarget({ type: 'session', session })
+                    setHighlightedId(null)
+                    setMode('actions')
+                  }}
                   onSelectPR={handleSelectPR}
                 />
               )}
@@ -758,6 +714,18 @@ export function CommandPalette() {
                     setMode('search')
                     setActionTarget(null)
                     setHighlightedId(null)
+                  }}
+                  onRevealTerminal={(terminal) =>
+                    handleSelectTerminal(terminal.id)
+                  }
+                  onRevealSession={(session) => {
+                    selectSession(session.session_id)
+                    closePalette()
+                    window.dispatchEvent(
+                      new CustomEvent('reveal-session', {
+                        detail: { sessionId: session.session_id },
+                      }),
+                    )
                   }}
                   onOpenInCursor={handleOpenInCursor}
                   onOpenPR={handleOpenPR}
@@ -847,26 +815,17 @@ export function CommandPalette() {
                 )}
             </Command>
             {mode === 'search' && (
-              <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
+              <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
                 <span className="flex items-center gap-1.5">
                   <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
                     <CornerDownLeft className="h-3 w-3" />
                   </kbd>
                   to select
                 </span>
-                {actionHint && (
-                  <span className="flex items-center gap-1.5">
-                    {actionHint}
-                    <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
-                      <CommandIcon className="h-3 w-3" />
-                      <CornerDownLeft className="h-3 w-3" />
-                    </kbd>
-                  </span>
-                )}
               </div>
             )}
             {mode === 'actions' && (
-              <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
+              <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
                 <span className="flex items-center gap-1.5">
                   <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
                     <CornerDownLeft className="h-3 w-3" />
@@ -982,7 +941,8 @@ function SearchView({
   sessions,
   branchToPR,
   onSelectTerminal,
-  onSelectSession,
+  onOpenTerminalActions,
+  onOpenSessionActions,
   onSelectPR,
 }: {
   terminals: Terminal[]
@@ -990,7 +950,8 @@ function SearchView({
   sessions: SessionWithProject[]
   branchToPR: Map<string, PRCheckStatus>
   onSelectTerminal: (id: number) => void
-  onSelectSession: (id: string) => void
+  onOpenTerminalActions: (terminal: Terminal, pr: PRCheckStatus | null) => void
+  onOpenSessionActions: (session: SessionWithProject) => void
   onSelectPR: (pr: PRCheckStatus) => void
 }) {
   return (
@@ -1019,7 +980,11 @@ function SearchView({
                     t.git_branch ?? '',
                     t.git_repo?.repo ?? '',
                   ]}
-                  onSelect={() => onSelectTerminal(t.id)}
+                  onSelect={() =>
+                    t.ssh_host
+                      ? onSelectTerminal(t.id)
+                      : onOpenTerminalActions(t, matchedPR)
+                  }
                 >
                   <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
                   <div className="flex min-w-0 flex-1 flex-col">
@@ -1091,7 +1056,7 @@ function SearchView({
                   s.latest_user_message ?? '',
                   s.latest_agent_message ?? '',
                 ]}
-                onSelect={() => onSelectSession(s.session_id)}
+                onSelect={() => onOpenSessionActions(s)}
               >
                 <SessionIcon status={s.status} />
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -1116,6 +1081,8 @@ function SearchView({
 function ActionsView({
   target,
   onBack,
+  onRevealTerminal,
+  onRevealSession,
   onOpenInCursor,
   onOpenPR,
   onClose,
@@ -1132,6 +1099,8 @@ function ActionsView({
 }: {
   target: ActionTarget | null
   onBack: () => void
+  onRevealTerminal: (terminal: Terminal) => void
+  onRevealSession: (session: SessionWithProject) => void
   onOpenInCursor: (terminal: Terminal) => void
   onOpenPR: (pr: PRCheckStatus) => void
   onClose: () => void
@@ -1181,6 +1150,7 @@ function ActionsView({
           {target?.type === 'terminal' && (
             <TerminalActions
               target={target}
+              onReveal={onRevealTerminal}
               onOpenInCursor={onOpenInCursor}
               onOpenPR={onOpenPR}
               onClose={onClose}
@@ -1195,6 +1165,7 @@ function ActionsView({
           {target?.type === 'session' && (
             <SessionActions
               target={target}
+              onReveal={onRevealSession}
               onClose={onClose}
               pinnedSessions={pinnedSessions}
               setPinnedSessions={setPinnedSessions}
@@ -1210,6 +1181,7 @@ function ActionsView({
 
 function TerminalActions({
   target,
+  onReveal,
   onOpenInCursor,
   onOpenPR,
   onClose,
@@ -1221,6 +1193,7 @@ function TerminalActions({
   onOpenBranches,
 }: {
   target: { type: 'terminal'; terminal: Terminal; pr: PRCheckStatus | null }
+  onReveal: (terminal: Terminal) => void
   onOpenInCursor: (terminal: Terminal) => void
   onOpenPR: (pr: PRCheckStatus) => void
   onClose: () => void
@@ -1237,6 +1210,14 @@ function TerminalActions({
 
   return (
     <>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:reveal"
+        onSelect={() => onReveal(target.terminal)}
+      >
+        <Eye className="h-4 w-4 shrink-0 text-zinc-400" />
+        <span>Reveal</span>
+      </CommandItem>
       {!target.terminal.ssh_host && (
         <CommandItem
           className="cursor-pointer"
@@ -1321,6 +1302,7 @@ function TerminalActions({
 
 function SessionActions({
   target,
+  onReveal,
   onClose,
   pinnedSessions,
   setPinnedSessions,
@@ -1328,6 +1310,7 @@ function SessionActions({
   onDeleteSession,
 }: {
   target: { type: 'session'; session: SessionWithProject }
+  onReveal: (session: SessionWithProject) => void
   onClose: () => void
   pinnedSessions: string[]
   setPinnedSessions: (value: string[] | ((prev: string[]) => string[])) => void
@@ -1338,6 +1321,14 @@ function SessionActions({
 
   return (
     <>
+      <CommandItem
+        className="cursor-pointer"
+        value="action:reveal"
+        onSelect={() => onReveal(target.session)}
+      >
+        <Eye className="h-4 w-4 shrink-0 text-zinc-400" />
+        <span>Reveal</span>
+      </CommandItem>
       <CommandItem
         className="cursor-pointer"
         value="action:pin"
@@ -1473,7 +1464,7 @@ function BranchesView({
           </div>
         )}
       </CommandList>
-      <div className="flex h-9 items-center border-t border-zinc-700 px-3 text-xs text-zinc-500">
+      <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
         <span className="flex items-center gap-1.5">
           <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
             <CornerDownLeft className="h-3 w-3" />
@@ -1644,7 +1635,7 @@ function BranchActionsView({
           )}
         </CommandGroup>
       </CommandList>
-      <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
+      <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
         <span className="flex items-center gap-1.5">
           <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
             <CornerDownLeft className="h-3 w-3" />
