@@ -186,7 +186,7 @@ export function DirectoryBrowser({
             Cancel
           </Button>
           <Button type="button" onClick={handleSave}>
-            Save
+            Select
           </Button>
         </DialogFooter>
       </DialogContent>

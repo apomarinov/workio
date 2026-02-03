@@ -21,7 +21,7 @@ function getParentAppName(): string | null {
       pid = Number.parseInt(ppidStr, 10)
       if (Number.isNaN(pid)) break
     }
-  } catch {}
+  } catch { }
   return null
 }
 
@@ -45,7 +45,7 @@ import {
   getTerminalById,
   updateTerminal,
 } from '../db'
-import { refreshPRChecks } from '../github/checks'
+import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { log } from '../logger'
 import { destroySession, detectGitBranch } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
@@ -348,6 +348,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           ),
         )
 
+        trackTerminal(terminal.id).then(() => refreshPRChecks(true))
         return reply.status(201).send(terminal)
       }
 
@@ -376,13 +377,13 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const hasSetup = conductor || setup_script || delete_script
         const setupObj = hasSetup
           ? {
-              ...(conductor ? { conductor: true } : {}),
-              ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
-              ...(delete_script?.trim()
-                ? { delete: delete_script.trim() }
-                : {}),
-              status: 'setup' as const,
-            }
+            ...(conductor ? { conductor: true } : {}),
+            ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
+            ...(delete_script?.trim()
+              ? { delete: delete_script.trim() }
+              : {}),
+            status: 'setup' as const,
+          }
           : null
 
         const gitRepoData: Record<string, unknown> = {
@@ -420,7 +421,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
           ),
         )
-
+        trackTerminal(terminal.id).then(() => refreshPRChecks(true))
         return reply.status(201).send(terminal)
       }
 
@@ -442,6 +443,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           null,
           trimmedHost,
         )
+        trackTerminal(terminal.id).then(() => refreshPRChecks(true))
         return reply.status(201).send(terminal)
       }
 
@@ -472,6 +474,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       const terminal = await createTerminal(cwd, name || null, shell || null)
+      trackTerminal(terminal.id).then(() => refreshPRChecks(true))
       return reply.status(201).send(terminal)
     },
   )
@@ -546,7 +549,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           `[terminals] Delete workspace error: ${err instanceof Error ? err.message : err}`,
         ),
       )
-      refreshPRChecks()
+      refreshPRChecks(true)
       return reply.status(202).send()
     }
 
@@ -569,7 +572,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     await deleteTerminal(id)
-    refreshPRChecks()
+    refreshPRChecks(true)
     return reply.status(204).send()
   })
 
@@ -708,7 +711,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection and PR checks
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id).catch(() => { })
 
         return { success: true, branch }
       } catch (err) {
@@ -768,7 +771,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id).catch(() => { })
 
         return { success: true, branch }
       } catch (err) {

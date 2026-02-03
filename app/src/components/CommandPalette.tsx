@@ -56,11 +56,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-    type: 'terminal'
-    terminal: Terminal
-    pr: PRCheckStatus | null
-    actionHint: string | null
-  }
+      type: 'terminal'
+      terminal: Terminal
+      pr: PRCheckStatus | null
+      actionHint: string | null
+    }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -1056,8 +1056,8 @@ function ActionsView({
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-      target?.session.latest_user_message ||
-      target?.session.session_id
+        target?.session.latest_user_message ||
+        target?.session.session_id
 
   return (
     <>
