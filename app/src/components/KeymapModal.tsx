@@ -1,5 +1,9 @@
 import {
   ArrowBigUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   ChevronUp,
   Command,
   Option,
@@ -7,7 +11,17 @@ import {
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -45,6 +59,19 @@ function renderKey(key: string): ReactNode {
   if (key === 'Control') return <ChevronUp className={cls} />
   if (key === 'Alt') return <Option className={cls} />
   if (key === 'Shift') return <ArrowBigUp className={cls} />
+  if (key === 'ArrowUp') return <ArrowUp className={cls} />
+  if (key === 'ArrowDown') return <ArrowDown className={cls} />
+  if (key === 'ArrowLeft') return <ArrowLeft className={cls} />
+  if (key === 'ArrowRight') return <ArrowRight className={cls} />
+  return <span>{key.toUpperCase()}</span>
+}
+
+function formatKeyDisplay(key: string): ReactNode {
+  const cls = cn(ICON_CLASS, 'stroke-3')
+  if (key === 'arrowup') return <ArrowUp className={cls} />
+  if (key === 'arrowdown') return <ArrowDown className={cls} />
+  if (key === 'arrowleft') return <ArrowLeft className={cls} />
+  if (key === 'arrowright') return <ArrowRight className={cls} />
   return <span>{key.toUpperCase()}</span>
 }
 
@@ -63,7 +90,7 @@ function formatBinding(
         <ArrowBigUp className={cn(ICON_CLASS, 'stroke-3')} />
       )}
       {binding.metaKey && <Command className={cn(ICON_CLASS, 'stroke-3')} />}
-      {binding.key && <span>{binding.key.toUpperCase()}</span>}
+      {binding.key && formatKeyDisplay(binding.key)}
       {suffix && <span>{suffix}</span>}
     </span>
   )
@@ -83,6 +110,37 @@ function bindingsConflict(
     !!palette.altKey === !!goToTab.altKey &&
     !!palette.shiftKey === !!goToTab.shiftKey
   )
+}
+
+type ShortcutName =
+  | 'palette'
+  | 'goToTab'
+  | 'goToLastTab'
+  | 'togglePip'
+  | 'itemActions'
+  | 'collapseAll'
+  | 'settings'
+
+function findDuplicates(
+  bindings: Record<ShortcutName, ShortcutBinding | null>,
+): Set<ShortcutName> {
+  const duplicates = new Set<ShortcutName>()
+  const keys = Object.keys(bindings) as ShortcutName[]
+
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const a = bindings[keys[i]]
+      const b = bindings[keys[j]]
+      // Skip if either is null or modifier-only (no key)
+      if (!a || !b || !a.key || !b.key) continue
+      if (bindingsEqual(a, b)) {
+        duplicates.add(keys[i])
+        duplicates.add(keys[j])
+      }
+    }
+  }
+
+  return duplicates
 }
 
 interface KeymapModalProps {
@@ -120,11 +178,77 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const [itemActions, setItemActions] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.itemActions,
   )
+  const [collapseAll, setCollapseAll] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.collapseAll,
+  )
+  const [settingsShortcut, setSettingsShortcut] =
+    useState<ShortcutBinding | null>(DEFAULT_KEYMAP.settings)
   const [recording, setRecording] = useState<
-    'palette' | 'goToTab' | 'goToLastTab' | 'togglePip' | 'itemActions' | null
+    | 'palette'
+    | 'goToTab'
+    | 'goToLastTab'
+    | 'togglePip'
+    | 'itemActions'
+    | 'collapseAll'
+    | 'settings'
+    | null
   >(null)
   const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [showConfirmClose, setShowConfirmClose] = useState(false)
+
+  // Check if current state differs from saved settings
+  const hasUnsavedChanges = useMemo(() => {
+    const saved = settings?.keymap
+    const savedPalette = saved?.palette ?? DEFAULT_KEYMAP.palette
+    const savedGoToTab = saved?.goToTab ?? DEFAULT_KEYMAP.goToTab
+    const savedGoToLastTab = saved?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab
+    const savedTogglePip = saved?.togglePip ?? DEFAULT_KEYMAP.togglePip
+    const savedItemActions = saved?.itemActions ?? DEFAULT_KEYMAP.itemActions
+    const savedCollapseAll = saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll
+    const savedSettings = saved?.settings ?? DEFAULT_KEYMAP.settings
+
+    return (
+      !bindingsEqual(palette, savedPalette) ||
+      !bindingsEqual(goToTab, savedGoToTab) ||
+      !bindingsEqual(goToLastTab, savedGoToLastTab) ||
+      !bindingsEqual(togglePip, savedTogglePip) ||
+      !bindingsEqual(itemActions, savedItemActions) ||
+      !bindingsEqual(collapseAll, savedCollapseAll) ||
+      !bindingsEqual(settingsShortcut, savedSettings)
+    )
+  }, [
+    settings?.keymap,
+    palette,
+    goToTab,
+    goToLastTab,
+    togglePip,
+    itemActions,
+    collapseAll,
+    settingsShortcut,
+  ])
+
+  const handleClose = (newOpen: boolean) => {
+    if (!newOpen && hasUnsavedChanges) {
+      setShowConfirmClose(true)
+      return
+    }
+    onOpenChange(newOpen)
+  }
+
+  const handleDiscardChanges = () => {
+    setShowConfirmClose(false)
+    // Reset to saved values
+    const saved = settings?.keymap
+    setPalette(saved?.palette ?? DEFAULT_KEYMAP.palette)
+    setGoToTab(saved?.goToTab ?? DEFAULT_KEYMAP.goToTab)
+    setGoToLastTab(saved?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab)
+    setTogglePip(saved?.togglePip ?? DEFAULT_KEYMAP.togglePip)
+    setItemActions(saved?.itemActions ?? DEFAULT_KEYMAP.itemActions)
+    setCollapseAll(saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
+    setSettingsShortcut(saved?.settings ?? DEFAULT_KEYMAP.settings)
+    onOpenChange(false)
+  }
 
   useEffect(() => {
     if (settings?.keymap) {
@@ -138,6 +262,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       }
       if (settings.keymap.itemActions !== undefined) {
         setItemActions(settings.keymap.itemActions)
+      }
+      if (settings.keymap.collapseAll !== undefined) {
+        setCollapseAll(settings.keymap.collapseAll)
+      }
+      if (settings.keymap.settings !== undefined) {
+        setSettingsShortcut(settings.keymap.settings)
       }
     }
   }, [settings?.keymap])
@@ -178,6 +308,16 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           binding.key = keyBuffer.join('')
         }
         setItemActions(binding)
+      } else if (recording === 'collapseAll') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setCollapseAll(binding)
+      } else if (recording === 'settings') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setSettingsShortcut(binding)
       }
 
       setRecording(null)
@@ -219,8 +359,18 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           setTogglePip({ key: e.key.toLowerCase() })
         } else if (recording === 'itemActions') {
           setItemActions({ key: e.key.toLowerCase() })
+        } else if (recording === 'collapseAll') {
+          setCollapseAll({ key: e.key.toLowerCase() })
+        } else if (recording === 'settings') {
+          setSettingsShortcut({ key: e.key.toLowerCase() })
         }
         setRecording(null)
+        return
+      }
+
+      // For modifier-only shortcuts, finalize immediately on any non-modifier key
+      if (!DEFAULT_KEYMAP[recording]?.key) {
+        finalize()
         return
       }
 
@@ -263,7 +413,15 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setSaving(true)
     try {
       await updateSettings({
-        keymap: { palette, goToTab, goToLastTab, togglePip, itemActions },
+        keymap: {
+          palette,
+          goToTab,
+          goToLastTab,
+          togglePip,
+          itemActions,
+          collapseAll,
+          settings: settingsShortcut,
+        },
       })
       toast.success('Keyboard shortcuts saved')
       onOpenChange(false)
@@ -282,94 +440,195 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)
     setTogglePip(DEFAULT_KEYMAP.togglePip)
     setItemActions(DEFAULT_KEYMAP.itemActions)
+    setCollapseAll(DEFAULT_KEYMAP.collapseAll)
+    setSettingsShortcut(DEFAULT_KEYMAP.settings)
     setRecording(null)
   }
 
   const hasConflict = bindingsConflict(palette, goToTab)
+  const duplicates = useMemo(
+    () =>
+      findDuplicates({
+        palette,
+        goToTab,
+        goToLastTab,
+        togglePip,
+        itemActions,
+        collapseAll,
+        settings: settingsShortcut,
+      }),
+    [
+      palette,
+      goToTab,
+      goToLastTab,
+      togglePip,
+      itemActions,
+      collapseAll,
+      settingsShortcut,
+    ],
+  )
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-sidebar sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Keyboard Shortcuts</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="bg-sidebar sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-3">
-          <ShortcutRow
-            label="Command Palette"
-            binding={palette}
-            isRecording={recording === 'palette'}
-            recordingKeys={recording === 'palette' ? recordingKeys : []}
-            onRecord={() =>
-              setRecording(recording === 'palette' ? null : 'palette')
-            }
-            onUnset={() => setPalette(null)}
-            display={formatBinding(palette)}
-            hasConflict={hasConflict}
-          />
-          <ShortcutRow
-            label="Go to project"
-            binding={goToTab}
-            isRecording={recording === 'goToTab'}
-            recordingKeys={recording === 'goToTab' ? recordingKeys : []}
-            onRecord={() =>
-              setRecording(recording === 'goToTab' ? null : 'goToTab')
-            }
-            onUnset={() => setGoToTab(null)}
-            display={formatBinding(goToTab, goToTab ? '1 - NN' : undefined)}
-          />
-          <ShortcutRow
-            label="Go to last project"
-            binding={goToLastTab}
-            isRecording={recording === 'goToLastTab'}
-            recordingKeys={recording === 'goToLastTab' ? recordingKeys : []}
-            onRecord={() =>
-              setRecording(recording === 'goToLastTab' ? null : 'goToLastTab')
-            }
-            onUnset={() => setGoToLastTab(null)}
-            display={formatBinding(goToLastTab)}
-          />
-          <ShortcutRow
-            label="Toggle PiP Window"
-            binding={togglePip}
-            isRecording={recording === 'togglePip'}
-            recordingKeys={recording === 'togglePip' ? recordingKeys : []}
-            onRecord={() =>
-              setRecording(recording === 'togglePip' ? null : 'togglePip')
-            }
-            onUnset={() => setTogglePip(null)}
-            display={formatBinding(togglePip)}
-          />
-          <ShortcutRow
-            label="Item Actions"
-            binding={itemActions}
-            isRecording={recording === 'itemActions'}
-            recordingKeys={recording === 'itemActions' ? recordingKeys : []}
-            onRecord={() =>
-              setRecording(recording === 'itemActions' ? null : 'itemActions')
-            }
-            onUnset={() => setItemActions(null)}
-            display={formatBinding(itemActions)}
-          />
-          {hasConflict && (
-            <p className="text-sm text-amber-500">
-              Conflict: Command Palette shortcut overlaps with Go to Tab (digit
-              key with same modifiers).
-            </p>
-          )}
-        </div>
+          <div className="space-y-3">
+            <ShortcutRow
+              label="Command Palette"
+              binding={palette}
+              isRecording={recording === 'palette'}
+              recordingKeys={recording === 'palette' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'palette' ? null : 'palette')
+              }
+              onReset={() => setPalette(DEFAULT_KEYMAP.palette)}
+              onUnset={() => setPalette(null)}
+              defaultBinding={DEFAULT_KEYMAP.palette}
+              display={formatBinding(palette)}
+              hasConflict={hasConflict || duplicates.has('palette')}
+            />
+            <ShortcutRow
+              label="Go to project"
+              binding={goToTab}
+              isRecording={recording === 'goToTab'}
+              recordingKeys={recording === 'goToTab' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'goToTab' ? null : 'goToTab')
+              }
+              onReset={() => setGoToTab(DEFAULT_KEYMAP.goToTab)}
+              onUnset={() => setGoToTab(null)}
+              defaultBinding={DEFAULT_KEYMAP.goToTab}
+              display={formatBinding(goToTab, goToTab ? '1 - 99' : undefined)}
+              hasConflict={duplicates.has('goToTab')}
+            />
+            <ShortcutRow
+              label="Go to last project"
+              binding={goToLastTab}
+              isRecording={recording === 'goToLastTab'}
+              recordingKeys={recording === 'goToLastTab' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'goToLastTab' ? null : 'goToLastTab')
+              }
+              onReset={() => setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)}
+              onUnset={() => setGoToLastTab(null)}
+              defaultBinding={DEFAULT_KEYMAP.goToLastTab}
+              display={formatBinding(goToLastTab)}
+              hasConflict={duplicates.has('goToLastTab')}
+            />
+            <ShortcutRow
+              label="Toggle PiP Window"
+              binding={togglePip}
+              isRecording={recording === 'togglePip'}
+              recordingKeys={recording === 'togglePip' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'togglePip' ? null : 'togglePip')
+              }
+              onReset={() => setTogglePip(DEFAULT_KEYMAP.togglePip)}
+              onUnset={() => setTogglePip(null)}
+              defaultBinding={DEFAULT_KEYMAP.togglePip}
+              display={formatBinding(togglePip)}
+              hasConflict={duplicates.has('togglePip')}
+            />
+            <ShortcutRow
+              label="Item Actions"
+              binding={itemActions}
+              isRecording={recording === 'itemActions'}
+              recordingKeys={recording === 'itemActions' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'itemActions' ? null : 'itemActions')
+              }
+              onReset={() => setItemActions(DEFAULT_KEYMAP.itemActions)}
+              onUnset={() => setItemActions(null)}
+              defaultBinding={DEFAULT_KEYMAP.itemActions}
+              display={formatBinding(itemActions)}
+              hasConflict={duplicates.has('itemActions')}
+            />
+            <ShortcutRow
+              label="Collapse All"
+              binding={collapseAll}
+              isRecording={recording === 'collapseAll'}
+              recordingKeys={recording === 'collapseAll' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'collapseAll' ? null : 'collapseAll')
+              }
+              onReset={() => setCollapseAll(DEFAULT_KEYMAP.collapseAll)}
+              onUnset={() => setCollapseAll(null)}
+              defaultBinding={DEFAULT_KEYMAP.collapseAll}
+              display={formatBinding(collapseAll)}
+              hasConflict={duplicates.has('collapseAll')}
+            />
+            <ShortcutRow
+              label="Settings"
+              binding={settingsShortcut}
+              isRecording={recording === 'settings'}
+              recordingKeys={recording === 'settings' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'settings' ? null : 'settings')
+              }
+              onReset={() => setSettingsShortcut(DEFAULT_KEYMAP.settings)}
+              onUnset={() => setSettingsShortcut(null)}
+              hasConflict={duplicates.has('settings')}
+              defaultBinding={DEFAULT_KEYMAP.settings}
+              display={formatBinding(settingsShortcut)}
+            />
+          </div>
 
-        <DialogFooter className="flex-row justify-between sm:justify-between">
-          <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
-            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-            Reset to Default
-          </Button>
-          <Button type="button" disabled={saving} onClick={handleSave}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="flex-row justify-between sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Reset to Default
+            </Button>
+            <Button type="button" disabled={saving} onClick={handleSave}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showConfirmClose} onOpenChange={setShowConfirmClose}>
+        <AlertDialogContent className="bg-sidebar">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDiscardChanges}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+function bindingsEqual(
+  a: ShortcutBinding | null,
+  b: ShortcutBinding | null,
+): boolean {
+  if (a === null && b === null) return true
+  if (a === null || b === null) return false
+  return (
+    !!a.metaKey === !!b.metaKey &&
+    !!a.ctrlKey === !!b.ctrlKey &&
+    !!a.altKey === !!b.altKey &&
+    !!a.shiftKey === !!b.shiftKey &&
+    (a.key ?? '') === (b.key ?? '')
   )
 }
 
@@ -378,21 +637,26 @@ function ShortcutRow({
   isRecording,
   recordingKeys,
   onRecord,
+  onReset,
   onUnset,
   binding,
+  defaultBinding,
   display,
   hasConflict,
 }: {
   label: string
   binding: ShortcutBinding | null
+  defaultBinding: ShortcutBinding | null
   isRecording: boolean
   recordingKeys: string[]
   onRecord: () => void
+  onReset: () => void
   onUnset: () => void
   display: ReactNode
   hasConflict?: boolean
 }) {
   const isDisabled = !binding
+  const isDefault = bindingsEqual(binding, defaultBinding)
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm font-medium flex flex-col gap-0">
@@ -434,6 +698,16 @@ function ShortcutRow({
             display
           )}
         </button>
+        {!isDefault && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="p-1.5 cursor-pointer text-muted-foreground hover:text-foreground rounded-md border border-border bg-zinc-800 hover:bg-zinc-700/70 transition-colors"
+            title="Reset to default"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        )}
         {!isDisabled && (
           <button
             type="button"

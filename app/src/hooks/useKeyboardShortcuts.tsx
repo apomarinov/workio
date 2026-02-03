@@ -151,6 +151,8 @@ interface KeymapHandlers {
   goToLastTab?: () => void
   togglePip?: () => void
   itemActions?: () => void
+  collapseAll?: () => void
+  settings?: () => void
 }
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
@@ -190,6 +192,14 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     settings?.keymap?.itemActions === null
       ? null
       : (settings?.keymap?.itemActions ?? DEFAULT_KEYMAP.itemActions)
+  const collapseAllBinding =
+    settings?.keymap?.collapseAll === null
+      ? null
+      : (settings?.keymap?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
+  const settingsBinding =
+    settings?.keymap?.settings === null
+      ? null
+      : (settings?.keymap?.settings ?? DEFAULT_KEYMAP.settings)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: pip.window is needed to re-attach listeners when PiP window changes
   useEffect(() => {
@@ -278,6 +288,38 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           e.preventDefault()
           e.stopPropagation()
           h.itemActions()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check collapseAll: modifiers + accumulated keys match binding
+        if (
+          h.collapseAll &&
+          collapseAllBinding &&
+          collapseAllBinding.key &&
+          modifiersMatchBinding(modifierBuffer, collapseAllBinding) &&
+          keyBuffer.join('') === collapseAllBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.collapseAll()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check settings: modifiers + accumulated keys match binding
+        if (
+          h.settings &&
+          settingsBinding &&
+          settingsBinding.key &&
+          modifiersMatchBinding(modifierBuffer, settingsBinding) &&
+          keyBuffer.join('') === settingsBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.settings()
           consumed = true
           suppressModifiers()
           return
@@ -391,6 +433,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     goToLastTabBinding,
     togglePipBinding,
     itemActionsBinding,
+    collapseAllBinding,
+    settingsBinding,
     pip.window,
   ])
 }

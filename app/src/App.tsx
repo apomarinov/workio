@@ -77,6 +77,12 @@ function AppContent() {
         }),
       )
     },
+    collapseAll: () => {
+      window.dispatchEvent(new Event('collapse-all'))
+    },
+    settings: () => {
+      window.dispatchEvent(new Event('open-settings'))
+    },
   })
 
   // Example: Change favicon based on session status

@@ -253,13 +253,20 @@ export function Sidebar({ width }: SidebarProps) {
     [sessions],
   )
 
-  const collapseAll = () => {
+  const collapseAll = useCallback(() => {
     setExpandedFoldersArray([])
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
     setCollapsedSessions(allSessionIds)
     setExpandedGitHubPRs([])
-  }
+  }, [
+    allSessionIds,
+    setExpandedFoldersArray,
+    setExpandedSessionGroups,
+    setExpandedTerminalSessions,
+    setCollapsedSessions,
+    setExpandedGitHubPRs,
+  ])
 
   const handlePipToggle = useCallback(() => {
     if (pip.isOpen) {
@@ -284,6 +291,20 @@ export function Sidebar({ width }: SidebarProps) {
     window.addEventListener('toggle-pip', handler)
     return () => window.removeEventListener('toggle-pip', handler)
   }, [handlePipToggle])
+
+  // Listen for collapse-all events from keyboard shortcut
+  useEffect(() => {
+    const handler = () => collapseAll()
+    window.addEventListener('collapse-all', handler)
+    return () => window.removeEventListener('collapse-all', handler)
+  }, [collapseAll])
+
+  // Listen for open-settings events from keyboard shortcut
+  useEffect(() => {
+    const handler = () => setShowSettingsModal(true)
+    window.addEventListener('open-settings', handler)
+    return () => window.removeEventListener('open-settings', handler)
+  }, [])
 
   // Listen for reveal-pr events from the command palette
   useEffect(() => {
