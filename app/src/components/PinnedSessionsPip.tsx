@@ -138,10 +138,9 @@ function SettingsMenu({
   maxSessions: number
   setMaxSessions: (v: number) => void
   portalContainer?: HTMLElement | null
-  open: boolean,
+  open: boolean
   setOpen: (v: boolean) => void
 }) {
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -341,8 +340,18 @@ export function PinnedSessionsPip() {
       {pipContainer &&
         createPortal(
           <div className="relative h-full w-full flex max-w-[100vw] max-h-[100vh]">
-            <div className="rounded-tl-md w-[90vw] h-10 absolute top-0 left-0 z-30" onMouseEnter={() => setIsHoveringMenu(true)} onMouseLeave={() => setIsHoveringMenu(openMenu)}>
-              <div onMouseLeave={() => setIsHoveringMenu(false)} className={cn('transition-all translate-y-[-45px]', (isHoveringMenu || openMenu) && 'flex translate-y-0')}>
+            <div
+              className="rounded-tl-md w-[90vw] h-10 absolute top-0 left-0 z-30"
+              onMouseEnter={() => setIsHoveringMenu(true)}
+              onMouseLeave={() => setIsHoveringMenu(openMenu)}
+            >
+              <div
+                onMouseLeave={() => setIsHoveringMenu(false)}
+                className={cn(
+                  'transition-all translate-y-[-45px]',
+                  (isHoveringMenu || openMenu) && 'flex translate-y-0',
+                )}
+              >
                 <div className="flex-row border-[2px] !border-t-[0px] border-sidebar-accent flex rounded-b-lg px-2 py-1.5 w-fit h-fit items-start gap-2 bg-sidebar mx-auto">
                   <Button
                     variant="ghost"

@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Copy,
   ExternalLink,
   GitBranch,
@@ -114,6 +115,7 @@ export function TerminalItem({
     _setActiveTab((o) => (o === v ? null : v))
   }
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
+  const [showAllSessions, setShowAllSessions] = useState(false)
   const isSettingUp =
     terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'
   const isDeleting = terminal.setup?.status === 'delete'
@@ -519,14 +521,48 @@ export function TerminalItem({
                     )}
                     Claude ({sessions.length})
                   </button>
-                  {sessionsListExpanded &&
-                    sessions.map((session, idx) => (
-                      <SessionItem
-                        defaultCollapsed={idx > 0}
-                        key={session.session_id}
-                        session={session}
-                      />
-                    ))}
+                  {sessionsListExpanded && (
+                    <>
+                      {sessions.slice(0, 2).map((session, idx) => (
+                        <SessionItem
+                          defaultCollapsed={idx > 0}
+                          key={session.session_id}
+                          session={session}
+                        />
+                      ))}
+                      {sessions.length > 2 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowAllSessions(!showAllSessions)}
+                            className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-1"
+                          >
+                            {showAllSessions ? (
+                              <>
+                                <ChevronUp className="w-3 h-3" />
+                                Hide older
+                              </>
+                            ) : (
+                              <>
+                                <ChevronRight className="w-3 h-3" />
+                                Show {sessions.length - 2} older
+                              </>
+                            )}
+                          </button>
+                          {showAllSessions &&
+                            sessions
+                              .slice(2)
+                              .map((session) => (
+                                <SessionItem
+                                  defaultCollapsed
+                                  key={session.session_id}
+                                  session={session}
+                                />
+                              ))}
+                        </>
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </div>
