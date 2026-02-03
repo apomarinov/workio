@@ -161,6 +161,12 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   sendNotificationRef.current = sendNotification
   const [prPoll, setPrPoll] = useState(true)
   const lastDetectEmitRef = useRef(0)
+  const [hiddenAuthors] = useLocalStorage<string[]>(
+    'hidden-comment-authors',
+    [],
+  )
+  const hiddenAuthorsRef = useRef(new Set(hiddenAuthors))
+  hiddenAuthorsRef.current = new Set(hiddenAuthors)
 
   useEffect(() => {
     if (!prPoll) {
@@ -262,13 +268,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             })
           }
 
-          // New comments (skip if from current user)
+          // New comments (skip if from current user or hidden author)
           if (prev && pr.comments.length > 0) {
             const prevCommentKeys = new Set(
               prev.comments.map((c) => `${c.author}:${c.createdAt}`),
             )
             for (const comment of pr.comments) {
               if (data.username && comment.author === data.username) continue
+              if (hiddenAuthorsRef.current.has(comment.author)) continue
               const commentKey = `${comment.author}:${comment.createdAt}`
               if (!prevCommentKeys.has(commentKey)) {
                 sendNotificationRef.current(`💬 ${comment.author} commented`, {
@@ -280,13 +287,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          // New reviews (skip if from current user)
+          // New reviews (skip if from current user or hidden author)
           if (prev && pr.reviews.length > 0) {
             const prevReviewKeys = new Set(
               prev.reviews.map((r) => `${r.author}:${r.state}`),
             )
             for (const review of pr.reviews) {
               if (data.username && review.author === data.username) continue
+              if (hiddenAuthorsRef.current.has(review.author)) continue
               const reviewKey = `${review.author}:${review.state}`
               if (!prevReviewKeys.has(reviewKey)) {
                 const emoji =
