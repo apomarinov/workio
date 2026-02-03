@@ -308,7 +308,14 @@ export function CommandPalette() {
         setBranchesLoading(true)
         setOpen(true)
         getBranches(terminalId)
-          .then(setBranches)
+          .then((data) => {
+            setBranches(data)
+            const firstBranch = data.local[0] ?? data.remote[0]
+            if (firstBranch) {
+              const prefix = data.local[0] ? 'local' : 'remote'
+              setHighlightedId(`branch:${prefix}:${firstBranch.name}`)
+            }
+          })
           .catch((err) => {
             toast.error(
               err instanceof Error ? err.message : 'Failed to fetch branches',
@@ -477,7 +484,14 @@ export function CommandPalette() {
           setBranches(null)
           setBranchesLoading(true)
           getBranches(actionTarget.terminal.id)
-            .then(setBranches)
+            .then((data) => {
+              setBranches(data)
+              const firstBranch = data.local[0] ?? data.remote[0]
+              if (firstBranch) {
+                const prefix = data.local[0] ? 'local' : 'remote'
+                setHighlightedId(`branch:${prefix}:${firstBranch.name}`)
+              }
+            })
             .catch((err) => {
               toast.error(
                 err instanceof Error ? err.message : 'Failed to fetch branches',
@@ -686,7 +700,14 @@ export function CommandPalette() {
     setBranches(null)
     setBranchesLoading(true)
     getBranches(actionTarget.terminal.id)
-      .then(setBranches)
+      .then((data) => {
+        setBranches(data)
+        const firstBranch = data.local[0] ?? data.remote[0]
+        if (firstBranch) {
+          const prefix = data.local[0] ? 'local' : 'remote'
+          setHighlightedId(`branch:${prefix}:${firstBranch.name}`)
+        }
+      })
       .catch((err) => {
         toast.error(
           err instanceof Error ? err.message : 'Failed to fetch branches',
@@ -1585,11 +1606,11 @@ function BranchActionsView({
               <CommandItem
                 value="action:push"
                 className="cursor-pointer"
-                disabled={!canPush}
+                disabled={isDirty || isLoading}
                 onSelect={onPush}
               >
                 <ArrowUp className="h-4 w-4 shrink-0 text-zinc-400" />
-                <span className={!canPush ? 'text-zinc-500' : ''}>Push</span>
+                <span className={isDirty ? 'text-zinc-500' : ''}>Push</span>
                 {isDirty && (
                   <span className="text-xs text-yellow-500/80">
                     (uncommitted changes)
@@ -1602,11 +1623,11 @@ function BranchActionsView({
               <CommandItem
                 value="action:force-push"
                 className="cursor-pointer"
-                disabled={!canPush}
+                disabled={isDirty || isLoading}
                 onSelect={onForcePush}
               >
                 <ArrowUp className="h-4 w-4 shrink-0 text-red-400" />
-                <span className={!canPush ? 'text-zinc-500' : ''}>
+                <span className={isDirty ? 'text-zinc-500' : ''}>
                   Force Push
                 </span>
                 {isDirty && (
