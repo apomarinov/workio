@@ -1,6 +1,8 @@
 import {
   Activity,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -25,6 +27,11 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
@@ -64,6 +71,7 @@ export function TerminalItem({
     processes: allProcesses,
     terminalPorts,
     gitDirtyStatus,
+    gitRemoteSyncStatus,
   } = useProcessContext()
   const processes = useMemo(
     () => allProcesses.filter((p) => p.terminalId === terminal.id),
@@ -86,6 +94,12 @@ export function TerminalItem({
   const isDirty =
     !!diffStat &&
     (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
+  const remoteSyncStat = gitRemoteSyncStatus[terminal.id]
+  const showRemoteSync =
+    !!remoteSyncStat &&
+    (remoteSyncStat.noRemote ||
+      remoteSyncStat.behind > 0 ||
+      remoteSyncStat.ahead > 0)
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
   const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
@@ -216,7 +230,8 @@ export function TerminalItem({
               !hasProcesses &&
               !hasGitHub &&
               !hasPorts &&
-              !isDirty) ||
+              !isDirty &&
+              !showRemoteSync) ||
               isSettingUp ||
               isDeleting) &&
             'pl-2.5',
@@ -225,7 +240,12 @@ export function TerminalItem({
         >
           {!isSettingUp &&
             !isDeleting &&
-            (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
+            (hasSessions ||
+              hasProcesses ||
+              hasGitHub ||
+              hasPorts ||
+              isDirty ||
+              showRemoteSync) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -413,121 +433,185 @@ export function TerminalItem({
             Clone failed: {terminal.git_repo.error}
           </div>
         )}
-        {(hasGitHub || hasProcesses || hasPorts || isDirty || hasSessions) &&
+        {(hasGitHub ||
+          hasProcesses ||
+          hasPorts ||
+          isDirty ||
+          showRemoteSync ||
+          hasSessions) &&
           sessionsExpanded && (
             <div className="ml-2 space-y-0.5">
-              {(hasGitHub || hasProcesses || hasPorts || isDirty) && (
-                <>
-                  <div className="flex items-center px-2 pl-1 pt-1 flex-wrap">
-                    {hasGitHub && prForBranch && (
-                      <PRTabButton
-                        pr={prForBranch}
-                        withIcon
-                        active={activeTab === 'prs' && isActive}
-                        className="whitespace-nowrap"
-                        hasNewActivity={hasNewActivity(prForBranch)}
-                        onClick={() => {
-                          setActiveTab('prs')
-                          markPRSeen(prForBranch)
-                        }}
-                      />
-                    )}
-                    {hasProcesses && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('processes')}
-                        className={cn(
-                          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
-                          activeTab === 'processes'
-                            ? 'text-foreground bg-sidebar-accent'
-                            : 'text-muted-foreground/60 hover:text-muted-foreground',
-                        )}
-                      >
-                        Processes ({processes.length})
-                      </button>
-                    )}
-                    {hasPorts && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('ports')}
-                        className={cn(
-                          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
-                          activeTab === 'ports'
-                            ? 'text-foreground bg-sidebar-accent'
-                            : 'text-muted-foreground/60 hover:text-muted-foreground',
-                        )}
-                      >
-                        Ports ({ports.length})
-                      </button>
-                    )}
-                    {isDirty && diffStat && (
-                      <span
-                        className={cn(
-                          'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono',
-                          isActive && 'opacity-80',
-                        )}
-                      >
-                        {diffStat.added > 0 && (
-                          <span className="text-green-500/80">
-                            +{diffStat.added}
-                          </span>
-                        )}
-                        {diffStat.added > 0 && diffStat.removed > 0 && '/'}
-                        {diffStat.removed > 0 && (
-                          <span className="text-red-500/80">
-                            -{diffStat.removed}
-                          </span>
-                        )}
-                        {diffStat.untracked > 0 &&
-                          (diffStat.added > 0 || diffStat.removed > 0) &&
-                          '/'}
-                        {diffStat.untracked > 0 && (
-                          <span className="text-yellow-500/80">
-                            ?{diffStat.untracked}
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    {activeTab === 'processes' &&
-                      hasProcesses &&
-                      processes.map((process) => (
-                        <div
-                          key={`${process.pid}-${process.command}`}
-                          className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+              {(hasGitHub ||
+                hasProcesses ||
+                hasPorts ||
+                isDirty ||
+                showRemoteSync) && (
+                  <>
+                    <div className="flex items-center px-2 pl-1 pt-1 flex-wrap">
+                      {hasGitHub && prForBranch && (
+                        <PRTabButton
+                          pr={prForBranch}
+                          withIcon
+                          active={activeTab === 'prs' && isActive}
+                          className="whitespace-nowrap"
+                          hasNewActivity={hasNewActivity(prForBranch)}
+                          onClick={() => {
+                            setActiveTab('prs')
+                            markPRSeen(prForBranch)
+                          }}
+                        />
+                      )}
+                      {hasProcesses && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('processes')}
+                          className={cn(
+                            'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+                            activeTab === 'processes'
+                              ? 'text-foreground bg-sidebar-accent'
+                              : 'text-muted-foreground/60 hover:text-muted-foreground',
+                          )}
                         >
-                          <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
-                          <span className="text-xs truncate">
-                            {process.command}
-                          </span>
-                        </div>
-                      ))}
-                    {activeTab === 'ports' &&
-                      hasPorts &&
-                      ports.map((port) => (
-                        <a
-                          key={port}
-                          href={`http://localhost:${port}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                          Processes ({processes.length})
+                        </button>
+                      )}
+                      {hasPorts && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('ports')}
+                          className={cn(
+                            'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+                            activeTab === 'ports'
+                              ? 'text-foreground bg-sidebar-accent'
+                              : 'text-muted-foreground/60 hover:text-muted-foreground',
+                          )}
                         >
-                          <span className="text-xs">{port}</span>
-                          <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
-                        </a>
-                      ))}
-                    {activeTab === 'prs' && hasGitHub && prForBranch && (
-                      <PRStatusContent
-                        pr={prForBranch}
-                        expanded={true}
-                        hasNewActivity={hasNewActivity(prForBranch)}
-                        onSeen={() => markPRSeen(prForBranch)}
-                      />
-                    )}
-                  </div>
-                </>
-              )}
+                          Ports ({ports.length})
+                        </button>
+                      )}
+                      {isDirty && diffStat && (
+                        <span
+                          className={cn(
+                            'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono',
+                            isActive && 'opacity-80',
+                          )}
+                        >
+                          {diffStat.added > 0 && (
+                            <span className="text-green-500/80">
+                              +{diffStat.added}
+                            </span>
+                          )}
+                          {diffStat.added > 0 && diffStat.removed > 0 && '/'}
+                          {diffStat.removed > 0 && (
+                            <span className="text-red-500/80">
+                              -{diffStat.removed}
+                            </span>
+                          )}
+                          {diffStat.untracked > 0 &&
+                            (diffStat.added > 0 || diffStat.removed > 0) &&
+                            '/'}
+                          {diffStat.untracked > 0 && (
+                            <span className="text-yellow-500/80">
+                              ?{diffStat.untracked}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {showRemoteSync && remoteSyncStat && (
+                        <span
+                          className={cn(
+                            'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded flex items-center gap-1 font-mono',
+                            isActive && 'opacity-80',
+                          )}
+                        >
+                          {remoteSyncStat.noRemote ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex gap-0 group/norem">
+                                  <ArrowDown className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500" />
+                                  <ArrowUp className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500 translate-x-[-3px]" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                No remote configured
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <>
+                              {remoteSyncStat.behind > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex items-center text-blue-500/80 hover:text-blue-500">
+                                      {remoteSyncStat.behind}
+                                      <ArrowDown className="w-3 h-3" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {remoteSyncStat.behind} commit
+                                    {remoteSyncStat.behind > 1 ? 's' : ''} behind
+                                    remote
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {remoteSyncStat.ahead > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex items-center text-green-500/80 hover:text-green-500">
+                                      {remoteSyncStat.ahead}
+                                      <ArrowUp className="w-3 h-3" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {remoteSyncStat.ahead} commit
+                                    {remoteSyncStat.ahead > 1 ? 's' : ''} ahead of
+                                    remote
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      {activeTab === 'processes' &&
+                        hasProcesses &&
+                        processes.map((process) => (
+                          <div
+                            key={`${process.pid}-${process.command}`}
+                            className="flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                          >
+                            <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                            <span className="text-xs truncate">
+                              {process.command}
+                            </span>
+                          </div>
+                        ))}
+                      {activeTab === 'ports' &&
+                        hasPorts &&
+                        ports.map((port) => (
+                          <a
+                            key={port}
+                            href={`http://localhost:${port}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                          >
+                            <span className="text-xs">{port}</span>
+                            <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
+                          </a>
+                        ))}
+                      {activeTab === 'prs' && hasGitHub && prForBranch && (
+                        <PRStatusContent
+                          pr={prForBranch}
+                          expanded={true}
+                          hasNewActivity={hasNewActivity(prForBranch)}
+                          onSeen={() => markPRSeen(prForBranch)}
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
               {sessions.length > 0 && (
                 <>
                   <button

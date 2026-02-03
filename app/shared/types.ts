@@ -76,6 +76,16 @@ export interface GitDirtyPayload {
   dirtyStatus: Record<number, GitDiffStat> // terminalId -> line diff stats
 }
 
+export interface GitRemoteSyncStat {
+  behind: number
+  ahead: number
+  noRemote: boolean
+}
+
+export interface GitRemoteSyncPayload {
+  syncStatus: Record<number, GitRemoteSyncStat> // terminalId -> remote sync stats
+}
+
 export interface WorkspacePayload {
   terminalId: number
   name: string

@@ -65,6 +65,10 @@ const lastDirtyStatus = new Map<
   number,
   { added: number; removed: number; untracked: number }
 >()
+const lastRemoteSyncStatus = new Map<
+  number,
+  { behind: number; ahead: number; noRemote: boolean }
+>()
 
 // Terminal name file helpers for dynamic zellij session naming
 const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
@@ -288,10 +292,141 @@ async function checkGitDirty(
   }
 }
 
+async function checkGitRemoteSync(
+  cwd: string,
+  sshHost?: string | null,
+): Promise<{ behind: number; ahead: number; noRemote: boolean }> {
+  const noRemote = { behind: 0, ahead: 0, noRemote: true }
+  try {
+    if (sshHost) {
+      // Try @{u} first, fall back to origin/<branch>
+      const [behindResult, aheadResult] = await Promise.all([
+        execSSHCommand(
+          sshHost,
+          `REF=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || (git rev-parse --abbrev-ref HEAD | xargs -I {} git rev-parse --verify origin/{} >/dev/null 2>&1 && git rev-parse --abbrev-ref HEAD | xargs -I {} echo origin/{})); [ -n "$REF" ] && git rev-list --count HEAD..$REF`,
+          cwd,
+        ),
+        execSSHCommand(
+          sshHost,
+          `REF=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || (git rev-parse --abbrev-ref HEAD | xargs -I {} git rev-parse --verify origin/{} >/dev/null 2>&1 && git rev-parse --abbrev-ref HEAD | xargs -I {} echo origin/{})); [ -n "$REF" ] && git rev-list --count $REF..HEAD`,
+          cwd,
+        ),
+      ])
+      if (!behindResult.stdout.trim() || !aheadResult.stdout.trim()) {
+        return noRemote
+      }
+      return {
+        behind: Number.parseInt(behindResult.stdout.trim(), 10) || 0,
+        ahead: Number.parseInt(aheadResult.stdout.trim(), 10) || 0,
+        noRemote: false,
+      }
+    }
+    return await new Promise<{
+      behind: number
+      ahead: number
+      noRemote: boolean
+    }>((resolve) => {
+      // First get the remote ref (upstream or origin/<branch>)
+      execFile(
+        'git',
+        ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+        { cwd, timeout: 5000 },
+        (upstreamErr, upstreamRef) => {
+          if (!upstreamErr && upstreamRef.trim()) {
+            // Has upstream, use it
+            countRemoteSync(cwd, upstreamRef.trim(), resolve, noRemote)
+          } else {
+            // No upstream, try origin/<branch>
+            execFile(
+              'git',
+              ['rev-parse', '--abbrev-ref', 'HEAD'],
+              { cwd, timeout: 5000 },
+              (branchErr, branch) => {
+                if (branchErr || !branch.trim()) {
+                  resolve(noRemote)
+                  return
+                }
+                const remoteBranch = `origin/${branch.trim()}`
+                // Check if origin/<branch> exists
+                execFile(
+                  'git',
+                  ['rev-parse', '--verify', remoteBranch],
+                  { cwd, timeout: 5000 },
+                  (verifyErr) => {
+                    if (verifyErr) {
+                      resolve(noRemote)
+                    } else {
+                      countRemoteSync(cwd, remoteBranch, resolve, noRemote)
+                    }
+                  },
+                )
+              },
+            )
+          }
+        },
+      )
+    })
+  } catch {
+    return noRemote
+  }
+}
+
+function countRemoteSync(
+  cwd: string,
+  remoteRef: string,
+  resolve: (value: {
+    behind: number
+    ahead: number
+    noRemote: boolean
+  }) => void,
+  noRemote: { behind: number; ahead: number; noRemote: boolean },
+) {
+  let behind = 0
+  let ahead = 0
+  let completed = 0
+  const checkDone = () => {
+    if (++completed === 2) {
+      resolve({ behind, ahead, noRemote: false })
+    }
+  }
+
+  execFile(
+    'git',
+    ['rev-list', '--count', `HEAD..${remoteRef}`],
+    { cwd, timeout: 5000 },
+    (err, stdout) => {
+      if (err) {
+        resolve(noRemote)
+        return
+      }
+      behind = Number.parseInt(stdout.trim(), 10) || 0
+      checkDone()
+    },
+  )
+
+  execFile(
+    'git',
+    ['rev-list', '--count', `${remoteRef}..HEAD`],
+    { cwd, timeout: 5000 },
+    (err, stdout) => {
+      if (err) {
+        resolve(noRemote)
+        return
+      }
+      ahead = Number.parseInt(stdout.trim(), 10) || 0
+      checkDone()
+    },
+  )
+}
+
 async function scanAndEmitGitDirty() {
   const currentStatus: Record<
     number,
     { added: number; removed: number; untracked: number }
+  > = {}
+  const currentSyncStatus: Record<
+    number,
+    { behind: number; ahead: number; noRemote: boolean }
   > = {}
   const checks: Promise<void>[] = []
 
@@ -303,8 +438,12 @@ async function scanAndEmitGitDirty() {
       checks.push(
         (async () => {
           try {
-            const stat = await checkGitDirty(terminal.cwd, terminal.ssh_host)
+            const [stat, syncStat] = await Promise.all([
+              checkGitDirty(terminal.cwd, terminal.ssh_host),
+              checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
+            ])
             currentStatus[terminal.id] = stat
+            currentSyncStatus[terminal.id] = syncStat
 
             // Also detect branch changes
             let branch: string | null = null
@@ -346,30 +485,43 @@ async function scanAndEmitGitDirty() {
 
   await Promise.all(checks)
 
-  // Update cache
+  // Update dirty status cache
   lastDirtyStatus.clear()
   for (const [id, stat] of Object.entries(currentStatus)) {
     lastDirtyStatus.set(Number(id), stat)
   }
 
+  // Update remote sync cache
+  lastRemoteSyncStatus.clear()
+  for (const [id, stat] of Object.entries(currentSyncStatus)) {
+    lastRemoteSyncStatus.set(Number(id), stat)
+  }
+
   // Always emit — the payload is small and clients may have reconnected
   getIO()?.emit('git:dirty-status', { dirtyStatus: currentStatus })
+  getIO()?.emit('git:remote-sync', { syncStatus: currentSyncStatus })
 }
 
 async function checkAndEmitSingleGitDirty(terminalId: number) {
   try {
     const terminal = await getTerminalById(terminalId)
     if (!terminal) return
-    const stat = await checkGitDirty(terminal.cwd, terminal.ssh_host)
-    const prev = lastDirtyStatus.get(terminalId)
-    if (
-      !prev ||
-      prev.added !== stat.added ||
-      prev.removed !== stat.removed ||
-      prev.untracked !== stat.untracked
-    ) {
+
+    const [stat, syncStat] = await Promise.all([
+      checkGitDirty(terminal.cwd, terminal.ssh_host),
+      checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
+    ])
+
+    // Check if dirty status changed
+    const prevDirty = lastDirtyStatus.get(terminalId)
+    const dirtyChanged =
+      !prevDirty ||
+      prevDirty.added !== stat.added ||
+      prevDirty.removed !== stat.removed ||
+      prevDirty.untracked !== stat.untracked
+
+    if (dirtyChanged) {
       lastDirtyStatus.set(terminalId, stat)
-      // Emit full status map
       const dirtyStatus: Record<
         number,
         { added: number; removed: number; untracked: number }
@@ -378,6 +530,26 @@ async function checkAndEmitSingleGitDirty(terminalId: number) {
         dirtyStatus[id] = s
       }
       getIO()?.emit('git:dirty-status', { dirtyStatus })
+    }
+
+    // Check if remote sync status changed
+    const prevSync = lastRemoteSyncStatus.get(terminalId)
+    const syncChanged =
+      !prevSync ||
+      prevSync.behind !== syncStat.behind ||
+      prevSync.ahead !== syncStat.ahead ||
+      prevSync.noRemote !== syncStat.noRemote
+
+    if (syncChanged) {
+      lastRemoteSyncStatus.set(terminalId, syncStat)
+      const syncStatus: Record<
+        number,
+        { behind: number; ahead: number; noRemote: boolean }
+      > = {}
+      for (const [id, s] of lastRemoteSyncStatus) {
+        syncStatus[id] = s
+      }
+      getIO()?.emit('git:remote-sync', { syncStatus })
     }
   } catch {
     // ignore
@@ -615,6 +787,7 @@ export async function createSession(
   backend.onExit(({ exitCode }) => {
     sessions.delete(terminalId)
     lastDirtyStatus.delete(terminalId)
+    lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()
     updateTerminal(terminalId, {
       pid: null,
@@ -810,6 +983,7 @@ export function destroySession(terminalId: number): boolean {
 
   sessions.delete(terminalId)
   lastDirtyStatus.delete(terminalId)
+  lastRemoteSyncStatus.delete(terminalId)
   stopGlobalProcessPolling()
   untrackTerminal(terminalId)
   return true

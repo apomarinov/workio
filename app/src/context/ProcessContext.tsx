@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type {
   ActiveProcess,
   GitDirtyPayload,
+  GitRemoteSyncPayload,
   ProcessesPayload,
 } from '../../shared/types'
 import { useSocket } from '../hooks/useSocket'
@@ -12,6 +13,10 @@ interface ProcessContextValue {
   gitDirtyStatus: Record<
     number,
     { added: number; removed: number; untracked: number }
+  >
+  gitRemoteSyncStatus: Record<
+    number,
+    { behind: number; ahead: number; noRemote: boolean }
   >
 }
 
@@ -26,6 +31,9 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
   )
   const [gitDirtyStatus, setGitDirtyStatus] = useState<
     Record<number, { added: number; removed: number; untracked: number }>
+  >({})
+  const [gitRemoteSyncStatus, setGitRemoteSyncStatus] = useState<
+    Record<number, { behind: number; ahead: number; noRemote: boolean }>
   >({})
 
   useEffect(() => {
@@ -44,6 +52,30 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
             p.added !== n.added ||
             p.removed !== n.removed ||
             p.untracked !== n.untracked
+          )
+            return next
+        }
+        return prev
+      })
+    })
+  }, [subscribe])
+
+  useEffect(() => {
+    return subscribe<GitRemoteSyncPayload>('git:remote-sync', (data) => {
+      setGitRemoteSyncStatus((prev) => {
+        const next = data.syncStatus
+        const prevKeys = Object.keys(prev)
+        const nextKeys = Object.keys(next)
+        if (prevKeys.length !== nextKeys.length) return next
+        for (const key of nextKeys) {
+          const p = prev[Number(key)]
+          const n = next[Number(key)]
+          if (
+            !p ||
+            !n ||
+            p.behind !== n.behind ||
+            p.ahead !== n.ahead ||
+            p.noRemote !== n.noRemote
           )
             return next
         }
@@ -82,8 +114,8 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
   }, [subscribe])
 
   const value = useMemo(
-    () => ({ processes, terminalPorts, gitDirtyStatus }),
-    [processes, terminalPorts, gitDirtyStatus],
+    () => ({ processes, terminalPorts, gitDirtyStatus, gitRemoteSyncStatus }),
+    [processes, terminalPorts, gitDirtyStatus, gitRemoteSyncStatus],
   )
 
   return (
