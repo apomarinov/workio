@@ -433,6 +433,8 @@ async function scanAndEmitGitDirty() {
   try {
     const terminals = await getAllTerminals()
     for (const terminal of terminals) {
+      // Skip terminals that aren't in a git repo
+      if (!terminal.git_branch) continue
       // Skip SSH terminals that don't have an active session
       if (terminal.ssh_host && !sessions.has(terminal.id)) continue
       checks.push(
@@ -505,7 +507,7 @@ async function scanAndEmitGitDirty() {
 async function checkAndEmitSingleGitDirty(terminalId: number) {
   try {
     const terminal = await getTerminalById(terminalId)
-    if (!terminal) return
+    if (!terminal || !terminal.git_branch) return
 
     const [stat, syncStat] = await Promise.all([
       checkGitDirty(terminal.cwd, terminal.ssh_host),

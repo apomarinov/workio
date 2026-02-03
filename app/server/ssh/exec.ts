@@ -34,9 +34,18 @@ export function execSSHCommand(
     }, timeout)
 
     conn.on('ready', () => {
-      const fullCommand = cwd
-        ? `cd '${cwd.replace(/'/g, "'\\''")}' && ${command}`
-        : command
+      let fullCommand = command
+      if (cwd) {
+        // Handle tilde expansion - don't quote the ~ part
+        if (cwd.startsWith('~/')) {
+          const rest = cwd.slice(2).replace(/'/g, "'\\''")
+          fullCommand = `cd ~/'${rest}' && ${command}`
+        } else if (cwd === '~') {
+          fullCommand = `cd ~ && ${command}`
+        } else {
+          fullCommand = `cd '${cwd.replace(/'/g, "'\\''")}' && ${command}`
+        }
+      }
 
       conn.exec(fullCommand, (err, channel) => {
         if (err) {

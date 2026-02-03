@@ -14,6 +14,7 @@ import {
   GitBranch,
   GitFork,
   GitMerge,
+  Globe,
   Loader2,
   Pencil,
   Pin,
@@ -60,11 +61,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-    type: 'terminal'
-    terminal: Terminal
-    pr: PRCheckStatus | null
-    actionHint: string | null
-  }
+      type: 'terminal'
+      terminal: Terminal
+      pr: PRCheckStatus | null
+      actionHint: string | null
+    }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -282,7 +283,7 @@ export function CommandPalette() {
       // Otherwise show terminal actions
       if (terminalId) {
         const terminal = terminals.find((t) => t.id === terminalId)
-        if (terminal && !terminal.ssh_host) {
+        if (terminal) {
           const pr = terminal.git_branch
             ? (branchToPR.get(terminal.git_branch) ?? null)
             : null
@@ -452,10 +453,7 @@ export function CommandPalette() {
       if (e.key === 'ArrowRight') {
         // In search mode: open actions for terminal/session (not for PRs - they just open a link)
         if (mode === 'search' && highlightedItem) {
-          if (
-            highlightedItem.type === 'terminal' &&
-            !highlightedItem.terminal.ssh_host
-          ) {
+          if (highlightedItem.type === 'terminal') {
             e.preventDefault()
             setActionTarget({
               type: 'terminal',
@@ -717,7 +715,6 @@ export function CommandPalette() {
                   mergedPRs={mergedPRs}
                   sessions={sessions}
                   branchToPR={branchToPR}
-                  onSelectTerminal={handleSelectTerminal}
                   onOpenTerminalActions={(terminal, pr) => {
                     setActionTarget({ type: 'terminal', terminal, pr })
                     setHighlightedId(null)
@@ -976,7 +973,6 @@ function SearchView({
   mergedPRs,
   sessions,
   branchToPR,
-  onSelectTerminal,
   onOpenTerminalActions,
   onOpenSessionActions,
   onSelectPR,
@@ -992,7 +988,6 @@ function SearchView({
   }[]
   sessions: SessionWithProject[]
   branchToPR: Map<string, PRCheckStatus>
-  onSelectTerminal: (id: number) => void
   onOpenTerminalActions: (terminal: Terminal, pr: PRCheckStatus | null) => void
   onOpenSessionActions: (session: SessionWithProject) => void
   onSelectPR: (pr: { branch: string; repo: string }) => void
@@ -1028,13 +1023,13 @@ function SearchView({
                     t.git_branch ?? '',
                     t.git_repo?.repo ?? '',
                   ]}
-                  onSelect={() =>
-                    t.ssh_host
-                      ? onSelectTerminal(t.id)
-                      : onOpenTerminalActions(t, matchedPR)
-                  }
+                  onSelect={() => onOpenTerminalActions(t, matchedPR)}
                 >
-                  <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
+                  {t.ssh_host ? (
+                    <Globe className="h-4 w-4 shrink-0 text-blue-400" />
+                  ) : (
+                    <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
+                  )}
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium">
                       {t.name || getLastPathSegment(t.cwd)}
@@ -1194,8 +1189,8 @@ function ActionsView({
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-      target?.session.latest_user_message ||
-      target?.session.session_id
+        target?.session.latest_user_message ||
+        target?.session.session_id
 
   return (
     <>

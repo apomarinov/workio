@@ -657,6 +657,11 @@ export async function trackTerminal(terminalId: number): Promise<void> {
     }
   }
 
+  // Detect git branch for SSH terminals (they lack shell integration events)
+  if (terminal.ssh_host && !terminal.git_branch) {
+    detectGitBranch(terminalId, { skipPRRefresh: true })
+  }
+
   if (ghAvailable === null) {
     ghAvailable = await checkGhAvailable()
   }
