@@ -19,7 +19,9 @@ import {
   ChevronsDownUp,
   Ellipsis,
   Folder,
+  GitBranch,
   Github,
+  GitMerge,
   LayoutList,
   PictureInPicture2,
   Plus,
@@ -42,7 +44,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
-import { MergedPRsList } from './MergedPRsList'
+import { OlderMergedPRsList } from './MergedPRsList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
@@ -96,6 +98,7 @@ export function Sidebar({ width }: SidebarProps) {
     useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
   const {
     githubPRs,
+    mergedPRs,
     hasNewActivity,
     markPRSeen,
     markAllPRsSeen,
@@ -247,6 +250,19 @@ export function Sidebar({ width }: SidebarProps) {
     }
     return grouped
   }, [githubPRs])
+
+  const mergedPRsByRepo = useMemo(() => {
+    const grouped = new Map<string, typeof mergedPRs>()
+    for (const pr of mergedPRs) {
+      const existing = grouped.get(pr.repo)
+      if (existing) {
+        existing.push(pr)
+      } else {
+        grouped.set(pr.repo, [pr])
+      }
+    }
+    return grouped
+  }, [mergedPRs])
 
   const allSessionIds = useMemo(
     () => sessions.map((s) => s.session_id),
@@ -847,7 +863,30 @@ export function Sidebar({ width }: SidebarProps) {
                                   onSeen={() => markPRSeen(pr)}
                                 />
                               ))}
-                              <MergedPRsList repo={repo} />
+                              {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
+                                <a
+                                  key={pr.prNumber}
+                                  href={pr.prUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                                >
+                                  <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs truncate block">
+                                      {pr.prTitle}
+                                    </span>
+                                    <div className="flex gap-1 items-center">
+                                      <GitBranch className="w-2.5 h-2.5" />
+                                      <span className="text-[11px] text-muted-foreground/50 truncate">
+                                        {pr.branch}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </a>
+                              ))}
+                              <OlderMergedPRsList repo={repo} />
                             </>
                           )}
                         </div>

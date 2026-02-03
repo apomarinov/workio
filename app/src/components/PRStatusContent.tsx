@@ -65,9 +65,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -180,7 +180,7 @@ const ReviewRow = memo(function ReviewRow({
           href={reviewUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 min-w-0 py-1 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
         >
           {icon}
           {review.avatarUrl ? (
@@ -216,7 +216,7 @@ const ReviewRow = memo(function ReviewRow({
             onClick={() => onMerge()}
             disabled={hasConflicts}
             className={cn(
-              'text-[10px] flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity pr-2 pt-1',
+              'text-[10px] flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity pr-2',
               hasConflicts
                 ? 'text-muted-foreground/30 cursor-not-allowed'
                 : 'text-muted-foreground/50 hover:text-muted-foreground cursor-pointer',
@@ -625,7 +625,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

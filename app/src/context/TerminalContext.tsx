@@ -19,6 +19,14 @@ import * as api from '../lib/api'
 import type { Terminal } from '../types'
 import { useNotifications } from './NotificationContext'
 
+export interface MergedPRSummary {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  branch: string
+  repo: string
+}
+
 interface TerminalContextValue {
   terminals: Terminal[]
   loading: boolean
@@ -45,6 +53,7 @@ interface TerminalContextValue {
   setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
   refetch: () => void
   githubPRs: PRCheckStatus[]
+  mergedPRs: MergedPRSummary[]
   hasNewActivity: (pr: PRCheckStatus) => boolean
   markPRSeen: (pr: PRCheckStatus) => void
   markAllPRsSeen: () => void
@@ -390,6 +399,70 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [githubPRs, prSeenTimes],
   )
 
+  // Fetch merged PRs for all repos
+  const [mergedPRs, setMergedPRs] = useState<MergedPRSummary[]>([])
+
+  const repos = useMemo(() => {
+    const repoSet = new Set<string>()
+    for (const pr of githubPRs) {
+      repoSet.add(pr.repo)
+    }
+    return Array.from(repoSet)
+  }, [githubPRs])
+
+  useEffect(() => {
+    if (repos.length === 0) {
+      setMergedPRs([])
+      return
+    }
+
+    let cancelled = false
+
+    async function fetchMergedPRs() {
+      try {
+        const results = await Promise.all(
+          repos.map(async (repo) => {
+            const [owner, repoName] = repo.split('/')
+            if (!owner || !repoName) return []
+            try {
+              const result = await api.getMergedPRs(owner, repoName, 3, 0)
+              return result.prs
+            } catch {
+              return []
+            }
+          }),
+        )
+
+        if (!cancelled) {
+          // Flatten, dedupe, and exclude PRs already in githubPRs
+          const existingPRs = new Set(
+            githubPRs.map((pr) => `${pr.repo}#${pr.prNumber}`),
+          )
+          const seen = new Set<string>()
+          const allPRs: MergedPRSummary[] = []
+          for (const prs of results) {
+            for (const pr of prs) {
+              const key = `${pr.repo}#${pr.prNumber}`
+              if (!seen.has(key) && !existingPRs.has(key)) {
+                seen.add(key)
+                allPRs.push(pr)
+              }
+            }
+          }
+          setMergedPRs(allPRs)
+        }
+      } catch {
+        // silently fail
+      }
+    }
+
+    fetchMergedPRs()
+
+    return () => {
+      cancelled = true
+    }
+  }, [repos, githubPRs])
+
   const selectTerminal = useCallback((id: number) => {
     setActiveTerminalId((prev) => {
       if (prev !== null && prev !== id) {
@@ -467,6 +540,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       setTerminalOrder,
       refetch,
       githubPRs,
+      mergedPRs,
       hasNewActivity,
       markPRSeen,
       markAllPRsSeen,
@@ -484,6 +558,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       setTerminalOrder,
       refetch,
       githubPRs,
+      mergedPRs,
       hasNewActivity,
       markPRSeen,
       markAllPRsSeen,

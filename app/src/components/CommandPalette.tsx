@@ -13,6 +13,7 @@ import {
   FolderOpen,
   GitBranch,
   GitFork,
+  GitMerge,
   Loader2,
   Pencil,
   Pin,
@@ -59,11 +60,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-    type: 'terminal'
-    terminal: Terminal
-    pr: PRCheckStatus | null
-    actionHint: string | null
-  }
+      type: 'terminal'
+      terminal: Terminal
+      pr: PRCheckStatus | null
+      actionHint: string | null
+    }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -137,6 +138,7 @@ export function CommandPalette() {
     terminals,
     selectTerminal,
     githubPRs,
+    mergedPRs,
     createTerminal,
     updateTerminal,
     deleteTerminal,
@@ -231,6 +233,8 @@ export function CommandPalette() {
         actionHint: 'Open PR in new tab',
       })
     }
+
+    // Note: merged PRs are not added to itemMap since they're simpler type
 
     for (const s of sessions) {
       map.set(`s:${s.session_id}`, {
@@ -366,7 +370,7 @@ export function CommandPalette() {
   )
 
   const handleSelectPR = useCallback(
-    (pr: PRCheckStatus) => {
+    (pr: { branch: string; repo: string }) => {
       closePalette()
       window.dispatchEvent(
         new CustomEvent('reveal-pr', {
@@ -410,9 +414,16 @@ export function CommandPalette() {
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowLeft' && mode === 'actions') {
         e.preventDefault()
+        // Restore highlight to the item we came from
+        const restoreId =
+          actionTarget?.type === 'terminal'
+            ? `t:${actionTarget.terminal.id}`
+            : actionTarget?.type === 'session'
+              ? `s:${actionTarget.session.session_id}`
+              : null
         setMode('search')
         setActionTarget(null)
-        setHighlightedId(null)
+        setHighlightedId(restoreId)
         return
       }
 
@@ -420,15 +431,20 @@ export function CommandPalette() {
         e.preventDefault()
         setMode('actions')
         setBranches(null)
-        setHighlightedId(null)
+        setHighlightedId('action:branches')
         return
       }
 
       if (e.key === 'ArrowLeft' && mode === 'branch-actions') {
         e.preventDefault()
+        // Restore highlight to the branch we came from
+        const prefix = selectedBranch?.isRemote ? 'remote' : 'local'
+        const restoreId = selectedBranch
+          ? `branch:${prefix}:${selectedBranch.name}`
+          : null
         setMode('branches')
         setSelectedBranch(null)
-        setHighlightedId(null)
+        setHighlightedId(restoreId)
         return
       }
 
@@ -540,7 +556,14 @@ export function CommandPalette() {
         }
       }
     },
-    [mode, highlightedItem, highlightedId, branches, actionTarget],
+    [
+      mode,
+      highlightedItem,
+      highlightedId,
+      branches,
+      actionTarget,
+      selectedBranch,
+    ],
   )
 
   // Compute dirty state for the terminal if we're in branches mode
@@ -691,6 +714,7 @@ export function CommandPalette() {
                 <SearchView
                   terminals={terminals}
                   openPRs={openPRs}
+                  mergedPRs={mergedPRs}
                   sessions={sessions}
                   branchToPR={branchToPR}
                   onSelectTerminal={handleSelectTerminal}
@@ -711,9 +735,15 @@ export function CommandPalette() {
                 <ActionsView
                   target={actionTarget}
                   onBack={() => {
+                    const restoreId =
+                      actionTarget?.type === 'terminal'
+                        ? `t:${actionTarget.terminal.id}`
+                        : actionTarget?.type === 'session'
+                          ? `s:${actionTarget.session.session_id}`
+                          : null
                     setMode('search')
                     setActionTarget(null)
-                    setHighlightedId(null)
+                    setHighlightedId(restoreId)
                   }}
                   onRevealTerminal={(terminal) =>
                     handleSelectTerminal(terminal.id)
@@ -779,7 +809,7 @@ export function CommandPalette() {
                   onBack={() => {
                     setMode('actions')
                     setBranches(null)
-                    setHighlightedId(null)
+                    setHighlightedId('action:branches')
                   }}
                   onSelectBranch={handleBranchSelect}
                 />
@@ -803,9 +833,14 @@ export function CommandPalette() {
                       pushingBranch.force
                     }
                     onBack={() => {
+                      const prefix = selectedBranch.isRemote
+                        ? 'remote'
+                        : 'local'
                       setMode('branches')
                       setSelectedBranch(null)
-                      setHighlightedId(null)
+                      setHighlightedId(
+                        `branch:${prefix}:${selectedBranch.name}`,
+                      )
                     }}
                     onCheckout={handleBranchCheckout}
                     onPull={handleBranchPull}
@@ -938,6 +973,7 @@ export function CommandPalette() {
 function SearchView({
   terminals,
   openPRs,
+  mergedPRs,
   sessions,
   branchToPR,
   onSelectTerminal,
@@ -947,12 +983,19 @@ function SearchView({
 }: {
   terminals: Terminal[]
   openPRs: PRCheckStatus[]
+  mergedPRs: {
+    prNumber: number
+    prTitle: string
+    prUrl: string
+    branch: string
+    repo: string
+  }[]
   sessions: SessionWithProject[]
   branchToPR: Map<string, PRCheckStatus>
   onSelectTerminal: (id: number) => void
   onOpenTerminalActions: (terminal: Terminal, pr: PRCheckStatus | null) => void
   onOpenSessionActions: (session: SessionWithProject) => void
-  onSelectPR: (pr: PRCheckStatus) => void
+  onSelectPR: (pr: { branch: string; repo: string }) => void
 }) {
   return (
     <>
@@ -1011,7 +1054,7 @@ function SearchView({
           </CommandGroup>
         )}
 
-        {openPRs.length > 0 && (
+        {(openPRs.length > 0 || mergedPRs.length > 0) && (
           <CommandGroup heading="Pull Requests">
             {openPRs.map((pr) => {
               const prInfo = getPRStatusInfo(pr)
@@ -1041,6 +1084,31 @@ function SearchView({
                 </CommandItem>
               )
             })}
+            {mergedPRs.map((pr) => (
+              <CommandItem
+                className="cursor-pointer group/cmd-pr"
+                key={`${pr.repo}-${pr.prNumber}`}
+                value={`pr:${pr.prNumber}:${pr.repo}`}
+                keywords={[pr.prTitle, pr.branch]}
+                onSelect={() => window.open(pr.prUrl, '_blank')}
+              >
+                <GitMerge className="h-4 w-4 shrink-0 text-purple-500" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-medium">{pr.prTitle}</span>
+                  <div className="flex justify-between">
+                    <span className="flex items-center gap-1 truncate text-xs text-zinc-500">
+                      <GitBranch
+                        className={cn('max-h-3 max-w-3 shrink-0 text-zinc-400')}
+                      />
+                      {pr.branch}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded text-purple-400">
+                      Merged
+                    </span>
+                  </div>
+                </div>
+              </CommandItem>
+            ))}
           </CommandGroup>
         )}
 
@@ -1121,8 +1189,8 @@ function ActionsView({
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-      target?.session.latest_user_message ||
-      target?.session.session_id
+        target?.session.latest_user_message ||
+        target?.session.session_id
 
   return (
     <>
