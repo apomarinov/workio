@@ -1,6 +1,8 @@
 # WorkIO
 
-![WorkIO Dashboard](app/public/hero.png)
+<p align="center">
+  <img src="app/public/hero.png" alt="WorkIO Dashboard" />
+</p>
 
 A developer dashboard that brings together your projects, temrinals, Claude AI sessions, and GitHub pull requests into a single interface. Manage multiple projects, monitor what Claude is doing, track PRs, and connect to remote machines -- all from one place.
 
