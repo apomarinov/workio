@@ -206,7 +206,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
                 // If reviewer has a pending re-review request, mark as PENDING
                 state:
                   r.state === 'CHANGES_REQUESTED' &&
-                  pendingReviewers.has(r.author.login)
+                    pendingReviewers.has(r.author.login)
                     ? 'PENDING'
                     : r.state,
                 body: r.body || '',
@@ -514,18 +514,45 @@ async function pollAllPRChecks(): Promise<void> {
 }
 
 let lastRefreshAt = 0
-const REFRESH_MIN_INTERVAL = 10_000 // 10 seconds
+const REFRESH_MIN_INTERVAL = 30_000 // 30 seconds
 
-export async function refreshPRChecks(): Promise<void> {
+interface PollUntilOptions {
+  repo: string
+  prNumber: number
+  until: (pr: PRCheckStatus | undefined) => boolean
+}
+
+let activePollId = 0
+
+export async function refreshPRChecks(
+  force = false,
+  poll?: PollUntilOptions,
+): Promise<void> {
   const now = Date.now()
-  if (now - lastRefreshAt < REFRESH_MIN_INTERVAL) return
-  lastRefreshAt = now
+  if (!force && now - lastRefreshAt < REFRESH_MIN_INTERVAL) return
 
   if (ghAvailable === null) {
     ghAvailable = await checkGhAvailable()
   }
   if (!ghAvailable) return
 
+  if (poll) {
+    const myPollId = ++activePollId
+    for (let i = 0; i < 6; i++) {
+      checksCache.delete(poll.repo)
+      await pollAllPRChecks()
+      lastRefreshAt = Date.now()
+      const match = lastEmittedPRs.find(
+        (pr) => pr.repo === poll.repo && pr.prNumber === poll.prNumber,
+      )
+      if (poll.until(match)) return
+      if (activePollId !== myPollId) return
+      if (i < 5) await new Promise((r) => setTimeout(r, 1200))
+    }
+    return
+  }
+
+  lastRefreshAt = now
   await pollAllPRChecks()
 }
 

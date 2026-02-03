@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
   X,
+  XCircle,
 } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -62,7 +63,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
   const hasPendingReviews =
     pr.reviews.filter((r) => r.state === 'PENDING').length > 0
 
-  if (isMerged)
+  if (isMerged) {
     return {
       isMerged,
       label: 'Merged',
@@ -78,14 +79,15 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (hasChangesRequested)
+  }
+  if (hasChangesRequested) {
     return {
       hasChangesRequested,
       label: 'Change request',
       colorClass: 'text-orange-400',
       dimColorClass: 'text-orange-400/60 hover:text-orange-400',
       icon: (props?: { cls?: string; group?: string }) => (
-        <GitMerge
+        <RefreshCw
           className={cn(
             iconClass,
             `text-orange-400/70 ${props?.group ? `${props.group}:text-orange-400` : ''}`,
@@ -94,7 +96,8 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (runningChecks > 0)
+  }
+  if (runningChecks > 0) {
     return {
       hasRunningChecks: true,
       label: `Running checks (${runningChecks})`,
@@ -110,15 +113,17 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (isApproved && hasConflicts)
+  }
+  if (isApproved && (hasConflicts || failedChecks > 0)) {
     return {
       isApproved,
       hasConflicts,
-      label: 'Conflicts',
+      hasFailedChecks: failedChecks > 0,
+      label: hasConflicts ? 'Conflicts' : 'Failed Checks',
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
       icon: (props?: { cls?: string; group?: string }) => (
-        <CircleX
+        <Check
           className={cn(
             iconClass,
             `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
@@ -127,7 +132,8 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (isApproved)
+  }
+  if (isApproved) {
     return {
       isApproved,
       label: 'Approved',
@@ -143,7 +149,25 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (failedChecks > 0)
+  }
+  if (hasConflicts) {
+    return {
+      hasConflicts,
+      label: 'Conflicts',
+      colorClass: 'text-red-400',
+      dimColorClass: 'text-red-400/60 hover:text-red-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <CircleX
+          className={cn(
+            iconClass,
+            `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
+    }
+  }
+  if (failedChecks > 0) {
     return {
       hasFailedChecks: true,
       label: `Failed checks (${failedChecks})`,
@@ -159,7 +183,8 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (pr.areAllChecksOk)
+  }
+  if (pr.areAllChecksOk) {
     return {
       areAllChecksOk: true,
       label: 'Checks passed',
@@ -171,7 +196,8 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         />
       ),
     }
-  if (hasPendingReviews)
+  }
+  if (hasPendingReviews) {
     return {
       hasPendingReviews,
       label: 'Pending Reviews',
@@ -181,6 +207,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         <Clock className={cn(iconClass, `text-muted-foreground`, props?.cls)} />
       ),
     }
+  }
   return {
     label: 'Pull Request',
     colorClass: '',
@@ -221,9 +248,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -688,7 +715,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
@@ -744,10 +771,18 @@ export function PRStatusContent({
           <Dialog
             open={reReviewAuthor !== null}
             onOpenChange={(open) => {
+              if (!open && reReviewLoading) return
               if (!open) setReReviewAuthor(null)
             }}
           >
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent
+              className="sm:max-w-sm"
+              showCloseButton={false}
+              onPointerDownOutside={(e) =>
+                reReviewLoading && e.preventDefault()
+              }
+              onEscapeKeyDown={(e) => reReviewLoading && e.preventDefault()}
+            >
               <DialogHeader>
                 <DialogTitle>Request re-review</DialogTitle>
                 <DialogDescription>
@@ -777,8 +812,19 @@ export function PRStatusContent({
             </DialogContent>
           </Dialog>
 
-          <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
-            <DialogContent className="sm:max-w-sm">
+          <Dialog
+            open={mergeOpen}
+            onOpenChange={(open) => {
+              if (!open && mergeLoading) return
+              setMergeOpen(open)
+            }}
+          >
+            <DialogContent
+              showCloseButton={false}
+              className="sm:max-w-sm"
+              onPointerDownOutside={(e) => mergeLoading && e.preventDefault()}
+              onEscapeKeyDown={(e) => mergeLoading && e.preventDefault()}
+            >
               <DialogHeader>
                 <DialogTitle>Merge pull request</DialogTitle>
                 <DialogDescription>
@@ -823,10 +869,16 @@ export function PRStatusContent({
           <Dialog
             open={rerunCheck !== null}
             onOpenChange={(open) => {
+              if (!open && rerunLoading) return
               if (!open) setRerunCheck(null)
             }}
           >
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent
+              showCloseButton={false}
+              className="sm:max-w-sm"
+              onPointerDownOutside={(e) => rerunLoading && e.preventDefault()}
+              onEscapeKeyDown={(e) => rerunLoading && e.preventDefault()}
+            >
               <DialogHeader>
                 <DialogTitle>Re-run failed check</DialogTitle>
                 <DialogDescription>

@@ -38,9 +38,9 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.isMerged
             ? undefined
             : () => {
-                onToggle()
-                onSeen?.()
-              }
+              onToggle()
+              onSeen?.()
+            }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
@@ -54,8 +54,9 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.hasFailedChecks ||
           prInfo.isMerged ||
           prInfo.areAllChecksOk ||
-          (prInfo.isApproved && prInfo.hasConflicts) ||
+          prInfo.hasConflicts ||
           prInfo.isApproved ||
+          prInfo.hasConflicts ||
           prInfo.hasPendingReviews ? (
           prInfo.icon({ cls: 'w-4 h-4' })
         ) : (
@@ -65,12 +66,14 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <span className="text-xs font-medium truncate block">
             {pr.prTitle}
           </span>
-          <div className="flex gap-1 items-center">
-            <GitBranch className="w-2.5 h-2.5" />
-            <TruncatedPath
-              className="text-[11px] text-muted-foreground/70"
-              path={pr.branch}
-            />
+          <div className="flex gap-1 items-center justify-between min-w-0">
+            <div className="flex gap-1 items-center min-w-0">
+              <GitBranch className="min-w-2.5 min-h-2.5 max-w-2.5 max-h-2.5" />
+              <span
+                className="text-[11px] text-muted-foreground/70 truncate"
+              >{pr.branch}</span>
+            </div>
+            <span className="text-[11px] text-muted-foreground/70">#{pr.prNumber}</span>
           </div>
         </div>
         <a
@@ -92,7 +95,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => {}}
+            onToggle={() => { }}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />

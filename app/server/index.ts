@@ -176,7 +176,14 @@ fastify.post<{
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }
-  refreshPRChecks()
+  await refreshPRChecks(true, {
+    repo: `${owner}/${repo}`,
+    prNumber: Number(pr),
+    until: (pr) =>
+      pr?.reviews?.some(
+        (r) => r.author === reviewer && r.state === 'PENDING',
+      ) ?? false,
+  })
   return { ok: true }
 })
 
@@ -191,7 +198,11 @@ fastify.post<{
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }
-  refreshPRChecks()
+  await refreshPRChecks(true, {
+    repo: `${owner}/${repo}`,
+    prNumber: Number(pr),
+    until: (pr) => !pr || pr.state === 'MERGED',
+  })
   return { ok: true }
 })
 
@@ -209,7 +220,17 @@ fastify.post<{
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }
-  refreshPRChecks()
+  await refreshPRChecks(true, {
+    repo: `${owner}/${repo}`,
+    prNumber: Number(request.params.pr),
+    until: (pr) => {
+      if (!pr) return false
+      const check = pr.checks.find((c) => c.detailsUrl === checkUrl)
+      return (
+        !!check && (check.status === 'QUEUED' || check.status === 'IN_PROGRESS')
+      )
+    },
+  })
   return { ok: true }
 })
 
