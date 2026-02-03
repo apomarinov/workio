@@ -21,7 +21,7 @@ function getParentAppName(): string | null {
       pid = Number.parseInt(ppidStr, 10)
       if (Number.isNaN(pid)) break
     }
-  } catch { }
+  } catch {}
   return null
 }
 
@@ -377,13 +377,13 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const hasSetup = conductor || setup_script || delete_script
         const setupObj = hasSetup
           ? {
-            ...(conductor ? { conductor: true } : {}),
-            ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
-            ...(delete_script?.trim()
-              ? { delete: delete_script.trim() }
-              : {}),
-            status: 'setup' as const,
-          }
+              ...(conductor ? { conductor: true } : {}),
+              ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
+              ...(delete_script?.trim()
+                ? { delete: delete_script.trim() }
+                : {}),
+              status: 'setup' as const,
+            }
           : null
 
         const gitRepoData: Record<string, unknown> = {
@@ -711,7 +711,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection and PR checks
-        detectGitBranch(id).catch(() => { })
+        detectGitBranch(id).catch(() => {})
 
         return { success: true, branch }
       } catch (err) {
@@ -771,7 +771,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection
-        detectGitBranch(id).catch(() => { })
+        detectGitBranch(id).catch(() => {})
 
         return { success: true, branch }
       } catch (err) {

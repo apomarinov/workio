@@ -126,16 +126,21 @@ interface GhPR {
   }[]
 }
 
-function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
+function fetchOpenPRs(
+  owner: string,
+  repo: string,
+  force = false,
+): Promise<PRCheckStatus[]> {
   return new Promise((resolve) => {
     const repoKey = `${owner}/${repo}`
     const cached = checksCache.get(repoKey)
 
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+    if (!force && cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
       resolve(cached.prs)
       return
     }
 
+    console.log({ FETCH_OPEN_PR: 1 })
     execFile(
       'gh',
       [
@@ -431,7 +436,7 @@ async function refreshSSHBranch(terminalId: number): Promise<void> {
   }
 }
 
-async function pollAllPRChecks(): Promise<void> {
+async function pollAllPRChecks(force = false): Promise<void> {
   if (ghAvailable === false) return
 
   // Collect unique repos and their terminal branches
@@ -476,7 +481,7 @@ async function pollAllPRChecks(): Promise<void> {
 
   for (const [, { owner, repo, branches }] of repoData) {
     try {
-      const openPRs = await fetchOpenPRs(owner, repo)
+      const openPRs = await fetchOpenPRs(owner, repo, force)
       allPRs.push(...openPRs)
 
       // Only check merged for branches that don't already have an open PR
@@ -540,7 +545,7 @@ export async function refreshPRChecks(
     const myPollId = ++activePollId
     for (let i = 0; i < 6; i++) {
       checksCache.delete(poll.repo)
-      await pollAllPRChecks()
+      await pollAllPRChecks(true)
       lastRefreshAt = Date.now()
       const match = lastEmittedPRs.find(
         (pr) => pr.repo === poll.repo && pr.prNumber === poll.prNumber,
@@ -553,7 +558,7 @@ export async function refreshPRChecks(
   }
 
   lastRefreshAt = now
-  await pollAllPRChecks()
+  await pollAllPRChecks(force)
 }
 
 export async function trackTerminal(terminalId: number): Promise<void> {
