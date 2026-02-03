@@ -7,6 +7,7 @@ import {
   Copy,
   ExternalLink,
   GitBranch,
+  GitFork,
   Globe,
   MoreVertical,
   Pencil,
@@ -340,6 +341,23 @@ export function TerminalItem({
                           <path d="M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z" />
                         </svg>
                         Cursor
+                      </button>
+                    )}
+                    {terminal.git_repo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMenu(false)
+                          window.dispatchEvent(
+                            new CustomEvent('open-terminal-branches', {
+                              detail: { terminalId: terminal.id },
+                            }),
+                          )
+                        }}
+                        className="flex cursor-pointer items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent/50 text-left"
+                      >
+                        <GitFork className="w-3.5 h-3.5" />
+                        Branches
                       </button>
                     )}
                     {terminal.git_repo && (

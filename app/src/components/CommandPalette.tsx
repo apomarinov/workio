@@ -10,6 +10,8 @@ import {
   ExternalLink,
   FolderOpen,
   GitBranch,
+  GitFork,
+  Loader2,
   Pencil,
   Pin,
   PinOff,
@@ -27,9 +29,11 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { toast } from '@/components/ui/sonner'
+import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { type BranchInfo, checkoutBranch, getBranches } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import type { SessionWithProject, Terminal } from '../types'
@@ -38,7 +42,7 @@ import { EditSessionModal } from './EditSessionModal'
 import { EditTerminalModal } from './EditTerminalModal'
 import { getPRStatusInfo, PRTabButton } from './PRStatusContent'
 
-type Mode = 'search' | 'actions'
+type Mode = 'search' | 'actions' | 'branches'
 
 type ActionTarget =
   | { type: 'terminal'; terminal: Terminal; pr: PRCheckStatus | null }
@@ -46,11 +50,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-      type: 'terminal'
-      terminal: Terminal
-      pr: PRCheckStatus | null
-      actionHint: string | null
-    }
+    type: 'terminal'
+    terminal: Terminal
+    pr: PRCheckStatus | null
+    actionHint: string | null
+  }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -156,6 +160,18 @@ export function CommandPalette() {
   const [deleteSessionTarget, setDeleteSessionTarget] =
     useState<SessionWithProject | null>(null)
 
+  // Branches state
+  const [branches, setBranches] = useState<{
+    local: BranchInfo[]
+    remote: BranchInfo[]
+  } | null>(null)
+  const [branchesLoading, setBranchesLoading] = useState(false)
+  const [checkingOutBranch, setCheckingOutBranch] = useState<string | null>(
+    null,
+  )
+
+  const { gitDirtyStatus } = useProcessContext()
+
   const openPRs = githubPRs.filter((pr) => pr.state === 'OPEN')
 
   // Match TerminalItem logic: prefer OPEN, fall back to MERGED
@@ -252,11 +268,46 @@ export function CommandPalette() {
       window.removeEventListener('open-item-actions', handler as EventListener)
   }, [terminals, sessions, branchToPR])
 
+  // Listen for open-terminal-branches event to open directly to branches mode
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number }>) => {
+      const { terminalId } = e.detail
+      const terminal = terminals.find((t) => t.id === terminalId)
+      if (terminal?.git_repo) {
+        const pr = terminal.git_branch
+          ? (branchToPR.get(terminal.git_branch) ?? null)
+          : null
+        setActionTarget({ type: 'terminal', terminal, pr })
+        setMode('branches')
+        setBranches(null)
+        setBranchesLoading(true)
+        setOpen(true)
+        getBranches(terminalId)
+          .then(setBranches)
+          .catch((err) => {
+            toast.error(
+              err instanceof Error ? err.message : 'Failed to fetch branches',
+            )
+          })
+          .finally(() => setBranchesLoading(false))
+      }
+    }
+    window.addEventListener('open-terminal-branches', handler as EventListener)
+    return () =>
+      window.removeEventListener(
+        'open-terminal-branches',
+        handler as EventListener,
+      )
+  }, [terminals, branchToPR])
+
   const handleOpenChange = useCallback((value: boolean) => {
     setOpen(value)
     if (!value) {
       setActionTarget(null)
       setHighlightedId(null)
+      setBranches(null)
+      setBranchesLoading(false)
+      setCheckingOutBranch(null)
     } else {
       setMode('search')
     }
@@ -340,6 +391,14 @@ export function CommandPalette() {
         return
       }
 
+      if (e.key === 'ArrowLeft' && mode === 'branches') {
+        e.preventDefault()
+        setMode('actions')
+        setBranches(null)
+        setHighlightedId(null)
+        return
+      }
+
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         e.stopPropagation()
@@ -381,13 +440,58 @@ export function CommandPalette() {
   )
 
   const actionHint =
-    mode === 'actions'
+    mode === 'actions' || mode === 'branches'
       ? null
       : highlightedItem
         ? highlightedItem.actionHint
         : firstId
           ? (itemMap.get(firstId)?.actionHint ?? null)
           : null
+
+  // Compute dirty state for the terminal if we're in branches mode
+  const terminalDirtyStatus =
+    actionTarget?.type === 'terminal'
+      ? gitDirtyStatus[actionTarget.terminal.id]
+      : undefined
+  const isDirty =
+    !!terminalDirtyStatus &&
+    (terminalDirtyStatus.added > 0 || terminalDirtyStatus.removed > 0)
+
+  const handleBranchSelect = useCallback(
+    async (branch: string, isRemote: boolean, isCurrent: boolean) => {
+      if (!actionTarget || actionTarget.type !== 'terminal') return
+      if (isCurrent || isDirty) return
+
+      setCheckingOutBranch(branch)
+      try {
+        await checkoutBranch(actionTarget.terminal.id, branch, isRemote)
+        toast.success(`Switched to ${branch}`)
+        closePalette()
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to checkout branch',
+        )
+      } finally {
+        setCheckingOutBranch(null)
+      }
+    },
+    [actionTarget, isDirty, closePalette],
+  )
+
+  const handleOpenBranches = useCallback(() => {
+    if (!actionTarget || actionTarget.type !== 'terminal') return
+    setMode('branches')
+    setBranches(null)
+    setBranchesLoading(true)
+    getBranches(actionTarget.terminal.id)
+      .then(setBranches)
+      .catch((err) => {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to fetch branches',
+        )
+      })
+      .finally(() => setBranchesLoading(false))
+  }, [actionTarget])
 
   return (
     <>
@@ -409,7 +513,7 @@ export function CommandPalette() {
               value={highlightedId ?? ''}
               onValueChange={handleValueChange}
             >
-              {mode === 'search' ? (
+              {mode === 'search' && (
                 <SearchView
                   terminals={terminals}
                   openPRs={openPRs}
@@ -419,7 +523,8 @@ export function CommandPalette() {
                   onSelectSession={handleSelectSession}
                   onSelectPR={handleSelectPR}
                 />
-              ) : (
+              )}
+              {mode === 'actions' && (
                 <ActionsView
                   target={actionTarget}
                   onBack={() => {
@@ -468,26 +573,55 @@ export function CommandPalette() {
                     closePalette()
                     setTimeout(() => setDeleteSessionTarget(session), 150)
                   }}
+                  onOpenBranches={handleOpenBranches}
+                />
+              )}
+              {mode === 'branches' && actionTarget?.type === 'terminal' && (
+                <BranchesView
+                  terminal={actionTarget.terminal}
+                  branches={branches}
+                  loading={branchesLoading}
+                  checkingOutBranch={checkingOutBranch}
+                  isDirty={isDirty}
+                  highlightedId={highlightedId}
+                  onBack={() => {
+                    setMode('actions')
+                    setBranches(null)
+                    setHighlightedId(null)
+                  }}
+                  onSelectBranch={handleBranchSelect}
                 />
               )}
             </Command>
-            <div className="flex items-center justify-between border-t border-zinc-700 px-3 py-2 text-xs text-zinc-500">
-              <span className="flex items-center gap-1.5">
-                <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
-                  <CornerDownLeft className="h-3 w-3" />
-                </kbd>
-                to select
-              </span>
-              {actionHint && (
+            {mode === 'search' && (
+              <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
                 <span className="flex items-center gap-1.5">
-                  {actionHint}
-                  <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
-                    <CommandIcon className="h-3 w-3" />
+                  <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
                     <CornerDownLeft className="h-3 w-3" />
                   </kbd>
+                  to select
                 </span>
-              )}
-            </div>
+                {actionHint && (
+                  <span className="flex items-center gap-1.5">
+                    {actionHint}
+                    <kbd className="inline-flex items-center gap-0.5 rounded bg-zinc-800 px-1 py-1 text-zinc-400">
+                      <CommandIcon className="h-3 w-3" />
+                      <CornerDownLeft className="h-3 w-3" />
+                    </kbd>
+                  </span>
+                )}
+              </div>
+            )}
+            {mode === 'actions' && (
+              <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
+                    <CornerDownLeft className="h-3 w-3" />
+                  </kbd>
+                  to select
+                </span>
+              </div>
+            )}
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
@@ -726,6 +860,7 @@ function ActionsView({
   onDeleteTerminal,
   onRenameSession,
   onDeleteSession,
+  onOpenBranches,
 }: {
   target: ActionTarget | null
   onBack: () => void
@@ -743,30 +878,32 @@ function ActionsView({
   onDeleteTerminal: (terminal: Terminal) => void
   onRenameSession: (session: SessionWithProject) => void
   onDeleteSession: (session: SessionWithProject) => void
+  onOpenBranches: () => void
 }) {
   const title =
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-        target?.session.latest_user_message ||
-        target?.session.session_id
+      target?.session.latest_user_message ||
+      target?.session.session_id
 
   return (
     <>
-      <div className="h-0 overflow-hidden">
-        <CommandInput autoFocus />
-      </div>
-      <div className="flex items-center gap-2 border-b border-zinc-700 px-3 py-2.5">
+      <div className="flex items-center gap-2 border-b border-zinc-700 px-1">
         <button
           type="button"
           onClick={onBack}
-          className="rounded p-0.5 text-zinc-400 hover:text-zinc-200"
+          className="rounded p-1.5 text-zinc-400 hover:text-zinc-200 cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="truncate text-sm font-medium text-zinc-200">
-          {title}
-        </span>
+        <span className="shrink-0 text-sm text-zinc-500">{title}</span>
+        <span className="text-zinc-600">/</span>
+        <CommandInput
+          placeholder="Filter actions..."
+          autoFocus
+          className="border-0 px-0 focus-visible:ring-0"
+        />
       </div>
       <CommandList>
         <CommandGroup>
@@ -781,6 +918,7 @@ function ActionsView({
               onAddWorkspace={onAddWorkspace}
               onEditTerminal={onEditTerminal}
               onDeleteTerminal={onDeleteTerminal}
+              onOpenBranches={onOpenBranches}
             />
           )}
           {target?.type === 'session' && (
@@ -809,6 +947,7 @@ function TerminalActions({
   onAddWorkspace,
   onEditTerminal,
   onDeleteTerminal,
+  onOpenBranches,
 }: {
   target: { type: 'terminal'; terminal: Terminal; pr: PRCheckStatus | null }
   onOpenInCursor: (terminal: Terminal) => void
@@ -821,6 +960,7 @@ function TerminalActions({
   onAddWorkspace: (terminal: Terminal) => void
   onEditTerminal: (terminal: Terminal) => void
   onDeleteTerminal: (terminal: Terminal) => void
+  onOpenBranches: () => void
 }) {
   const isPinned = pinnedTerminalSessions.includes(target.terminal.id)
 
@@ -847,6 +987,16 @@ function TerminalActions({
         >
           <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
           <span>Open PR in new tab</span>
+        </CommandItem>
+      )}
+      {target.terminal.git_repo && (
+        <CommandItem
+          className="cursor-pointer"
+          value="action:branches"
+          onSelect={onOpenBranches}
+        >
+          <GitFork className="h-4 w-4 shrink-0 text-zinc-400" />
+          <span>Branches</span>
         </CommandItem>
       )}
       {target.terminal.git_repo && (
@@ -952,6 +1102,137 @@ function SessionActions({
         <Trash2 className="h-4 w-4 shrink-0 text-red-400" />
         <span className="text-red-400">Delete</span>
       </CommandItem>
+    </>
+  )
+}
+
+function BranchesView({
+  terminal,
+  branches,
+  loading,
+  checkingOutBranch,
+  isDirty,
+  highlightedId,
+  onBack,
+  onSelectBranch,
+}: {
+  terminal: Terminal
+  branches: { local: BranchInfo[]; remote: BranchInfo[] } | null
+  loading: boolean
+  checkingOutBranch: string | null
+  isDirty: boolean
+  highlightedId: string | null
+  onBack: () => void
+  onSelectBranch: (
+    branch: string,
+    isRemote: boolean,
+    isCurrent: boolean,
+  ) => void
+}) {
+  const title = terminal.name || getLastPathSegment(terminal.cwd)
+
+  // Find if the highlighted branch is the current branch
+  const currentBranch = branches?.local.find((b) => b.current)
+  const isCurrentBranchHighlighted =
+    currentBranch && highlightedId === `branch:local:${currentBranch.name}`
+
+  // Show checkout hint only if not dirty and not highlighting current branch
+  const showCheckoutHint = !isDirty && !isCurrentBranchHighlighted
+
+  return (
+    <>
+      <div className="flex items-center gap-2 border-b border-zinc-700 px-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded p-1.5 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <span className="shrink-0 text-sm text-zinc-500">{title}</span>
+        <span className="text-zinc-600">/</span>
+        <span className="shrink-0 text-sm text-zinc-500">Branches</span>
+        <span className="text-zinc-600">/</span>
+        <CommandInput
+          placeholder="Filter branches..."
+          autoFocus
+          className="border-0 px-0 focus-visible:ring-0"
+        />
+      </div>
+      <CommandList className="max-h-[360px]">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+          </div>
+        ) : branches ? (
+          <>
+            {branches.local.length > 0 && (
+              <CommandGroup heading="Local Branches">
+                {branches.local.map((branch) => (
+                  <CommandItem
+                    key={`local:${branch.name}`}
+                    value={`branch:local:${branch.name}`}
+                    className="cursor-pointer"
+                    onSelect={() =>
+                      onSelectBranch(branch.name, false, branch.current)
+                    }
+                  >
+                    <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />
+                    <span className="flex-1 truncate">{branch.name}</span>
+                    {branch.current && (
+                      <Check className="h-4 w-4 shrink-0 text-green-500" />
+                    )}
+                    {checkingOutBranch === branch.name && (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {branches.remote.length > 0 && (
+              <CommandGroup heading="Remote Branches">
+                {branches.remote.map((branch) => (
+                  <CommandItem
+                    key={`remote:${branch.name}`}
+                    value={`branch:remote:${branch.name}`}
+                    className="cursor-pointer"
+                    onSelect={() => onSelectBranch(branch.name, true, false)}
+                  >
+                    <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />
+                    <span className="flex-1 truncate">{branch.name}</span>
+                    {checkingOutBranch === branch.name && (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {branches.local.length === 0 && branches.remote.length === 0 && (
+              <div className="py-6 text-center text-sm text-zinc-500">
+                No branches found
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="py-6 text-center text-sm text-zinc-500">
+            Failed to load branches
+          </div>
+        )}
+      </CommandList>
+      <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
+        {isDirty ? (
+          <span className="text-yellow-500/70">
+            Commit or stash changes to switch branches
+          </span>
+        ) : showCheckoutHint ? (
+          <span className="flex items-center gap-1.5">
+            <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
+              <CornerDownLeft className="h-3 w-3" />
+            </kbd>
+            to checkout
+          </span>
+        ) : null}
+      </div>
     </>
   )
 }

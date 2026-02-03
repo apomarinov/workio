@@ -314,3 +314,42 @@ export async function getSessionMessages(
   if (!res.ok) throw new Error('Failed to fetch session messages')
   return res.json()
 }
+
+export interface BranchInfo {
+  name: string
+  current: boolean
+  commitDate: string
+}
+
+export interface BranchesResponse {
+  local: BranchInfo[]
+  remote: BranchInfo[]
+}
+
+export async function getBranches(
+  terminalId: number,
+): Promise<BranchesResponse> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/branches`)
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to fetch branches')
+  }
+  return res.json()
+}
+
+export async function checkoutBranch(
+  terminalId: number,
+  branch: string,
+  isRemote: boolean,
+): Promise<{ success: boolean; branch: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch, isRemote }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to checkout branch')
+  }
+  return data
+}

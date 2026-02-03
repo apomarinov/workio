@@ -47,7 +47,7 @@ import {
 } from '../db'
 import { refreshPRChecks } from '../github/checks'
 import { log } from '../logger'
-import { destroySession } from '../pty/manager'
+import { destroySession, detectGitBranch } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import {
@@ -72,6 +72,17 @@ interface CreateTerminalBody {
 
 interface UpdateTerminalBody {
   name?: string
+}
+
+interface CheckoutBranchBody {
+  branch: string
+  isRemote: boolean
+}
+
+interface BranchInfo {
+  name: string
+  current: boolean
+  commitDate: string
 }
 
 interface TerminalParams {
@@ -557,4 +568,154 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     refreshPRChecks()
     return reply.status(204).send()
   })
+
+  // Get branches for a terminal
+  fastify.get<{ Params: TerminalParams }>(
+    '/api/terminals/:id/branches',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const gitCmd = `git for-each-ref --sort=-committerdate --format='%(refname:short)|%(HEAD)|%(committerdate:iso8601)' refs/heads refs/remotes/origin`
+
+      try {
+        let stdout: string
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
+            cwd: terminal.cwd,
+          })
+          stdout = result.stdout
+        } else {
+          stdout = await new Promise<string>((resolve, reject) => {
+            execFile(
+              'git',
+              [
+                'for-each-ref',
+                '--sort=-committerdate',
+                '--format=%(refname:short)|%(HEAD)|%(committerdate:iso8601)',
+                'refs/heads',
+                'refs/remotes/origin',
+              ],
+              { cwd: expandPath(terminal.cwd), timeout: 10000 },
+              (err, out) => {
+                if (err) reject(err)
+                else resolve(out)
+              },
+            )
+          })
+        }
+
+        let currentBranch: BranchInfo | null = null
+        const local: BranchInfo[] = []
+        const remote: BranchInfo[] = []
+
+        for (const line of stdout.split('\n')) {
+          if (!line.trim()) continue
+          const [name, head, commitDate] = line.split('|')
+
+          // Skip origin/HEAD and origin (the remote ref itself)
+          if (name === 'origin/HEAD' || name === 'origin') continue
+
+          const isCurrent = head === '*'
+
+          if (name.startsWith('origin/')) {
+            // Remote branch - strip origin/ prefix
+            const branchName = name.slice(7)
+            if (remote.length < 50) {
+              remote.push({ name: branchName, current: false, commitDate })
+            }
+          } else {
+            // Local branch - track current separately to put it first
+            if (isCurrent) {
+              currentBranch = { name, current: true, commitDate }
+            } else if (local.length < 49) {
+              local.push({ name, current: false, commitDate })
+            }
+          }
+        }
+
+        // Prepend current branch to local list
+        if (currentBranch) {
+          local.unshift(currentBranch)
+        }
+
+        return { local, remote }
+      } catch (err) {
+        return reply.status(500).send({
+          error: err instanceof Error ? err.message : 'Failed to list branches',
+        })
+      }
+    },
+  )
+
+  // Checkout a branch
+  fastify.post<{ Params: TerminalParams; Body: CheckoutBranchBody }>(
+    '/api/terminals/:id/checkout',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { branch } = request.body
+      if (!branch) {
+        return reply.status(400).send({ error: 'Branch is required' })
+      }
+
+      const gitCmd = `git checkout ${branch.replace(/'/g, "'\\''")}`
+
+      try {
+        if (terminal.ssh_host) {
+          await execSSHCommand(terminal.ssh_host, gitCmd, {
+            cwd: terminal.cwd,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['checkout', branch],
+              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              (err) => {
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        // Refresh git branch detection and PR checks
+        detectGitBranch(id).catch(() => {})
+
+        return { success: true, branch }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to checkout branch'
+        return reply.status(400).send({
+          success: false,
+          branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
 }
