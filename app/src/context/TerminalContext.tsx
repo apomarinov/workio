@@ -129,12 +129,12 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       }
       if (data.setup?.status === 'failed') {
         sendNotificationRef.current(`❌ ${data.name} failed`, {
-          audio: 'pr-activity',
+          audio: 'error',
         })
       }
       if (data.git_repo?.status === 'failed') {
         sendNotificationRef.current(`❌ ${data.name} failed repo init`, {
-          audio: 'pr-activity',
+          audio: 'error',
         })
       }
       mutate(
@@ -237,7 +237,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           if (prev && !hasFailedChecks(prev) && hasFailedChecks(pr)) {
             sendNotificationRef.current('❌ Check failed', {
               body: pr.prTitle,
-              audio: 'pr-activity',
+              audio: 'error',
               onClick: () => revealPR(pr),
             })
           }
@@ -250,7 +250,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           ) {
             sendNotificationRef.current('🔄 Changes requested', {
               body: pr.prTitle,
-              audio: 'pr-activity',
+              audio: 'error',
               onClick: () => revealPR(pr),
             })
           }

@@ -81,23 +81,6 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       ),
     }
   }
-  if (hasChangesRequested) {
-    return {
-      hasChangesRequested,
-      label: 'Change request',
-      colorClass: 'text-orange-400',
-      dimColorClass: 'text-orange-400/60 hover:text-orange-400',
-      icon: (props?: { cls?: string; group?: string }) => (
-        <RefreshCw
-          className={cn(
-            iconClass,
-            `text-orange-400/70 ${props?.group ? `${props.group}:text-orange-400` : ''}`,
-            props?.cls,
-          )}
-        />
-      ),
-    }
-  }
   if (runningChecks > 0) {
     return {
       hasRunningChecks: true,
@@ -109,6 +92,23 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
           className={cn(
             iconClass,
             `text-yellow-400 animate-spin ${props?.group ? `${props.group}:text-yellow-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
+    }
+  }
+  if (hasChangesRequested) {
+    return {
+      hasChangesRequested,
+      label: 'Change request',
+      colorClass: 'text-orange-400',
+      dimColorClass: 'text-orange-400/60 hover:text-orange-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <RefreshCw
+          className={cn(
+            iconClass,
+            `text-orange-400/70 ${props?.group ? `${props.group}:text-orange-400` : ''}`,
             props?.cls,
           )}
         />
@@ -228,15 +228,17 @@ export const PRTabButton = memo(function PRTabButton({
   active = false,
   hasNewActivity,
   onClick,
+  withIcon,
   className,
 }: {
   pr: PRCheckStatus
   active?: boolean
   hasNewActivity?: boolean
+  withIcon?: boolean
   className?: string
   onClick?: () => void
 }) {
-  const { label, colorClass, dimColorClass } = useMemo(
+  const { label, colorClass, dimColorClass, icon } = useMemo(
     () => getPRStatusInfo(pr),
     [pr],
   )
@@ -251,12 +253,13 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
+        {withIcon && icon({ cls: 'w-2.5 h-2.5 mr-1' })}
         {label}
         {hasNewActivity && (
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
@@ -810,7 +813,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

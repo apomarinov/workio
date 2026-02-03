@@ -9,11 +9,12 @@ import { NotificationPrompt } from '../components/NotificationPrompt'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
 
-type AudioType = 'permission' | 'done' | 'pr-activity'
+type AudioType = 'permission' | 'done' | 'pr-activity' | 'error'
 
 const audioFiles: Record<AudioType, string> = {
   permission: '/audio/permissions.mp3',
   done: '/audio/done.mp3',
+  error: '/audio/error.mp3',
   'pr-activity': '/audio/pr-noti.mp3',
 }
 
