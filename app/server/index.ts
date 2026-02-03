@@ -18,6 +18,7 @@ import {
   mergePR,
   refreshPRChecks,
   requestPRReview,
+  rerunAllFailedChecks,
   rerunFailedCheck,
 } from './github/checks'
 import { setIO } from './io'
@@ -252,6 +253,37 @@ fastify.post<{
   })
   return { ok: true }
 })
+
+// Re-run all failed checks
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { checkUrls: string[] }
+}>(
+  '/api/github/:owner/:repo/pr/:pr/rerun-all-checks',
+  async (request, reply) => {
+    const { owner, repo } = request.params
+    const { checkUrls } = request.body
+    if (!checkUrls || !Array.isArray(checkUrls) || checkUrls.length === 0) {
+      return reply.status(400).send({ error: 'checkUrls array is required' })
+    }
+    const result = await rerunAllFailedChecks(owner, repo, checkUrls)
+    if (!result.ok) {
+      return reply.status(500).send({ error: result.error })
+    }
+    await refreshPRChecks(true, {
+      repo: `${owner}/${repo}`,
+      prNumber: Number(request.params.pr),
+      until: (pr) => {
+        if (!pr) return false
+        // Consider done when at least one check is now queued/in_progress
+        return pr.checks.some(
+          (c) => c.status === 'QUEUED' || c.status === 'IN_PROGRESS',
+        )
+      },
+    })
+    return { ok: true, rerunCount: result.rerunCount }
+  },
+)
 
 // Routes
 await fastify.register(terminalRoutes)

@@ -60,11 +60,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-      type: 'terminal'
-      terminal: Terminal
-      pr: PRCheckStatus | null
-      actionHint: string | null
-    }
+    type: 'terminal'
+    terminal: Terminal
+    pr: PRCheckStatus | null
+    actionHint: string | null
+  }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -997,13 +997,18 @@ function SearchView({
   onOpenSessionActions: (session: SessionWithProject) => void
   onSelectPR: (pr: { branch: string; repo: string }) => void
 }) {
+  const totalItems =
+    terminals.length + openPRs.length + mergedPRs.length + sessions.length
+
   return (
     <>
       <CommandInput
         placeholder="Search projects, PRs, Claude sessions..."
         autoFocus
       />
-      <CommandList className="max-h-[360px]">
+      <CommandList
+        className={totalItems >= 10 ? 'max-h-[480px]' : 'max-h-[360px]'}
+      >
         <CommandEmpty>No results found.</CommandEmpty>
 
         {terminals.length > 0 && (
@@ -1189,8 +1194,8 @@ function ActionsView({
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-        target?.session.latest_user_message ||
-        target?.session.session_id
+      target?.session.latest_user_message ||
+      target?.session.session_id
 
   return (
     <>

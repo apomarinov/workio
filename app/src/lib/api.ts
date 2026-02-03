@@ -303,6 +303,27 @@ export async function rerunFailedCheck(
   }
 }
 
+export async function rerunAllFailedChecks(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  checkUrls: string[],
+): Promise<{ rerunCount: number }> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-all-checks`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checkUrls }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to rerun checks')
+  }
+  return res.json()
+}
+
 export async function addPRComment(
   owner: string,
   repo: string,

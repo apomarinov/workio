@@ -65,9 +65,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
@@ -444,6 +444,8 @@ export function PRStatusContent({
     url: string
   } | null>(null)
   const [rerunLoading, setRerunLoading] = useState(false)
+  const [rerunAllOpen, setRerunAllOpen] = useState(false)
+  const [rerunAllLoading, setRerunAllLoading] = useState(false)
   const [replyAuthor, setReplyAuthor] = useState<string | null>(null)
   const [replyBody, setReplyBody] = useState('')
   const [replyLoading, setReplyLoading] = useState(false)
@@ -513,6 +515,32 @@ export function PRStatusContent({
       toast.error(err instanceof Error ? err.message : 'Failed to rerun check')
     } finally {
       setRerunLoading(false)
+    }
+  }
+
+  // Filter for completed failed checks (not in-progress or queued)
+  const failedCompletedChecks = useMemo(
+    () => pr.checks.filter((c) => c.status === 'COMPLETED'),
+    [pr.checks],
+  )
+
+  const handleRerunAllChecks = async () => {
+    if (failedCompletedChecks.length === 0) return
+    setRerunAllLoading(true)
+    try {
+      const checkUrls = failedCompletedChecks.map((c) => c.detailsUrl)
+      const result = await api.rerunAllFailedChecks(
+        owner,
+        repo,
+        pr.prNumber,
+        checkUrls,
+      )
+      toast.success(`Re-running ${result.rerunCount} failed workflow(s)`)
+      setRerunAllOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rerun checks')
+    } finally {
+      setRerunAllLoading(false)
     }
   }
 
@@ -625,7 +653,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                    check.status === 'QUEUED' ? (
+                  check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
@@ -648,6 +676,17 @@ export function PRStatusContent({
                 )}
               </div>
             ))}
+
+            {failedCompletedChecks.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setRerunAllOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Re-run All ({failedCompletedChecks.length})
+              </button>
+            )}
 
             {/* Comments */}
             {hasComments && (
@@ -811,6 +850,53 @@ export function PRStatusContent({
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     'Re-run'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={rerunAllOpen}
+            onOpenChange={(open) => {
+              if (!open && rerunAllLoading) return
+              setRerunAllOpen(open)
+            }}
+          >
+            <DialogContent
+              showCloseButton={false}
+              className="sm:max-w-sm"
+              onPointerDownOutside={(e) =>
+                rerunAllLoading && e.preventDefault()
+              }
+              onEscapeKeyDown={(e) => rerunAllLoading && e.preventDefault()}
+            >
+              <DialogHeader>
+                <DialogTitle>Re-run all failed checks</DialogTitle>
+                <DialogDescription>
+                  Re-run failed jobs for all{' '}
+                  <span className="font-medium">
+                    {failedCompletedChecks.length}
+                  </span>{' '}
+                  failed checks?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setRerunAllOpen(false)}
+                  disabled={rerunAllLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleRerunAllChecks}
+                  disabled={rerunAllLoading}
+                >
+                  {rerunAllLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Re-run All'
                   )}
                 </Button>
               </DialogFooter>

@@ -843,6 +843,64 @@ export function rerunFailedCheck(
   })
 }
 
+/** Re-run all failed checks by extracting unique run IDs and calling rerun-failed-jobs for each. */
+export async function rerunAllFailedChecks(
+  owner: string,
+  repo: string,
+  checkUrls: string[],
+): Promise<{ ok: boolean; error?: string; rerunCount: number }> {
+  // Extract unique run IDs from URLs
+  const runIds = new Set<string>()
+  for (const url of checkUrls) {
+    const match = url.match(/actions\/runs\/(\d+)/)
+    if (match) {
+      runIds.add(match[1])
+    }
+  }
+
+  if (runIds.size === 0) {
+    return { ok: false, error: 'No valid action runs found', rerunCount: 0 }
+  }
+
+  const errors: string[] = []
+  let successCount = 0
+
+  // Rerun each unique workflow run
+  await Promise.all(
+    [...runIds].map(
+      (runId) =>
+        new Promise<void>((resolve) => {
+          execFile(
+            'gh',
+            [
+              'api',
+              '--method',
+              'POST',
+              `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+            ],
+            { timeout: 30000 },
+            (err, _stdout, stderr) => {
+              if (err) {
+                errors.push(stderr || err.message)
+              } else {
+                successCount++
+              }
+              resolve()
+            },
+          )
+        }),
+    ),
+  )
+
+  checksCache.delete(`${owner}/${repo}`)
+
+  if (successCount === 0) {
+    return { ok: false, error: errors[0] || 'All reruns failed', rerunCount: 0 }
+  }
+
+  return { ok: true, rerunCount: successCount }
+}
+
 export function addPRComment(
   owner: string,
   repo: string,
