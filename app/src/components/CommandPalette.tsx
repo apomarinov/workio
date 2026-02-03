@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Bot,
   Check,
   Command as CommandIcon,
@@ -39,6 +40,7 @@ import {
   checkoutBranch,
   getBranches,
   pullBranch,
+  pushBranch,
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
@@ -176,6 +178,14 @@ export function CommandPalette() {
     null,
   )
   const [pullingBranch, setPullingBranch] = useState<string | null>(null)
+  const [pushingBranch, setPushingBranch] = useState<{
+    branch: string
+    force: boolean
+  } | null>(null)
+  const [forcePushConfirm, setForcePushConfirm] = useState<{
+    terminalId: number
+    branch: string
+  } | null>(null)
   const [selectedBranch, setSelectedBranch] = useState<{
     name: string
     isRemote: boolean
@@ -325,6 +335,7 @@ export function CommandPalette() {
         setBranchesLoading(false)
         setCheckingOutBranch(null)
         setPullingBranch(null)
+        setPushingBranch(null)
         setSelectedBranch(null)
         setMode('search')
       }, 300)
@@ -631,6 +642,44 @@ export function CommandPalette() {
     }
   }, [actionTarget, selectedBranch, isDirty, closePalette])
 
+  const handleBranchPush = useCallback(
+    async (force?: boolean) => {
+      if (!actionTarget || actionTarget.type !== 'terminal' || !selectedBranch)
+        return
+
+      // Can only push if not dirty
+      if (isDirty) return
+
+      setPushingBranch({ branch: selectedBranch.name, force: !!force })
+      try {
+        await pushBranch(actionTarget.terminal.id, selectedBranch.name, force)
+        toast.success(
+          force
+            ? `Force pushed ${selectedBranch.name}`
+            : `Pushed ${selectedBranch.name}`,
+        )
+        closePalette()
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to push branch',
+        )
+      } finally {
+        setPushingBranch(null)
+      }
+    },
+    [actionTarget, selectedBranch, isDirty, closePalette],
+  )
+
+  const handleForcePushRequest = useCallback(() => {
+    if (!actionTarget || actionTarget.type !== 'terminal' || !selectedBranch)
+      return
+    if (isDirty) return
+    setForcePushConfirm({
+      terminalId: actionTarget.terminal.id,
+      branch: selectedBranch.name,
+    })
+  }, [actionTarget, selectedBranch, isDirty])
+
   const handleOpenBranches = useCallback(() => {
     if (!actionTarget || actionTarget.type !== 'terminal') return
     setMode('branches')
@@ -755,6 +804,14 @@ export function CommandPalette() {
                     isDirty={isDirty}
                     checkingOut={checkingOutBranch === selectedBranch.name}
                     pulling={pullingBranch === selectedBranch.name}
+                    pushing={
+                      pushingBranch?.branch === selectedBranch.name &&
+                      !pushingBranch.force
+                    }
+                    forcePushing={
+                      pushingBranch?.branch === selectedBranch.name &&
+                      pushingBranch.force
+                    }
                     onBack={() => {
                       setMode('branches')
                       setSelectedBranch(null)
@@ -762,6 +819,8 @@ export function CommandPalette() {
                     }}
                     onCheckout={handleBranchCheckout}
                     onPull={handleBranchPull}
+                    onPush={() => handleBranchPush(false)}
+                    onForcePush={handleForcePushRequest}
                   />
                 )}
             </Command>
@@ -874,6 +933,21 @@ export function CommandPalette() {
             setDeleteSessionTarget(null)
           }}
           onCancel={() => setDeleteSessionTarget(null)}
+        />
+      )}
+
+      {forcePushConfirm && (
+        <ConfirmModal
+          open={!!forcePushConfirm}
+          title="Force Push"
+          message={`Are you sure you want to force push "${forcePushConfirm.branch}"? This will overwrite the remote branch history.`}
+          confirmLabel="Force Push"
+          variant="danger"
+          onConfirm={() => {
+            handleBranchPush(true)
+            setForcePushConfirm(null)
+          }}
+          onCancel={() => setForcePushConfirm(null)}
         />
       )}
     </>
@@ -1396,9 +1470,13 @@ function BranchActionsView({
   isDirty,
   checkingOut,
   pulling,
+  pushing,
+  forcePushing,
   onBack,
   onCheckout,
   onPull,
+  onPush,
+  onForcePush,
 }: {
   terminal: Terminal
   branch: { name: string; isRemote: boolean; isCurrent: boolean }
@@ -1406,9 +1484,13 @@ function BranchActionsView({
   isDirty: boolean
   checkingOut: boolean
   pulling: boolean
+  pushing: boolean
+  forcePushing: boolean
   onBack: () => void
   onCheckout: () => void
   onPull: () => void
+  onPush: () => void
+  onForcePush: () => void
 }) {
   const title = terminal.name || getLastPathSegment(terminal.cwd)
 
@@ -1417,13 +1499,19 @@ function BranchActionsView({
     branch.isRemote ||
     (branches?.remote.some((r) => r.name === branch.name) ?? false)
 
+  // Any action in progress disables all other actions
+  const isLoading = checkingOut || pulling || pushing || forcePushing
+
   // Can checkout if not current branch and not dirty
-  const canCheckout = !branch.isCurrent && !isDirty
+  const canCheckout = !branch.isCurrent && !isDirty && !isLoading
 
   // Can pull if:
   // - It's a remote branch (always)
   // - It's a local branch with remote AND (not current OR not dirty)
-  const canPull = hasRemote && (!branch.isCurrent || !isDirty)
+  const canPull = hasRemote && (!branch.isCurrent || !isDirty) && !isLoading
+
+  // Can push if not dirty and not loading
+  const canPush = !isDirty && !isLoading
 
   return (
     <>
@@ -1491,6 +1579,46 @@ function BranchActionsView({
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
               )}
             </CommandItem>
+          )}
+          {!branch.isRemote && (
+            <>
+              <CommandItem
+                value="action:push"
+                className="cursor-pointer"
+                disabled={!canPush}
+                onSelect={onPush}
+              >
+                <ArrowUp className="h-4 w-4 shrink-0 text-zinc-400" />
+                <span className={!canPush ? 'text-zinc-500' : ''}>Push</span>
+                {isDirty && (
+                  <span className="text-xs text-yellow-500/80">
+                    (uncommitted changes)
+                  </span>
+                )}
+                {pushing && (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+                )}
+              </CommandItem>
+              <CommandItem
+                value="action:force-push"
+                className="cursor-pointer"
+                disabled={!canPush}
+                onSelect={onForcePush}
+              >
+                <ArrowUp className="h-4 w-4 shrink-0 text-red-400" />
+                <span className={!canPush ? 'text-zinc-500' : ''}>
+                  Force Push
+                </span>
+                {isDirty && (
+                  <span className="text-xs text-yellow-500/80">
+                    (uncommitted changes)
+                  </span>
+                )}
+                {forcePushing && (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+                )}
+              </CommandItem>
+            </>
           )}
         </CommandGroup>
       </CommandList>

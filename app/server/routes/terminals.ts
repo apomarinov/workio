@@ -83,6 +83,11 @@ interface PullBranchBody {
   branch: string
 }
 
+interface PushBranchBody {
+  branch: string
+  force?: boolean
+}
+
 interface BranchInfo {
   name: string
   current: boolean
@@ -777,6 +782,71 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to pull branch'
+        return reply.status(400).send({
+          success: false,
+          branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
+  // Push a branch
+  fastify.post<{ Params: TerminalParams; Body: PushBranchBody }>(
+    '/api/terminals/:id/push',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { branch, force } = request.body
+      if (!branch) {
+        return reply.status(400).send({ error: 'Branch is required' })
+      }
+
+      const pushArgs = force
+        ? ['push', '--force', 'origin', branch]
+        : ['push', 'origin', branch]
+      const gitCmd = force
+        ? `git push --force origin ${branch.replace(/'/g, "'\\''")}`
+        : `git push origin ${branch.replace(/'/g, "'\\''")}`
+
+      try {
+        if (terminal.ssh_host) {
+          await execSSHCommand(terminal.ssh_host, gitCmd, {
+            cwd: terminal.cwd,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              pushArgs,
+              { cwd: expandPath(terminal.cwd), timeout: 60000 },
+              (err) => {
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        // Refresh git branch detection
+        detectGitBranch(id).catch(() => {})
+
+        return { success: true, branch }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to push branch'
         return reply.status(400).send({
           success: false,
           branch,

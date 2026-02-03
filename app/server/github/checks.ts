@@ -598,7 +598,11 @@ export async function trackTerminal(terminalId: number): Promise<void> {
         status: 'done' as const,
       }
       await updateTerminal(terminalId, { git_repo: gitRepoObj })
-      getIO()?.emit('terminal:workspace', { terminalId, git_repo: gitRepoObj })
+      getIO()?.emit('terminal:workspace', {
+        terminalId,
+        name: terminal.name || terminal.cwd,
+        git_repo: gitRepoObj,
+      })
     }
   }
 
@@ -624,7 +628,11 @@ export async function trackTerminal(terminalId: number): Promise<void> {
     if (hasConductor) {
       const setupObj = { conductor: true, status: 'done' as const }
       await updateTerminal(terminalId, { setup: setupObj })
-      getIO()?.emit('terminal:workspace', { terminalId, setup: setupObj })
+      getIO()?.emit('terminal:workspace', {
+        terminalId,
+        name: terminal.name || terminal.cwd,
+        setup: setupObj,
+      })
     }
   }
 

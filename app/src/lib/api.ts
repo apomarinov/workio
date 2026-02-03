@@ -369,3 +369,20 @@ export async function pullBranch(
   }
   return data
 }
+
+export async function pushBranch(
+  terminalId: number,
+  branch: string,
+  force?: boolean,
+): Promise<{ success: boolean; branch: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch, force }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to push branch')
+  }
+  return data
+}
