@@ -1,6 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
   Bot,
   Check,
@@ -33,7 +34,12 @@ import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { type BranchInfo, checkoutBranch, getBranches } from '@/lib/api'
+import {
+  type BranchInfo,
+  checkoutBranch,
+  getBranches,
+  pullBranch,
+} from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import type { SessionWithProject, Terminal } from '../types'
@@ -42,7 +48,7 @@ import { EditSessionModal } from './EditSessionModal'
 import { EditTerminalModal } from './EditTerminalModal'
 import { getPRStatusInfo, PRTabButton } from './PRStatusContent'
 
-type Mode = 'search' | 'actions' | 'branches'
+type Mode = 'search' | 'actions' | 'branches' | 'branch-actions'
 
 type ActionTarget =
   | { type: 'terminal'; terminal: Terminal; pr: PRCheckStatus | null }
@@ -169,6 +175,12 @@ export function CommandPalette() {
   const [checkingOutBranch, setCheckingOutBranch] = useState<string | null>(
     null,
   )
+  const [pullingBranch, setPullingBranch] = useState<string | null>(null)
+  const [selectedBranch, setSelectedBranch] = useState<{
+    name: string
+    isRemote: boolean
+    isCurrent: boolean
+  } | null>(null)
 
   const { gitDirtyStatus } = useProcessContext()
 
@@ -227,7 +239,10 @@ export function CommandPalette() {
     : null
 
   useEffect(() => {
-    const handler = () => setOpen(true)
+    const handler = () => {
+      setMode('search')
+      setOpen(true)
+    }
     window.addEventListener('open-palette', handler)
     return () => window.removeEventListener('open-palette', handler)
   }, [])
@@ -303,13 +318,16 @@ export function CommandPalette() {
   const handleOpenChange = useCallback((value: boolean) => {
     setOpen(value)
     if (!value) {
-      setActionTarget(null)
-      setHighlightedId(null)
-      setBranches(null)
-      setBranchesLoading(false)
-      setCheckingOutBranch(null)
-    } else {
-      setMode('search')
+      setTimeout(() => {
+        setActionTarget(null)
+        setHighlightedId(null)
+        setBranches(null)
+        setBranchesLoading(false)
+        setCheckingOutBranch(null)
+        setPullingBranch(null)
+        setSelectedBranch(null)
+        setMode('search')
+      }, 300)
     }
   }, [])
 
@@ -399,11 +417,108 @@ export function CommandPalette() {
         return
       }
 
+      if (e.key === 'ArrowLeft' && mode === 'branch-actions') {
+        e.preventDefault()
+        setMode('branches')
+        setSelectedBranch(null)
+        setHighlightedId(null)
+        return
+      }
+
+      // ArrowRight to open a new mode (only when selection would open a new list)
+      if (e.key === 'ArrowRight') {
+        // In search mode: open actions for terminal/session (not for PRs - they just open a link)
+        if (mode === 'search' && highlightedItem) {
+          if (
+            highlightedItem.type === 'terminal' &&
+            !highlightedItem.terminal.ssh_host
+          ) {
+            e.preventDefault()
+            setActionTarget({
+              type: 'terminal',
+              terminal: highlightedItem.terminal,
+              pr: highlightedItem.pr,
+            })
+            setHighlightedId(null)
+            setMode('actions')
+            return
+          }
+          if (highlightedItem.type === 'session') {
+            e.preventDefault()
+            setActionTarget({
+              type: 'session',
+              session: highlightedItem.session,
+            })
+            setHighlightedId(null)
+            setMode('actions')
+            return
+          }
+        }
+
+        // In actions mode: open branches when "Branches" action is highlighted
+        if (
+          mode === 'actions' &&
+          highlightedId === 'action:branches' &&
+          actionTarget?.type === 'terminal'
+        ) {
+          e.preventDefault()
+          setMode('branches')
+          setBranches(null)
+          setBranchesLoading(true)
+          getBranches(actionTarget.terminal.id)
+            .then(setBranches)
+            .catch((err) => {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to fetch branches',
+              )
+            })
+            .finally(() => setBranchesLoading(false))
+          return
+        }
+
+        // In branches mode: open branch-actions
+        if (mode === 'branches' && highlightedId?.startsWith('branch:')) {
+          e.preventDefault()
+          const parts = highlightedId.split(':')
+          const isRemote = parts[1] === 'remote'
+          const branchName = parts.slice(2).join(':')
+          const isCurrent =
+            !isRemote &&
+            branches?.local.some((b) => b.name === branchName && b.current)
+          setSelectedBranch({
+            name: branchName,
+            isRemote,
+            isCurrent: isCurrent ?? false,
+          })
+          setMode('branch-actions')
+          setHighlightedId(null)
+          return
+        }
+      }
+
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         e.stopPropagation()
 
-        if (mode === 'actions') return
+        if (mode === 'actions' || mode === 'branch-actions') return
+
+        // Handle cmd+enter in branches mode to open branch-actions
+        if (mode === 'branches' && highlightedId?.startsWith('branch:')) {
+          const parts = highlightedId.split(':')
+          const isRemote = parts[1] === 'remote'
+          const branchName = parts.slice(2).join(':')
+          const isCurrent =
+            !isRemote &&
+            branches?.local.some((b) => b.name === branchName && b.current)
+          setSelectedBranch({
+            name: branchName,
+            isRemote,
+            isCurrent: isCurrent ?? false,
+          })
+          setMode('branch-actions')
+          setHighlightedId(null)
+          return
+        }
 
         if (!highlightedItem) return
 
@@ -436,11 +551,18 @@ export function CommandPalette() {
         }
       }
     },
-    [mode, highlightedItem, closePalette],
+    [
+      mode,
+      highlightedItem,
+      closePalette,
+      highlightedId,
+      branches,
+      actionTarget,
+    ],
   )
 
   const actionHint =
-    mode === 'actions' || mode === 'branches'
+    mode === 'actions' || mode === 'branches' || mode === 'branch-actions'
       ? null
       : highlightedItem
         ? highlightedItem.actionHint
@@ -458,25 +580,56 @@ export function CommandPalette() {
     (terminalDirtyStatus.added > 0 || terminalDirtyStatus.removed > 0)
 
   const handleBranchSelect = useCallback(
-    async (branch: string, isRemote: boolean, isCurrent: boolean) => {
+    (branch: string, isRemote: boolean, isCurrent: boolean) => {
       if (!actionTarget || actionTarget.type !== 'terminal') return
-      if (isCurrent || isDirty) return
-
-      setCheckingOutBranch(branch)
-      try {
-        await checkoutBranch(actionTarget.terminal.id, branch, isRemote)
-        toast.success(`Switched to ${branch}`)
-        closePalette()
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to checkout branch',
-        )
-      } finally {
-        setCheckingOutBranch(null)
-      }
+      setSelectedBranch({ name: branch, isRemote, isCurrent })
+      setMode('branch-actions')
+      setHighlightedId(null)
     },
-    [actionTarget, isDirty, closePalette],
+    [actionTarget],
   )
+
+  const handleBranchCheckout = useCallback(async () => {
+    if (!actionTarget || actionTarget.type !== 'terminal' || !selectedBranch)
+      return
+    if (selectedBranch.isCurrent || isDirty) return
+
+    setCheckingOutBranch(selectedBranch.name)
+    try {
+      await checkoutBranch(
+        actionTarget.terminal.id,
+        selectedBranch.name,
+        selectedBranch.isRemote,
+      )
+      toast.success(`Switched to ${selectedBranch.name}`)
+      closePalette()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to checkout branch',
+      )
+    } finally {
+      setCheckingOutBranch(null)
+    }
+  }, [actionTarget, selectedBranch, isDirty, closePalette])
+
+  const handleBranchPull = useCallback(async () => {
+    if (!actionTarget || actionTarget.type !== 'terminal' || !selectedBranch)
+      return
+
+    // Can only pull current branch if not dirty
+    if (selectedBranch.isCurrent && isDirty) return
+
+    setPullingBranch(selectedBranch.name)
+    try {
+      await pullBranch(actionTarget.terminal.id, selectedBranch.name)
+      toast.success(`Pulled ${selectedBranch.name}`)
+      closePalette()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to pull branch')
+    } finally {
+      setPullingBranch(null)
+    }
+  }, [actionTarget, selectedBranch, isDirty, closePalette])
 
   const handleOpenBranches = useCallback(() => {
     if (!actionTarget || actionTarget.type !== 'terminal') return
@@ -500,7 +653,10 @@ export function CommandPalette() {
           <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
           <DialogPrimitive.Content
             aria-description="asd"
-            className="fixed left-[50%] top-[20%] z-50 w-full max-w-xl translate-x-[-50%] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+            className={cn(
+              'fixed left-[50%] top-[20%] z-50 w-full translate-x-[-50%] rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 transition-[max-width] duration-150',
+              mode === 'branch-actions' ? 'max-w-2xl' : 'max-w-xl',
+            )}
             onKeyDownCapture={handleKeyDown}
             onEscapeKeyDown={handleEscapeKeyDown}
           >
@@ -581,9 +737,6 @@ export function CommandPalette() {
                   terminal={actionTarget.terminal}
                   branches={branches}
                   loading={branchesLoading}
-                  checkingOutBranch={checkingOutBranch}
-                  isDirty={isDirty}
-                  highlightedId={highlightedId}
                   onBack={() => {
                     setMode('actions')
                     setBranches(null)
@@ -592,6 +745,25 @@ export function CommandPalette() {
                   onSelectBranch={handleBranchSelect}
                 />
               )}
+              {mode === 'branch-actions' &&
+                actionTarget?.type === 'terminal' &&
+                selectedBranch && (
+                  <BranchActionsView
+                    terminal={actionTarget.terminal}
+                    branch={selectedBranch}
+                    branches={branches}
+                    isDirty={isDirty}
+                    checkingOut={checkingOutBranch === selectedBranch.name}
+                    pulling={pullingBranch === selectedBranch.name}
+                    onBack={() => {
+                      setMode('branches')
+                      setSelectedBranch(null)
+                      setHighlightedId(null)
+                    }}
+                    onCheckout={handleBranchCheckout}
+                    onPull={handleBranchPull}
+                  />
+                )}
             </Command>
             {mode === 'search' && (
               <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
@@ -897,9 +1069,12 @@ function ActionsView({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="shrink-0 text-sm text-zinc-500">{title}</span>
-        <span className="text-zinc-600">/</span>
+        <span className="truncate text-sm text-zinc-500 max-w-[200px]">
+          {title}
+        </span>
+        <span className="shrink-0 text-zinc-600">/</span>
         <CommandInput
+          wrapperCls="border-none px-0 min-w-0 flex-1"
           placeholder="Filter actions..."
           autoFocus
           className="border-0 px-0 focus-visible:ring-0"
@@ -1110,18 +1285,12 @@ function BranchesView({
   terminal,
   branches,
   loading,
-  checkingOutBranch,
-  isDirty,
-  highlightedId,
   onBack,
   onSelectBranch,
 }: {
   terminal: Terminal
   branches: { local: BranchInfo[]; remote: BranchInfo[] } | null
   loading: boolean
-  checkingOutBranch: string | null
-  isDirty: boolean
-  highlightedId: string | null
   onBack: () => void
   onSelectBranch: (
     branch: string,
@@ -1130,14 +1299,6 @@ function BranchesView({
   ) => void
 }) {
   const title = terminal.name || getLastPathSegment(terminal.cwd)
-
-  // Find if the highlighted branch is the current branch
-  const currentBranch = branches?.local.find((b) => b.current)
-  const isCurrentBranchHighlighted =
-    currentBranch && highlightedId === `branch:local:${currentBranch.name}`
-
-  // Show checkout hint only if not dirty and not highlighting current branch
-  const showCheckoutHint = !isDirty && !isCurrentBranchHighlighted
 
   return (
     <>
@@ -1149,11 +1310,14 @@ function BranchesView({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="shrink-0 text-sm text-zinc-500">{title}</span>
-        <span className="text-zinc-600">/</span>
+        <span className="truncate text-sm text-zinc-500 max-w-[200px]">
+          {title}
+        </span>
+        <span className="shrink-0 text-zinc-600">/</span>
         <span className="shrink-0 text-sm text-zinc-500">Branches</span>
-        <span className="text-zinc-600">/</span>
+        <span className="shrink-0 text-zinc-600">/</span>
         <CommandInput
+          wrapperCls="border-none px-0 min-w-0 flex-1"
           placeholder="Filter branches..."
           autoFocus
           className="border-0 px-0 focus-visible:ring-0"
@@ -1182,9 +1346,6 @@ function BranchesView({
                     {branch.current && (
                       <Check className="h-4 w-4 shrink-0 text-green-500" />
                     )}
-                    {checkingOutBranch === branch.name && (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
-                    )}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -1200,9 +1361,6 @@ function BranchesView({
                   >
                     <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />
                     <span className="flex-1 truncate">{branch.name}</span>
-                    {checkingOutBranch === branch.name && (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
-                    )}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -1219,19 +1377,132 @@ function BranchesView({
           </div>
         )}
       </CommandList>
+      <div className="flex h-9 items-center border-t border-zinc-700 px-3 text-xs text-zinc-500">
+        <span className="flex items-center gap-1.5">
+          <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
+            <CornerDownLeft className="h-3 w-3" />
+          </kbd>
+          to select
+        </span>
+      </div>
+    </>
+  )
+}
+
+function BranchActionsView({
+  terminal,
+  branch,
+  branches,
+  isDirty,
+  checkingOut,
+  pulling,
+  onBack,
+  onCheckout,
+  onPull,
+}: {
+  terminal: Terminal
+  branch: { name: string; isRemote: boolean; isCurrent: boolean }
+  branches: { local: BranchInfo[]; remote: BranchInfo[] } | null
+  isDirty: boolean
+  checkingOut: boolean
+  pulling: boolean
+  onBack: () => void
+  onCheckout: () => void
+  onPull: () => void
+}) {
+  const title = terminal.name || getLastPathSegment(terminal.cwd)
+
+  // Check if this local branch has a remote
+  const hasRemote =
+    branch.isRemote ||
+    (branches?.remote.some((r) => r.name === branch.name) ?? false)
+
+  // Can checkout if not current branch and not dirty
+  const canCheckout = !branch.isCurrent && !isDirty
+
+  // Can pull if:
+  // - It's a remote branch (always)
+  // - It's a local branch with remote AND (not current OR not dirty)
+  const canPull = hasRemote && (!branch.isCurrent || !isDirty)
+
+  return (
+    <>
+      <div className="flex items-center gap-2 border-b border-zinc-700 px-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded p-1.5 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <span className="truncate text-sm text-zinc-500 max-w-[120px]">
+          {title}
+        </span>
+        <span className="shrink-0 text-zinc-600">/</span>
+        <span className="shrink-0 text-sm text-zinc-500">Branches</span>
+        <span className="shrink-0 text-zinc-600">/</span>
+        <span className="truncate text-sm text-zinc-500 max-w-[160px]">
+          {branch.name}
+        </span>
+        <span className="shrink-0 text-zinc-600">/</span>
+        <CommandInput
+          placeholder="Filter actions..."
+          autoFocus
+          wrapperCls="border-none px-0 min-w-0 flex-1"
+          className="border-0 px-0 focus-visible:ring-0"
+        />
+      </div>
+      <CommandList>
+        <CommandGroup>
+          {branch.isCurrent && (
+            <CommandItem
+              value="action:checkout"
+              className="cursor-pointer"
+              disabled={!canCheckout}
+              onSelect={onCheckout}
+            >
+              <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />
+              <span className={!canCheckout ? 'text-zinc-500' : ''}>
+                Checkout
+              </span>
+              {!branch.isCurrent && isDirty && (
+                <span className="text-xs text-yellow-500/80">
+                  (uncommitted changes)
+                </span>
+              )}
+              {checkingOut && (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+              )}
+            </CommandItem>
+          )}
+          {hasRemote && (
+            <CommandItem
+              value="action:pull"
+              className="cursor-pointer"
+              disabled={!canPull}
+              onSelect={onPull}
+            >
+              <ArrowDown className="h-4 w-4 shrink-0 text-zinc-400" />
+              <span className={!canPull ? 'text-zinc-500' : ''}>Pull</span>
+              {branch.isCurrent && isDirty && (
+                <span className="text-xs text-yellow-500/80">
+                  (uncommitted changes)
+                </span>
+              )}
+              {pulling && (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+              )}
+            </CommandItem>
+          )}
+        </CommandGroup>
+      </CommandList>
       <div className="flex h-9 items-center justify-between border-t border-zinc-700 px-3 text-xs text-zinc-500">
-        {isDirty ? (
-          <span className="text-yellow-500/70">
-            Commit or stash changes to switch branches
-          </span>
-        ) : showCheckoutHint ? (
-          <span className="flex items-center gap-1.5">
-            <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
-              <CornerDownLeft className="h-3 w-3" />
-            </kbd>
-            to checkout
-          </span>
-        ) : null}
+        <span className="flex items-center gap-1.5">
+          <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
+            <CornerDownLeft className="h-3 w-3" />
+          </kbd>
+          to select
+        </span>
       </div>
     </>
   )
