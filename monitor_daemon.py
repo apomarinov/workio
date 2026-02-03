@@ -158,13 +158,28 @@ def start_cleanup_worker() -> None:
     )
 
 
+def derive_project_path(transcript_path: str) -> str:
+    """Derive project path from transcript path.
+
+    Example:
+        transcript: /Users/apo/.claude/projects/-Users-apo-code-workio/xxx.jsonl
+        returns: /Users/apo/code/workio
+    """
+    if not transcript_path:
+        return ''
+    path = Path(transcript_path)
+    encoded_path = path.parent.name  # e.g., '-Users-apo-code-workio'
+    return encoded_path.replace('-', '/')
+
+
 def process_event(event: dict, env: dict) -> dict:
     """Process a single hook event. Returns the response dict."""
     with _db_lock:
         conn = get_conn()
         try:
             session_id = event.get('session_id', 'unknown')
-            project_path = event.get('cwd', '')
+            transcript_path = event.get('transcript_path', '')
+            project_path = derive_project_path(transcript_path) or event.get('cwd', '')
             hook_type = event.get('hook_event_name', '')
             terminal_id_str = env.get('CLAUDE_TERMINAL_ID')
             terminal_id = int(terminal_id_str) if terminal_id_str else None
@@ -191,7 +206,6 @@ def process_event(event: dict, env: dict) -> dict:
 
             project_id = upsert_project(conn, project_path)
 
-            transcript_path = event.get('transcript_path', '')
             if status:
                 upsert_session(conn, session_id, project_id, status, transcript_path, terminal_id)
 
