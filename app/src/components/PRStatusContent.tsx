@@ -12,7 +12,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, ReactNode, useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -251,9 +251,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -292,7 +292,7 @@ function ContentDialog({
   open,
   onOpenChange,
 }: {
-  author: string
+  author: string | ReactNode
   avatarUrl?: string
   content: string
   open: boolean
@@ -303,7 +303,7 @@ function ContentDialog({
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {avatarUrl && (
+            {avatarUrl && typeof author === 'string' && (
               <img
                 src={avatarUrl}
                 alt={author}
@@ -667,7 +667,10 @@ export function PRStatusContent({
           )}
           {hasBody && (
             <ContentDialog
-              author={`#${pr.prNumber} ${pr.prTitle}`}
+              author={<div className='flex items-center justify-between w-full'>
+                <h2>{pr.prTitle}</h2>
+                <span>#{pr.prNumber}</span>
+              </div>}
               content={pr.prBody}
               open={bodyModalOpen}
               onOpenChange={setBodyModalOpen}
@@ -734,7 +737,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

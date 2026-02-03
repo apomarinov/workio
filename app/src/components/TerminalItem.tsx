@@ -74,8 +74,8 @@ export function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-          ) ??
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
@@ -206,10 +206,9 @@ export function TerminalItem({
             }
           }}
           className={cn(
-            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
             }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
             ((!hasSessions &&
               !hasProcesses &&
@@ -218,13 +217,13 @@ export function TerminalItem({
               !isDirty) ||
               isSettingUp ||
               isDeleting) &&
-              'pl-2.5',
+            'pl-2.5',
             hideFolder && 'rounded-l-lg',
           )}
         >
           {!isSettingUp &&
-          !isDeleting &&
-          (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
+            !isDeleting &&
+            (hasSessions || hasProcesses || hasGitHub || hasPorts || isDirty) ? (
             <Button
               variant="ghost"
               size="icon"
@@ -240,8 +239,7 @@ export function TerminalItem({
           ) : (
             <div
               className={cn(
-                'h-6 w-6 flex-shrink-0',
-                !hideFolder ? 'hidden' : '',
+                'h-4.5 w-4.5 flex-shrink-0',
               )}
             />
           )}
@@ -541,14 +539,14 @@ export function TerminalItem({
                   </button>
                   {sessionsListExpanded && (
                     <>
-                      {sessions.slice(0, 2).map((session, idx) => (
+                      {sessions.slice(0, 1).map((session, idx) => (
                         <SessionItem
                           defaultCollapsed={idx > 0}
                           key={session.session_id}
                           session={session}
                         />
                       ))}
-                      {sessions.length > 2 && (
+                      {sessions.length > 1 && (
                         <>
                           <button
                             type="button"
@@ -563,13 +561,13 @@ export function TerminalItem({
                             ) : (
                               <>
                                 <ChevronRight className="w-3 h-3" />
-                                Show {sessions.length - 2} older
+                                Show {sessions.length - 1} older
                               </>
                             )}
                           </button>
                           {showAllSessions &&
                             sessions
-                              .slice(2)
+                              .slice(1)
                               .map((session) => (
                                 <SessionItem
                                   defaultCollapsed

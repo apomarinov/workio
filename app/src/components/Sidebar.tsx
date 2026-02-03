@@ -357,6 +357,7 @@ export function Sidebar({ width }: SidebarProps) {
   // Listen for reveal-session events from the command palette
   useEffect(() => {
     const handler = (e: Event) => {
+      window.focus()
       const { sessionId } = (e as CustomEvent).detail as { sessionId: string }
       const session = sessions.find((s) => s.session_id === sessionId)
       if (!session) return

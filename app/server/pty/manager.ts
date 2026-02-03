@@ -229,6 +229,35 @@ async function scanAndEmitGitDirty() {
           try {
             const stat = await checkGitDirty(terminal.cwd, terminal.ssh_host)
             currentStatus[terminal.id] = stat
+
+            // Also detect branch changes
+            let branch: string | null = null
+            if (terminal.ssh_host) {
+              const result = await execSSHCommand(
+                terminal.ssh_host,
+                'git rev-parse --abbrev-ref HEAD',
+                terminal.cwd,
+              )
+              branch = result.stdout.trim() || null
+            } else {
+              branch = await new Promise<string | null>((resolve) => {
+                execFile(
+                  'git',
+                  ['rev-parse', '--abbrev-ref', 'HEAD'],
+                  { cwd: terminal.cwd },
+                  (err, stdout) => {
+                    if (err || !stdout) return resolve(null)
+                    resolve(stdout.trim() || null)
+                  },
+                )
+              })
+            }
+
+            // Only update if branch changed
+            if (branch && branch !== terminal.git_branch) {
+              await updateTerminal(terminal.id, { git_branch: branch })
+              getIO()?.emit('terminal:updated', { terminalId: terminal.id })
+            }
           } catch {
             // skip this terminal
           }
