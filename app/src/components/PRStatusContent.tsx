@@ -8,6 +8,7 @@ import {
   ExternalLink,
   GitMerge,
   Loader2,
+  MessageSquare,
   RefreshCw,
   X,
 } from 'lucide-react'
@@ -250,9 +251,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -523,10 +524,15 @@ export function PRStatusContent({
     () => pr.reviews.filter((r) => r.state === 'PENDING'),
     [pr.reviews],
   )
+  const commentedReviews = useMemo(
+    () => pr.reviews.filter((r) => r.state === 'COMMENTED'),
+    [pr.reviews],
+  )
   const hasReviews =
     approvedReviews.length > 0 ||
     changesRequestedReviews.length > 0 ||
-    pendingReviews.length > 0
+    pendingReviews.length > 0 ||
+    commentedReviews.length > 0
   const hasChecks = pr.checks.length > 0
   const hasComments = useMemo(
     () => pr.comments.some((c) => !hiddenAuthorsSet.has(c.author)),
@@ -702,6 +708,17 @@ export function PRStatusContent({
               onReReview={handleReReview}
             />
           ))}
+          {commentedReviews.map((review) => (
+            <ReviewRow
+              key={`commented-${review.author}`}
+              review={review}
+              icon={
+                <MessageSquare className="w-3 h-3 flex-shrink-0 text-zinc-500" />
+              }
+              prUrl={pr.prUrl}
+              onReReview={handleReReview}
+            />
+          ))}
 
           <div className="relative flex flex-col gap-0 pl-[13px]">
             <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
@@ -717,7 +734,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

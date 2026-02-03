@@ -56,11 +56,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-      type: 'terminal'
-      terminal: Terminal
-      pr: PRCheckStatus | null
-      actionHint: string | null
-    }
+    type: 'terminal'
+    terminal: Terminal
+    pr: PRCheckStatus | null
+    actionHint: string | null
+  }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -1056,8 +1056,8 @@ function ActionsView({
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-        target?.session.latest_user_message ||
-        target?.session.session_id
+      target?.session.latest_user_message ||
+      target?.session.session_id
 
   return (
     <>
@@ -1454,27 +1454,25 @@ function BranchActionsView({
       </div>
       <CommandList>
         <CommandGroup>
-          {branch.isCurrent && (
-            <CommandItem
-              value="action:checkout"
-              className="cursor-pointer"
-              disabled={!canCheckout}
-              onSelect={onCheckout}
-            >
-              <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />
-              <span className={!canCheckout ? 'text-zinc-500' : ''}>
-                Checkout
+          <CommandItem
+            value="action:checkout"
+            className="cursor-pointer"
+            disabled={!canCheckout}
+            onSelect={onCheckout}
+          >
+            <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />
+            <span className={!canCheckout ? 'text-zinc-500' : ''}>
+              Checkout
+            </span>
+            {!branch.isCurrent && isDirty && (
+              <span className="text-xs text-yellow-500/80">
+                (uncommitted changes)
               </span>
-              {!branch.isCurrent && isDirty && (
-                <span className="text-xs text-yellow-500/80">
-                  (uncommitted changes)
-                </span>
-              )}
-              {checkingOut && (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
-              )}
-            </CommandItem>
-          )}
+            )}
+            {checkingOut && (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-400" />
+            )}
+          </CommandItem>
           {hasRemote && (
             <CommandItem
               value="action:pull"

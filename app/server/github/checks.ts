@@ -32,7 +32,8 @@ let globalChecksPollingId: NodeJS.Timeout | null = null
 let lastEmittedPRs: PRCheckStatus[] = []
 
 const POLL_INTERVAL = 60_000 // 60 seconds
-const CACHE_TTL = 30_000 // 30 seconds
+const CACHE_TTL = 30_000 // 30
+const REFRESH_MIN_INTERVAL = 30_000 // 30 seconds
 
 export function parseGitHubRemoteUrl(
   url: string,
@@ -213,14 +214,16 @@ function fetchOpenPRs(
                 detailsUrl: c.detailsUrl || '',
               }))
 
-            // Extract reviews (APPROVED / CHANGES_REQUESTED only)
+            // Extract reviews (APPROVED / CHANGES_REQUESTED / COMMENTED)
             const pendingReviewers = new Set(
               (pr.reviewRequests || []).map((r) => r.login),
             )
             const reviews: PRReview[] = (pr.reviews || [])
               .filter(
                 (r) =>
-                  r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED',
+                  r.state === 'APPROVED' ||
+                  r.state === 'CHANGES_REQUESTED' ||
+                  r.state === 'COMMENTED',
               )
               .map((r) => ({
                 author: r.author.login,
@@ -541,7 +544,6 @@ async function pollAllPRChecks(force = false): Promise<void> {
 }
 
 let lastRefreshAt = 0
-const REFRESH_MIN_INTERVAL = 30_000 // 30 seconds
 
 interface PollUntilOptions {
   repo: string

@@ -279,6 +279,39 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
               }
             }
           }
+
+          // New reviews (skip if from current user)
+          if (prev && pr.reviews.length > 0) {
+            const prevReviewKeys = new Set(
+              prev.reviews.map((r) => `${r.author}:${r.state}`),
+            )
+            for (const review of pr.reviews) {
+              if (data.username && review.author === data.username) continue
+              const reviewKey = `${review.author}:${review.state}`
+              if (!prevReviewKeys.has(reviewKey)) {
+                const emoji =
+                  review.state === 'APPROVED'
+                    ? '✅'
+                    : review.state === 'CHANGES_REQUESTED'
+                      ? '🔄'
+                      : '💬'
+                const action =
+                  review.state === 'APPROVED'
+                    ? 'approved'
+                    : review.state === 'CHANGES_REQUESTED'
+                      ? 'requested changes'
+                      : 'reviewed'
+                sendNotificationRef.current(
+                  `${emoji} ${review.author} ${action}`,
+                  {
+                    body: review.body || pr.prTitle,
+                    audio: 'pr-activity',
+                    onClick: () => window.open(pr.prUrl, '_blank'),
+                  },
+                )
+              }
+            }
+          }
         }
       }
 
