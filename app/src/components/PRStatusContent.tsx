@@ -347,11 +347,15 @@ const ReviewRow = memo(function ReviewRow({
     [onReReview, review.author],
   )
 
+  const reviewUrl = review.id
+    ? `${prUrl}#pullrequestreview-${review.id}`
+    : prUrl
+
   return (
     <div className="group/review px-2 py-1 rounded text-sidebar-foreground/70">
       <div className="flex items-center gap-1.5">
         <a
-          href={prUrl}
+          href={reviewUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
@@ -417,14 +421,17 @@ const ReviewRow = memo(function ReviewRow({
 
 const CommentItem = memo(function CommentItem({
   comment,
+  prUrl,
   onHide,
 }: {
   comment: {
+    url?: string
     author: string
     avatarUrl: string
     body: string
     createdAt: string
   }
+  prUrl: string
   onHide: (author: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -435,6 +442,8 @@ const CommentItem = memo(function CommentItem({
     [onHide, comment.author],
   )
 
+  const commentUrl = comment.url || prUrl
+
   return (
     <>
       <div className="group/comment px-2 py-1 rounded text-sidebar-foreground/70">
@@ -442,13 +451,20 @@ const CommentItem = memo(function CommentItem({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer"
+            className="flex items-center gap-0 min-w-0 cursor-pointer"
           >
             {expanded ? (
               <ChevronDown className="w-3 h-3 flex-shrink-0" />
             ) : (
               <ChevronRight className="w-3 h-3 flex-shrink-0" />
             )}
+          </button>
+          <a
+            href={commentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
+          >
             {comment.avatarUrl ? (
               <img
                 src={comment.avatarUrl}
@@ -461,7 +477,7 @@ const CommentItem = memo(function CommentItem({
             <span className="text-xs font-medium truncate">
               {comment.author}
             </span>
-          </button>
+          </a>
           <button
             type="button"
             onClick={handleHide}
@@ -773,6 +789,7 @@ export function PRStatusContent({
               <CommentItem
                 key={`${comment.author}-${i}`}
                 comment={comment}
+                prUrl={pr.prUrl}
                 onHide={handleHideComment}
               />
             ))}

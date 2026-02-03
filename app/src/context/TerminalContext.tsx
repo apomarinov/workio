@@ -278,10 +278,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
               if (hiddenAuthorsRef.current.has(comment.author)) continue
               const commentKey = `${comment.author}:${comment.createdAt}`
               if (!prevCommentKeys.has(commentKey)) {
+                const commentUrl = comment.url || pr.prUrl
                 sendNotificationRef.current(`💬 ${comment.author} commented`, {
                   body: comment.body,
                   audio: 'pr-activity',
-                  onClick: () => window.open(pr.prUrl, '_blank'),
+                  onClick: () => window.open(commentUrl, '_blank'),
                 })
               }
             }
@@ -309,12 +310,15 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
                     : review.state === 'CHANGES_REQUESTED'
                       ? 'requested changes'
                       : 'reviewed'
+                const reviewUrl = review.id
+                  ? `${pr.prUrl}#pullrequestreview-${review.id}`
+                  : pr.prUrl
                 sendNotificationRef.current(
                   `${emoji} ${review.author} ${action}`,
                   {
                     body: review.body || pr.prTitle,
                     audio: 'pr-activity',
-                    onClick: () => window.open(pr.prUrl, '_blank'),
+                    onClick: () => window.open(reviewUrl, '_blank'),
                   },
                 )
               }

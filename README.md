@@ -36,6 +36,7 @@ A developer dashboard that brings together your projects, temrinals, Claude AI s
 - **Zellij Tweaks**
   - copy to clipboard of multipage selection in panes
   - detect running processes in tabs
+  - use project name for session name
 - **Keyboard Shortcuts**
 - **PWA Ready**
 

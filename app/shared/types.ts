@@ -20,6 +20,7 @@ export interface FailedPRCheck {
 }
 
 export interface PRComment {
+  url?: string
   author: string
   avatarUrl: string
   body: string
@@ -27,6 +28,7 @@ export interface PRComment {
 }
 
 export interface PRReview {
+  id?: number
   author: string
   avatarUrl: string
   state: string

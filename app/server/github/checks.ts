@@ -35,6 +35,19 @@ const POLL_INTERVAL = 60_000 // 60 seconds
 const CACHE_TTL = 30_000 // 30
 const REFRESH_MIN_INTERVAL = 30_000 // 30 seconds
 
+/** Decode GitHub GraphQL node ID to extract database ID (last 4 bytes as big-endian uint32) */
+function decodeNodeId(nodeId: string): number | null {
+  try {
+    const base64Part = nodeId.split('_')[1]
+    if (!base64Part) return null
+    const buffer = Buffer.from(base64Part, 'base64')
+    if (buffer.length < 4) return null
+    return buffer.readUInt32BE(buffer.length - 4)
+  } catch {
+    return null
+  }
+}
+
 export function parseGitHubRemoteUrl(
   url: string,
 ): { owner: string; repo: string } | null {
@@ -130,9 +143,15 @@ interface GhPR {
   state: 'OPEN' | 'MERGED' | 'CLOSED'
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
   reviewDecision: string
-  reviews: { author: { login: string }; state: string; body: string }[]
+  reviews: {
+    id: string
+    author: { login: string }
+    state: string
+    body: string
+  }[]
   reviewRequests: { login: string }[]
   comments: {
+    url: string
     author: { login: string }
     body: string
     createdAt: string
@@ -226,6 +245,7 @@ function fetchOpenPRs(
                   r.state === 'COMMENTED',
               )
               .map((r) => ({
+                id: decodeNodeId(r.id) ?? undefined,
                 author: r.author.login,
                 avatarUrl: `https://github.com/${r.author.login}.png?size=32`,
                 // If reviewer has a pending re-review request, mark as PENDING
@@ -249,6 +269,7 @@ function fetchOpenPRs(
               .reverse()
               .slice(0, 5)
               .map((c) => ({
+                url: c.url,
                 author: c.author.login,
                 avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
                 body: c.body,
@@ -693,6 +714,7 @@ export function fetchPRComments(
         try {
           const data: {
             comments: {
+              url: string
               author: { login: string }
               body: string
               createdAt: string
@@ -710,6 +732,7 @@ export function fetchPRComments(
             .reverse()
             .slice(offset, offset + limit)
             .map((c) => ({
+              url: c.url,
               author: c.author.login,
               avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
               body: c.body,
