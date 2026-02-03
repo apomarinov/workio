@@ -47,14 +47,37 @@ export function getPipDimensions(layout: 'horizontal' | 'vertical'): {
 export function usePinnedSessionsData() {
   const { sessions } = useSessionContext()
   const { terminals } = useTerminalContext()
-  const [pinnedSessionIds] = useLocalStorage<string[]>(
-    'sidebar-pinned-sessions',
-    [],
-  )
-  const [pinnedTerminalIds] = useLocalStorage<number[]>(
-    'sidebar-pinned-terminal-sessions',
-    [],
-  )
+  const [rawPinnedSessionIds, setRawPinnedSessionIds] = useLocalStorage<
+    string[]
+  >('sidebar-pinned-sessions', [])
+  const [rawPinnedTerminalIds, setRawPinnedTerminalIds] = useLocalStorage<
+    number[]
+  >('sidebar-pinned-terminal-sessions', [])
+
+  // Validate pinned session IDs against actual sessions
+  const pinnedSessionIds = useMemo(() => {
+    const sessionIdSet = new Set(sessions.map((s) => s.session_id))
+    return rawPinnedSessionIds.filter((id) => sessionIdSet.has(id))
+  }, [sessions, rawPinnedSessionIds])
+
+  // Validate pinned terminal IDs against actual terminals
+  const pinnedTerminalIds = useMemo(() => {
+    const terminalIdSet = new Set(terminals.map((t) => t.id))
+    return rawPinnedTerminalIds.filter((id) => terminalIdSet.has(id))
+  }, [terminals, rawPinnedTerminalIds])
+
+  // Clean up stale IDs from localStorage
+  useEffect(() => {
+    if (pinnedSessionIds.length < rawPinnedSessionIds.length) {
+      setRawPinnedSessionIds(pinnedSessionIds)
+    }
+  }, [pinnedSessionIds, rawPinnedSessionIds, setRawPinnedSessionIds])
+
+  useEffect(() => {
+    if (pinnedTerminalIds.length < rawPinnedTerminalIds.length) {
+      setRawPinnedTerminalIds(pinnedTerminalIds)
+    }
+  }, [pinnedTerminalIds, rawPinnedTerminalIds, setRawPinnedTerminalIds])
 
   const pinnedSessions = useMemo(() => {
     const result: SessionWithProject[] = []
@@ -89,7 +112,7 @@ export function usePinnedSessionsData() {
     // Sort by updated_at ascending (latest on right in horizontal)
     return result.sort(
       (a, b) =>
-        new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime(),
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     )
   }, [sessions, terminals, pinnedSessionIds, pinnedTerminalIds])
 
@@ -107,14 +130,17 @@ function SettingsMenu({
   maxSessions,
   setMaxSessions,
   portalContainer,
+  open,
+  setOpen,
 }: {
   layout: 'horizontal' | 'vertical'
   setLayout: (v: 'horizontal' | 'vertical') => void
   maxSessions: number
   setMaxSessions: (v: number) => void
   portalContainer?: HTMLElement | null
+  open: boolean,
+  setOpen: (v: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -210,6 +236,8 @@ export function PinnedSessionsPip() {
     'pip-max-sessions',
     0,
   )
+  const [isHoveringMenu, setIsHoveringMenu] = useState(false)
+  const [openMenu, setOpenMenu] = useState(false)
 
   // Auto-close PiP when all items unpinned
   useEffect(() => {
@@ -232,23 +260,17 @@ export function PinnedSessionsPip() {
     return () => pipWin.removeEventListener('keydown', handleKeyDown)
   }, [pip.window, pip.closeAll])
 
-  const cappedSessions = useMemo(() => {
+  const displayedSessions = useMemo(() => {
     if (maxSessions > 0) return pinnedSessions.slice(0, maxSessions)
     return pinnedSessions
   }, [pinnedSessions, maxSessions])
-
-  const displayedSessions = useMemo(
-    () =>
-      layout === 'vertical' ? [...cappedSessions].reverse() : cappedSessions,
-    [cappedSessions, layout],
-  )
 
   const resizePip = useCallback(
     (l: 'horizontal' | 'vertical') => {
       const dims = getPipDimensions(l)
       if (!dims) return
       try {
-        pip.resize({ width: dims.width, height: dims.height })
+        pip.resize({ width: dims.width, height: dims.height + 34 })
         if (dims.left !== undefined) {
           pip.moveTo(dims.left, dims.top ?? 0)
         }
@@ -299,7 +321,7 @@ export function PinnedSessionsPip() {
             layout === 'horizontal' ? 'flex-row' : 'flex-col',
           )}
         >
-          {cappedSessions.map((session) => (
+          {displayedSessions.map((session) => (
             <div
               key={session.session_id}
               className="flex-shrink-0"
@@ -319,9 +341,9 @@ export function PinnedSessionsPip() {
       {pipContainer &&
         createPortal(
           <div className="relative h-full w-full flex max-w-[100vw] max-h-[100vh]">
-            <div className="group/pip rounded-tl-md w-10 h-16 absolute bottom-0 right-0 z-30">
-              <div className="group-hover/pip:flex group-hover/pip:translate-x-0 transition-all translate-x-[40px]">
-                <div className="flex-col rounded-tl-lg p-2 w-fit h-fit items-start gap-0.5 bg-sidebar">
+            <div className="rounded-tl-md w-[90vw] h-10 absolute top-0 left-0 z-30" onMouseEnter={() => setIsHoveringMenu(true)} onMouseLeave={() => setIsHoveringMenu(openMenu)}>
+              <div onMouseLeave={() => setIsHoveringMenu(false)} className={cn('transition-all translate-y-[-45px]', (isHoveringMenu || openMenu) && 'flex translate-y-0')}>
+                <div className="flex-row border-[2px] !border-t-[0px] border-sidebar-accent flex rounded-b-lg px-2 py-1.5 w-fit h-fit items-start gap-2 bg-sidebar mx-auto">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -332,6 +354,13 @@ export function PinnedSessionsPip() {
                     <Maximize2 className="w-3.5 h-3.5" />
                   </Button>
                   <SettingsMenu
+                    open={openMenu}
+                    setOpen={(v) => {
+                      setOpenMenu(v)
+                      if (!v) {
+                        setIsHoveringMenu(false)
+                      }
+                    }}
                     layout={layout}
                     setLayout={handleSetLayout}
                     maxSessions={maxSessions}

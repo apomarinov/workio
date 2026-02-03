@@ -206,7 +206,7 @@ function fetchOpenPRs(owner: string, repo: string): Promise<PRCheckStatus[]> {
                 // If reviewer has a pending re-review request, mark as PENDING
                 state:
                   r.state === 'CHANGES_REQUESTED' &&
-                    pendingReviewers.has(r.author.login)
+                  pendingReviewers.has(r.author.login)
                     ? 'PENDING'
                     : r.state,
                 body: r.body || '',

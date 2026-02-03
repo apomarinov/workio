@@ -470,8 +470,8 @@ const CommentItem = memo(function CommentItem({
         <div
           onClick={() => setModalOpen(true)}
           className={cn(
-            ' mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors',
-            !expanded && 'line-clamp-1',
+            'mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors',
+            !expanded && 'line-clamp-1 leading-[1.5]',
           )}
         >
           <MarkdownContent content={comment.body} />
@@ -652,7 +652,7 @@ export function PRStatusContent({
           {hasBody && (
             <div
               onClick={() => setBodyModalOpen(true)}
-              className="px-2 py-1 text-xs text-sidebar-foreground/70 line-clamp-2 cursor-pointer hover:bg-sidebar-accent/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-sidebar-foreground/70 line-clamp-2 leading-[1.5] cursor-pointer hover:bg-sidebar-accent/30 rounded transition-colors"
             >
               <MarkdownContent content={pr.prBody} />
             </div>

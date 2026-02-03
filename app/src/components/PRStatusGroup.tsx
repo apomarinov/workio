@@ -38,9 +38,9 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.isMerged
             ? undefined
             : () => {
-              onToggle()
-              onSeen?.()
-            }
+                onToggle()
+                onSeen?.()
+              }
         }
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0',
@@ -69,11 +69,13 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <div className="flex gap-1 items-center justify-between min-w-0">
             <div className="flex gap-1 items-center min-w-0">
               <GitBranch className="min-w-2.5 min-h-2.5 max-w-2.5 max-h-2.5" />
-              <span
-                className="text-[11px] text-muted-foreground/70 truncate"
-              >{pr.branch}</span>
+              <span className="text-[11px] text-muted-foreground/70 truncate">
+                {pr.branch}
+              </span>
             </div>
-            <span className="text-[11px] text-muted-foreground/70">#{pr.prNumber}</span>
+            <span className="text-[11px] text-muted-foreground/70">
+              #{pr.prNumber}
+            </span>
           </div>
         </div>
         <a
@@ -95,7 +97,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => { }}
+            onToggle={() => {}}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />
