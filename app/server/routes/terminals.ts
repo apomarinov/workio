@@ -278,10 +278,19 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   // List all terminals
   fastify.get('/api/terminals', async () => {
     const terminals = await getAllTerminals()
-    return terminals.map((terminal) => ({
-      ...terminal,
-      orphaned: terminal.ssh_host ? false : !fs.existsSync(terminal.cwd),
-    }))
+    return terminals.map((terminal) => {
+      // Don't mark as orphaned if it's being set up (directory doesn't exist yet)
+      const isSettingUp =
+        terminal.git_repo?.status === 'setup' ||
+        terminal.setup?.status === 'setup'
+      return {
+        ...terminal,
+        orphaned:
+          terminal.ssh_host || isSettingUp
+            ? false
+            : !fs.existsSync(terminal.cwd),
+      }
+    })
   })
 
   // Create terminal

@@ -499,9 +499,10 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }) => {
       const terminal = await api.createTerminal(opts)
       mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
+      setTerminalOrder((prev) => [terminal.id, ...prev])
       return terminal
     },
-    [mutate],
+    [mutate, setTerminalOrder],
   )
 
   const updateTerminal = useCallback(

@@ -145,7 +145,9 @@ export function TerminalItem({
 
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    onToggleSessions?.()
+    if (!isSettingUp && !isDeleting) {
+      onToggleSessions?.()
+    }
   }
 
   const handleMenuClick = (e: React.MouseEvent) => {
@@ -434,12 +436,14 @@ export function TerminalItem({
             Clone failed: {terminal.git_repo.error}
           </div>
         )}
-        {(hasGitHub ||
-          hasProcesses ||
-          hasPorts ||
-          isDirty ||
-          showRemoteSync ||
-          hasSessions) &&
+        {!isSettingUp &&
+          !isDeleting &&
+          (hasGitHub ||
+            hasProcesses ||
+            hasPorts ||
+            isDirty ||
+            showRemoteSync ||
+            hasSessions) &&
           sessionsExpanded && (
             <div className="ml-2 space-y-0.5">
               {(hasGitHub ||
