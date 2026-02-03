@@ -1,4 +1,11 @@
-import { ArrowBigUp, ChevronUp, Command, Option, RotateCcw } from 'lucide-react'
+import {
+  ArrowBigUp,
+  ChevronUp,
+  Command,
+  Option,
+  RotateCcw,
+  X,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -41,7 +48,13 @@ function renderKey(key: string): ReactNode {
   return <span>{key.toUpperCase()}</span>
 }
 
-function formatBinding(binding: ShortcutBinding, suffix?: string): ReactNode {
+function formatBinding(
+  binding: ShortcutBinding | null,
+  suffix?: string,
+): ReactNode {
+  if (!binding) {
+    return <span className="text-muted-foreground italic">Disabled</span>
+  }
   return (
     <span className="inline-flex items-center gap-1">
       {binding.ctrlKey && <ChevronUp className={cn(ICON_CLASS, 'stroke-3')} />}
@@ -57,9 +70,10 @@ function formatBinding(binding: ShortcutBinding, suffix?: string): ReactNode {
 }
 
 function bindingsConflict(
-  palette: ShortcutBinding,
-  goToTab: ShortcutBinding,
+  palette: ShortcutBinding | null,
+  goToTab: ShortcutBinding | null,
 ): boolean {
+  if (!palette || !goToTab) return false
   if (!palette.key) return false
   const isAllDigits = palette.key.split('').every((c) => c >= '0' && c <= '9')
   if (!isAllDigits) return false
@@ -79,16 +93,16 @@ interface KeymapModalProps {
 export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const { settings, updateSettings } = useSettings()
 
-  const [palette, setPalette] = useState<ShortcutBinding>(
+  const [palette, setPalette] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.palette,
   )
-  const [goToTab, setGoToTab] = useState<ShortcutBinding>(
+  const [goToTab, setGoToTab] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.goToTab,
   )
-  const [goToLastTab, setGoToLastTab] = useState<ShortcutBinding>(
+  const [goToLastTab, setGoToLastTab] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.goToLastTab,
   )
-  const [togglePip, setTogglePip] = useState<ShortcutBinding>(
+  const [togglePip, setTogglePip] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.togglePip,
   )
   const [recording, setRecording] = useState<
@@ -263,6 +277,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             onRecord={() =>
               setRecording(recording === 'palette' ? null : 'palette')
             }
+            onUnset={() => setPalette(null)}
             display={formatBinding(palette)}
             hasConflict={hasConflict}
           />
@@ -274,7 +289,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             onRecord={() =>
               setRecording(recording === 'goToTab' ? null : 'goToTab')
             }
-            display={formatBinding(goToTab, '1 - NN')}
+            onUnset={() => setGoToTab(null)}
+            display={formatBinding(goToTab, goToTab ? '1 - NN' : undefined)}
           />
           <ShortcutRow
             label="Go to last project"
@@ -284,6 +300,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             onRecord={() =>
               setRecording(recording === 'goToLastTab' ? null : 'goToLastTab')
             }
+            onUnset={() => setGoToLastTab(null)}
             display={formatBinding(goToLastTab)}
           />
           <ShortcutRow
@@ -294,6 +311,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             onRecord={() =>
               setRecording(recording === 'togglePip' ? null : 'togglePip')
             }
+            onUnset={() => setTogglePip(null)}
             display={formatBinding(togglePip)}
           />
           {hasConflict && (
@@ -323,56 +341,73 @@ function ShortcutRow({
   isRecording,
   recordingKeys,
   onRecord,
+  onUnset,
   binding,
   display,
   hasConflict,
 }: {
   label: string
-  binding: ShortcutBinding
+  binding: ShortcutBinding | null
   isRecording: boolean
   recordingKeys: string[]
   onRecord: () => void
+  onUnset: () => void
   display: ReactNode
   hasConflict?: boolean
 }) {
+  const isDisabled = !binding
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm font-medium flex flex-col gap-0">
         {label}
-        {!binding.key && (
+        {binding && !binding.key && (
           <span className="text-xs font-normal text-muted-foreground">
             Modifier only
           </span>
         )}
       </span>
-      <button
-        type="button"
-        onClick={onRecord}
-        className={`px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors ${
-          isRecording
-            ? 'border-primary bg-primary/10 text-primary animate-pulse'
-            : hasConflict
-              ? 'border-amber-500/50 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
-              : 'border-border bg-zinc-800 hover:bg-zinc-700/70'
-        }`}
-      >
-        {isRecording ? (
-          recordingKeys.length > 0 ? (
-            <span className="inline-flex items-center gap-1">
-              {[...recordingKeys]
-                .sort((a, b) => (KEY_ORDER[a] ?? 4) - (KEY_ORDER[b] ?? 4))
-                .map((key, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: stable sorted list
-                  <span key={i}>{renderKey(key)}</span>
-                ))}
-            </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onRecord}
+          className={`px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors ${
+            isRecording
+              ? 'border-primary bg-primary/10 text-primary animate-pulse'
+              : hasConflict
+                ? 'border-amber-500/50 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
+                : isDisabled
+                  ? 'border-border bg-zinc-800/50 text-muted-foreground hover:bg-zinc-700/70'
+                  : 'border-border bg-zinc-800 hover:bg-zinc-700/70'
+          }`}
+        >
+          {isRecording ? (
+            recordingKeys.length > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                {[...recordingKeys]
+                  .sort((a, b) => (KEY_ORDER[a] ?? 4) - (KEY_ORDER[b] ?? 4))
+                  .map((key, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: stable sorted list
+                    <span key={i}>{renderKey(key)}</span>
+                  ))}
+              </span>
+            ) : (
+              'Press shortcut...'
+            )
           ) : (
-            'Press shortcut...'
-          )
-        ) : (
-          display
+            display
+          )}
+        </button>
+        {!isDisabled && (
+          <button
+            type="button"
+            onClick={onUnset}
+            className="p-1.5 cursor-pointer text-muted-foreground hover:text-foreground rounded-md border border-border bg-zinc-800 hover:bg-zinc-700/70 transition-colors"
+            title="Disable shortcut"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         )}
-      </button>
+      </div>
     </div>
   )
 }

@@ -34,7 +34,7 @@ const MAX_BUFFER_LINES = 5000
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 const LONG_TIMEOUT = 300_000 // 5 min for setup/teardown operations
 
-const COMMAND_IGNORE_LIST = ['claude']
+const COMMAND_IGNORE_LIST: string[] = []
 
 export interface PtySession {
   pty: TerminalBackend

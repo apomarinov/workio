@@ -113,10 +113,17 @@ function renderModifierIcons(
 export function useModifiersHeld() {
   const held = useSyncExternalStore(subscribeHeld, getHeldSnapshot)
   const { settings } = useSettings()
-  const paletteBinding = settings?.keymap?.palette ?? DEFAULT_KEYMAP.palette
-  const goToTabBinding = settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab
+  const paletteBinding =
+    settings?.keymap?.palette === null
+      ? null
+      : (settings?.keymap?.palette ?? DEFAULT_KEYMAP.palette)
+  const goToTabBinding =
+    settings?.keymap?.goToTab === null
+      ? null
+      : (settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab)
 
   const isGoToTabModifierHeld =
+    goToTabBinding !== null &&
     held.meta === !!goToTabBinding.metaKey &&
     held.ctrl === !!goToTabBinding.ctrlKey &&
     held.alt === !!goToTabBinding.altKey &&
@@ -126,8 +133,12 @@ export function useModifiersHeld() {
     held,
     isGoToTabModifierHeld,
     modifierIcons: {
-      palette: renderModifierIcons(paletteBinding),
-      goToTab: renderModifierIcons(goToTabBinding),
+      palette: paletteBinding
+        ? renderModifierIcons(paletteBinding)
+        : () => null,
+      goToTab: goToTabBinding
+        ? renderModifierIcons(goToTabBinding)
+        : () => null,
     } as Record<keyof Keymap, (className?: string) => ReactNode>,
   }
 }
@@ -149,12 +160,22 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
 
-  const paletteBinding = settings?.keymap?.palette ?? DEFAULT_KEYMAP.palette
-  const goToTabBinding = settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab
+  const paletteBinding =
+    settings?.keymap?.palette === null
+      ? null
+      : (settings?.keymap?.palette ?? DEFAULT_KEYMAP.palette)
+  const goToTabBinding =
+    settings?.keymap?.goToTab === null
+      ? null
+      : (settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab)
   const goToLastTabBinding =
-    settings?.keymap?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab
+    settings?.keymap?.goToLastTab === null
+      ? null
+      : (settings?.keymap?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab)
   const togglePipBinding =
-    settings?.keymap?.togglePip ?? DEFAULT_KEYMAP.togglePip
+    settings?.keymap?.togglePip === null
+      ? null
+      : (settings?.keymap?.togglePip ?? DEFAULT_KEYMAP.togglePip)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: pip.window is needed to re-attach listeners when PiP window changes
   useEffect(() => {
@@ -201,6 +222,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
         // Check palette: modifiers + accumulated keys match binding
         if (
           h.palette &&
+          paletteBinding &&
           paletteBinding.key &&
           modifiersMatchBinding(modifierBuffer, paletteBinding) &&
           keyBuffer.join('') === paletteBinding.key
@@ -216,6 +238,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
         // Check togglePip: modifiers + accumulated keys match binding
         if (
           h.togglePip &&
+          togglePipBinding &&
           togglePipBinding.key &&
           modifiersMatchBinding(modifierBuffer, togglePipBinding) &&
           keyBuffer.join('') === togglePipBinding.key
@@ -234,6 +257,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           e.code >= 'Digit0' && e.code <= 'Digit9' ? e.code[5] : null
         if (
           h.goToTab &&
+          goToTabBinding &&
           digit &&
           modifiersMatchBinding(modifierBuffer, goToTabBinding)
         ) {
@@ -252,6 +276,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       const h = handlersRef.current
       if (
         h.palette &&
+        paletteBinding &&
         paletteBinding.key &&
         !paletteBinding.metaKey &&
         !paletteBinding.ctrlKey &&
@@ -303,6 +328,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       ) {
         if (
           !consumed &&
+          goToLastTabBinding &&
           keyBuffer.length === 0 &&
           digitBuffer.length === 0 &&
           modifiersMatchBinding(modifierBuffer, goToLastTabBinding) &&

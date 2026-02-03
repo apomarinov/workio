@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   Check,
   ChevronDown,
   ChevronRight,
@@ -8,7 +9,6 @@ import {
   GitMerge,
   Loader2,
   RefreshCw,
-  ArrowLeftRight,
   X,
 } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
@@ -157,13 +157,15 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
       icon: (props?: { cls?: string; group?: string }) => {
-        return <ArrowLeftRight
-          className={cn(
-            iconClass,
-            `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
-            props?.cls,
-          )}
-        />
+        return (
+          <ArrowLeftRight
+            className={cn(
+              iconClass,
+              `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
+              props?.cls,
+            )}
+          />
+        )
       },
     }
   }
@@ -248,9 +250,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
@@ -715,7 +717,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                    check.status === 'QUEUED' ? (
+                  check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

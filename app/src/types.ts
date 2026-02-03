@@ -229,10 +229,10 @@ export interface ShortcutBinding {
 }
 
 export interface Keymap {
-  palette: ShortcutBinding
-  goToTab: ShortcutBinding
-  goToLastTab: ShortcutBinding
-  togglePip: ShortcutBinding
+  palette: ShortcutBinding | null
+  goToTab: ShortcutBinding | null
+  goToLastTab: ShortcutBinding | null
+  togglePip: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
