@@ -12,7 +12,6 @@ import {
   PRStatusContent,
   PRTabButton,
 } from './PRStatusContent'
-import { TruncatedPath } from './TruncatedPath'
 
 interface PRStatusGroupProps {
   pr: PRCheckStatus

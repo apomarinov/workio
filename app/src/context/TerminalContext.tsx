@@ -155,6 +155,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   // GitHub PR checks
   const [githubPRs, setGithubPRs] = useState<PRCheckStatus[]>([])
+  const previousPRsRef = useRef<Map<string, PRCheckStatus>>(new Map())
   const { sendNotification } = useNotifications()
   const sendNotificationRef = useRef(sendNotification)
   sendNotificationRef.current = sendNotification
@@ -191,36 +192,87 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [githubPRs, prPoll, raw, emit])
 
   useEffect(() => {
-    return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
-      setGithubPRs(data.prs)
+    const hasFailedChecks = (pr: PRCheckStatus) =>
+      pr.checks.some(
+        (c) =>
+          c.status === 'COMPLETED' &&
+          c.conclusion !== 'SUCCESS' &&
+          c.conclusion !== 'SKIPPED' &&
+          c.conclusion !== 'NEUTRAL',
+      )
 
-      setPrPoll(true)
-      // Browser notification for new PR activity
-      const lastNotifAt = localStorage.getItem('pr-activity-notif-at') ?? ''
-      const unseenCount = data.prs.filter(
-        (pr) =>
-          pr.updatedAt &&
-          pr.updatedAt > lastNotifAt &&
-          (!pr.checks.some(
-            (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-          ) ||
-            pr.checks.some(
-              (c) =>
-                c.status === 'COMPLETED' &&
-                c.conclusion !== 'SUCCESS' &&
-                c.conclusion !== 'SKIPPED' &&
-                c.conclusion !== 'NEUTRAL',
-            )),
-      ).length
-      if (unseenCount > 0) {
-        const sent = sendNotificationRef.current(
-          `New activity on ${unseenCount} PR${unseenCount !== 1 ? 's' : ''}`,
-          { audio: 'pr-activity' },
-        )
-        if (sent) {
-          localStorage.setItem('pr-activity-notif-at', new Date().toISOString())
+    const revealPR = (pr: PRCheckStatus) => {
+      window.dispatchEvent(
+        new CustomEvent('reveal-pr', {
+          detail: { branch: pr.branch, repo: pr.repo },
+        }),
+      )
+    }
+
+    return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
+      const prevMap = previousPRsRef.current
+
+      // Only send notifications if we have previous state (not initial load)
+      if (prevMap.size > 0) {
+        for (const pr of data.prs) {
+          const key = `${pr.repo}#${pr.prNumber}`
+          const prev = prevMap.get(key)
+
+          // PR merged
+          if (prev && prev.state !== 'MERGED' && pr.state === 'MERGED') {
+            sendNotificationRef.current('✅ Merged', {
+              body: pr.prTitle,
+              audio: 'pr-activity',
+              onClick: () => revealPR(pr),
+            })
+          }
+
+          // Check failed (had no failures, now has failures)
+          if (prev && !hasFailedChecks(prev) && hasFailedChecks(pr)) {
+            sendNotificationRef.current('❌ Check failed', {
+              body: pr.prTitle,
+              audio: 'pr-activity',
+              onClick: () => revealPR(pr),
+            })
+          }
+
+          // Changes requested
+          if (
+            prev &&
+            prev.reviewDecision !== 'CHANGES_REQUESTED' &&
+            pr.reviewDecision === 'CHANGES_REQUESTED'
+          ) {
+            sendNotificationRef.current('🔄 Changes requested', {
+              body: pr.prTitle,
+              audio: 'pr-activity',
+              onClick: () => revealPR(pr),
+            })
+          }
+
+          // Approved
+          if (
+            prev &&
+            prev.reviewDecision !== 'APPROVED' &&
+            pr.reviewDecision === 'APPROVED'
+          ) {
+            sendNotificationRef.current('✅ Approved', {
+              body: pr.prTitle,
+              audio: 'pr-activity',
+              onClick: () => revealPR(pr),
+            })
+          }
         }
       }
+
+      // Update previous state
+      const newMap = new Map<string, PRCheckStatus>()
+      for (const pr of data.prs) {
+        newMap.set(`${pr.repo}#${pr.prNumber}`, pr)
+      }
+      previousPRsRef.current = newMap
+
+      setGithubPRs(data.prs)
+      setPrPoll(true)
     })
   }, [subscribe])
 
