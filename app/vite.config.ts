@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
           'favicon.svg',
           'favicon-active.svg',
           'favicon-warning.svg',
+          'icon.png',
         ],
         manifest: {
           name: 'WorkIO',
@@ -34,9 +35,9 @@ export default defineConfig(({ mode }) => {
           display: 'standalone',
           icons: [
             {
-              src: 'favicon.svg',
-              sizes: 'any',
-              type: 'image/svg+xml',
+              src: 'icon.png',
+              sizes: '512x512',
+              type: 'image/png',
               purpose: 'any maskable',
             },
           ],
