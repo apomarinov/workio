@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
-  ChevronsUpDown,
   Ellipsis,
   Folder,
   Github,
@@ -82,7 +81,7 @@ export function Sidebar({ width }: SidebarProps) {
   >('sidebar-expanded-session-groups', [])
   const [expandedTerminalSessions, setExpandedTerminalSessions] =
     useLocalStorage<number[]>('sidebar-expanded-terminal-sessions', [])
-  const [, setCollapsedSessions] = useLocalStorage<string[]>(
+  const [collapsedSessions, setCollapsedSessions] = useLocalStorage<string[]>(
     'sidebar-collapsed-sessions',
     [],
   )
@@ -168,11 +167,6 @@ export function Sidebar({ width }: SidebarProps) {
     }
   }, [sessions, terminals])
 
-  const allFolders = useMemo(
-    () => Array.from(groupedTerminals.keys()),
-    [groupedTerminals],
-  )
-
   const toggleFolder = (cwd: string) => {
     setExpandedFoldersArray((prev) => {
       if (prev.includes(cwd)) {
@@ -254,38 +248,16 @@ export function Sidebar({ width }: SidebarProps) {
     return grouped
   }, [githubPRs])
 
-  const allGitHubRepos = useMemo(
-    () => Array.from(githubPRsByRepo.keys()),
-    [githubPRsByRepo],
-  )
-
   const allSessionIds = useMemo(
     () => sessions.map((s) => s.session_id),
     [sessions],
   )
-
-  const allTerminalIds = useMemo(() => terminals.map((t) => t.id), [terminals])
-
-  const allOrphanGroupPaths = useMemo(
-    () => Array.from(orphanSessionGroups.keys()),
-    [orphanSessionGroups],
-  )
-
-  const expandAll = () => {
-    setExpandedFoldersArray(allFolders)
-    setExpandedSessionGroups(allOrphanGroupPaths)
-    setExpandedTerminalSessions(allTerminalIds)
-    setCollapsedSessions([])
-    setCollapsedGitHubRepos([])
-    setExpandedGitHubPRs(githubPRs.map((pr) => pr.branch))
-  }
 
   const collapseAll = () => {
     setExpandedFoldersArray([])
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
     setCollapsedSessions(allSessionIds)
-    setCollapsedGitHubRepos(allGitHubRepos)
     setExpandedGitHubPRs([])
   }
 
@@ -445,11 +417,12 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedSessionGroups,
   ])
 
-  const allExpanded =
-    allFolders.every((f) => expandedFolders.has(f)) &&
-    allOrphanGroupPaths.every((p) => expandedSessionGroupsSet.has(p)) &&
-    allTerminalIds.every((id) => expandedTerminalSessionsSet.has(id)) &&
-    allGitHubRepos.every((r) => !collapsedGitHubReposSet.has(r))
+  const hasAnythingExpanded =
+    expandedFoldersArray.length > 0 ||
+    expandedSessionGroups.length > 0 ||
+    expandedTerminalSessions.length > 0 ||
+    collapsedSessions.length < allSessionIds.length ||
+    expandedGitHubPRs.length > 0
 
   return (
     <div
@@ -558,17 +531,15 @@ export function Sidebar({ width }: SidebarProps) {
                     </button>
                   </PopoverContent>
                 </Popover>
-                <button
-                  onClick={allExpanded ? collapseAll : expandAll}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                >
-                  {allExpanded ? (
+                {hasAnythingExpanded && (
+                  <button
+                    onClick={collapseAll}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                  >
                     <ChevronsDownUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronsUpDown className="w-4 h-4" />
-                  )}
-                  {allExpanded ? 'Collapse all' : 'Expand all'}
-                </button>
+                    Collapse all
+                  </button>
+                )}
                 <button
                   onClick={() =>
                     window.dispatchEvent(new Event('open-palette'))
@@ -649,19 +620,17 @@ export function Sidebar({ width }: SidebarProps) {
                 </button>
               </PopoverContent>
             </Popover>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={allExpanded ? collapseAll : expandAll}
-              title={allExpanded ? 'Collapse all' : 'Expand all'}
-            >
-              {allExpanded ? (
+            {hasAnythingExpanded && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={collapseAll}
+                title="Collapse all"
+              >
                 <ChevronsDownUp className="w-4 h-4" />
-              ) : (
-                <ChevronsUpDown className="w-4 h-4" />
-              )}
-            </Button>
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

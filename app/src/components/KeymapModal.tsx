@@ -93,6 +93,18 @@ interface KeymapModalProps {
 export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const { settings, updateSettings } = useSettings()
 
+  // Disable global shortcuts while modal is open
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('shortcuts-disabled', { detail: open }),
+    )
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent('shortcuts-disabled', { detail: false }),
+      )
+    }
+  }, [open])
+
   const [palette, setPalette] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.palette,
   )

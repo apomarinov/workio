@@ -160,6 +160,15 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const pip = useDocumentPip()
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
+  const disabledRef = useRef(false)
+
+  useEffect(() => {
+    const onDisable = (e: Event) => {
+      disabledRef.current = (e as CustomEvent).detail
+    }
+    window.addEventListener('shortcuts-disabled', onDisable)
+    return () => window.removeEventListener('shortcuts-disabled', onDisable)
+  }, [])
 
   const paletteBinding =
     settings?.keymap?.palette === null
@@ -207,6 +216,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     let consumed = false // true after a shortcut fires; blocks until all modifiers released
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (disabledRef.current) return
+
       if (MODIFIER_KEYS.has(e.key)) {
         const mod = KEY_TO_MOD[e.key]
         if (mod && !modifierBuffer[mod]) {
