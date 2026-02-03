@@ -150,6 +150,7 @@ interface KeymapHandlers {
   goToTab?: (index: number) => void
   goToLastTab?: () => void
   togglePip?: () => void
+  itemActions?: () => void
 }
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
@@ -176,6 +177,10 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     settings?.keymap?.togglePip === null
       ? null
       : (settings?.keymap?.togglePip ?? DEFAULT_KEYMAP.togglePip)
+  const itemActionsBinding =
+    settings?.keymap?.itemActions === null
+      ? null
+      : (settings?.keymap?.itemActions ?? DEFAULT_KEYMAP.itemActions)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: pip.window is needed to re-attach listeners when PiP window changes
   useEffect(() => {
@@ -246,6 +251,22 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           e.preventDefault()
           e.stopPropagation()
           h.togglePip()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check itemActions: modifiers + accumulated keys match binding
+        if (
+          h.itemActions &&
+          itemActionsBinding &&
+          itemActionsBinding.key &&
+          modifiersMatchBinding(modifierBuffer, itemActionsBinding) &&
+          keyBuffer.join('') === itemActionsBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.itemActions()
           consumed = true
           suppressModifiers()
           return
@@ -358,6 +379,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     goToTabBinding,
     goToLastTabBinding,
     togglePipBinding,
+    itemActionsBinding,
     pip.window,
   ])
 }

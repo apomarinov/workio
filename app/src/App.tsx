@@ -65,6 +65,18 @@ function AppContent() {
     togglePip: () => {
       window.dispatchEvent(new Event('toggle-pip'))
     },
+    itemActions: () => {
+      // Only dispatch if there's an active terminal or session
+      if (!activeTerminal && !activeSessionId) return
+      window.dispatchEvent(
+        new CustomEvent('open-item-actions', {
+          detail: {
+            terminalId: activeTerminal?.id ?? null,
+            sessionId: activeSessionId ?? null,
+          },
+        }),
+      )
+    },
   })
 
   // Example: Change favicon based on session status

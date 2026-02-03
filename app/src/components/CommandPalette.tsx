@@ -216,12 +216,49 @@ export function CommandPalette() {
     return () => window.removeEventListener('open-palette', handler)
   }, [])
 
+  // Listen for item-actions event to open directly to actions mode
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number | null; sessionId: string | null }>,
+    ) => {
+      const { terminalId, sessionId } = e.detail
+
+      // If viewing a session, show session actions
+      if (sessionId) {
+        const session = sessions.find((s) => s.session_id === sessionId)
+        if (session) {
+          setActionTarget({ type: 'session', session })
+          setMode('actions')
+          setOpen(true)
+          return
+        }
+      }
+
+      // Otherwise show terminal actions
+      if (terminalId) {
+        const terminal = terminals.find((t) => t.id === terminalId)
+        if (terminal && !terminal.ssh_host) {
+          const pr = terminal.git_branch
+            ? (branchToPR.get(terminal.git_branch) ?? null)
+            : null
+          setActionTarget({ type: 'terminal', terminal, pr })
+          setMode('actions')
+          setOpen(true)
+        }
+      }
+    }
+    window.addEventListener('open-item-actions', handler as EventListener)
+    return () =>
+      window.removeEventListener('open-item-actions', handler as EventListener)
+  }, [terminals, sessions, branchToPR])
+
   const handleOpenChange = useCallback((value: boolean) => {
     setOpen(value)
     if (!value) {
-      setMode('search')
       setActionTarget(null)
       setHighlightedId(null)
+    } else {
+      setMode('search')
     }
   }, [])
 
@@ -287,14 +324,10 @@ export function CommandPalette() {
 
   const handleEscapeKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (mode === 'actions') {
-        e.preventDefault()
-        setMode('search')
-        setActionTarget(null)
-        setHighlightedId(null)
-      }
+      e.preventDefault()
+      closePalette()
     },
-    [mode],
+    [closePalette],
   )
 
   const handleKeyDown = useCallback(
@@ -388,7 +421,7 @@ export function CommandPalette() {
                 />
               ) : (
                 <ActionsView
-                  target={actionTarget!}
+                  target={actionTarget}
                   onBack={() => {
                     setMode('search')
                     setActionTarget(null)
@@ -694,7 +727,7 @@ function ActionsView({
   onRenameSession,
   onDeleteSession,
 }: {
-  target: ActionTarget
+  target: ActionTarget | null
   onBack: () => void
   onOpenInCursor: (terminal: Terminal) => void
   onOpenPR: (pr: PRCheckStatus) => void
@@ -712,11 +745,11 @@ function ActionsView({
   onDeleteSession: (session: SessionWithProject) => void
 }) {
   const title =
-    target.type === 'terminal'
-      ? target.terminal.name || getLastPathSegment(target.terminal.cwd)
-      : target.session.name ||
-        target.session.latest_user_message ||
-        target.session.session_id
+    target?.type === 'terminal'
+      ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
+      : target?.session.name ||
+        target?.session.latest_user_message ||
+        target?.session.session_id
 
   return (
     <>
@@ -737,7 +770,7 @@ function ActionsView({
       </div>
       <CommandList>
         <CommandGroup>
-          {target.type === 'terminal' && (
+          {target?.type === 'terminal' && (
             <TerminalActions
               target={target}
               onOpenInCursor={onOpenInCursor}
@@ -750,7 +783,7 @@ function ActionsView({
               onDeleteTerminal={onDeleteTerminal}
             />
           )}
-          {target.type === 'session' && (
+          {target?.type === 'session' && (
             <SessionActions
               target={target}
               onClose={onClose}

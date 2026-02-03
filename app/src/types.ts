@@ -233,6 +233,7 @@ export interface Keymap {
   goToTab: ShortcutBinding | null
   goToLastTab: ShortcutBinding | null
   togglePip: ShortcutBinding | null
+  itemActions: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -240,6 +241,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   goToTab: { metaKey: true },
   goToLastTab: { metaKey: true, shiftKey: true },
   togglePip: { metaKey: true, key: 'p' },
+  itemActions: { metaKey: true, key: 'i' },
 }
 
 export interface Settings {

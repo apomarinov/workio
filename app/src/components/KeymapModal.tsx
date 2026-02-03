@@ -105,8 +105,11 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const [togglePip, setTogglePip] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.togglePip,
   )
+  const [itemActions, setItemActions] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.itemActions,
+  )
   const [recording, setRecording] = useState<
-    'palette' | 'goToTab' | 'goToLastTab' | 'togglePip' | null
+    'palette' | 'goToTab' | 'goToLastTab' | 'togglePip' | 'itemActions' | null
   >(null)
   const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -115,11 +118,14 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     if (settings?.keymap) {
       setPalette(settings.keymap.palette)
       setGoToTab(settings.keymap.goToTab)
-      if (settings.keymap.goToLastTab) {
+      if (settings.keymap.goToLastTab !== undefined) {
         setGoToLastTab(settings.keymap.goToLastTab)
       }
-      if (settings.keymap.togglePip) {
+      if (settings.keymap.togglePip !== undefined) {
         setTogglePip(settings.keymap.togglePip)
+      }
+      if (settings.keymap.itemActions !== undefined) {
+        setItemActions(settings.keymap.itemActions)
       }
     }
   }, [settings?.keymap])
@@ -155,6 +161,11 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           binding.key = keyBuffer.join('')
         }
         setTogglePip(binding)
+      } else if (recording === 'itemActions') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setItemActions(binding)
       }
 
       setRecording(null)
@@ -194,6 +205,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           setGoToLastTab({})
         } else if (recording === 'togglePip') {
           setTogglePip({ key: e.key.toLowerCase() })
+        } else if (recording === 'itemActions') {
+          setItemActions({ key: e.key.toLowerCase() })
         }
         setRecording(null)
         return
@@ -238,7 +251,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setSaving(true)
     try {
       await updateSettings({
-        keymap: { palette, goToTab, goToLastTab, togglePip },
+        keymap: { palette, goToTab, goToLastTab, togglePip, itemActions },
       })
       toast.success('Keyboard shortcuts saved')
       onOpenChange(false)
@@ -256,6 +269,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setGoToTab(DEFAULT_KEYMAP.goToTab)
     setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)
     setTogglePip(DEFAULT_KEYMAP.togglePip)
+    setItemActions(DEFAULT_KEYMAP.itemActions)
     setRecording(null)
   }
 
@@ -313,6 +327,17 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             }
             onUnset={() => setTogglePip(null)}
             display={formatBinding(togglePip)}
+          />
+          <ShortcutRow
+            label="Item Actions"
+            binding={itemActions}
+            isRecording={recording === 'itemActions'}
+            recordingKeys={recording === 'itemActions' ? recordingKeys : []}
+            onRecord={() =>
+              setRecording(recording === 'itemActions' ? null : 'itemActions')
+            }
+            onUnset={() => setItemActions(null)}
+            display={formatBinding(itemActions)}
           />
           {hasConflict && (
             <p className="text-sm text-amber-500">
