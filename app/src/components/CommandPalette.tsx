@@ -42,13 +42,14 @@ import {
   pullBranch,
   pushBranch,
 } from '@/lib/api'
+import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import type { SessionWithProject, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { EditSessionModal } from './EditSessionModal'
 import { EditTerminalModal } from './EditTerminalModal'
-import { getPRStatusInfo, PRTabButton } from './PRStatusContent'
+import { PRTabButton } from './PRStatusContent'
 
 type Mode = 'search' | 'actions' | 'branches' | 'branch-actions'
 
@@ -58,11 +59,11 @@ type ActionTarget =
 
 type ItemInfo =
   | {
-      type: 'terminal'
-      terminal: Terminal
-      pr: PRCheckStatus | null
-      actionHint: string | null
-    }
+    type: 'terminal'
+    terminal: Terminal
+    pr: PRCheckStatus | null
+    actionHint: string | null
+  }
   | { type: 'pr'; pr: PRCheckStatus; actionHint: string }
   | { type: 'session'; session: SessionWithProject; actionHint: string | null }
 
@@ -1151,8 +1152,8 @@ function ActionsView({
     target?.type === 'terminal'
       ? target?.terminal.name || getLastPathSegment(target?.terminal.cwd)
       : target?.session.name ||
-        target?.session.latest_user_message ||
-        target?.session.session_id
+      target?.session.latest_user_message ||
+      target?.session.session_id
 
   return (
     <>
@@ -1606,7 +1607,7 @@ function BranchActionsView({
               <CommandItem
                 value="action:push"
                 className="cursor-pointer"
-                disabled={canPush}
+                disabled={!canPush}
                 onSelect={onPush}
               >
                 <ArrowUp className="h-4 w-4 shrink-0 text-zinc-400" />
@@ -1623,7 +1624,7 @@ function BranchActionsView({
               <CommandItem
                 value="action:force-push"
                 className="cursor-pointer"
-                disabled={canPush}
+                disabled={!canPush}
                 onSelect={onForcePush}
               >
                 <ArrowUp className="h-4 w-4 shrink-0 text-red-400" />

@@ -5,13 +5,10 @@ import {
   GitBranch,
 } from 'lucide-react'
 import { memo } from 'react'
+import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
-import {
-  getPRStatusInfo,
-  PRStatusContent,
-  PRTabButton,
-} from './PRStatusContent'
+import { PRStatusContent, PRTabButton } from './PRStatusContent'
 
 interface PRStatusGroupProps {
   pr: PRCheckStatus
