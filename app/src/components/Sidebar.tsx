@@ -63,12 +63,12 @@ export function Sidebar({ width }: SidebarProps) {
   const pip = useDocumentPip()
   const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
   const { clearSession, selectSession, sessions } = useSessionContext()
-  const { pinnedSessions, totalCount: pinnedCount } = usePinnedSessionsData()
+  const { allSessions: pipSessions } = usePinnedSessionsData()
   const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(
     'pip-layout',
     'horizontal',
   )
-  const hasPinnedItems = pinnedCount > 0
+  const hasAnySessions = pipSessions.length > 0
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
@@ -295,7 +295,7 @@ export function Sidebar({ width }: SidebarProps) {
       pip.closeAll()
       return
     }
-    if (pinnedSessions.length === 0) return
+    if (pipSessions.length === 0) return
 
     const dims = getPipDimensions(pipLayout)
     pip.open({
@@ -305,7 +305,7 @@ export function Sidebar({ width }: SidebarProps) {
       top: dims?.top,
       elementId: 'pinned-sessions-pip',
     })
-  }, [pip, pinnedSessions.length, pipLayout])
+  }, [pip, pipSessions.length, pipLayout])
 
   // Listen for toggle-pip events from keyboard shortcut
   useEffect(() => {
@@ -593,7 +593,7 @@ export function Sidebar({ width }: SidebarProps) {
                   <Search className="w-4 h-4" />
                   Search
                 </button>
-                {hasPinnedItems && pip.isSupported && (
+                {hasAnySessions && pip.isSupported && (
                   <button
                     onClick={handlePipToggle}
                     className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
@@ -684,7 +684,7 @@ export function Sidebar({ width }: SidebarProps) {
             >
               <Search className="w-4 h-4" />
             </Button>
-            {hasPinnedItems && pip.isSupported && (
+            {hasAnySessions && pip.isSupported && (
               <Button
                 variant="ghost"
                 size="icon"

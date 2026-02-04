@@ -79,7 +79,8 @@ export function usePinnedSessionsData() {
     }
   }, [pinnedTerminalIds, rawPinnedTerminalIds, setRawPinnedTerminalIds])
 
-  const pinnedSessions = useMemo(() => {
+  // Get pinned sessions (directly pinned + latest from pinned terminals)
+  const { pinnedSessions, pinnedSessionIdSet } = useMemo(() => {
     const result: SessionWithProject[] = []
     const addedIds = new Set<string>()
 
@@ -109,15 +110,29 @@ export function usePinnedSessionsData() {
       }
     }
 
-    // Sort by updated_at ascending (latest on right in horizontal)
-    return result.sort(
+    // Sort pinned by updated_at descending
+    result.sort(
       (a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     )
+
+    return { pinnedSessions: result, pinnedSessionIdSet: addedIds }
   }, [sessions, terminals, pinnedSessionIds, pinnedTerminalIds])
+
+  // Get non-pinned sessions sorted by updated_at
+  const nonPinnedSessions = useMemo(() => {
+    return sessions
+      .filter((s) => !pinnedSessionIdSet.has(s.session_id))
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      )
+  }, [sessions, pinnedSessionIdSet])
 
   return {
     pinnedSessions,
+    nonPinnedSessions,
+    allSessions: sessions,
     pinnedSessionIds,
     pinnedTerminalIds,
     totalCount: pinnedSessionIds.length + pinnedTerminalIds.length,
@@ -217,7 +232,8 @@ function SettingsMenu({
 export function PinnedSessionsPip() {
   const pip = useDocumentPip()
   const { terminals } = useTerminalContext()
-  const { pinnedSessions, totalCount } = usePinnedSessionsData()
+  const { pinnedSessions, nonPinnedSessions, allSessions } =
+    usePinnedSessionsData()
 
   const getTerminalName = useCallback(
     (terminalId: number | null) => {
@@ -238,12 +254,12 @@ export function PinnedSessionsPip() {
   const [isHoveringMenu, setIsHoveringMenu] = useState(false)
   const [openMenu, setOpenMenu] = useState(false)
 
-  // Auto-close PiP when all items unpinned
+  // Auto-close PiP when there are no sessions
   useEffect(() => {
-    if (pip.isOpen && totalCount === 0) {
+    if (pip.isOpen && allSessions.length === 0) {
       pip.close(PIP_ELEMENT_ID)
     }
-  }, [totalCount, pip.isOpen, pip.close])
+  }, [allSessions.length, pip.isOpen, pip.close])
 
   // Close PiP on Escape key press inside the PiP window
   useEffect(() => {
@@ -260,9 +276,28 @@ export function PinnedSessionsPip() {
   }, [pip.window, pip.closeAll])
 
   const displayedSessions = useMemo(() => {
-    if (maxSessions > 0) return pinnedSessions.slice(0, maxSessions)
-    return pinnedSessions
-  }, [pinnedSessions, maxSessions])
+    // Combine pinned first, then non-pinned, deduped by session_id
+    const seen = new Set<string>()
+    const combined: SessionWithProject[] = []
+
+    for (const session of pinnedSessions) {
+      if (!seen.has(session.session_id)) {
+        seen.add(session.session_id)
+        combined.push(session)
+      }
+    }
+
+    for (const session of nonPinnedSessions) {
+      if (!seen.has(session.session_id)) {
+        seen.add(session.session_id)
+        combined.push(session)
+      }
+    }
+
+    // If maxSessions is 0 ("All"), show last 5; otherwise use maxSessions
+    const limit = maxSessions === 0 ? 5 : maxSessions
+    return combined.slice(0, limit)
+  }, [pinnedSessions, nonPinnedSessions, maxSessions])
 
   const resizePip = useCallback(
     (l: 'horizontal' | 'vertical') => {
