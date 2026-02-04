@@ -8,9 +8,11 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import {
   type BranchInfo,
   checkoutBranch,
+  deleteBranch,
   getBranches,
   pullBranch,
   pushBranch,
+  rebaseBranch,
 } from '@/lib/api'
 import type { PRCheckStatus } from '../../../shared/types'
 import type { SessionWithProject, Terminal } from '../../types'
@@ -55,6 +57,8 @@ export function CommandPalette() {
     checkingOut?: string
     pulling?: string
     pushing?: { branch: string; force: boolean }
+    rebasing?: string
+    deleting?: string
   }>({})
 
   // Modal state
@@ -71,6 +75,12 @@ export function CommandPalette() {
     terminalId: number
     branch: string
   } | null>(null)
+  const [deleteBranchConfirm, setDeleteBranchConfirm] = useState<{
+    terminalId: number
+    branch: string
+    hasRemote: boolean
+  } | null>(null)
+  const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false)
 
   // PR action state
   const [actionPR, setActionPR] = useState<PRCheckStatus | null>(null)
@@ -475,6 +485,25 @@ export function CommandPalette() {
       requestForcePush: (terminalId, branch) => {
         setForcePushConfirm({ terminalId, branch })
       },
+      rebaseBranch: async (name) => {
+        if (!selectedTerminal) return
+        setLoadingStates((s) => ({ ...s, rebasing: name }))
+        try {
+          const result = await rebaseBranch(selectedTerminal.id, name)
+          toast.success(`Rebased ${name} onto ${result.onto}`)
+          closePalette()
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to rebase branch',
+          )
+        } finally {
+          setLoadingStates((s) => ({ ...s, rebasing: undefined }))
+        }
+      },
+      requestDeleteBranch: (terminalId, branch, hasRemote) => {
+        setDeleteRemoteBranch(false)
+        setDeleteBranchConfirm({ terminalId, branch, hasRemote })
+      },
 
       // PR actions
       openMergeModal: (pr) => {
@@ -687,6 +716,48 @@ export function CommandPalette() {
           }}
           onCancel={() => setForcePushConfirm(null)}
         />
+      )}
+
+      {deleteBranchConfirm && (
+        <ConfirmModal
+          open={!!deleteBranchConfirm}
+          title="Delete Branch"
+          message={`Are you sure you want to delete the branch "${deleteBranchConfirm.branch}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={async () => {
+            try {
+              const result = await deleteBranch(
+                deleteBranchConfirm.terminalId,
+                deleteBranchConfirm.branch,
+                deleteRemoteBranch,
+              )
+              const msg = result.deletedRemote
+                ? `Deleted branch ${deleteBranchConfirm.branch} (local and remote)`
+                : `Deleted branch ${deleteBranchConfirm.branch}`
+              toast.success(msg)
+              setDeleteBranchConfirm(null)
+              closePalette()
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to delete branch',
+              )
+              setDeleteBranchConfirm(null)
+            }
+          }}
+          onCancel={() => setDeleteBranchConfirm(null)}
+        >
+          {deleteBranchConfirm.hasRemote && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={deleteRemoteBranch}
+                onCheckedChange={(v) => setDeleteRemoteBranch(v === true)}
+                className="w-5 h-5"
+              />
+              Also delete remote branch
+            </label>
+          )}
+        </ConfirmModal>
       )}
 
       {mergeModal && (

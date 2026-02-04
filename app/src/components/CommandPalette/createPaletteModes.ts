@@ -34,6 +34,8 @@ export type ModeState = {
     checkingOut?: string
     pulling?: string
     pushing?: { branch: string; force: boolean }
+    rebasing?: string
+    deleting?: string
   }
   // PR-specific state
   selectedPR: PRCheckStatus | null
@@ -71,6 +73,12 @@ export type AppActions = {
   pullBranch: (name: string) => Promise<void>
   pushBranch: (name: string, force?: boolean) => Promise<void>
   requestForcePush: (terminalId: number, branch: string) => void
+  rebaseBranch: (name: string) => Promise<void>
+  requestDeleteBranch: (
+    terminalId: number,
+    branch: string,
+    hasRemote: boolean,
+  ) => void
 
   // PR actions
   openMergeModal: (pr: PRCheckStatus) => void

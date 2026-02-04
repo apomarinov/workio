@@ -112,6 +112,15 @@ interface PushBranchBody {
   force?: boolean
 }
 
+interface RebaseBranchBody {
+  branch: string
+}
+
+interface DeleteBranchBody {
+  branch: string
+  deleteRemote?: boolean
+}
+
 interface BranchInfo {
   name: string
   current: boolean
@@ -920,6 +929,185 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to push branch'
+        return reply.status(400).send({
+          success: false,
+          branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
+  // Rebase a branch onto the current branch
+  fastify.post<{ Params: TerminalParams; Body: RebaseBranchBody }>(
+    '/api/terminals/:id/rebase',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { branch } = request.body
+      if (!branch) {
+        return reply.status(400).send({ error: 'Branch is required' })
+      }
+
+      const currentBranch = terminal.git_branch
+      if (!currentBranch) {
+        return reply
+          .status(400)
+          .send({ error: 'Could not determine current branch' })
+      }
+
+      if (branch === currentBranch) {
+        return reply
+          .status(400)
+          .send({ error: 'Cannot rebase branch onto itself' })
+      }
+
+      try {
+        // Rebase current branch onto the selected branch
+        // git rebase <selected> rebases current onto selected
+        const rebaseCmd = `git rebase ${branch.replace(/'/g, "'\\''")}`
+        if (terminal.ssh_host) {
+          await execSSHCommand(terminal.ssh_host, rebaseCmd, {
+            cwd: terminal.cwd,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['rebase', branch],
+              { cwd: expandPath(terminal.cwd), timeout: 60000 },
+              (err) => {
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        // Refresh git branch detection
+        detectGitBranch(id).catch(() => {})
+
+        return { success: true, branch: currentBranch, onto: branch }
+      } catch (err) {
+        // Abort the rebase to leave repo in clean state
+        const abortCmd = 'git rebase --abort'
+        try {
+          if (terminal.ssh_host) {
+            await execSSHCommand(terminal.ssh_host, abortCmd, {
+              cwd: terminal.cwd,
+            })
+          } else {
+            await new Promise<void>((resolve) => {
+              execFile(
+                'git',
+                ['rebase', '--abort'],
+                { cwd: expandPath(terminal.cwd), timeout: 10000 },
+                () => resolve(), // Ignore errors from abort
+              )
+            })
+          }
+        } catch {
+          // Ignore abort errors
+        }
+
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to rebase branch'
+        return reply.status(400).send({
+          success: false,
+          branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
+  // Delete a local branch
+  fastify.delete<{ Params: TerminalParams; Body: DeleteBranchBody }>(
+    '/api/terminals/:id/branch',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { branch, deleteRemote } = request.body
+      if (!branch) {
+        return reply.status(400).send({ error: 'Branch is required' })
+      }
+
+      const currentBranch = terminal.git_branch
+      if (branch === currentBranch) {
+        return reply.status(400).send({ error: 'Cannot delete current branch' })
+      }
+
+      try {
+        // Delete the local branch with -D (force delete)
+        const deleteCmd = `git branch -D ${branch.replace(/'/g, "'\\''")}`
+        if (terminal.ssh_host) {
+          await execSSHCommand(terminal.ssh_host, deleteCmd, {
+            cwd: terminal.cwd,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['branch', '-D', branch],
+              { cwd: expandPath(terminal.cwd), timeout: 10000 },
+              (err) => {
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        // Delete remote branch if requested
+        if (deleteRemote) {
+          const deleteRemoteCmd = `git push origin --delete ${branch.replace(/'/g, "'\\''")}`
+          if (terminal.ssh_host) {
+            await execSSHCommand(terminal.ssh_host, deleteRemoteCmd, {
+              cwd: terminal.cwd,
+            })
+          } else {
+            await new Promise<void>((resolve, reject) => {
+              execFile(
+                'git',
+                ['push', 'origin', '--delete', branch],
+                { cwd: expandPath(terminal.cwd), timeout: 30000 },
+                (err) => {
+                  if (err) reject(err)
+                  else resolve()
+                },
+              )
+            })
+          }
+        }
+
+        return { success: true, branch, deletedRemote: !!deleteRemote }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to delete branch'
         return reply.status(400).send({
           success: false,
           branch,

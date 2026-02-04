@@ -403,6 +403,44 @@ export async function pushBranch(
   return data
 }
 
+export async function rebaseBranch(
+  terminalId: number,
+  branch: string,
+): Promise<{ success: boolean; branch: string; onto: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/rebase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to rebase branch')
+  }
+  return data
+}
+
+export async function deleteBranch(
+  terminalId: number,
+  branch: string,
+  deleteRemote?: boolean,
+): Promise<{
+  success: boolean
+  branch: string
+  deletedRemote?: boolean
+  error?: string
+}> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/branch`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch, deleteRemote }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete branch')
+  }
+  return data
+}
+
 // Webhook management
 
 export async function createWebhook(

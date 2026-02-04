@@ -64,9 +64,35 @@ const logStream = pino.multistream([
 ])
 
 const fastify = Fastify({
-  loggerInstance: pino({ level: 'info' }, logStream),
+  loggerInstance: pino(
+    {
+      level: 'info',
+      base: undefined, // Remove pid, hostname
+      formatters: {
+        level: (label) => ({ level: label }),
+      },
+      serializers: {
+        err: pino.stdSerializers.err,
+      },
+    },
+    logStream,
+  ),
+  disableRequestLogging: true, // Disable default verbose request logging
 })
 setLogger(fastify.log)
+
+// Simple request logging
+fastify.addHook('onRequest', async (request) => {
+  request.log.info({ method: request.method, url: request.url }, 'request')
+})
+
+// Log errors
+fastify.addHook('onError', async (request, _reply, error) => {
+  request.log.error(
+    { method: request.method, url: request.url, error: error.message },
+    'error',
+  )
+})
 
 // Initialize database
 await initDb()

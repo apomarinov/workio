@@ -4,6 +4,8 @@ import {
   Check,
   CornerDownLeft,
   GitBranch,
+  GitMerge,
+  Trash2,
 } from 'lucide-react'
 import type { AppActions, AppData, ModeState } from '../createPaletteModes'
 import { getLastPathSegment } from '../createPaletteModes'
@@ -247,6 +249,42 @@ export function createBranchActionsMode(
       onSelect: () => {
         if (canPush) {
           actions.requestForcePush(terminal.id, branch.name)
+        }
+      },
+    })
+  }
+
+  // Rebase current branch onto selected branch (for non-current local branches, when not dirty)
+  if (!branch.isCurrent && !branch.isRemote) {
+    const canRebase = !isDirty && !isLoading
+    items.push({
+      id: 'action:rebase',
+      label: `Rebase ${terminal.git_branch || 'current'} onto ${branch.name}`,
+      icon: <GitMerge className="h-4 w-4 shrink-0 text-zinc-400" />,
+      disabled: !canRebase,
+      disabledReason: isDirty ? 'uncommitted changes' : undefined,
+      loading: loadingStates.rebasing === branch.name,
+      onSelect: () => {
+        if (canRebase) {
+          actions.rebaseBranch(branch.name)
+        }
+      },
+    })
+  }
+
+  // Delete (for local non-current branches when not dirty)
+  if (!branch.isRemote && !branch.isCurrent) {
+    const canDelete = !isDirty && !isLoading
+    items.push({
+      id: 'action:delete',
+      label: 'Delete',
+      icon: <Trash2 className="h-4 w-4 shrink-0 text-red-400" />,
+      disabled: !canDelete,
+      disabledReason: isDirty ? 'uncommitted changes' : undefined,
+      loading: loadingStates.deleting === branch.name,
+      onSelect: () => {
+        if (canDelete) {
+          actions.requestDeleteBranch(terminal.id, branch.name, hasRemote)
         }
       },
     })
