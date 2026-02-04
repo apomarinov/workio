@@ -563,6 +563,29 @@ export function CommandPalette() {
       openRerunAllModal: (pr) => {
         setRerunAllModal(pr)
       },
+      checkoutPRBranch: async (terminalId, branch) => {
+        api.updateLevel((l) => ({
+          ...l,
+          loadingStates: {
+            ...l.loadingStates,
+            checkingOut: `${terminalId}:${branch}`,
+          },
+        }))
+        try {
+          await checkoutBranch(terminalId, branch, true)
+          toast.success(`Checked out ${branch}`)
+          closePalette()
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to checkout branch',
+          )
+        } finally {
+          api.updateLevel((l) => ({
+            ...l,
+            loadingStates: { ...l.loadingStates, checkingOut: undefined },
+          }))
+        }
+      },
     }),
     [
       selectTerminal,

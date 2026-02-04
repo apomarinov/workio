@@ -7,6 +7,7 @@ import type { PreferredIDE, SessionWithProject, Terminal } from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createPRActionsMode } from './modes/pr-actions'
+import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
 import type { PaletteAPI, PaletteLevel, PaletteMode } from './types'
 
@@ -61,6 +62,7 @@ export type AppActions = {
   // PR actions
   openMergeModal: (pr: PRCheckStatus) => void
   openRerunAllModal: (pr: PRCheckStatus) => void
+  checkoutPRBranch: (terminalId: number, branch: string) => Promise<void>
 }
 
 // Factory creates modes with data already bound
@@ -76,6 +78,7 @@ export function createPaletteModes(
     branches: createBranchesMode(data, level, actions, api),
     'branch-actions': createBranchActionsMode(data, level, actions, api),
     'pr-actions': createPRActionsMode(data, level, actions, api),
+    'pr-checkout': createPRCheckoutMode(data, level, actions, api),
   }
 }
 

@@ -1,4 +1,10 @@
-import { CornerDownLeft, ExternalLink, GitMerge, RefreshCw } from 'lucide-react'
+import {
+  CornerDownLeft,
+  ExternalLink,
+  GitBranch,
+  GitMerge,
+  RefreshCw,
+} from 'lucide-react'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
@@ -9,12 +15,13 @@ import type {
 } from '../types'
 
 export function createPRActionsMode(
-  _data: AppData,
+  data: AppData,
   level: PaletteLevel,
   actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
-  const { pr } = level
+  const { pr, terminal } = level
+  const { terminals } = data
 
   if (!pr) {
     return {
@@ -60,6 +67,32 @@ export function createPRActionsMode(
       api.close()
     },
   })
+
+  // Checkout (only if no terminal is selected in the stack)
+  // Check if there are any terminals from the same repo
+  const hasMatchingTerminals =
+    !terminal && terminals.some((t) => t.git_repo?.repo === pr.repo)
+  if (hasMatchingTerminals && isOpen) {
+    items.push({
+      id: 'action:checkout',
+      label: 'Checkout',
+      icon: <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => {
+        api.push({
+          mode: 'pr-checkout',
+          title: 'Checkout',
+          pr,
+        })
+      },
+      onNavigate: () => {
+        api.push({
+          mode: 'pr-checkout',
+          title: 'Checkout',
+          pr,
+        })
+      },
+    })
+  }
 
   // Rerun all failed checks (if there are any)
   if (hasFailedChecks && isOpen) {
