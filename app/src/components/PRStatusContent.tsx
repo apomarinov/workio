@@ -1,4 +1,5 @@
 import {
+  BellOff,
   Check,
   ChevronDown,
   ChevronRight,
@@ -9,7 +10,7 @@ import {
   Loader2,
   MessageSquare,
   RefreshCw,
-  X,
+  Trash2,
 } from 'lucide-react'
 import { memo, type ReactNode, useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -56,39 +57,122 @@ export const PRTabButton = memo(function PRTabButton({
     [pr],
   )
 
+  const { settings, updateSettings } = useSettings()
+  const [hiddenAuthorsModalOpen, setHiddenAuthorsModalOpen] = useState(false)
+  const [removingAuthor, setRemovingAuthor] = useState<string | null>(null)
+
+  const hiddenAuthorsForRepo = useMemo(() => {
+    return (settings?.hide_gh_authors ?? []).filter(
+      (entry) => entry.repo === pr.repo,
+    )
+  }, [settings?.hide_gh_authors, pr.repo])
+
+  const handleRemoveHiddenAuthor = async (author: string) => {
+    setRemovingAuthor(author)
+    try {
+      const current = settings?.hide_gh_authors ?? []
+      const updated = current.filter(
+        (e) => !(e.repo === pr.repo && e.author === author),
+      )
+      await updateSettings({ hide_gh_authors: updated })
+    } catch {
+      // Error handling is silent - the UI will show the author still there
+    } finally {
+      setRemovingAuthor(null)
+    }
+  }
+
   return (
-    <div className="group/pr-btn">
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'text-[10px] flex items-center uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
-          active
-            ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
-            : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
-          className,
-        )}
-      >
-        {withIcon && icon({ cls: 'w-2.5 h-2.5 mr-1' })}
-        {label}
-        {hasNewActivity && (
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
-        )}
-        <a
-          href={pr.prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
+    <div className="group/pr-btn flex items-center">
+      <div className='flex justify-between items-center w-full pr-2'>
+        <button
+          type="button"
+          onClick={onClick}
           className={cn(
-            'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
+            'text-[10px] flex items-center uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+            active
+              ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
+              : cn(
+                dimColorClass ||
+                'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
+            className,
           )}
         >
-          <ExternalLink className="w-3 h-3 max-w-3 max-h-3" />
-        </a>
-      </button>
+          {withIcon && icon({ cls: 'w-2.5 h-2.5 mr-1' })}
+          {label}
+          {hasNewActivity && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
+          )}
+          <a
+            href={pr.prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
+            )}
+          >
+            <ExternalLink className="w-3 h-3 max-w-3 max-h-3" />
+          </a>
+        </button>
+        {hiddenAuthorsForRepo.length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setHiddenAuthorsModalOpen(true)
+            }}
+            className="ml-1 hidden group-hover/pr-btn:block text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer"
+            title="Hidden comment authors"
+          >
+            <BellOff className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      <Dialog
+        open={hiddenAuthorsModalOpen}
+        onOpenChange={setHiddenAuthorsModalOpen}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hidden Comment Authors</DialogTitle>
+            <DialogDescription>
+              Comments from these authors are hidden for this repo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {hiddenAuthorsForRepo.map((entry) => (
+              <div
+                key={entry.author}
+                className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+              >
+                <span className="text-sm">{entry.author}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveHiddenAuthor(entry.author)}
+                  disabled={removingAuthor === entry.author}
+                  className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {removingAuthor === entry.author ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setHiddenAuthorsModalOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 })
@@ -328,7 +412,7 @@ const CommentItem = memo(function CommentItem({
             onClick={handleHide}
             className="text-muted-foreground/30 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
           >
-            <X className="w-3 h-3" />
+            <BellOff className="w-3 h-3" />
           </button>
         </div>
         <div
@@ -649,7 +733,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
