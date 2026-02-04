@@ -1,42 +1,36 @@
-import {
-  CornerDownLeft,
-  ExternalLink,
-  Eye,
-  GitMerge,
-  RefreshCw,
-} from 'lucide-react'
+import { CornerDownLeft, ExternalLink, GitMerge, RefreshCw } from 'lucide-react'
 import { getPRStatusInfo } from '@/lib/pr-status'
-import type { AppActions, AppData, ModeState } from '../createPaletteModes'
-import type { PaletteAPI, PaletteItem, PaletteMode } from '../types'
+import type { AppActions, AppData } from '../createPaletteModes'
+import type {
+  PaletteAPI,
+  PaletteItem,
+  PaletteLevel,
+  PaletteMode,
+} from '../types'
 
 export function createPRActionsMode(
   _data: AppData,
-  state: ModeState,
+  level: PaletteLevel,
   actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
-  const { selectedPR, prLoadingStates } = state
+  const { pr } = level
 
-  if (!selectedPR) {
+  if (!pr) {
     return {
       id: 'pr-actions',
-      breadcrumbs: [],
       placeholder: 'Filter actions...',
       items: [],
     }
   }
 
-  const statusInfo = getPRStatusInfo(selectedPR)
-  const isOpen = selectedPR.state === 'OPEN'
-  const isMerged = 'isMerged' in statusInfo && statusInfo.isMerged
+  const statusInfo = getPRStatusInfo(pr)
+  const isOpen = pr.state === 'OPEN'
   const hasFailedChecks =
     'hasFailedChecks' in statusInfo && statusInfo.hasFailedChecks
-  const hasConflicts = 'hasConflicts' in statusInfo && statusInfo.hasConflicts
-  const hasChangesRequested =
-    'hasChangesRequested' in statusInfo && statusInfo.hasChangesRequested
 
   // Count failed checks for display (need the actual count for label)
-  const failedChecksCount = selectedPR.checks.filter(
+  const failedChecksCount = pr.checks.filter(
     (c) =>
       c.status === 'COMPLETED' &&
       c.conclusion !== 'SUCCESS' &&
@@ -47,23 +41,14 @@ export function createPRActionsMode(
   // Check if PR can be merged
   const canMerge =
     isOpen &&
-    selectedPR.mergeable === 'MERGEABLE' &&
-    (selectedPR.reviewDecision === 'APPROVED' ||
-      selectedPR.reviewDecision === '')
+    pr.mergeable === 'MERGEABLE' &&
+    (pr.reviewDecision === 'APPROVED' || pr.reviewDecision === '')
 
-  const isLoading = prLoadingStates?.merging || prLoadingStates?.rerunningAll
+  const hasConflicts = 'hasConflicts' in statusInfo && statusInfo.hasConflicts
+  const hasChangesRequested =
+    'hasChangesRequested' in statusInfo && statusInfo.hasChangesRequested
 
   const items: PaletteItem[] = []
-
-  // Reveal (for non-merged PRs - shows PR in sidebar)
-  // if (!isMerged) {
-  //   items.push({
-  //     id: 'action:reveal',
-  //     label: 'Reveal',
-  //     icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
-  //     onSelect: () => actions.revealPR(selectedPR),
-  //   })
-  // }
 
   // Open in new tab (all PRs)
   items.push({
@@ -71,7 +56,7 @@ export function createPRActionsMode(
     label: 'View on GitHub',
     icon: <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />,
     onSelect: () => {
-      window.open(selectedPR.prUrl, '_blank')
+      window.open(pr.prUrl, '_blank')
       api.close()
     },
   })
@@ -82,12 +67,8 @@ export function createPRActionsMode(
       id: 'action:rerun-all',
       label: `Re-run ${failedChecksCount} failed check${failedChecksCount > 1 ? 's' : ''}`,
       icon: <RefreshCw className="h-4 w-4 shrink-0 text-zinc-400" />,
-      disabled: isLoading,
-      loading: prLoadingStates?.rerunningAll,
       onSelect: () => {
-        if (!isLoading) {
-          actions.openRerunAllModal(selectedPR)
-        }
+        actions.openRerunAllModal(pr)
       },
     })
   }
@@ -98,20 +79,19 @@ export function createPRActionsMode(
       id: 'action:merge',
       label: 'Merge PR',
       icon: <GitMerge className="h-4 w-4 shrink-0 text-purple-400" />,
-      disabled: !canMerge || isLoading,
+      disabled: !canMerge,
       disabledReason: !canMerge
         ? hasConflicts
           ? 'has conflicts'
           : hasChangesRequested
             ? 'changes requested'
-            : selectedPR.reviewDecision === 'REVIEW_REQUIRED'
+            : pr.reviewDecision === 'REVIEW_REQUIRED'
               ? 'review required'
               : undefined
         : undefined,
-      loading: prLoadingStates?.merging,
       onSelect: () => {
-        if (canMerge && !isLoading) {
-          actions.openMergeModal(selectedPR)
+        if (canMerge) {
+          actions.openMergeModal(pr)
         }
       },
     })
@@ -119,13 +99,8 @@ export function createPRActionsMode(
 
   return {
     id: 'pr-actions',
-    breadcrumbs: [selectedPR.prTitle],
     placeholder: 'Filter actions...',
     items,
-    onBack: () => ({
-      modeId: 'search',
-      highlightedId: `pr:${selectedPR.prNumber}:${selectedPR.repo}`,
-    }),
     footer: () => (
       <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
         <span className="flex items-center gap-1.5">

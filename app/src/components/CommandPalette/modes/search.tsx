@@ -12,9 +12,14 @@ import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../../../shared/types'
 import { PRTabButton } from '../../PRStatusContent'
-import type { AppActions, AppData, ModeState } from '../createPaletteModes'
+import type { AppActions, AppData } from '../createPaletteModes'
 import { getLastPathSegment } from '../createPaletteModes'
-import type { PaletteAPI, PaletteItem, PaletteMode } from '../types'
+import type {
+  PaletteAPI,
+  PaletteItem,
+  PaletteLevel,
+  PaletteMode,
+} from '../types'
 
 const sessionStatusColor: Record<string, string> = {
   started: 'text-green-500',
@@ -74,8 +79,8 @@ function SessionIcon({ status }: { status: string }) {
 
 export function createSearchMode(
   data: AppData,
-  _state: ModeState,
-  actions: AppActions,
+  _level: PaletteLevel,
+  _actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
   const { terminals, sessions, githubPRs, mergedPRs } = data
@@ -121,12 +126,20 @@ export function createSearchMode(
         t.git_repo?.repo ?? '',
       ],
       onSelect: () => {
-        actions.setSelectedTerminal(t, matchedPR)
-        api.navigate({ modeId: 'actions' })
+        api.push({
+          mode: 'actions',
+          title: t.name || getLastPathSegment(t.cwd),
+          terminal: t,
+          pr: matchedPR ?? undefined,
+        })
       },
       onNavigate: () => {
-        actions.setSelectedTerminal(t, matchedPR)
-        api.navigate({ modeId: 'actions' })
+        api.push({
+          mode: 'actions',
+          title: t.name || getLastPathSegment(t.cwd),
+          terminal: t,
+          pr: matchedPR ?? undefined,
+        })
       },
     }
   })
@@ -149,12 +162,18 @@ export function createSearchMode(
       icon: prInfo.icon?.(),
       keywords: [pr.prTitle, pr.branch],
       onSelect: () => {
-        actions.setSelectedPR(pr)
-        api.navigate({ modeId: 'pr-actions' })
+        api.push({
+          mode: 'pr-actions',
+          title: pr.prTitle,
+          pr,
+        })
       },
       onNavigate: () => {
-        actions.setSelectedPR(pr)
-        api.navigate({ modeId: 'pr-actions' })
+        api.push({
+          mode: 'pr-actions',
+          title: pr.prTitle,
+          pr,
+        })
       },
     }
   })
@@ -193,12 +212,18 @@ export function createSearchMode(
       s.latest_agent_message ?? '',
     ],
     onSelect: () => {
-      actions.setSelectedSession(s)
-      api.navigate({ modeId: 'actions' })
+      api.push({
+        mode: 'actions',
+        title: s.name || s.latest_user_message || s.session_id,
+        session: s,
+      })
     },
     onNavigate: () => {
-      actions.setSelectedSession(s)
-      api.navigate({ modeId: 'actions' })
+      api.push({
+        mode: 'actions',
+        title: s.name || s.latest_user_message || s.session_id,
+        session: s,
+      })
     },
   }))
 
@@ -219,7 +244,6 @@ export function createSearchMode(
 
   return {
     id: 'search',
-    breadcrumbs: [],
     placeholder: 'Search projects, PRs, Claude sessions...',
     items: [],
     groups,

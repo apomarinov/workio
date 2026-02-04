@@ -17,6 +17,7 @@ type Props = {
   onOpenChange: (open: boolean) => void
   modes: Record<string, PaletteMode>
   currentModeId: string
+  breadcrumbs: string[] // derived from stack titles
   highlightedId: string | null
   onHighlightChange: (id: string | null) => void
   onBack: () => void
@@ -28,6 +29,7 @@ export function CommandPaletteCore({
   onOpenChange,
   modes,
   currentModeId,
+  breadcrumbs,
   highlightedId,
   onHighlightChange,
   onBack,
@@ -45,7 +47,7 @@ export function CommandPaletteCore({
     return allItems.find((i) => i.id === highlightedId) ?? null
   }, [allItems, highlightedId])
 
-  const canGoBack = (mode?.breadcrumbs.length ?? 0) > 0
+  const canGoBack = breadcrumbs.length > 0
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -118,7 +120,7 @@ export function CommandPaletteCore({
             loop
           >
             <PaletteHeader
-              breadcrumbs={mode.breadcrumbs}
+              breadcrumbs={breadcrumbs}
               placeholder={mode.placeholder}
               onBreadcrumbClick={canGoBack ? onBreadcrumbClick : undefined}
               onBack={canGoBack ? onBack : undefined}

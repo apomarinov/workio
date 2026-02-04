@@ -1,4 +1,3 @@
-import type { BranchInfo } from '@/lib/api'
 import type {
   GitDiffStat,
   MergedPRSummary,
@@ -9,7 +8,7 @@ import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createPRActionsMode } from './modes/pr-actions'
 import { createSearchMode } from './modes/search'
-import type { PaletteAPI, PaletteMode } from './types'
+import type { PaletteAPI, PaletteLevel, PaletteMode } from './types'
 
 // App-specific data that modes need
 export type AppData = {
@@ -20,29 +19,6 @@ export type AppData = {
   gitDirtyStatus: Record<number, GitDiffStat>
   pinnedTerminalSessions: number[]
   pinnedSessions: string[]
-}
-
-// State specific to the current mode navigation
-export type ModeState = {
-  terminal: Terminal | null
-  session: SessionWithProject | null
-  pr: PRCheckStatus | null
-  branch: { name: string; isRemote: boolean; isCurrent: boolean } | null
-  branches: { local: BranchInfo[]; remote: BranchInfo[] } | null
-  branchesLoading: boolean
-  loadingStates: {
-    checkingOut?: string
-    pulling?: string
-    pushing?: { branch: string; force: boolean }
-    rebasing?: string
-    deleting?: string
-  }
-  // PR-specific state
-  selectedPR: PRCheckStatus | null
-  prLoadingStates: {
-    merging?: boolean
-    rerunningAll?: boolean
-  }
 }
 
 // Actions that modes can trigger
@@ -83,32 +59,21 @@ export type AppActions = {
   // PR actions
   openMergeModal: (pr: PRCheckStatus) => void
   openRerunAllModal: (pr: PRCheckStatus) => void
-  setSelectedPR: (pr: PRCheckStatus | null) => void
-
-  // Mode state setters
-  setSelectedTerminal: (
-    terminal: Terminal | null,
-    pr: PRCheckStatus | null,
-  ) => void
-  setSelectedSession: (session: SessionWithProject | null) => void
-  setSelectedBranch: (
-    branch: { name: string; isRemote: boolean; isCurrent: boolean } | null,
-  ) => void
 }
 
 // Factory creates modes with data already bound
 export function createPaletteModes(
   data: AppData,
-  state: ModeState,
+  level: PaletteLevel,
   actions: AppActions,
   api: PaletteAPI,
 ): Record<string, PaletteMode> {
   return {
-    search: createSearchMode(data, state, actions, api),
-    actions: createActionsMode(data, state, actions, api),
-    branches: createBranchesMode(data, state, actions, api),
-    'branch-actions': createBranchActionsMode(data, state, actions, api),
-    'pr-actions': createPRActionsMode(data, state, actions, api),
+    search: createSearchMode(data, level, actions, api),
+    actions: createActionsMode(data, level, actions, api),
+    branches: createBranchesMode(data, level, actions, api),
+    'branch-actions': createBranchActionsMode(data, level, actions, api),
+    'pr-actions': createPRActionsMode(data, level, actions, api),
   }
 }
 

@@ -1,9 +1,8 @@
 import {
   Copy,
   CornerDownLeft,
-  ExternalLink,
-  Eye,
   GitFork,
+  GitPullRequest,
   Pencil,
   Pin,
   PinOff,
@@ -23,24 +22,27 @@ function CursorIcon({ className }: { className?: string }) {
   )
 }
 
-import type { AppActions, AppData, ModeState } from '../createPaletteModes'
-import { getLastPathSegment } from '../createPaletteModes'
-import type { PaletteAPI, PaletteItem, PaletteMode } from '../types'
+import type { AppActions, AppData } from '../createPaletteModes'
+import type {
+  PaletteAPI,
+  PaletteItem,
+  PaletteLevel,
+  PaletteMode,
+} from '../types'
 
 export function createActionsMode(
   data: AppData,
-  state: ModeState,
+  level: PaletteLevel,
   actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
-  const { terminal, session, pr } = state
+  const { terminal, session, pr } = level
   const { pinnedTerminalSessions, pinnedSessions } = data
 
   // If no target, return empty mode
   if (!terminal && !session) {
     return {
       id: 'actions',
-      breadcrumbs: [],
       placeholder: 'Filter actions...',
       items: [],
     }
@@ -48,17 +50,9 @@ export function createActionsMode(
 
   // Terminal actions
   if (terminal) {
-    const title = terminal.name || getLastPathSegment(terminal.cwd)
     const isPinned = pinnedTerminalSessions.includes(terminal.id)
 
-    const items: PaletteItem[] = [
-      // {
-      //   id: 'action:reveal',
-      //   label: 'Reveal',
-      //   icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
-      //   onSelect: () => actions.selectTerminal(terminal.id),
-      // },
-    ]
+    const items: PaletteItem[] = []
 
     // Open in Cursor (non-SSH only)
     if (!terminal.ssh_host) {
@@ -78,24 +72,48 @@ export function createActionsMode(
         icon: <GitFork className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => {
           actions.loadBranches(terminal.id)
-          api.navigate({ modeId: 'branches' })
+          api.push({
+            mode: 'branches',
+            title: 'Branches',
+            terminal,
+            pr,
+            branchesLoading: true,
+          })
         },
         onNavigate: () => {
           actions.loadBranches(terminal.id)
-          api.navigate({ modeId: 'branches' })
+          api.push({
+            mode: 'branches',
+            title: 'Branches',
+            terminal,
+            pr,
+            branchesLoading: true,
+          })
         },
       })
     }
 
-    // Open PR if available
+    // Pull Request actions (if PR exists)
     if (pr) {
       items.push({
-        id: 'action:open-pr',
-        label: 'PR on GitHub',
-        icon: <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />,
+        id: 'action:pr',
+        label: 'Pull Request',
+        icon: <GitPullRequest className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => {
-          actions.openPR(pr)
-          api.close()
+          api.push({
+            mode: 'pr-actions',
+            title: pr.prTitle,
+            terminal,
+            pr,
+          })
+        },
+        onNavigate: () => {
+          api.push({
+            mode: 'pr-actions',
+            title: pr.prTitle,
+            terminal,
+            pr,
+          })
         },
       })
     }
@@ -143,13 +161,8 @@ export function createActionsMode(
 
     return {
       id: 'actions',
-      breadcrumbs: [title],
       placeholder: 'Filter actions...',
       items,
-      onBack: () => ({
-        modeId: 'search',
-        highlightedId: `t:${terminal.id}`,
-      }),
       footer: () => (
         <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5">
@@ -165,17 +178,9 @@ export function createActionsMode(
 
   // Session actions
   if (session) {
-    const title =
-      session.name || session.latest_user_message || session.session_id
     const isPinned = pinnedSessions.includes(session.session_id)
 
     const items: PaletteItem[] = [
-      // {
-      //   id: 'action:reveal',
-      //   label: 'Reveal',
-      //   icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
-      //   onSelect: () => actions.selectSession(session.session_id),
-      // },
       {
         id: 'action:pin',
         label: isPinned ? 'Unpin' : 'Pin',
@@ -205,13 +210,8 @@ export function createActionsMode(
 
     return {
       id: 'actions',
-      breadcrumbs: [title],
       placeholder: 'Filter actions...',
       items,
-      onBack: () => ({
-        modeId: 'search',
-        highlightedId: `s:${session.session_id}`,
-      }),
       footer: () => (
         <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5">
@@ -228,7 +228,6 @@ export function createActionsMode(
   // Shouldn't reach here
   return {
     id: 'actions',
-    breadcrumbs: [],
     placeholder: 'Filter actions...',
     items: [],
   }

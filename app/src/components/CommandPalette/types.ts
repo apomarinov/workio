@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react'
+import type { BranchInfo } from '@/lib/api'
+import type { PRCheckStatus } from '../../../shared/types'
+import type { SessionWithProject, Terminal } from '../../types'
 
 // Generic types - the palette core knows nothing about terminals, sessions, etc.
 
@@ -21,27 +24,45 @@ export type PaletteGroup = {
   items: PaletteItem[]
 }
 
-export type NavigationResult = {
-  modeId: string
+// Each level in the navigation stack carries its context
+export type PaletteLevel = {
+  mode: string
+  title: string // for breadcrumb (empty for root)
   highlightedId?: string
+
+  // Context (each level carries what it needs)
+  terminal?: Terminal
+  pr?: PRCheckStatus
+  session?: SessionWithProject
+  branch?: { name: string; isRemote: boolean; isCurrent: boolean }
+  branches?: { local: BranchInfo[]; remote: BranchInfo[] }
+  branchesLoading?: boolean
+  loadingStates?: {
+    checkingOut?: string
+    pulling?: string
+    pushing?: { branch: string; force: boolean }
+    rebasing?: string
+    deleting?: string
+  }
 }
 
 export type PaletteMode = {
   id: string
-  breadcrumbs: string[] // breadcrumb trail (empty for root mode)
   placeholder: string
   items: PaletteItem[] // flat list when no groups
   groups?: PaletteGroup[] // optional grouping
   emptyMessage?: string
   loading?: boolean
   footer?: (highlighted: PaletteItem | null) => ReactNode
-  onBack?: () => NavigationResult | null
   width?: 'default' | 'wide' // palette width (default: default)
 }
 
 // API that mode factories receive to navigate and control the palette
 export type PaletteAPI = {
-  navigate: (result: NavigationResult) => void
-  back: () => void
+  push: (
+    level: Omit<PaletteLevel, 'highlightedId'> & { highlightedId?: string },
+  ) => void
+  pop: () => void
+  updateLevel: (updater: (prev: PaletteLevel) => PaletteLevel) => void // for async loading
   close: () => void
 }

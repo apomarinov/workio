@@ -6,7 +6,6 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import {
-  type BranchInfo,
   checkoutBranch,
   deleteBranch,
   getBranches,
@@ -26,42 +25,18 @@ import {
   type AppActions,
   type AppData,
   createPaletteModes,
-  type ModeState,
+  getLastPathSegment,
 } from './createPaletteModes'
-import type { NavigationResult, PaletteAPI } from './types'
+import type { PaletteAPI, PaletteLevel } from './types'
+
+const initialLevel: PaletteLevel = { mode: 'search', title: '' }
 
 export function CommandPalette() {
-  // Palette state
+  // Single stack state replaces modeStack + all mode-specific state
   const [open, setOpen] = useState(false)
-  const [modeStack, setModeStack] = useState<string[]>(['search'])
-  const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  const [stack, setStack] = useState<PaletteLevel[]>([initialLevel])
 
-  // Mode-specific state
-  const [selectedTerminal, setSelectedTerminal] = useState<Terminal | null>(
-    null,
-  )
-  const [selectedPR, setSelectedPR] = useState<PRCheckStatus | null>(null)
-  const [selectedSession, setSelectedSession] =
-    useState<SessionWithProject | null>(null)
-  const [selectedBranch, setSelectedBranch] = useState<{
-    name: string
-    isRemote: boolean
-    isCurrent: boolean
-  } | null>(null)
-  const [branches, setBranches] = useState<{
-    local: BranchInfo[]
-    remote: BranchInfo[]
-  } | null>(null)
-  const [branchesLoading, setBranchesLoading] = useState(false)
-  const [loadingStates, setLoadingStates] = useState<{
-    checkingOut?: string
-    pulling?: string
-    pushing?: { branch: string; force: boolean }
-    rebasing?: string
-    deleting?: string
-  }>({})
-
-  // Modal state
+  // Modal state (not navigation-related, stays separate)
   const [editTerminal, setEditTerminal] = useState<Terminal | null>(null)
   const [deleteTerminalTarget, setDeleteTerminalTarget] =
     useState<Terminal | null>(null)
@@ -82,8 +57,7 @@ export function CommandPalette() {
   } | null>(null)
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false)
 
-  // PR action state
-  const [actionPR, setActionPR] = useState<PRCheckStatus | null>(null)
+  // PR action modals
   const [mergeModal, setMergeModal] = useState<PRCheckStatus | null>(null)
   const [rerunAllModal, setRerunAllModal] = useState<PRCheckStatus | null>(null)
 
@@ -115,21 +89,21 @@ export function CommandPalette() {
     [],
   )
 
+  // Derived values from stack
+  const currentLevel = stack[stack.length - 1]
+  const currentModeId = currentLevel.mode
+  const highlightedId = currentLevel.highlightedId ?? null
+  const breadcrumbs = stack
+    .slice(1)
+    .map((l) => l.title)
+    .filter(Boolean)
+
   // Reset state when palette closes
   const handleOpenChange = useCallback((value: boolean) => {
     setOpen(value)
     if (!value) {
       setTimeout(() => {
-        setSelectedTerminal(null)
-        setSelectedPR(null)
-        setSelectedSession(null)
-        setSelectedBranch(null)
-        setBranches(null)
-        setBranchesLoading(false)
-        setLoadingStates({})
-        setActionPR(null)
-        setHighlightedId(null)
-        setModeStack(['search'])
+        setStack([initialLevel])
       }, 300)
     }
   }, [])
@@ -141,7 +115,7 @@ export function CommandPalette() {
   // Event listeners
   useEffect(() => {
     const handler = () => {
-      setModeStack(['search'])
+      setStack([initialLevel])
       setOpen(true)
     }
     window.addEventListener('open-palette', handler)
@@ -179,11 +153,10 @@ export function CommandPalette() {
           (p) => p.prNumber === prNumber && p.repo === prRepo,
         )
         if (pr) {
-          setActionPR(pr)
-          setSelectedTerminal(null)
-          setSelectedPR(null)
-          setSelectedSession(null)
-          setModeStack(['search', 'pr-actions'])
+          setStack([
+            initialLevel,
+            { mode: 'pr-actions', title: pr.prTitle, pr },
+          ])
           setOpen(true)
           return
         }
@@ -192,11 +165,17 @@ export function CommandPalette() {
       if (sessionId) {
         const session = sessions.find((s) => s.session_id === sessionId)
         if (session) {
-          setSelectedSession(session)
-          setSelectedTerminal(null)
-          setSelectedPR(null)
-          setActionPR(null)
-          setModeStack(['search', 'actions'])
+          setStack([
+            initialLevel,
+            {
+              mode: 'actions',
+              title:
+                session.name ||
+                session.latest_user_message ||
+                session.session_id,
+              session,
+            },
+          ])
           setOpen(true)
           return
         }
@@ -206,13 +185,17 @@ export function CommandPalette() {
         const terminal = terminals.find((t) => t.id === terminalId)
         if (terminal) {
           const pr = terminal.git_branch
-            ? (branchToPR.get(terminal.git_branch) ?? null)
-            : null
-          setSelectedTerminal(terminal)
-          setSelectedPR(pr)
-          setSelectedSession(null)
-          setActionPR(null)
-          setModeStack(['search', 'actions'])
+            ? (branchToPR.get(terminal.git_branch) ?? undefined)
+            : undefined
+          setStack([
+            initialLevel,
+            {
+              mode: 'actions',
+              title: terminal.name || getLastPathSegment(terminal.cwd),
+              terminal,
+              pr,
+            },
+          ])
           setOpen(true)
         }
       }
@@ -229,30 +212,58 @@ export function CommandPalette() {
       const terminal = terminals.find((t) => t.id === terminalId)
       if (terminal?.git_repo) {
         const pr = terminal.git_branch
-          ? (branchToPR.get(terminal.git_branch) ?? null)
-          : null
-        setSelectedTerminal(terminal)
-        setSelectedPR(pr)
-        setSelectedSession(null)
-        setBranches(null)
-        setBranchesLoading(true)
-        setModeStack(['search', 'actions', 'branches'])
+          ? (branchToPR.get(terminal.git_branch) ?? undefined)
+          : undefined
+        setStack([
+          initialLevel,
+          {
+            mode: 'actions',
+            title: terminal.name || getLastPathSegment(terminal.cwd),
+            terminal,
+            pr,
+          },
+          {
+            mode: 'branches',
+            title: 'Branches',
+            terminal,
+            pr,
+            branchesLoading: true,
+          },
+        ])
         setOpen(true)
         getBranches(terminalId)
           .then((data) => {
-            setBranches(data)
-            const firstBranch = data.local[0] ?? data.remote[0]
-            if (firstBranch) {
+            setStack((prev) => {
+              const current = prev[prev.length - 1]
+              if (current.mode !== 'branches') return prev
+              const firstBranch = data.local[0] ?? data.remote[0]
               const prefix = data.local[0] ? 'local' : 'remote'
-              setHighlightedId(`branch:${prefix}:${firstBranch.name}`)
-            }
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...current,
+                  branches: data,
+                  branchesLoading: false,
+                  highlightedId: firstBranch
+                    ? `branch:${prefix}:${firstBranch.name}`
+                    : undefined,
+                },
+              ]
+            })
           })
           .catch((err) => {
             toast.error(
               err instanceof Error ? err.message : 'Failed to fetch branches',
             )
+            setStack((prev) => {
+              const current = prev[prev.length - 1]
+              if (current.mode !== 'branches') return prev
+              return [
+                ...prev.slice(0, -1),
+                { ...current, branchesLoading: false },
+              ]
+            })
           })
-          .finally(() => setBranchesLoading(false))
       }
     }
     window.addEventListener('open-terminal-branches', handler as EventListener)
@@ -285,45 +296,24 @@ export function CommandPalette() {
     ],
   )
 
-  // Build mode state
-  const modeState: ModeState = useMemo(
-    () => ({
-      terminal: selectedTerminal,
-      session: selectedSession,
-      pr: selectedPR,
-      branch: selectedBranch,
-      branches,
-      branchesLoading,
-      loadingStates,
-      selectedPR: actionPR,
-      prLoadingStates: {},
-    }),
-    [
-      selectedTerminal,
-      selectedSession,
-      selectedPR,
-      selectedBranch,
-      branches,
-      branchesLoading,
-      loadingStates,
-      actionPR,
-    ],
-  )
-
   // Palette API
   const api: PaletteAPI = useMemo(
     () => ({
-      navigate: (result: NavigationResult) => {
-        setModeStack((prev) => [...prev, result.modeId])
-        setHighlightedId(result.highlightedId ?? null)
+      push: (level) => {
+        setStack((prev) => [...prev, level])
       },
-      back: () => {
-        if (modeStack.length <= 1) return
-        setModeStack((prev) => prev.slice(0, -1))
+      pop: () => {
+        setStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev))
+      },
+      updateLevel: (updater) => {
+        setStack((prev) => {
+          const current = prev[prev.length - 1]
+          return [...prev.slice(0, -1), updater(current)]
+        })
       },
       close: closePalette,
     }),
-    [modeStack, closePalette],
+    [closePalette],
   )
 
   // App actions
@@ -416,29 +406,49 @@ export function CommandPalette() {
 
       // Branch actions
       loadBranches: (terminalId) => {
-        setBranches(null)
-        setBranchesLoading(true)
         getBranches(terminalId)
           .then((data) => {
-            setBranches(data)
-            const firstBranch = data.local[0] ?? data.remote[0]
-            if (firstBranch) {
+            setStack((prev) => {
+              const current = prev[prev.length - 1]
+              if (current.mode !== 'branches') return prev
+              const firstBranch = data.local[0] ?? data.remote[0]
               const prefix = data.local[0] ? 'local' : 'remote'
-              setHighlightedId(`branch:${prefix}:${firstBranch.name}`)
-            }
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...current,
+                  branches: data,
+                  branchesLoading: false,
+                  highlightedId: firstBranch
+                    ? `branch:${prefix}:${firstBranch.name}`
+                    : undefined,
+                },
+              ]
+            })
           })
           .catch((err) => {
             toast.error(
               err instanceof Error ? err.message : 'Failed to fetch branches',
             )
+            setStack((prev) => {
+              const current = prev[prev.length - 1]
+              if (current.mode !== 'branches') return prev
+              return [
+                ...prev.slice(0, -1),
+                { ...current, branchesLoading: false },
+              ]
+            })
           })
-          .finally(() => setBranchesLoading(false))
       },
       checkoutBranch: async (name, isRemote) => {
-        if (!selectedTerminal) return
-        setLoadingStates((s) => ({ ...s, checkingOut: name }))
+        const terminal = currentLevel.terminal
+        if (!terminal) return
+        api.updateLevel((l) => ({
+          ...l,
+          loadingStates: { ...l.loadingStates, checkingOut: name },
+        }))
         try {
-          await checkoutBranch(selectedTerminal.id, name, isRemote)
+          await checkoutBranch(terminal.id, name, isRemote)
           toast.success(`Switched to ${name}`)
           closePalette()
         } catch (err) {
@@ -446,14 +456,21 @@ export function CommandPalette() {
             err instanceof Error ? err.message : 'Failed to checkout branch',
           )
         } finally {
-          setLoadingStates((s) => ({ ...s, checkingOut: undefined }))
+          api.updateLevel((l) => ({
+            ...l,
+            loadingStates: { ...l.loadingStates, checkingOut: undefined },
+          }))
         }
       },
       pullBranch: async (name) => {
-        if (!selectedTerminal) return
-        setLoadingStates((s) => ({ ...s, pulling: name }))
+        const terminal = currentLevel.terminal
+        if (!terminal) return
+        api.updateLevel((l) => ({
+          ...l,
+          loadingStates: { ...l.loadingStates, pulling: name },
+        }))
         try {
-          await pullBranch(selectedTerminal.id, name)
+          await pullBranch(terminal.id, name)
           toast.success(`Pulled ${name}`)
           closePalette()
         } catch (err) {
@@ -461,17 +478,24 @@ export function CommandPalette() {
             err instanceof Error ? err.message : 'Failed to pull branch',
           )
         } finally {
-          setLoadingStates((s) => ({ ...s, pulling: undefined }))
+          api.updateLevel((l) => ({
+            ...l,
+            loadingStates: { ...l.loadingStates, pulling: undefined },
+          }))
         }
       },
       pushBranch: async (name, force) => {
-        if (!selectedTerminal) return
-        setLoadingStates((s) => ({
-          ...s,
-          pushing: { branch: name, force: !!force },
+        const terminal = currentLevel.terminal
+        if (!terminal) return
+        api.updateLevel((l) => ({
+          ...l,
+          loadingStates: {
+            ...l.loadingStates,
+            pushing: { branch: name, force: !!force },
+          },
         }))
         try {
-          await pushBranch(selectedTerminal.id, name, force)
+          await pushBranch(terminal.id, name, force)
           toast.success(force ? `Force pushed ${name}` : `Pushed ${name}`)
           closePalette()
         } catch (err) {
@@ -479,17 +503,24 @@ export function CommandPalette() {
             err instanceof Error ? err.message : 'Failed to push branch',
           )
         } finally {
-          setLoadingStates((s) => ({ ...s, pushing: undefined }))
+          api.updateLevel((l) => ({
+            ...l,
+            loadingStates: { ...l.loadingStates, pushing: undefined },
+          }))
         }
       },
       requestForcePush: (terminalId, branch) => {
         setForcePushConfirm({ terminalId, branch })
       },
       rebaseBranch: async (name) => {
-        if (!selectedTerminal) return
-        setLoadingStates((s) => ({ ...s, rebasing: name }))
+        const terminal = currentLevel.terminal
+        if (!terminal) return
+        api.updateLevel((l) => ({
+          ...l,
+          loadingStates: { ...l.loadingStates, rebasing: name },
+        }))
         try {
-          const result = await rebaseBranch(selectedTerminal.id, name)
+          const result = await rebaseBranch(terminal.id, name)
           toast.success(`Rebased ${name} onto ${result.onto}`)
           closePalette()
         } catch (err) {
@@ -497,7 +528,10 @@ export function CommandPalette() {
             err instanceof Error ? err.message : 'Failed to rebase branch',
           )
         } finally {
-          setLoadingStates((s) => ({ ...s, rebasing: undefined }))
+          api.updateLevel((l) => ({
+            ...l,
+            loadingStates: { ...l.loadingStates, rebasing: undefined },
+          }))
         }
       },
       requestDeleteBranch: (terminalId, branch, hasRemote) => {
@@ -512,26 +546,6 @@ export function CommandPalette() {
       openRerunAllModal: (pr) => {
         setRerunAllModal(pr)
       },
-      setSelectedPR: (pr) => {
-        setActionPR(pr)
-        setSelectedTerminal(null)
-        setSelectedSession(null)
-      },
-
-      // State setters
-      setSelectedTerminal: (terminal, pr) => {
-        setSelectedTerminal(terminal)
-        setSelectedPR(pr)
-        setSelectedSession(null)
-        setActionPR(null)
-      },
-      setSelectedSession: (session) => {
-        setSelectedSession(session)
-        setSelectedTerminal(null)
-        setSelectedPR(null)
-        setActionPR(null)
-      },
-      setSelectedBranch,
     }),
     [
       selectTerminal,
@@ -541,73 +555,45 @@ export function CommandPalette() {
       createTerminal,
       setPinnedTerminalSessions,
       setPinnedSessions,
-      selectedTerminal,
+      currentLevel,
+      api,
     ],
   )
 
   // Create modes
   const modes = useMemo(
-    () => createPaletteModes(appData, modeState, appActions, api),
-    [appData, modeState, appActions, api],
+    () => createPaletteModes(appData, currentLevel, appActions, api),
+    [appData, currentLevel, appActions, api],
   )
 
-  const currentModeId = modeStack[modeStack.length - 1]
-
-  // Handle back navigation with highlight restoration
+  // Handle back navigation - just pop the stack
   const handleBack = useCallback(() => {
-    if (modeStack.length <= 1) return
-    const currentMode = modes[currentModeId]
-    const backResult = currentMode?.onBack?.()
-    if (backResult) {
-      setModeStack((prev) => prev.slice(0, -1))
-      setHighlightedId(backResult.highlightedId ?? null)
-
-      // Clear state based on which mode we're leaving
-      if (currentModeId === 'actions') {
-        setSelectedTerminal(null)
-        setSelectedPR(null)
-        setSelectedSession(null)
-      } else if (currentModeId === 'branches') {
-        setBranches(null)
-      } else if (currentModeId === 'branch-actions') {
-        setSelectedBranch(null)
-      } else if (currentModeId === 'pr-actions') {
-        setActionPR(null)
-      }
-    } else {
-      setModeStack((prev) => prev.slice(0, -1))
-    }
-  }, [modeStack, modes, currentModeId])
+    if (stack.length <= 1) return
+    setStack((prev) => prev.slice(0, -1))
+  }, [stack.length])
 
   // Handle clicking on a breadcrumb to navigate to that level
   const handleBreadcrumbClick = useCallback(
     (index: number) => {
-      // Breadcrumb at index i corresponds to modeStack[i + 1]
-      // (index 0 in modeStack is root 'search' which has no breadcrumb)
+      // Breadcrumb at index i corresponds to stack[i + 1]
+      // (index 0 in stack is root 'search' which has no breadcrumb)
       const targetStackLength = index + 2
-      if (targetStackLength >= modeStack.length) return
-
-      // Clear state for modes we're leaving
-      const modesBeingLeft = modeStack.slice(targetStackLength)
-      for (const modeId of modesBeingLeft) {
-        if (modeId === 'actions') {
-          setSelectedTerminal(null)
-          setSelectedPR(null)
-          setSelectedSession(null)
-        } else if (modeId === 'branches') {
-          setBranches(null)
-        } else if (modeId === 'branch-actions') {
-          setSelectedBranch(null)
-        } else if (modeId === 'pr-actions') {
-          setActionPR(null)
-        }
-      }
-
-      setModeStack((prev) => prev.slice(0, targetStackLength))
-      setHighlightedId(null)
+      if (targetStackLength >= stack.length) return
+      setStack((prev) => prev.slice(0, targetStackLength))
     },
-    [modeStack],
+    [stack.length],
   )
+
+  // Handle highlight changes
+  const handleHighlightChange = useCallback((id: string | null) => {
+    setStack((prev) => {
+      const current = prev[prev.length - 1]
+      return [
+        ...prev.slice(0, -1),
+        { ...current, highlightedId: id ?? undefined },
+      ]
+    })
+  }, [])
 
   return (
     <>
@@ -616,8 +602,9 @@ export function CommandPalette() {
         onOpenChange={handleOpenChange}
         modes={modes}
         currentModeId={currentModeId}
+        breadcrumbs={breadcrumbs}
         highlightedId={highlightedId}
-        onHighlightChange={setHighlightedId}
+        onHighlightChange={handleHighlightChange}
         onBack={handleBack}
         onBreadcrumbClick={handleBreadcrumbClick}
       />
