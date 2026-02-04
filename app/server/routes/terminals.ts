@@ -800,25 +800,52 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Branch is required' })
       }
 
-      const gitCmd = `git pull origin ${branch.replace(/'/g, "'\\''")}`
-
       try {
-        if (terminal.ssh_host) {
-          await execSSHCommand(terminal.ssh_host, gitCmd, {
-            cwd: terminal.cwd,
-          })
+        // Check current branch to determine the right strategy
+        const currentBranch = terminal.git_branch || ''
+        const isOnTargetBranch = currentBranch === branch
+
+        if (isOnTargetBranch) {
+          // On target branch: pull with rebase
+          const pullCmd = `git pull --rebase origin ${branch.replace(/'/g, "'\\''")}`
+          if (terminal.ssh_host) {
+            await execSSHCommand(terminal.ssh_host, pullCmd, {
+              cwd: terminal.cwd,
+            })
+          } else {
+            await new Promise<void>((resolve, reject) => {
+              execFile(
+                'git',
+                ['pull', '--rebase', 'origin', branch],
+                { cwd: expandPath(terminal.cwd), timeout: 60000 },
+                (err) => {
+                  if (err) reject(err)
+                  else resolve()
+                },
+              )
+            })
+          }
         } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['pull', 'origin', branch],
-              { cwd: expandPath(terminal.cwd), timeout: 60000 },
-              (err) => {
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
+          // On different branch: fetch and fast-forward update the target branch
+          // This fails if branches have diverged (which requires manual resolution)
+          const fetchCmd = `git fetch origin ${branch.replace(/'/g, "'\\''")}:${branch.replace(/'/g, "'\\''")}`
+          if (terminal.ssh_host) {
+            await execSSHCommand(terminal.ssh_host, fetchCmd, {
+              cwd: terminal.cwd,
+            })
+          } else {
+            await new Promise<void>((resolve, reject) => {
+              execFile(
+                'git',
+                ['fetch', 'origin', `${branch}:${branch}`],
+                { cwd: expandPath(terminal.cwd), timeout: 60000 },
+                (err) => {
+                  if (err) reject(err)
+                  else resolve()
+                },
+              )
+            })
+          }
         }
 
         // Refresh git branch detection

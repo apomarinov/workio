@@ -161,7 +161,9 @@ function NotificationItem({
     >
       <div className="flex-shrink-0 mt-0.5">{getNotificationIcon(type)}</div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate">{title}</div>
+        <div className="text-xs font-medium line-clamp-3">
+          <MarkdownContent content={title} />
+        </div>
         {hasBody && (
           <div className="text-xs text-muted-foreground line-clamp-4 mt-0.5 [&_p]:mb-0 [&_pre]:hidden [&_code]:text-[10px]">
             <MarkdownContent content={data.body || ''} />
@@ -190,7 +192,7 @@ export function NotificationList() {
   } = useTerminalContext()
 
   return (
-    <div className="w-80">
+    <div className="w-[400px]">
       <div className="p-2 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium">Notifications</span>
         <div className="flex items-center gap-1">
@@ -203,25 +205,29 @@ export function NotificationList() {
           >
             Read all
           </Button>
-          {notifications.length > 0 && (<Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={deleteAllNotifications}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>)}
+          {notifications.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={deleteAllNotifications}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
       </div>
-      {notifications.length > 0 && (<div className="max-h-[28rem] overflow-y-auto p-1">
-        {notifications.map((notification) => (
-          <NotificationItem
-            key={notification.id}
-            notification={notification}
-            onMarkRead={markNotificationRead}
-          />
-        ))}
-      </div>)}
+      {notifications.length > 0 && (
+        <div className="max-h-[28rem] overflow-y-auto p-1">
+          {notifications.map((notification) => (
+            <NotificationItem
+              key={notification.id}
+              notification={notification}
+              onMarkRead={markNotificationRead}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

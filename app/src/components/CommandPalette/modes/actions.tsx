@@ -52,12 +52,12 @@ export function createActionsMode(
     const isPinned = pinnedTerminalSessions.includes(terminal.id)
 
     const items: PaletteItem[] = [
-      {
-        id: 'action:reveal',
-        label: 'Reveal',
-        icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
-        onSelect: () => actions.selectTerminal(terminal.id),
-      },
+      // {
+      //   id: 'action:reveal',
+      //   label: 'Reveal',
+      //   icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
+      //   onSelect: () => actions.selectTerminal(terminal.id),
+      // },
     ]
 
     // Open in Cursor (non-SSH only)
@@ -170,12 +170,12 @@ export function createActionsMode(
     const isPinned = pinnedSessions.includes(session.session_id)
 
     const items: PaletteItem[] = [
-      {
-        id: 'action:reveal',
-        label: 'Reveal',
-        icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
-        onSelect: () => actions.selectSession(session.session_id),
-      },
+      // {
+      //   id: 'action:reveal',
+      //   label: 'Reveal',
+      //   icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
+      //   onSelect: () => actions.selectSession(session.session_id),
+      // },
       {
         id: 'action:pin',
         label: isPinned ? 'Unpin' : 'Pin',

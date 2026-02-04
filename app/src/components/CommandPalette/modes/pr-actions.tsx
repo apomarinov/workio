@@ -56,19 +56,19 @@ export function createPRActionsMode(
   const items: PaletteItem[] = []
 
   // Reveal (for non-merged PRs - shows PR in sidebar)
-  if (!isMerged) {
-    items.push({
-      id: 'action:reveal',
-      label: 'Reveal',
-      icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
-      onSelect: () => actions.revealPR(selectedPR),
-    })
-  }
+  // if (!isMerged) {
+  //   items.push({
+  //     id: 'action:reveal',
+  //     label: 'Reveal',
+  //     icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
+  //     onSelect: () => actions.revealPR(selectedPR),
+  //   })
+  // }
 
   // Open in new tab (all PRs)
   items.push({
     id: 'action:open-url',
-    label: 'Open in new tab',
+    label: 'View on GitHub',
     icon: <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />,
     onSelect: () => {
       window.open(selectedPR.prUrl, '_blank')

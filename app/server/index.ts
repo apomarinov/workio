@@ -245,11 +245,12 @@ fastify.post<{
   await refreshPRChecks(true, {
     repo: `${owner}/${repo}`,
     prNumber: Number(request.params.pr),
+    // Poll until any check is queued/in_progress - the re-run creates a new
+    // run ID so we can't match by the original detailsUrl
     until: (pr) => {
       if (!pr) return false
-      const check = pr.checks.find((c) => c.detailsUrl === checkUrl)
-      return (
-        !!check && (check.status === 'QUEUED' || check.status === 'IN_PROGRESS')
+      return pr.checks.some(
+        (c) => c.status === 'QUEUED' || c.status === 'IN_PROGRESS',
       )
     },
   })
