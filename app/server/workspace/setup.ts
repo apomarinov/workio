@@ -522,6 +522,15 @@ export async function setupTerminalWorkspace(
 
     if (worktreeSource) {
       // --- Worktree mode ---
+      // First prune any orphaned worktrees from previous deletions
+      await runCmd(
+        'git',
+        ['worktree', 'prune'],
+        worktreeSource,
+        sshHost,
+        10000,
+      ).catch(() => {})
+
       targetPath = joinPath(sshHost, parentDir, slug)
       await runCmd(
         'git',

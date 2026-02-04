@@ -51,17 +51,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // In production, use CLIENT_PORT since we serve both UI and API
 const port = env.NODE_ENV === 'production' ? env.CLIENT_PORT : env.SERVER_PORT
 
-// Write logs to both stdout and a per-run JSONL file
+// Write logs to file (and stdout in development)
 const logsDir = path.join(__dirname, 'logs')
 fs.mkdirSync(logsDir, { recursive: true })
 const logFile = path.join(
   logsDir,
   `server-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`,
 )
-const logStream = pino.multistream([
-  { stream: process.stdout },
-  { stream: pino.destination(logFile) },
-])
+const logStreams: pino.StreamEntry[] = [{ stream: pino.destination(logFile) }]
+if (env.NODE_ENV !== 'production') {
+  logStreams.unshift({ stream: process.stdout })
+}
+const logStream = pino.multistream(logStreams)
 
 const fastify = Fastify({
   loggerInstance: pino(
