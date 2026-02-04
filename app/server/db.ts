@@ -271,6 +271,40 @@ export async function getTerminalById(
   return rows[0]
 }
 
+// Generate unique terminal name by appending -1, -2, etc. if name exists
+async function getUniqueTerminalName(
+  baseName: string,
+  excludeId?: number,
+): Promise<string> {
+  let name = baseName
+  let suffix = 1
+  while (suffix < 200) {
+    const { rows } = await pool.query(
+      excludeId
+        ? 'SELECT id FROM terminals WHERE name = $1 AND id != $2'
+        : 'SELECT id FROM terminals WHERE name = $1',
+      excludeId ? [name, excludeId] : [name],
+    )
+    if (rows.length === 0) return name
+    name = `${baseName}-${suffix++}`
+  }
+  return `${baseName}-${crypto.randomUUID().slice(0, 4)}`
+}
+
+// Check if terminal name already exists (for validation)
+export async function terminalNameExists(
+  name: string,
+  excludeId?: number,
+): Promise<boolean> {
+  const { rows } = await pool.query(
+    excludeId
+      ? 'SELECT id FROM terminals WHERE name = $1 AND id != $2'
+      : 'SELECT id FROM terminals WHERE name = $1',
+    excludeId ? [name, excludeId] : [name],
+  )
+  return rows.length > 0
+}
+
 export async function createTerminal(
   cwd: string,
   name: string | null,
@@ -279,6 +313,9 @@ export async function createTerminal(
   git_repo: object | null = null,
   setup: object | null = null,
 ): Promise<Terminal> {
+  // Auto-generate unique name if provided
+  const uniqueName = name ? await getUniqueTerminalName(name) : null
+
   const { rows } = await pool.query(
     `
     INSERT INTO terminals (cwd, name, shell, ssh_host, git_repo, setup)
@@ -287,7 +324,7 @@ export async function createTerminal(
   `,
     [
       cwd,
-      name,
+      uniqueName,
       shell,
       ssh_host,
       git_repo ? JSON.stringify(git_repo) : null,

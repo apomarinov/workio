@@ -66,6 +66,7 @@ import {
   deleteTerminal,
   getAllTerminals,
   getTerminalById,
+  terminalNameExists,
   updateTerminal,
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
@@ -548,6 +549,16 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const terminal = await getTerminalById(id)
       if (!terminal) {
         return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      // Check for duplicate name on rename
+      if (
+        request.body.name !== undefined &&
+        (await terminalNameExists(request.body.name, id))
+      ) {
+        return reply
+          .status(409)
+          .send({ error: 'A terminal with this name already exists' })
       }
 
       const updated = await updateTerminal(id, request.body)
