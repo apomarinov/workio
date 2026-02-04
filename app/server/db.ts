@@ -553,18 +553,23 @@ export async function getNotifications(
   return { notifications: rows, total }
 }
 
+export async function markAllNotificationsRead(): Promise<number> {
+  const result = await pool.query(
+    'UPDATE notifications SET read = TRUE WHERE read = FALSE',
+  )
+  return result.rowCount ?? 0
+}
+
 export async function markNotificationRead(id: number): Promise<boolean> {
   const result = await pool.query(
-    'UPDATE notifications SET read = TRUE WHERE id = $1',
+    'UPDATE notifications SET read = TRUE WHERE id = $1 AND read = FALSE',
     [id],
   )
   return (result.rowCount ?? 0) > 0
 }
 
-export async function markAllNotificationsRead(): Promise<number> {
-  const result = await pool.query(
-    'UPDATE notifications SET read = TRUE WHERE read = FALSE',
-  )
+export async function deleteAllNotifications(): Promise<number> {
+  const result = await pool.query('DELETE FROM notifications')
   return result.rowCount ?? 0
 }
 

@@ -64,8 +64,9 @@ interface TerminalContextValue {
   notifications: Notification[]
   hasNotifications: boolean
   hasUnreadNotifications: boolean
-  clearAllNotifications: () => Promise<void>
-  clearingNotifications: boolean
+  markNotificationRead: (id: number) => Promise<void>
+  markAllNotificationsRead: () => Promise<void>
+  deleteAllNotifications: () => Promise<void>
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -242,14 +243,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           break
 
         case 'new_comment':
-          sendNotificationRef.current(
-            `💬 ${data.author || 'Someone'} commented`,
-            {
-              body: data.body || prTitle,
-              audio: 'pr-activity',
-              onClick: () => window.open(data.commentUrl || prUrl, '_blank'),
-            },
-          )
+          sendNotificationRef.current(`💬 ${data.author || 'Someone'}`, {
+            body: data.body || prTitle,
+            audio: 'pr-activity',
+            onClick: () => window.open(data.commentUrl || prUrl, '_blank'),
+          })
           break
 
         case 'new_review': {
@@ -360,7 +358,6 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [clearingNotifications, setClearingNotifications] = useState(false)
 
   // Fetch notifications on mount
   useEffect(() => {
@@ -404,17 +401,23 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [notifications],
   )
 
-  const clearAllNotifications = useCallback(async () => {
-    setClearingNotifications(true)
-    try {
-      await api.markAllNotificationsRead()
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-      // Also mark all PRs as seen
-      markAllPRsSeen()
-    } finally {
-      setClearingNotifications(false)
-    }
+  const markNotificationRead = useCallback(async (id: number) => {
+    await api.markNotificationRead(id)
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    )
+  }, [])
+
+  const markAllNotificationsRead = useCallback(async () => {
+    await api.markAllNotificationsRead()
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    markAllPRsSeen()
   }, [markAllPRsSeen])
+
+  const deleteAllNotifications = useCallback(async () => {
+    await api.deleteAllNotifications()
+    setNotifications([])
+  }, [])
 
   // Fetch merged PRs for all repos
   const [mergedPRs, setMergedPRs] = useState<MergedPRSummary[]>([])
@@ -568,8 +571,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       notifications,
       hasNotifications,
       hasUnreadNotifications,
-      clearAllNotifications,
-      clearingNotifications,
+      markNotificationRead,
+      markAllNotificationsRead,
+      deleteAllNotifications,
     }),
     [
       terminals,
@@ -592,8 +596,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       notifications,
       hasNotifications,
       hasUnreadNotifications,
-      clearAllNotifications,
-      clearingNotifications,
+      markNotificationRead,
+      markAllNotificationsRead,
+      deleteAllNotifications,
     ],
   )
 

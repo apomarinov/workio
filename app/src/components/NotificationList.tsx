@@ -1,12 +1,14 @@
 import {
-  CheckCircle,
+  Check,
+  CircleX,
+  Eye,
   GitMerge,
-  Loader2,
   MessageSquare,
   RefreshCw,
   Terminal,
-  XCircle,
+  Trash2,
 } from 'lucide-react'
+import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '@/context/TerminalContext'
 import type { Notification } from '@/types'
@@ -31,16 +33,17 @@ function formatRelativeTime(dateString: string): string {
 function getNotificationIcon(type: string) {
   switch (type) {
     case 'pr_merged':
-      return <GitMerge className="w-4 h-4 text-purple-500" />
+      return <GitMerge className="w-4 h-4 text-purple-400" />
     case 'check_failed':
-      return <XCircle className="w-4 h-4 text-red-500" />
+      return <CircleX className="w-4 h-4 text-red-400" />
     case 'changes_requested':
-      return <RefreshCw className="w-4 h-4 text-orange-500" />
+      return <RefreshCw className="w-4 h-4 text-orange-400" />
     case 'pr_approved':
-      return <CheckCircle className="w-4 h-4 text-green-500" />
+      return <Check className="w-4 h-4 text-green-500" />
     case 'new_comment':
+      return <MessageSquare className="w-4 h-4 text-muted-foreground" />
     case 'new_review':
-      return <MessageSquare className="w-4 h-4 text-blue-500" />
+      return <Eye className="w-4 h-4 text-blue-500" />
     // Workspace notifications
     case 'workspace_ready':
     case 'workspace_deleted':
@@ -57,9 +60,9 @@ function getNotificationTitle(notification: Notification): string {
   const { type, data } = notification
   switch (type) {
     case 'pr_merged':
-      return 'PR Merged'
+      return data.prTitle ? `${data.prTitle}` : 'PR Merged'
     case 'check_failed':
-      return data.checkName ? `Check failed: ${data.checkName}` : 'Check failed'
+      return data.checkName ? `${data.checkName}` : 'Check failed'
     case 'changes_requested':
       return data.reviewer
         ? `${data.reviewer} requested changes`
@@ -67,9 +70,9 @@ function getNotificationTitle(notification: Notification): string {
     case 'pr_approved':
       return data.approver ? `${data.approver} approved` : 'PR approved'
     case 'new_comment':
-      return data.author ? `${data.author} commented` : 'New comment'
+      return data.author ? `${data.author}` : 'New comment'
     case 'new_review':
-      return data.author ? `${data.author} reviewed` : 'New review'
+      return data.author ? `${data.author} left a review` : 'New review'
     // Workspace notifications
     case 'workspace_ready':
       return `${data.name || 'Workspace'} is ready`
@@ -84,21 +87,67 @@ function getNotificationTitle(notification: Notification): string {
   }
 }
 
-function NotificationItem({ notification }: { notification: Notification }) {
-  const { type, data, created_at, read } = notification
+function getNotificationSubtitle(notification: Notification): string {
+  const { type, data, repo } = notification
+  switch (type) {
+    case 'pr_merged':
+      return repo
+    case 'check_failed':
+    case 'changes_requested':
+    case 'pr_approved':
+    case 'new_comment':
+    case 'new_review':
+      return data.prTitle || repo
+    default:
+      return ''
+  }
+}
+
+function getNotificationUrl(notification: Notification): string | undefined {
+  const { type, data } = notification
+  switch (type) {
+    case 'pr_merged':
+      return data.prUrl
+    case 'check_failed':
+      return data.checkUrl || data.prUrl
+    case 'changes_requested':
+    case 'pr_approved':
+      // For reviews, construct review URL if we have reviewId
+      if (data.reviewId && data.prUrl) {
+        return `${data.prUrl}#pullrequestreview-${data.reviewId}`
+      }
+      return data.prUrl
+    case 'new_comment':
+      return data.commentUrl || data.prUrl
+    case 'new_review':
+      if (data.reviewId && data.prUrl) {
+        return `${data.prUrl}#pullrequestreview-${data.reviewId}`
+      }
+      return data.prUrl
+    default:
+      return undefined
+  }
+}
+
+function NotificationItem({
+  notification,
+  onMarkRead,
+}: {
+  notification: Notification
+  onMarkRead: (id: number) => void
+}) {
+  const { id, type, data, created_at, read } = notification
   const title = getNotificationTitle(notification)
+  const subtitle = getNotificationSubtitle(notification)
+  const url = getNotificationUrl(notification)
   const isWorkspace = type.startsWith('workspace_')
+  const hasBody = (type === 'new_comment' || type === 'new_review') && data.body
 
   const handleClick = () => {
+    if (!read) {
+      onMarkRead(id)
+    }
     if (isWorkspace) return // No URL to open for workspace notifications
-    const url =
-      type === 'check_failed'
-        ? data.checkUrl || data.prUrl
-        : type === 'new_comment'
-          ? data.commentUrl || data.prUrl
-          : type === 'new_review' && data.reviewId
-            ? `${data.prUrl}#pullrequestreview-${data.reviewId}`
-            : data.prUrl
     if (url) {
       window.open(url, '_blank')
     }
@@ -107,20 +156,24 @@ function NotificationItem({ notification }: { notification: Notification }) {
   return (
     <button
       onClick={handleClick}
-      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-center gap-1.5 ${
-        read ? 'opacity-60' : ''
-      } ${isWorkspace ? 'cursor-default' : 'cursor-pointer'}`}
+      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${read ? 'opacity-60' : ''
+        } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
     >
-      <div className="flex-shrink-0">{getNotificationIcon(type)}</div>
+      <div className="flex-shrink-0 mt-0.5">{getNotificationIcon(type)}</div>
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{title}</div>
+        {hasBody && (
+          <div className="text-xs text-muted-foreground line-clamp-4 mt-0.5 [&_p]:mb-0 [&_pre]:hidden [&_code]:text-[10px]">
+            <MarkdownContent content={data.body || ''} />
+          </div>
+        )}
         <div className="text-xs text-muted-foreground truncate">
-          {data.prTitle ? `${data.prTitle} · ` : ''}
+          {subtitle ? `${subtitle} · ` : ''}
           {formatRelativeTime(created_at)}
         </div>
       </div>
       {!read && (
-        <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+        <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
       )}
     </button>
   )
@@ -129,41 +182,46 @@ function NotificationItem({ notification }: { notification: Notification }) {
 export function NotificationList() {
   const {
     notifications,
-    clearAllNotifications,
-    clearingNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    deleteAllNotifications,
+    hasAnyUnseenPRs,
     hasUnreadNotifications,
   } = useTerminalContext()
-
-  if (notifications.length === 0) {
-    return (
-      <div className="p-4 text-center text-sm text-muted-foreground">
-        No notifications
-      </div>
-    )
-  }
 
   return (
     <div className="w-80">
       <div className="p-2 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium">Notifications</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={clearAllNotifications}
-          disabled={clearingNotifications || !hasUnreadNotifications}
-        >
-          {clearingNotifications ? (
-            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-          ) : null}
-          Clear all
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={markAllNotificationsRead}
+            disabled={!hasUnreadNotifications && !hasAnyUnseenPRs}
+          >
+            Read all
+          </Button>
+          {notifications.length > 0 && (<Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={deleteAllNotifications}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>)}
+        </div>
       </div>
-      <div className="max-h-[28rem] overflow-y-auto p-1">
+      {notifications.length > 0 && (<div className="max-h-[28rem] overflow-y-auto p-1">
         {notifications.map((notification) => (
-          <NotificationItem key={notification.id} notification={notification} />
+          <NotificationItem
+            key={notification.id}
+            notification={notification}
+            onMarkRead={markNotificationRead}
+          />
         ))}
-      </div>
+      </div>)}
     </div>
   )
 }

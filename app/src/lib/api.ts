@@ -481,3 +481,21 @@ export async function markAllNotificationsRead(): Promise<{ count: number }> {
   if (!res.ok) throw new Error('Failed to mark notifications as read')
   return res.json()
 }
+
+export async function markNotificationRead(
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to mark notification as read')
+  return res.json()
+}
+
+export async function deleteAllNotifications(): Promise<{ count: number }> {
+  const res = await fetch(`${API_BASE}/notifications`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error('Failed to delete notifications')
+  return res.json()
+}

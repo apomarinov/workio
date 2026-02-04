@@ -637,6 +637,16 @@ async function pollAllPRChecks(force = false): Promise<void> {
 
       // Only check merged for branches that don't already have an open PR
       const openBranches = new Set(openPRs.map((pr) => pr.branch))
+
+      // Also include branches from previously-open PRs in lastPRData
+      // This ensures we detect merges even if terminal switched branches
+      const repoKey = `${owner}/${repo}`
+      for (const [, pr] of lastPRData) {
+        if (pr.repo === repoKey && pr.state === 'OPEN' && pr.branch) {
+          branches.add(pr.branch)
+        }
+      }
+
       const branchesWithoutOpenPR = new Set(
         [...branches].filter((b) => !openBranches.has(b)),
       )
@@ -1305,6 +1315,9 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         if (isHiddenAuthor(hiddenAuthors, pr.repo, review.author)) continue
         // Skip if we've seen this review before (by ID)
         if (review.id && prevReviewIds.has(review.id)) continue
+        // Skip reviews with no body - these are just containers for code comments
+        // which are already captured by new_comment notifications
+        if (!review.body) continue
         const notification = await insertNotification(
           'new_review',
           pr.repo,

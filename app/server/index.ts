@@ -6,7 +6,13 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
-import { getNotifications, initDb, markAllNotificationsRead } from './db'
+import {
+  deleteAllNotifications,
+  getNotifications,
+  initDb,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from './db'
 import { env } from './env'
 import {
   addPRComment,
@@ -378,6 +384,20 @@ fastify.get<{
 
 fastify.post('/api/notifications/mark-all-read', async () => {
   const count = await markAllNotificationsRead()
+  return { count }
+})
+
+fastify.post<{ Params: { id: string } }>(
+  '/api/notifications/:id/read',
+  async (request) => {
+    const id = Number(request.params.id)
+    const success = await markNotificationRead(id)
+    return { success }
+  },
+)
+
+fastify.delete('/api/notifications', async () => {
+  const count = await deleteAllNotifications()
   return { count }
 })
 
