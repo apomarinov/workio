@@ -19,10 +19,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
+import type { PreferredIDE } from '../types'
+import { CursorIcon, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
 import { useWebhookWarning, WebhooksModal } from './WebhooksModal'
 
@@ -39,6 +48,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [showTools, setShowTools] = useState(true)
   const [showToolOutput, setShowToolOutput] = useState(false)
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
+  const [preferredIDE, setPreferredIDE] = useState<PreferredIDE>('cursor')
   const [saving, setSaving] = useState(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
   const [showWebhooksModal, setShowWebhooksModal] = useState(false)
@@ -56,6 +66,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       setShowTools(settings.show_tools)
       setShowToolOutput(settings.show_tool_output)
       setMessageLineClamp(settings.message_line_clamp.toString())
+      setPreferredIDE(settings.preferred_ide)
     }
   }, [settings])
 
@@ -74,6 +85,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         show_tools: showTools,
         show_tool_output: showTools ? showToolOutput : false,
         message_line_clamp: lineClampValue,
+        preferred_ide: preferredIDE,
       })
       toast.success('Settings saved')
       onOpenChange(false)
@@ -156,6 +168,34 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             <p className="text-xs text-muted-foreground mt-1">
               Lines to show in session list message preview (1-20). Default: 5
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="preferred_ide" className="text-sm font-medium">
+              Preferred IDE
+            </label>
+            <Select
+              value={preferredIDE}
+              onValueChange={(v) => setPreferredIDE(v as PreferredIDE)}
+            >
+              <SelectTrigger id="preferred_ide">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cursor">
+                  <span className="flex items-center gap-2">
+                    <CursorIcon className="w-4 h-4 text-muted-foreground" />
+                    Cursor
+                  </span>
+                </SelectItem>
+                <SelectItem value="vscode">
+                  <span className="flex items-center gap-2">
+                    <VSCodeIcon className="w-4 h-4 text-muted-foreground" />
+                    VS Code
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col gap-3 border-t-[1px] mt-1 pt-3">

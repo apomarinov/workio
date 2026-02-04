@@ -451,6 +451,7 @@ const DEFAULT_CONFIG = {
   show_tools: true,
   show_tool_output: false,
   message_line_clamp: 5,
+  preferred_ide: 'cursor' as const,
   keymap: DEFAULT_KEYMAP,
 }
 

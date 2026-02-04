@@ -3,7 +3,7 @@ import type {
   MergedPRSummary,
   PRCheckStatus,
 } from '../../../shared/types'
-import type { SessionWithProject, Terminal } from '../../types'
+import type { PreferredIDE, SessionWithProject, Terminal } from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createPRActionsMode } from './modes/pr-actions'
@@ -19,6 +19,7 @@ export type AppData = {
   gitDirtyStatus: Record<number, GitDiffStat>
   pinnedTerminalSessions: number[]
   pinnedSessions: string[]
+  preferredIDE: PreferredIDE
 }
 
 // Actions that modes can trigger
@@ -29,7 +30,7 @@ export type AppActions = {
   revealPR: (pr: { branch: string; repo: string }) => void
 
   // Terminal actions
-  openInCursor: (terminal: Terminal) => void
+  openInIDE: (terminal: Terminal) => void
   openInExplorer: (terminal: Terminal) => void
   openPR: (pr: PRCheckStatus) => void
   addWorkspace: (terminal: Terminal) => void

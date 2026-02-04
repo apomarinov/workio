@@ -289,6 +289,8 @@ export interface Notification {
   data: NotificationData
 }
 
+export type PreferredIDE = 'cursor' | 'vscode'
+
 export interface Settings {
   id: number
   default_shell: string
@@ -297,6 +299,7 @@ export interface Settings {
   show_tools: boolean
   show_tool_output: boolean
   message_line_clamp: number
+  preferred_ide: PreferredIDE
   keymap?: Keymap
   webhook_secret?: string
   ngrok_url?: string

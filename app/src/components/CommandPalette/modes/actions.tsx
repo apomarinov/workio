@@ -8,56 +8,7 @@ import {
   PinOff,
   Trash2,
 } from 'lucide-react'
-
-function CursorIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      fill="currentColor"
-      fillRule="evenodd"
-      viewBox="0 0 24 24"
-      className={className}
-    >
-      <path d="M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z" />
-    </svg>
-  )
-}
-
-function FinderIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      height="800px"
-      width="800px"
-      version="1.1"
-      id="Capa_1"
-      viewBox="0 0 279.121 279.121"
-      className={className}
-    >
-      <g>
-        <path
-          d="M241.512,21.047h-96.208c-0.017,0-0.033,0-0.05,0H37.609C16.872,21.047,0,37.918,0,58.656v161.809
-		c0,20.738,16.872,37.609,37.609,37.609h203.902c20.738,0,37.609-16.871,37.609-37.609V58.656
-		C279.121,37.918,262.25,21.047,241.512,21.047z M15,220.465V58.656c0-12.467,10.143-22.609,22.609-22.609h95.375L80.597,136.081
-		c-1.217,2.325-1.131,5.117,0.228,7.362c1.358,2.245,3.792,3.617,6.417,3.617h44.82v55.756c-9.79,0.509-19.426-0.318-28.877-2.495
-		c-20.731-4.774-32.857-14.615-33.01-14.741c-3.178-2.641-7.892-2.217-10.545,0.953c-2.659,3.176-2.24,7.906,0.936,10.565
-		c0.579,0.484,14.445,11.93,38.391,17.639c7.571,1.805,16.71,3.141,27.18,3.141c1.93,0,3.907-0.047,5.926-0.144v25.339H37.609
-		C25.143,243.074,15,232.932,15,220.465z M264.121,220.465c0,12.467-10.143,22.609-22.609,22.609h-94.451v-26.943
-		c15.182-2.509,32.242-7.998,50.702-18.222c3.624-2.007,4.934-6.57,2.927-10.194c-2.007-3.622-6.571-4.935-10.195-2.927
-		c-14.697,8.139-29.206,13.545-43.435,16.218v-61.445c0-4.143-3.358-7.5-7.5-7.5H99.635l50.283-96.014h91.594
-		c12.467,0,22.609,10.143,22.609,22.609V220.465z"
-        />
-        <path
-          d="M194.129,67.377c-4.142,0-7.5,3.357-7.5,7.5v33.972c0,4.143,3.358,7.5,7.5,7.5s7.5-3.357,7.5-7.5
-		V74.877C201.629,70.734,198.271,67.377,194.129,67.377z"
-        />
-        <path
-          d="M65.379,116.349c4.142,0,7.5-3.357,7.5-7.5V74.877c0-4.143-3.358-7.5-7.5-7.5s-7.5,3.357-7.5,7.5
-		v33.972C57.879,112.991,61.237,116.349,65.379,116.349z"
-        />
-      </g>
-    </svg>
-  )
-}
-
+import { CursorIcon, FinderIcon, VSCodeIcon } from '../../icons'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
   PaletteAPI,
@@ -87,16 +38,24 @@ export function createActionsMode(
   // Terminal actions
   if (terminal) {
     const isPinned = pinnedTerminalSessions.includes(terminal.id)
+    const { preferredIDE } = data
 
     const items: PaletteItem[] = []
 
-    // Open in Cursor (non-SSH only)
+    // Open in IDE (non-SSH only)
     if (!terminal.ssh_host) {
+      const ideLabel = preferredIDE === 'vscode' ? 'VS Code' : 'Cursor'
+      const ideIcon =
+        preferredIDE === 'vscode' ? (
+          <VSCodeIcon className="h-4 w-4 shrink-0 text-zinc-400" />
+        ) : (
+          <CursorIcon className="h-4 w-4 shrink-0 text-zinc-400" />
+        )
       items.push({
-        id: 'action:cursor',
-        label: 'Open in Cursor',
-        icon: <CursorIcon className="h-4 w-4 shrink-0 text-zinc-400" />,
-        onSelect: () => actions.openInCursor(terminal),
+        id: 'action:ide',
+        label: `Open in ${ideLabel}`,
+        icon: ideIcon,
+        onSelect: () => actions.openInIDE(terminal),
       })
     }
 

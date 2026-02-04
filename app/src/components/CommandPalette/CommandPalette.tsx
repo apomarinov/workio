@@ -5,6 +5,7 @@ import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useSettings } from '@/hooks/useSettings'
 import {
   checkoutBranch,
   deleteBranch,
@@ -80,6 +81,7 @@ export function CommandPalette() {
     deleteSession,
   } = useSessionContext()
   const { gitDirtyStatus } = useProcessContext()
+  const { settings } = useSettings()
 
   // Pin state (shared localStorage keys with sidebar)
   const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
@@ -276,6 +278,7 @@ export function CommandPalette() {
   }, [terminals, branchToPR])
 
   // Build app data
+  const preferredIDE = settings?.preferred_ide ?? 'cursor'
   const appData: AppData = useMemo(
     () => ({
       terminals,
@@ -285,6 +288,7 @@ export function CommandPalette() {
       gitDirtyStatus,
       pinnedTerminalSessions,
       pinnedSessions,
+      preferredIDE,
     }),
     [
       terminals,
@@ -294,6 +298,7 @@ export function CommandPalette() {
       gitDirtyStatus,
       pinnedTerminalSessions,
       pinnedSessions,
+      preferredIDE,
     ],
   )
 
@@ -346,8 +351,9 @@ export function CommandPalette() {
       },
 
       // Terminal actions
-      openInCursor: (terminal) => {
-        window.open(`cursor://file/${terminal.cwd}`, '_blank')
+      openInIDE: (terminal) => {
+        const url = `${preferredIDE}://file/${terminal.cwd}`
+        window.open(url, '_blank')
         closePalette()
       },
       openInExplorer: async (terminal) => {
@@ -568,6 +574,7 @@ export function CommandPalette() {
       setPinnedSessions,
       currentLevel,
       api,
+      preferredIDE,
     ],
   )
 
