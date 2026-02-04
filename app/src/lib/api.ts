@@ -458,3 +458,26 @@ export async function testWebhook(owner: string, repo: string): Promise<void> {
     throw new Error(data.error || 'Failed to test webhook')
   }
 }
+
+// Notifications
+
+import type { Notification } from '../types'
+
+export async function getNotifications(
+  limit = 50,
+  offset = 0,
+): Promise<{ notifications: Notification[]; total: number }> {
+  const res = await fetch(
+    `${API_BASE}/notifications?limit=${limit}&offset=${offset}`,
+  )
+  if (!res.ok) throw new Error('Failed to fetch notifications')
+  return res.json()
+}
+
+export async function markAllNotificationsRead(): Promise<{ count: number }> {
+  const res = await fetch(`${API_BASE}/notifications/mark-all-read`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to mark notifications as read')
+  return res.json()
+}

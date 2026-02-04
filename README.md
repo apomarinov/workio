@@ -17,12 +17,16 @@ A developer dashboard that brings together your projects, temrinals, Claude AI s
   - view all ports running in your terminal
   - open your project in Cursor
 - **GitHub PRs**
+  - webhook integration for updates
   - view PR status of the current branch in your project
   - view PR list of all the repos you have projects in
   - view reviews, comments, running/failed checks
   - re request reviews from change requests
   - re run failed checks
   - merge PRs
+- **Git**
+  - changes badge
+  - pull/push branches
 - **Claude**
   - view all running Claude sessions on your system
   - view sessions started in your projects
@@ -36,7 +40,7 @@ A developer dashboard that brings together your projects, temrinals, Claude AI s
 - **Zellij Tweaks**
   - copy to clipboard of multipage selection in panes
   - detect running processes in tabs
-  - use project name for session name
+  - uses project name for session name
 - **Keyboard Shortcuts**
 - **PWA Ready**
 

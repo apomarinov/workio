@@ -46,6 +46,7 @@ import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
 import { OlderMergedPRsList } from './MergedPRsList'
+import { NotificationList } from './NotificationList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
@@ -104,8 +105,9 @@ export function Sidebar({ width }: SidebarProps) {
     mergedPRs,
     hasNewActivity,
     markPRSeen,
-    markAllPRsSeen,
     hasAnyUnseenPRs,
+    hasNotifications,
+    hasUnreadNotifications,
     activePR,
     setActivePR,
   } = useTerminalContext()
@@ -487,9 +489,9 @@ export function Sidebar({ width }: SidebarProps) {
             <Plus className="w-4 h-4" />
           </Button>
         </div>
-        {width !== undefined && width < 220 ? (
+        {width !== undefined && width < 250 ? (
           <div className="flex items-center gap-1">
-            {hasAnyUnseenPRs && (
+            {hasNotifications && (
               <Popover open={bellOpen} onOpenChange={setBellOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -499,19 +501,13 @@ export function Sidebar({ width }: SidebarProps) {
                     title="Notifications"
                   >
                     <Bell className="w-4 h-4" />
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
+                    {(hasAnyUnseenPRs || hasUnreadNotifications) && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
+                    )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-40 p-1" align="end">
-                  <button
-                    onClick={() => {
-                      markAllPRsSeen()
-                      setBellOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                  >
-                    Mark all as read
-                  </button>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <NotificationList />
                 </PopoverContent>
               </Popover>
             )}
@@ -544,9 +540,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Projects
@@ -556,9 +551,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -568,9 +562,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -633,9 +626,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Projects
@@ -645,9 +637,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -657,9 +648,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -697,6 +687,26 @@ export function Sidebar({ width }: SidebarProps) {
                 <PictureInPicture2 className="w-4 h-4" />
               </Button>
             )}
+            {hasNotifications && (
+              <Popover open={bellOpen} onOpenChange={setBellOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 relative"
+                    title="Notifications"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {(hasAnyUnseenPRs || hasUnreadNotifications) && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <NotificationList />
+                </PopoverContent>
+              </Popover>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -709,32 +719,6 @@ export function Sidebar({ width }: SidebarProps) {
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
               )}
             </Button>
-            {hasAnyUnseenPRs && (
-              <Popover open={bellOpen} onOpenChange={setBellOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 relative"
-                    title="Notifications"
-                  >
-                    <Bell className="w-4 h-4" />
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-40 p-1" align="end">
-                  <button
-                    onClick={() => {
-                      markAllPRsSeen()
-                      setBellOpen(false)
-                    }}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                  >
-                    Mark all as read
-                  </button>
-                </PopoverContent>
-              </Popover>
-            )}
           </div>
         )}
       </div>
@@ -824,8 +808,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button

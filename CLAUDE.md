@@ -31,6 +31,13 @@
   }
   ```
 
+## Types
+
+- Define types/interfaces once in designated files, then import where needed.
+- Client types: `src/types.ts`
+- Shared types (client + server): `shared/types.ts`
+- Never duplicate type definitions across multiple files.
+
 ## UI
 
 - Always use available shadcn components from `src/components/ui/` (Dialog, Button, Input, Popover, Card, Switch, etc.).

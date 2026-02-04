@@ -60,6 +60,12 @@ interface TerminalContextValue {
   hasAnyUnseenPRs: boolean
   activePR: PRCheckStatus | null
   setActivePR: (pr: PRCheckStatus | null) => void
+  // Notifications
+  notifications: Notification[]
+  hasNotifications: boolean
+  hasUnreadNotifications: boolean
+  clearAllNotifications: () => Promise<void>
+  clearingNotifications: boolean
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -344,6 +350,64 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [githubPRs, prSeenTimes],
   )
 
+  // Notifications
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [clearingNotifications, setClearingNotifications] = useState(false)
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    let cancelled = false
+    async function fetchNotifications() {
+      try {
+        const result = await api.getNotifications()
+        if (!cancelled) {
+          setNotifications(result.notifications)
+        }
+      } catch {
+        // silently fail
+      }
+    }
+    fetchNotifications()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Listen for new notifications from socket
+  useEffect(() => {
+    return subscribe<Notification>('notifications:new', (notification) => {
+      setNotifications((prev) => {
+        // Check if notification already exists (by dedup_hash or id)
+        const exists = prev.some(
+          (n) =>
+            (n.dedup_hash && n.dedup_hash === notification.dedup_hash) ||
+            n.id === notification.id,
+        )
+        if (exists) return prev
+        return [notification, ...prev]
+      })
+    })
+  }, [subscribe])
+
+  const hasNotifications = notifications.length > 0
+
+  const hasUnreadNotifications = useMemo(
+    () => notifications.some((n) => !n.read),
+    [notifications],
+  )
+
+  const clearAllNotifications = useCallback(async () => {
+    setClearingNotifications(true)
+    try {
+      await api.markAllNotificationsRead()
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      // Also mark all PRs as seen
+      markAllPRsSeen()
+    } finally {
+      setClearingNotifications(false)
+    }
+  }, [markAllPRsSeen])
+
   // Fetch merged PRs for all repos
   const [mergedPRs, setMergedPRs] = useState<MergedPRSummary[]>([])
 
@@ -493,6 +557,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasAnyUnseenPRs,
       activePR,
       setActivePR,
+      notifications,
+      hasNotifications,
+      hasUnreadNotifications,
+      clearAllNotifications,
+      clearingNotifications,
     }),
     [
       terminals,
@@ -512,6 +581,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markAllPRsSeen,
       hasAnyUnseenPRs,
       activePR,
+      notifications,
+      hasNotifications,
+      hasUnreadNotifications,
+      clearAllNotifications,
+      clearingNotifications,
     ],
   )
 

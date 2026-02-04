@@ -6,7 +6,7 @@ import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
 import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
-import { initDb } from './db'
+import { getNotifications, initDb, markAllNotificationsRead } from './db'
 import { env } from './env'
 import {
   addPRComment,
@@ -365,6 +365,20 @@ fastify.post<{
     return reply.status(500).send({ error: result.error })
   }
   return { ok: true }
+})
+
+// Notifications
+fastify.get<{
+  Querystring: { limit?: string; offset?: string }
+}>('/api/notifications', async (request) => {
+  const limit = Math.min(Number(request.query.limit) || 50, 100)
+  const offset = Number(request.query.offset) || 0
+  return getNotifications(limit, offset)
+})
+
+fastify.post('/api/notifications/mark-all-read', async () => {
+  const count = await markAllNotificationsRead()
+  return { count }
 })
 
 // Routes
