@@ -103,14 +103,10 @@ export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
       >
         {loading && prs.length === 0 ? (
           <Loader2 className="w-3 h-3 animate-spin" />
+        ) : expanded ? (
+          <ChevronDown className="w-3 h-3 flex-shrink-0" />
         ) : (
-          <>
-            {expanded ? (
-              <ChevronDown className="w-3 h-3 flex-shrink-0" />
-            ) : (
-              <ChevronRight className="w-3 h-3 flex-shrink-0" />
-            )}
-          </>
+          <ChevronRight className="w-3 h-3 flex-shrink-0" />
         )}
         <GitMerge className="w-3 h-3" />
         <span>Older merged PRs</span>
