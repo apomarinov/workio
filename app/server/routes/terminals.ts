@@ -1,23 +1,39 @@
-import { execFile, execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
 
 // Walk up the process tree to find the parent macOS .app (e.g. Terminal, iTerm2, VS Code)
-function getParentAppName(): string | null {
+async function getParentAppName(): Promise<string | null> {
   if (process.platform !== 'darwin') return null
   try {
     let pid = process.ppid
     while (pid > 1) {
-      const comm = execFileSync('ps', ['-o', 'comm=', '-p', String(pid)], {
-        encoding: 'utf-8',
-      }).trim()
+      const comm = await new Promise<string>((resolve, reject) => {
+        execFile(
+          'ps',
+          ['-o', 'comm=', '-p', String(pid)],
+          { encoding: 'utf-8' },
+          (err, stdout) => {
+            if (err) reject(err)
+            else resolve(stdout.trim())
+          },
+        )
+      })
       const match = comm.match(/\/([^/]+)\.app\//)
       if (match) return match[1]
-      const ppidStr = execFileSync('ps', ['-o', 'ppid=', '-p', String(pid)], {
-        encoding: 'utf-8',
-      }).trim()
+      const ppidStr = await new Promise<string>((resolve, reject) => {
+        execFile(
+          'ps',
+          ['-o', 'ppid=', '-p', String(pid)],
+          { encoding: 'utf-8' },
+          (err, stdout) => {
+            if (err) reject(err)
+            else resolve(stdout.trim())
+          },
+        )
+      })
       pid = Number.parseInt(ppidStr, 10)
       if (Number.isNaN(pid)) break
     }
@@ -25,7 +41,14 @@ function getParentAppName(): string | null {
   return null
 }
 
-const parentAppName = getParentAppName()
+// Lazily cached parent app name
+let parentAppNamePromise: Promise<string | null> | null = null
+function getParentAppNameCached(): Promise<string | null> {
+  if (!parentAppNamePromise) {
+    parentAppNamePromise = getParentAppName()
+  }
+  return parentAppNamePromise
+}
 
 // Expand ~ to home directory
 function expandPath(p: string): string {
@@ -255,9 +278,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             const isPermissionError =
               err instanceof Error &&
               (err as NodeJS.ErrnoException).code === 'EPERM'
+            const appName = isPermissionError
+              ? await getParentAppNameCached()
+              : null
             results[rawPath] = {
               error: isPermissionError
-                ? `permission_denied:${parentAppName ?? ''}`
+                ? `permission_denied:${appName ?? ''}`
                 : err instanceof Error
                   ? err.message
                   : 'Failed to list directory',
@@ -469,18 +495,18 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       // Expand ~ to home directory
       const cwd = expandPath(rawCwd.trim())
 
-      if (!fs.existsSync(cwd)) {
+      try {
+        const stat = await fs.promises.stat(cwd)
+        if (!stat.isDirectory()) {
+          return reply.status(400).send({ error: 'Path is not a directory' })
+        }
+      } catch {
         return reply.status(400).send({ error: 'Directory does not exist' })
-      }
-
-      const stat = fs.statSync(cwd)
-      if (!stat.isDirectory()) {
-        return reply.status(400).send({ error: 'Path is not a directory' })
       }
 
       // Check read and execute permissions (needed to cd into and list directory)
       try {
-        fs.accessSync(cwd, fs.constants.R_OK | fs.constants.X_OK)
+        await fs.promises.access(cwd, fs.constants.R_OK | fs.constants.X_OK)
       } catch {
         return reply
           .status(403)

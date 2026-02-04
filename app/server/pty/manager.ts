@@ -73,12 +73,16 @@ const lastRemoteSyncStatus = new Map<
 // Terminal name file helpers for dynamic zellij session naming
 const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
 
-export function writeTerminalNameFile(terminalId: number, name: string): void {
+export async function writeTerminalNameFile(
+  terminalId: number,
+  name: string,
+): Promise<void> {
   try {
-    if (!fs.existsSync(WORKIO_TERMINALS_DIR)) {
-      fs.mkdirSync(WORKIO_TERMINALS_DIR, { recursive: true })
-    }
-    fs.writeFileSync(path.join(WORKIO_TERMINALS_DIR, String(terminalId)), name)
+    await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
+    await fs.promises.writeFile(
+      path.join(WORKIO_TERMINALS_DIR, String(terminalId)),
+      name,
+    )
   } catch (err) {
     log.error(
       { err },
@@ -663,7 +667,9 @@ export async function createSession(
   } else {
     // --- Local terminal ---
     // Validate cwd exists
-    if (!fs.existsSync(terminal.cwd)) {
+    try {
+      await fs.promises.access(terminal.cwd)
+    } catch {
       log.error(`[pty] Working directory does not exist: ${terminal.cwd}`)
       return null
     }
@@ -672,16 +678,32 @@ export async function createSession(
     const settings = await getSettings()
     let shell = terminal.shell || settings.default_shell
 
+    // Helper to check if a path exists
+    const exists = async (p: string) => {
+      try {
+        await fs.promises.access(p)
+        return true
+      } catch {
+        return false
+      }
+    }
+
     // Fallback to environment shell if specified shell doesn't exist
-    if (!fs.existsSync(shell)) {
+    if (!(await exists(shell))) {
       const envShell = process.env.SHELL
-      if (envShell && fs.existsSync(envShell)) {
+      if (envShell && (await exists(envShell))) {
         log.warn(`[pty] Shell ${shell} not found, falling back to ${envShell}`)
         shell = envShell
       } else {
         // Last resort fallback
         const fallbacks = ['/bin/zsh', '/bin/bash', '/bin/sh']
-        const found = fallbacks.find((s) => fs.existsSync(s))
+        let found: string | undefined
+        for (const s of fallbacks) {
+          if (await exists(s)) {
+            found = s
+            break
+          }
+        }
         if (found) {
           log.warn(`[pty] Shell ${shell} not found, falling back to ${found}`)
           shell = found
@@ -810,55 +832,67 @@ export async function createSession(
   // Start global polling if not already running
   startGlobalProcessPolling()
 
-  // Write terminal name file for dynamic zellij session naming
+  // Write terminal name file for dynamic zellij session naming (fire-and-forget)
   const terminalName = terminal.name || `terminal-${terminalId}`
-  writeTerminalNameFile(terminalId, terminalName)
+  writeTerminalNameFile(terminalId, terminalName).catch(() => {})
 
   // wioname function to read current terminal name (for zellij session naming)
   const wionameFunc = `wioname() { cat "${WORKIO_TERMINALS_DIR}/${terminalId}" 2>/dev/null || echo "terminal-${terminalId}"; }`
 
   if (terminal.ssh_host) {
     // Inject shell integration for SSH terminals inline via heredoc
-    try {
-      const inlineScript = fs.readFileSync(
-        path.join(__dirname, 'shell-integration', 'ssh-inline.sh'),
-        'utf-8',
-      )
-      setTimeout(() => {
-        // Use heredoc + eval so the script is interpreted with real newlines
-        const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
-        backend.write(injection)
-        backend.write(`${wionameFunc}\n`)
-        if (terminal.cwd && terminal.cwd !== '~') {
-          backend.write(`cd ${terminal.cwd}\n`)
-        }
-        backend.write("printf '\\033c\\x1b[1;1H'\n")
-        backend.write('clear\n')
-      }, 200)
-    } catch (err) {
-      log.error({ err }, '[pty] Failed to inject SSH shell integration')
-      // Still cd into cwd even if integration fails
-      if (terminal.cwd && terminal.cwd !== '~') {
+    const sshScriptPath = path.join(
+      __dirname,
+      'shell-integration',
+      'ssh-inline.sh',
+    )
+    fs.promises
+      .readFile(sshScriptPath, 'utf-8')
+      .then((inlineScript) => {
         setTimeout(() => {
-          backend.write(`cd ${terminal.cwd}\n`)
+          // Use heredoc + eval so the script is interpreted with real newlines
+          const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
+          backend.write(injection)
+          backend.write(`${wionameFunc}\n`)
+          if (terminal.cwd && terminal.cwd !== '~') {
+            backend.write(`cd ${terminal.cwd}\n`)
+          }
+          backend.write("printf '\\033c\\x1b[1;1H'\n")
+          backend.write('clear\n')
         }, 200)
-      }
-    }
+      })
+      .catch((err) => {
+        log.error({ err }, '[pty] Failed to inject SSH shell integration')
+        // Still cd into cwd even if integration fails
+        if (terminal.cwd && terminal.cwd !== '~') {
+          setTimeout(() => {
+            backend.write(`cd ${terminal.cwd}\n`)
+          }, 200)
+        }
+      })
   } else {
     // Inject shell integration for local terminals via source
     const shellSettings = await getSettings()
     const shell = terminal.shell || shellSettings.default_shell || '/bin/bash'
+    const shellName = path.basename(shell)
+    let integrationScript: string | null = null
+
+    if (shellName === 'zsh') {
+      integrationScript = path.join(__dirname, 'shell-integration', 'zsh.sh')
+    } else if (shellName === 'bash') {
+      integrationScript = path.join(__dirname, 'shell-integration', 'bash.sh')
+    }
+
+    // Check if integration script exists before the timeout
+    const scriptExists = integrationScript
+      ? await fs.promises
+          .access(integrationScript)
+          .then(() => true)
+          .catch(() => false)
+      : false
+
     setTimeout(() => {
-      const shellName = path.basename(shell)
-      let integrationScript: string | null = null
-
-      if (shellName === 'zsh') {
-        integrationScript = path.join(__dirname, 'shell-integration', 'zsh.sh')
-      } else if (shellName === 'bash') {
-        integrationScript = path.join(__dirname, 'shell-integration', 'bash.sh')
-      }
-
-      if (integrationScript && fs.existsSync(integrationScript)) {
+      if (integrationScript && scriptExists) {
         // Source the integration silently, then reset and position cursor at top
         backend.write(
           `source "${integrationScript}"; ${wionameFunc}; printf '\\033c\\x1b[1;1H'\n`,

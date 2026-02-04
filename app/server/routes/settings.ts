@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import type { FastifyInstance } from 'fastify'
 import type { Settings } from '../../src/types'
 import { getAllTerminals, getSettings, updateSettings } from '../db'
@@ -61,9 +61,16 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
 
       // Verify shell exists if provided
       if (updates.default_shell) {
-        try {
-          execSync(`command -v ${updates.default_shell}`, { stdio: 'pipe' })
-        } catch {
+        const shellExists = await new Promise<boolean>((resolve) => {
+          execFile(
+            'sh',
+            ['-c', `command -v ${updates.default_shell}`],
+            (err) => {
+              resolve(!err)
+            },
+          )
+        })
+        if (!shellExists) {
           return reply
             .status(400)
             .send({ error: `Shell not found: ${updates.default_shell}` })

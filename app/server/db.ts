@@ -369,15 +369,18 @@ export async function updateTerminal(
   // Handle name change: update file and rename zellij session
   if (updates.name !== undefined) {
     const newName = updates.name
-    // Write new name to file
-    try {
-      if (!fs.existsSync(WORKIO_TERMINALS_DIR)) {
-        fs.mkdirSync(WORKIO_TERMINALS_DIR, { recursive: true })
+    // Write new name to file (fire-and-forget async)
+    ;(async () => {
+      try {
+        await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
+        await fs.promises.writeFile(
+          path.join(WORKIO_TERMINALS_DIR, String(id)),
+          newName,
+        )
+      } catch (err) {
+        log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
       }
-      fs.writeFileSync(path.join(WORKIO_TERMINALS_DIR, String(id)), newName)
-    } catch (err) {
-      log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
-    }
+    })()
     // Rename zellij session if it exists
     if (oldName && oldName !== newName) {
       execFile(
