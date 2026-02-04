@@ -9,6 +9,7 @@ import {
   checkoutBranch,
   deleteBranch,
   getBranches,
+  openInExplorer,
   pullBranch,
   pushBranch,
   rebaseBranch,
@@ -347,6 +348,16 @@ export function CommandPalette() {
       // Terminal actions
       openInCursor: (terminal) => {
         window.open(`cursor://file/${terminal.cwd}`, '_blank')
+        closePalette()
+      },
+      openInExplorer: async (terminal) => {
+        try {
+          await openInExplorer(terminal.cwd)
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to open file explorer',
+          )
+        }
         closePalette()
       },
       openPR: (pr) => {

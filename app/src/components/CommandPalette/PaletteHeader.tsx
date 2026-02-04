@@ -36,10 +36,11 @@ export function PaletteHeader({
             <button
               type="button"
               onClick={handleClick}
-              className={`truncate text-sm max-w-[160px] ${isClickable
-                ? 'text-zinc-400 hover:text-zinc-200 cursor-pointer'
-                : 'text-zinc-500 cursor-default'
-                }`}
+              className={`truncate text-sm max-w-[160px] ${
+                isClickable
+                  ? 'text-zinc-400 hover:text-zinc-200 cursor-pointer'
+                  : 'text-zinc-500 cursor-default'
+              }`}
             >
               {crumb}
             </button>

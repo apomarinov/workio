@@ -30,6 +30,7 @@ export type AppActions = {
 
   // Terminal actions
   openInCursor: (terminal: Terminal) => void
+  openInExplorer: (terminal: Terminal) => void
   openPR: (pr: PRCheckStatus) => void
   addWorkspace: (terminal: Terminal) => void
   openEditModal: (terminal: Terminal) => void

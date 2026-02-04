@@ -196,6 +196,31 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     })
   })
 
+  // Open directory in native file explorer (Finder on macOS, xdg-open on Linux)
+  fastify.post<{ Body: { path: string } }>(
+    '/api/open-in-explorer',
+    async (request, reply) => {
+      const { path: rawPath } = request.body
+      if (!rawPath) {
+        return reply.status(400).send({ error: 'Path is required' })
+      }
+
+      const targetPath = expandPath(rawPath)
+      const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
+
+      return new Promise<void>((resolve) => {
+        execFile(cmd, [targetPath], (err) => {
+          if (err) {
+            reply.status(500).send({ error: 'Failed to open file explorer' })
+          } else {
+            reply.status(204).send()
+          }
+          resolve()
+        })
+      })
+    },
+  )
+
   // List directory contents for the column browser
   fastify.post<{ Body: ListDirectoriesBody }>(
     '/api/list-directories',
