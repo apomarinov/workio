@@ -461,13 +461,15 @@ export interface Notification {
 export async function insertNotification(
   type: string,
   repo: string,
-  prNumber: number,
   data: Record<string, unknown>,
   dedupExtra?: string,
+  prNumber?: number,
 ): Promise<Notification | null> {
-  // Create dedup hash from type + repo + prNumber + optional extra
+  // Create dedup hash from type + repo + optional prNumber + optional extra
   const crypto = await import('node:crypto')
-  const dedupSource = `${type}:${repo}:${prNumber}${dedupExtra ? `:${dedupExtra}` : ''}`
+  const dedupSource = prNumber
+    ? `${type}:${repo}:${prNumber}${dedupExtra ? `:${dedupExtra}` : ''}`
+    : `${type}:${repo}${dedupExtra ? `:${dedupExtra}` : ''}`
   const dedupHash = crypto
     .createHash('sha256')
     .update(dedupSource)

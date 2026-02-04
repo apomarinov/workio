@@ -130,30 +130,13 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe, mutate])
 
-  // Handle workspace setup/archive events (merge state without refetching)
+  // Handle terminal:workspace events for state updates
+  // (Browser notifications for workspace events are handled via notifications:new)
   useEffect(() => {
     return subscribe<WorkspacePayload>('terminal:workspace', (data) => {
       if (data.deleted) {
-        sendNotificationRef.current(`✅ ${data.name} deleted`, {
-          audio: 'pr-activity',
-        })
         mutate((prev) => prev?.filter((t) => t.id !== data.terminalId), false)
         return
-      }
-      if (data.setup?.status === 'done') {
-        sendNotificationRef.current(`✅ ${data.name} is ready`, {
-          audio: 'pr-activity',
-        })
-      }
-      if (data.setup?.status === 'failed') {
-        sendNotificationRef.current(`❌ ${data.name} failed`, {
-          audio: 'error',
-        })
-      }
-      if (data.git_repo?.status === 'failed') {
-        sendNotificationRef.current(`❌ ${data.name} failed repo init`, {
-          audio: 'error',
-        })
       }
       mutate(
         (prev) =>
@@ -295,6 +278,31 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           )
           break
         }
+
+        // Workspace notifications (state updates handled by terminal:workspace handler)
+        case 'workspace_deleted':
+          sendNotificationRef.current(`✅ ${data.name} deleted`, {
+            audio: 'pr-activity',
+          })
+          break
+
+        case 'workspace_ready':
+          sendNotificationRef.current(`✅ ${data.name} is ready`, {
+            audio: 'pr-activity',
+          })
+          break
+
+        case 'workspace_failed':
+          sendNotificationRef.current(`❌ ${data.name} failed`, {
+            audio: 'error',
+          })
+          break
+
+        case 'workspace_repo_failed':
+          sendNotificationRef.current(`❌ ${data.name} repo init failed`, {
+            audio: 'error',
+          })
+          break
       }
     })
   }, [subscribe])

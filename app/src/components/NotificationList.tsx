@@ -4,6 +4,7 @@ import {
   Loader2,
   MessageSquare,
   RefreshCw,
+  Terminal,
   XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,13 @@ function getNotificationIcon(type: string) {
     case 'new_comment':
     case 'new_review':
       return <MessageSquare className="w-4 h-4 text-blue-500" />
+    // Workspace notifications
+    case 'workspace_ready':
+    case 'workspace_deleted':
+      return <Terminal className="w-4 h-4 text-green-500" />
+    case 'workspace_failed':
+    case 'workspace_repo_failed':
+      return <Terminal className="w-4 h-4 text-red-500" />
     default:
       return <MessageSquare className="w-4 h-4 text-muted-foreground" />
   }
@@ -62,23 +70,33 @@ function getNotificationTitle(notification: Notification): string {
       return data.author ? `${data.author} commented` : 'New comment'
     case 'new_review':
       return data.author ? `${data.author} reviewed` : 'New review'
+    // Workspace notifications
+    case 'workspace_ready':
+      return `${data.name || 'Workspace'} is ready`
+    case 'workspace_deleted':
+      return `${data.name || 'Workspace'} deleted`
+    case 'workspace_failed':
+      return `${data.name || 'Workspace'} failed`
+    case 'workspace_repo_failed':
+      return `${data.name || 'Workspace'} repo init failed`
     default:
       return type
   }
 }
 
 function NotificationItem({ notification }: { notification: Notification }) {
-  const { data, created_at, read } = notification
+  const { type, data, created_at, read } = notification
   const title = getNotificationTitle(notification)
-  const prTitle = data.prTitle || ''
+  const isWorkspace = type.startsWith('workspace_')
 
   const handleClick = () => {
+    if (isWorkspace) return // No URL to open for workspace notifications
     const url =
-      notification.type === 'check_failed'
+      type === 'check_failed'
         ? data.checkUrl || data.prUrl
-        : notification.type === 'new_comment'
+        : type === 'new_comment'
           ? data.commentUrl || data.prUrl
-          : notification.type === 'new_review' && data.reviewId
+          : type === 'new_review' && data.reviewId
             ? `${data.prUrl}#pullrequestreview-${data.reviewId}`
             : data.prUrl
     if (url) {
@@ -89,17 +107,15 @@ function NotificationItem({ notification }: { notification: Notification }) {
   return (
     <button
       onClick={handleClick}
-      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent cursor-pointer flex items-center gap-1.5 ${
+      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-center gap-1.5 ${
         read ? 'opacity-60' : ''
-      }`}
+      } ${isWorkspace ? 'cursor-default' : 'cursor-pointer'}`}
     >
-      <div className="flex-shrink-0">
-        {getNotificationIcon(notification.type)}
-      </div>
+      <div className="flex-shrink-0">{getNotificationIcon(type)}</div>
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{title}</div>
         <div className="text-xs text-muted-foreground truncate">
-          {prTitle ? `${prTitle} · ` : ''}
+          {data.prTitle ? `${data.prTitle} · ` : ''}
           {formatRelativeTime(created_at)}
         </div>
       </div>

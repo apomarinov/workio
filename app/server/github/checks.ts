@@ -288,7 +288,7 @@ function fetchOpenPRs(
                 // If reviewer has a pending re-review request, mark as PENDING
                 state:
                   r.state === 'CHANGES_REQUESTED' &&
-                  pendingReviewers.has(r.author.login)
+                    pendingReviewers.has(r.author.login)
                     ? 'PENDING'
                     : r.state,
                 body: r.body || '',
@@ -1177,8 +1177,9 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       const notification = await insertNotification(
         'pr_merged',
         pr.repo,
-        pr.prNumber,
         { prTitle: pr.prTitle, prUrl: pr.prUrl },
+        undefined,
+        pr.prNumber,
       )
       if (notification) {
         io?.emit('notifications:new', notification)
@@ -1205,7 +1206,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       const notification = await insertNotification(
         'check_failed',
         pr.repo,
-        pr.prNumber,
         {
           prTitle: pr.prTitle,
           prUrl: pr.prUrl,
@@ -1213,6 +1213,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           checkUrl: failedCheck?.detailsUrl,
         },
         failedCheck?.detailsUrl || failedCheck?.name,
+        pr.prNumber,
       )
       if (notification) {
         io?.emit('notifications:new', notification)
@@ -1232,9 +1233,9 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'changes_requested',
           pr.repo,
-          pr.prNumber,
           { prTitle: pr.prTitle, prUrl: pr.prUrl, reviewer },
           reviewer,
+          pr.prNumber,
         )
         if (notification) {
           io?.emit('notifications:new', notification)
@@ -1253,9 +1254,9 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'pr_approved',
           pr.repo,
-          pr.prNumber,
           { prTitle: pr.prTitle, prUrl: pr.prUrl, approver },
           approver,
+          pr.prNumber,
         )
         if (notification) {
           io?.emit('notifications:new', notification)
@@ -1276,7 +1277,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'new_comment',
           pr.repo,
-          pr.prNumber,
           {
             prTitle: pr.prTitle,
             prUrl: pr.prUrl,
@@ -1287,6 +1287,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           comment.id
             ? String(comment.id)
             : `${comment.author}:${comment.createdAt}`,
+          pr.prNumber,
         )
         if (notification) {
           io?.emit('notifications:new', notification)
@@ -1307,7 +1308,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'new_review',
           pr.repo,
-          pr.prNumber,
           {
             prTitle: pr.prTitle,
             prUrl: pr.prUrl,
@@ -1317,6 +1317,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
             reviewId: review.id,
           },
           review.id ? String(review.id) : `${review.author}:${review.state}`,
+          pr.prNumber,
         )
         if (notification) {
           io?.emit('notifications:new', notification)

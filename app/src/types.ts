@@ -259,6 +259,7 @@ export interface HiddenGHAuthor {
 }
 
 export interface NotificationData {
+  // PR fields
   prTitle?: string
   prUrl?: string
   reviewer?: string
@@ -270,6 +271,12 @@ export interface NotificationData {
   checkUrl?: string
   state?: string
   reviewId?: string
+  // Workspace fields
+  terminalId?: number
+  name?: string // workspace name
+  deleted?: boolean
+  git_repo?: GitRepoStatus
+  setup?: SetupStatus
 }
 
 export interface Notification {

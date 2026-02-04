@@ -4,7 +4,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { deleteTerminal, getTerminalById, updateTerminal } from '../db'
+import {
+  deleteTerminal,
+  getTerminalById,
+  insertNotification,
+  updateTerminal,
+} from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
 import {
@@ -224,11 +229,53 @@ function cloneUrl(repo: string): string {
   return `git@github.com:${repo}.git`
 }
 
-export function emitWorkspace(
+export async function emitWorkspace(
   terminalId: number,
   payload: Record<string, unknown>,
-): void {
-  getIO()?.emit('terminal:workspace', { terminalId, ...payload })
+): Promise<void> {
+  const io = getIO()
+
+  // Always emit terminal:workspace for client state updates
+  io?.emit('terminal:workspace', { terminalId, ...payload })
+
+  // Determine notification type based on payload state
+  let notificationType: string | null = null
+  if (payload.deleted) {
+    notificationType = 'workspace_deleted'
+  } else if (
+    payload.setup &&
+    typeof payload.setup === 'object' &&
+    'status' in payload.setup
+  ) {
+    const setup = payload.setup as { status: string }
+    if (setup.status === 'done') {
+      notificationType = 'workspace_ready'
+    } else if (setup.status === 'failed') {
+      notificationType = 'workspace_failed'
+    }
+  } else if (
+    payload.git_repo &&
+    typeof payload.git_repo === 'object' &&
+    'status' in payload.git_repo
+  ) {
+    const gitRepo = payload.git_repo as { status: string }
+    if (gitRepo.status === 'failed') {
+      notificationType = 'workspace_repo_failed'
+    }
+  }
+
+  // Additionally insert notification for terminal states that need it
+  if (notificationType) {
+    const notification = await insertNotification(
+      notificationType,
+      'workspace', // Use 'workspace' as repo for workspace notifications
+      { terminalId, ...payload },
+      `${terminalId}:${notificationType}`, // Dedup by terminalId + type
+    )
+    if (notification) {
+      io?.emit('notifications:new', notification)
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +556,7 @@ export async function setupTerminalWorkspace(
     } else {
       await updateTerminal(terminalId, { cwd: targetPath, name: terminalName })
     }
-    emitWorkspace(terminalId, { name: terminalName })
+    await emitWorkspace(terminalId, { name: terminalName })
 
     // Get GitHub username and rename branch
     // gh api runs locally (GitHub API call, gh CLI unlikely on remote)
@@ -542,7 +589,10 @@ export async function setupTerminalWorkspace(
 
     // Mark git_repo as done
     await updateTerminal(terminalId, { git_repo: gitRepoObj })
-    emitWorkspace(terminalId, { name: terminalName, git_repo: gitRepoObj })
+    await emitWorkspace(terminalId, {
+      name: terminalName,
+      git_repo: gitRepoObj,
+    })
 
     // Run setup script if configured — inject into PTY so output is visible
     if (setupObj) {
@@ -566,7 +616,7 @@ export async function setupTerminalWorkspace(
       }
       const doneSetup = { ...setupObj, status: 'done' as const }
       await updateTerminal(terminalId, { setup: doneSetup })
-      emitWorkspace(terminalId, { name: terminalName, setup: doneSetup })
+      await emitWorkspace(terminalId, { name: terminalName, setup: doneSetup })
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -578,7 +628,7 @@ export async function setupTerminalWorkspace(
     if (terminal?.git_repo?.status === 'setup') {
       const failed = gitRepoFailed(errorMsg)
       await updateTerminal(terminalId, { git_repo: failed })
-      emitWorkspace(terminalId, { name: terminalName, git_repo: failed })
+      await emitWorkspace(terminalId, { name: terminalName, git_repo: failed })
     } else if (setupObj) {
       const failedSetup = {
         ...setupObj,
@@ -586,7 +636,10 @@ export async function setupTerminalWorkspace(
         error: errorMsg,
       }
       await updateTerminal(terminalId, { setup: failedSetup })
-      emitWorkspace(terminalId, { name: terminalName, setup: failedSetup })
+      await emitWorkspace(terminalId, {
+        name: terminalName,
+        setup: failedSetup,
+      })
     }
   }
 }
@@ -632,7 +685,7 @@ export async function deleteTerminalWorkspace(
     await deleteTerminal(terminalId)
 
     // Notify clients
-    emitWorkspace(terminalId, { name: terminal.name, deleted: true })
+    await emitWorkspace(terminalId, { name: terminal.name, deleted: true })
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
     log.error(
@@ -645,6 +698,6 @@ export async function deleteTerminalWorkspace(
       error: errorMsg,
     }
     await updateTerminal(terminalId, { setup: failedSetup })
-    emitWorkspace(terminalId, { name: terminal.name, setup: failedSetup })
+    await emitWorkspace(terminalId, { name: terminal.name, setup: failedSetup })
   }
 }
