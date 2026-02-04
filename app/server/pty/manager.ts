@@ -42,6 +42,7 @@ export interface PtySession {
   buffer: string[]
   timeoutId: NodeJS.Timeout | null
   terminalId: number
+  sessionName: string // Zellij session name for process detection
   cols: number
   rows: number
   onData: ((data: string) => void) | null
@@ -125,9 +126,9 @@ async function getProcessesForTerminal(
       })
     }
 
-    // Check Zellij session (terminal-<ID>)
+    // Check Zellij session using actual session name
     const zellijProcs = await getZellijSessionProcesses(
-      `terminal-${terminalId}`,
+      session.sessionName,
       terminalId,
     )
     for (const p of zellijProcs.filter((p) => !p.isIdle)) {
@@ -147,15 +148,13 @@ async function getProcessesForTerminal(
 }
 
 async function getPortsForTerminal(
-  terminalId: number,
   session: PtySession,
   systemPorts: Map<number, number[]>,
 ): Promise<number[]> {
   const shellPid = session.pty.pid
-  const zellijSessionName = `terminal-${terminalId}`
   return await getListeningPortsForTerminal(
     shellPid,
-    zellijSessionName,
+    session.sessionName,
     systemPorts,
   )
 }
@@ -166,7 +165,7 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
 
   const processes = await getProcessesForTerminal(terminalId, session)
   const systemPorts = await getSystemListeningPorts()
-  const ports = await getPortsForTerminal(terminalId, session, systemPorts)
+  const ports = await getPortsForTerminal(session, systemPorts)
   const terminalPorts: Record<number, number[]> = {}
   if (ports.length > 0) {
     terminalPorts[terminalId] = ports
@@ -183,7 +182,7 @@ async function scanAndEmitAllProcesses() {
     const procs = await getProcessesForTerminal(terminalId, session)
     allProcesses.push(...procs)
 
-    const ports = await getPortsForTerminal(terminalId, session, systemPorts)
+    const ports = await getPortsForTerminal(session, systemPorts)
     if (ports.length > 0) {
       terminalPorts[terminalId] = ports
     }
@@ -644,6 +643,9 @@ export async function createSession(
     return null
   }
 
+  // Compute session name for zellij (used for process detection)
+  const terminalName = terminal.name || `terminal-${terminalId}`
+
   let backend: TerminalBackend
 
   if (terminal.ssh_host) {
@@ -740,6 +742,7 @@ export async function createSession(
     buffer: [],
     timeoutId: null,
     terminalId,
+    sessionName: terminalName,
     cols,
     rows,
     onData,
@@ -833,7 +836,6 @@ export async function createSession(
   startGlobalProcessPolling()
 
   // Write terminal name file for dynamic zellij session naming (fire-and-forget)
-  const terminalName = terminal.name || `terminal-${terminalId}`
   writeTerminalNameFile(terminalId, terminalName).catch(() => {})
 
   // wioname function to read current terminal name (for zellij session naming)

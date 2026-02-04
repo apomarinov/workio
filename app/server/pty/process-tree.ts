@@ -270,12 +270,6 @@ export async function getZellijSessionProcesses(
   }
 }
 
-// Check if a Zellij session exists for a terminal
-export async function hasZellijSession(terminalId: number): Promise<boolean> {
-  const sessionName = `terminal-${terminalId}`
-  return (await findZellijServerForSession(sessionName)) !== null
-}
-
 // Get all descendant PIDs of a process (recursive)
 export async function getDescendantPids(pid: number): Promise<Set<number>> {
   const descendants = new Set<number>()
