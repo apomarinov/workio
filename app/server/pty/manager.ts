@@ -126,11 +126,24 @@ async function getProcessesForTerminal(
       })
     }
 
-    // Check Zellij session using actual session name
-    const zellijProcs = await getZellijSessionProcesses(
+    // Check Zellij session - try session name first, then current terminal name from DB
+    // This handles the case where zellij was restarted after a terminal rename
+    let zellijProcs = await getZellijSessionProcesses(
       session.sessionName,
       terminalId,
     )
+    if (zellijProcs.length === 0) {
+      // Try current terminal name from DB (in case zellij restarted with new name)
+      const terminal = await getTerminalById(terminalId)
+      const currentName = terminal?.name || `terminal-${terminalId}`
+      if (currentName !== session.sessionName) {
+        zellijProcs = await getZellijSessionProcesses(currentName, terminalId)
+        // Update session name if we found processes with the new name
+        if (zellijProcs.length > 0) {
+          session.sessionName = currentName
+        }
+      }
+    }
     for (const p of zellijProcs.filter((p) => !p.isIdle)) {
       processes.push({
         pid: 0,
