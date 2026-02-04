@@ -242,7 +242,9 @@ export function TerminalItem({
           )}
           {gitBranch && terminal.setup?.status !== 'delete' && (
             <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <GitBranch className={cn('w-2.5 h-2.5 text-zinc-400')} />
+              <GitBranch
+                className={cn('w-2.5 h-2.5 min-w-2.5 min-h-2.5 text-zinc-400')}
+              />
               {gitBranch}
             </span>
           )}

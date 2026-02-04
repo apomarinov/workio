@@ -107,7 +107,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 onChange={(e) => setDefaultShell(e.target.value)}
                 placeholder="/bin/bash"
                 className="pl-10"
-                autoFocus
               />
             </div>
             <p className="text-xs text-muted-foreground">

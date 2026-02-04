@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -27,6 +27,7 @@ export function RerunChecksModal({
   onSuccess,
 }: RerunChecksModalProps) {
   const [loading, setLoading] = useState(false)
+  const rerunButtonRef = useRef<HTMLButtonElement>(null)
 
   const failedChecks = pr.checks.filter(
     (c) =>
@@ -61,7 +62,12 @@ export function RerunChecksModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          rerunButtonRef.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Re-run Failed Checks</DialogTitle>
           <DialogDescription>
@@ -73,7 +79,7 @@ export function RerunChecksModal({
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleRerun} disabled={loading} autoFocus>
+          <Button ref={rerunButtonRef} onClick={handleRerun} disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Re-run All
           </Button>

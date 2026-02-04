@@ -40,7 +40,6 @@ export function EditSessionModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Session name"
-            autoFocus
           />
           <DialogFooter className="mt-4">
             <Button type="button" variant="ghost" onClick={onCancel}>

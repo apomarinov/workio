@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -37,6 +37,7 @@ export function MergePRModal({
     'squash',
   )
   const [loading, setLoading] = useState(false)
+  const mergeButtonRef = useRef<HTMLButtonElement>(null)
 
   const handleMerge = async () => {
     const [owner, repo] = pr.repo.split('/')
@@ -55,7 +56,12 @@ export function MergePRModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          mergeButtonRef.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Merge Pull Request</DialogTitle>
           <DialogDescription>Merge "{pr.prTitle}"?</DialogDescription>
@@ -79,7 +85,7 @@ export function MergePRModal({
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleMerge} disabled={loading} autoFocus>
+          <Button ref={mergeButtonRef} onClick={handleMerge} disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Merge
           </Button>

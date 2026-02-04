@@ -52,7 +52,6 @@ export function EditTerminalModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Name"
-              autoFocus
             />
           </div>
           <DialogFooter>
