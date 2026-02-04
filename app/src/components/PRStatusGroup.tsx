@@ -33,14 +33,12 @@ export const PRStatusGroup = memo(function PRStatusGroup({
   return (
     <div data-pr-branch={pr.branch}>
       <div
-        onClick={
-          prInfo.isMerged
-            ? undefined
-            : () => {
-                onToggle()
-                onSeen?.()
-              }
-        }
+        onClick={() => {
+          if (!prInfo.isMerged) {
+            onToggle()
+          }
+          onSeen?.()
+        }}
         className={cn(
           'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 transition-colors min-w-0',
           isActive
@@ -49,7 +47,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           !prInfo.isMerged && 'cursor-pointer',
         )}
       >
-        {expanded ? (
+        {expanded && !prInfo.isMerged ? (
           <ChevronDown className="w-4 h-4 flex-shrink-0" />
         ) : prInfo.hasChangesRequested ||
           prInfo.hasRunningChecks ||

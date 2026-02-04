@@ -1,14 +1,49 @@
 import { execSync } from 'node:child_process'
 import type { FastifyInstance } from 'fastify'
 import type { Settings } from '../../src/types'
-import { getSettings, updateSettings } from '../db'
+import { getAllTerminals, getSettings, updateSettings } from '../db'
 
 type UpdateSettingsBody = Partial<Omit<Settings, 'id'>>
 
 export default async function settingsRoutes(fastify: FastifyInstance) {
   // Get settings
   fastify.get('/api/settings', async () => {
-    return await getSettings()
+    const settings = await getSettings()
+    const terminals = await getAllTerminals()
+
+    const repoWebhooks = settings.repo_webhooks ?? {}
+
+    // Get repos from terminals
+    const terminalRepos = new Set<string>()
+    for (const terminal of terminals) {
+      const repo = (terminal.git_repo as { repo?: string } | null)?.repo
+      if (repo) {
+        terminalRepos.add(repo)
+      }
+    }
+
+    // Count missing webhooks (webhooks marked as missing for repos in terminals)
+    let missingWebhookCount = 0
+    for (const repo of terminalRepos) {
+      const webhook = repoWebhooks[repo]
+      if (webhook?.missing) {
+        missingWebhookCount++
+      }
+    }
+
+    // Count orphaned webhooks (webhooks for repos not in any terminal)
+    let orphanedWebhookCount = 0
+    for (const repo of Object.keys(repoWebhooks)) {
+      if (!terminalRepos.has(repo)) {
+        orphanedWebhookCount++
+      }
+    }
+
+    return {
+      ...settings,
+      missingWebhookCount,
+      orphanedWebhookCount,
+    }
   })
 
   // Update settings

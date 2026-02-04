@@ -5,10 +5,10 @@ import {
   CircleX,
   Clock,
   ExternalLink,
+  File,
   Loader2,
   MessageSquare,
   RefreshCw,
-  File,
   X,
 } from 'lucide-react'
 import { memo, type ReactNode, useCallback, useMemo, useState } from 'react'
@@ -29,10 +29,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
-import type { PRCheckStatus, PRComment, PRReview } from '../../shared/types'
+import type { PRCheckStatus, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
 
@@ -66,9 +66,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
@@ -339,7 +339,7 @@ const CommentItem = memo(function CommentItem({
         >
           {comment.path && (
             <span className="text-[10px] flex items-center gap-1 text-muted-foreground/50 truncate">
-              <File className='w-2 h-2 min-w-2 min-h-2' />
+              <File className="w-2 h-2 min-w-2 min-h-2" />
               {comment.path}
             </span>
           )}
@@ -370,15 +370,18 @@ export function PRStatusContent({
   const hasHeader = onToggle !== undefined
   const expanded = hasHeader ? (expandedProp ?? false) : true
 
-  const [hiddenAuthors, setHiddenAuthors] = useLocalStorage<string[]>(
-    'hidden-comment-authors',
-    [],
-  )
+  const { settings, updateSettings } = useSettings()
   const [hideAuthor, setHideAuthor] = useState<string | null>(null)
-  const hiddenAuthorsSet = useMemo(
-    () => new Set(hiddenAuthors),
-    [hiddenAuthors],
-  )
+  const [hideLoading, setHideLoading] = useState(false)
+  const hiddenAuthorsSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const entry of settings?.hide_gh_authors ?? []) {
+      if (entry.repo === pr.repo) {
+        set.add(entry.author)
+      }
+    }
+    return set
+  }, [settings?.hide_gh_authors, pr.repo])
 
   const approvedReviews = useMemo(
     () => pr.reviews.filter((r) => r.state === 'APPROVED'),
@@ -408,37 +411,21 @@ export function PRStatusContent({
   )
   const hasConflicts = pr.mergeable === 'CONFLICTING'
 
-  const [extraComments, setExtraComments] = useState<PRComment[]>([])
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(5)
 
   const [owner, repo] = pr.repo.split('/')
-  const allComments = useMemo(
-    () =>
-      [...pr.comments, ...extraComments].filter(
-        (c) => !hiddenAuthorsSet.has(c.author),
-      ),
-    [pr.comments, extraComments, hiddenAuthorsSet],
+  const filteredComments = useMemo(
+    () => pr.comments.filter((c) => !hiddenAuthorsSet.has(c.author)),
+    [pr.comments, hiddenAuthorsSet],
   )
+  const visibleComments = useMemo(
+    () => filteredComments.slice(0, visibleCount),
+    [filteredComments, visibleCount],
+  )
+  const hasMoreComments = visibleCount < filteredComments.length
 
-  const handleLoadMore = async () => {
-    setLoadingMore(true)
-    try {
-      const result = await api.getPRComments(
-        owner,
-        repo,
-        pr.prNumber,
-        20,
-        allComments.length,
-        hiddenAuthors.length > 0 ? hiddenAuthors : undefined,
-      )
-      setExtraComments((prev) => [...prev, ...result.comments])
-      setHasMore(allComments.length + result.comments.length < result.total)
-    } catch {
-      // ignore
-    } finally {
-      setLoadingMore(false)
-    }
+  const handleShowMore = () => {
+    setVisibleCount((v) => v + 10)
   }
 
   const [reReviewAuthor, setReReviewAuthor] = useState<string | null>(null)
@@ -662,7 +649,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                    check.status === 'QUEUED' ? (
+                  check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
@@ -703,7 +690,7 @@ export function PRStatusContent({
                 Comments
               </p>
             )}
-            {allComments.map((comment, i) => (
+            {visibleComments.map((comment, i) => (
               <CommentItem
                 key={`${comment.author}-${i}`}
                 comment={comment}
@@ -713,17 +700,13 @@ export function PRStatusContent({
               />
             ))}
 
-            {hasComments && hasMore && (
+            {hasComments && hasMoreComments && (
               <button
                 type="button"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                onClick={handleShowMore}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
-                {loadingMore ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : null}
-                {loadingMore ? 'Loading...' : 'Load more comments'}
+                Show more ({filteredComments.length - visibleCount} remaining)
               </button>
             )}
           </div>
@@ -915,6 +898,7 @@ export function PRStatusContent({
           <Dialog
             open={hideAuthor !== null}
             onOpenChange={(open) => {
+              if (!open && hideLoading) return
               if (!open) setHideAuthor(null)
             }}
           >
@@ -927,22 +911,47 @@ export function PRStatusContent({
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setHideAuthor(null)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setHideAuthor(null)}
+                  disabled={hideLoading}
+                >
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => {
-                    if (hideAuthor) {
-                      setHiddenAuthors((prev) =>
-                        prev.includes(hideAuthor)
-                          ? prev
-                          : [...prev, hideAuthor],
-                      )
+                  disabled={hideLoading}
+                  onClick={async () => {
+                    if (!hideAuthor) return
+                    const current = settings?.hide_gh_authors ?? []
+                    const alreadyHidden = current.some(
+                      (e) => e.repo === pr.repo && e.author === hideAuthor,
+                    )
+                    if (alreadyHidden) {
+                      setHideAuthor(null)
+                      return
                     }
-                    setHideAuthor(null)
+                    setHideLoading(true)
+                    try {
+                      await updateSettings({
+                        hide_gh_authors: [
+                          ...current,
+                          { repo: pr.repo, author: hideAuthor },
+                        ],
+                      })
+                      toast.success(`Comments from ${hideAuthor} hidden`)
+                    } catch {
+                      toast.error('Failed to hide author')
+                    } finally {
+                      setHideLoading(false)
+                      setHideAuthor(null)
+                    }
                   }}
                 >
-                  Hide
+                  {hideLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Hide'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>

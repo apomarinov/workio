@@ -446,4 +446,84 @@ export async function updateSettings(
   return getSettings()
 }
 
+// Notification queries
+
+export interface Notification {
+  id: number
+  dedup_hash: string | null
+  type: string
+  repo: string
+  read: boolean
+  created_at: string
+  data: Record<string, unknown>
+}
+
+export async function insertNotification(
+  type: string,
+  repo: string,
+  prNumber: number,
+  data: Record<string, unknown>,
+  dedupExtra?: string,
+): Promise<Notification | null> {
+  // Create dedup hash from type + repo + prNumber + optional extra
+  const crypto = await import('node:crypto')
+  const dedupSource = `${type}:${repo}:${prNumber}${dedupExtra ? `:${dedupExtra}` : ''}`
+  const dedupHash = crypto
+    .createHash('sha256')
+    .update(dedupSource)
+    .digest('hex')
+    .substring(0, 64)
+
+  const { rows } = await pool.query(
+    `
+    INSERT INTO notifications (dedup_hash, type, repo, data)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (dedup_hash) DO NOTHING
+    RETURNING *
+    `,
+    [dedupHash, type, repo, JSON.stringify(data)],
+  )
+  return rows[0] || null
+}
+
+export async function getNotifications(
+  limit: number,
+  offset: number,
+  unreadOnly = false,
+): Promise<{ notifications: Notification[]; total: number }> {
+  const whereClause = unreadOnly ? 'WHERE read = FALSE' : ''
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*) as count FROM notifications ${whereClause}`,
+  )
+  const total = Number.parseInt(countResult.rows[0].count, 10)
+
+  const { rows } = await pool.query(
+    `
+    SELECT * FROM notifications
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT $1 OFFSET $2
+    `,
+    [limit, offset],
+  )
+
+  return { notifications: rows, total }
+}
+
+export async function markNotificationRead(id: number): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE notifications SET read = TRUE WHERE id = $1',
+    [id],
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+export async function markAllNotificationsRead(): Promise<number> {
+  const result = await pool.query(
+    'UPDATE notifications SET read = TRUE WHERE read = FALSE',
+  )
+  return result.rowCount ?? 0
+}
+
 export default pool

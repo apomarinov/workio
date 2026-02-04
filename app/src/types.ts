@@ -248,6 +248,40 @@ export const DEFAULT_KEYMAP: Keymap = {
   settings: { metaKey: true, key: ',' },
 }
 
+export interface RepoWebhookStatus {
+  id: number
+  missing?: boolean
+}
+
+export interface HiddenGHAuthor {
+  repo: string
+  author: string
+}
+
+export interface NotificationData {
+  prTitle?: string
+  prUrl?: string
+  reviewer?: string
+  approver?: string
+  author?: string
+  body?: string
+  commentUrl?: string
+  checkName?: string
+  checkUrl?: string
+  state?: string
+  reviewId?: string
+}
+
+export interface Notification {
+  id: number
+  dedup_hash: string | null
+  type: string
+  repo: string
+  read: boolean
+  created_at: string
+  data: NotificationData
+}
+
 export interface Settings {
   id: number
   default_shell: string
@@ -257,4 +291,11 @@ export interface Settings {
   show_tool_output: boolean
   message_line_clamp: number
   keymap?: Keymap
+  webhook_secret?: string
+  ngrok_url?: string
+  repo_webhooks?: Record<string, RepoWebhookStatus>
+  hide_gh_authors?: HiddenGHAuthor[]
+  // Computed webhook warning counts
+  missingWebhookCount?: number
+  orphanedWebhookCount?: number
 }

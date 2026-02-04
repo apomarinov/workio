@@ -130,6 +130,22 @@ BEGIN
 END;
 $$;
 
+-- Notifications table (for webhook-triggered PR notifications)
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    dedup_hash VARCHAR(64) UNIQUE,
+    type VARCHAR(50) NOT NULL,
+    repo TEXT NOT NULL,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    data JSONB NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_repo ON notifications(repo);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+
 -- Insert default settings row if not present
 INSERT INTO settings (id, config) VALUES (1, '{}')
 ON CONFLICT (id) DO NOTHING;

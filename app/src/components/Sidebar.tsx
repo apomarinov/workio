@@ -52,6 +52,7 @@ import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
 import { SortableTerminalItem } from './SortableTerminalItem'
+import { useWebhookWarning } from './WebhooksModal'
 
 type GroupingMode = 'all' | 'folder' | 'sessions'
 
@@ -69,6 +70,7 @@ export function Sidebar({ width }: SidebarProps) {
     'horizontal',
   )
   const hasAnySessions = pipSessions.length > 0
+  const { hasWarning: hasWebhookWarning } = useWebhookWarning()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
@@ -698,11 +700,14 @@ export function Sidebar({ width }: SidebarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 relative"
               onClick={() => setShowSettingsModal(true)}
               title="Settings"
             >
               <Settings className="w-4 h-4" />
+              {hasWebhookWarning && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
+              )}
             </Button>
             {hasAnyUnseenPRs && (
               <Popover open={bellOpen} onOpenChange={setBellOpen}>

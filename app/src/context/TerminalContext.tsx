@@ -16,7 +16,7 @@ import type {
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
-import type { Terminal } from '../types'
+import type { Notification, Terminal } from '../types'
 import { useNotifications } from './NotificationContext'
 
 export interface MergedPRSummary {
@@ -167,18 +167,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   // GitHub PR checks
   const [githubPRs, setGithubPRs] = useState<PRCheckStatus[]>([])
-  const previousPRsRef = useRef<Map<string, PRCheckStatus>>(new Map())
   const { sendNotification } = useNotifications()
   const sendNotificationRef = useRef(sendNotification)
   sendNotificationRef.current = sendNotification
   const [prPoll, setPrPoll] = useState(true)
   const lastDetectEmitRef = useRef(0)
-  const [hiddenAuthors] = useLocalStorage<string[]>(
-    'hidden-comment-authors',
-    [],
-  )
-  const hiddenAuthorsRef = useRef(new Set(hiddenAuthors))
-  hiddenAuthorsRef.current = new Set(hiddenAuthors)
 
   useEffect(() => {
     if (!prPoll) {
@@ -209,145 +202,94 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [githubPRs, prPoll, raw, emit])
 
+  // Subscribe to PR checks updates
   useEffect(() => {
-    const hasFailedChecks = (pr: PRCheckStatus) =>
-      pr.checks.some(
-        (c) =>
-          c.status === 'COMPLETED' &&
-          c.conclusion !== 'SUCCESS' &&
-          c.conclusion !== 'SKIPPED' &&
-          c.conclusion !== 'NEUTRAL',
-      )
-
-    const revealPR = (pr: PRCheckStatus) => {
-      window.dispatchEvent(
-        new CustomEvent('reveal-pr', {
-          detail: { branch: pr.branch, repo: pr.repo },
-        }),
-      )
-    }
-
     return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
-      const prevMap = previousPRsRef.current
-
-      // Only send notifications if we have previous state (not initial load)
-      if (prevMap.size > 0) {
-        for (const pr of data.prs) {
-          const key = `${pr.repo}#${pr.prNumber}`
-          const prev = prevMap.get(key)
-
-          // PR merged
-          if (prev && prev.state !== 'MERGED' && pr.state === 'MERGED') {
-            sendNotificationRef.current('✅ Merged', {
-              body: pr.prTitle,
-              audio: 'pr-activity',
-              onClick: () => revealPR(pr),
-            })
-          }
-
-          // Check failed (had no failures, now has failures)
-          if (prev && !hasFailedChecks(prev) && hasFailedChecks(pr)) {
-            sendNotificationRef.current('❌ Check failed', {
-              body: pr.prTitle,
-              audio: 'error',
-              onClick: () => revealPR(pr),
-            })
-          }
-
-          // Changes requested
-          if (
-            prev &&
-            prev.reviewDecision !== 'CHANGES_REQUESTED' &&
-            pr.reviewDecision === 'CHANGES_REQUESTED'
-          ) {
-            sendNotificationRef.current('🔄 Changes requested', {
-              body: pr.prTitle,
-              audio: 'error',
-              onClick: () => revealPR(pr),
-            })
-          }
-
-          // Approved
-          if (
-            prev &&
-            prev.reviewDecision !== 'APPROVED' &&
-            pr.reviewDecision === 'APPROVED'
-          ) {
-            sendNotificationRef.current('✅ Approved', {
-              body: pr.prTitle,
-              audio: 'pr-activity',
-              onClick: () => revealPR(pr),
-            })
-          }
-
-          // New comments (skip if from current user or hidden author)
-          if (prev && pr.comments.length > 0) {
-            const prevCommentKeys = new Set(
-              prev.comments.map((c) => `${c.author}:${c.createdAt}`),
-            )
-            for (const comment of pr.comments) {
-              if (data.username && comment.author === data.username) continue
-              if (hiddenAuthorsRef.current.has(comment.author)) continue
-              const commentKey = `${comment.author}:${comment.createdAt}`
-              if (!prevCommentKeys.has(commentKey)) {
-                const commentUrl = comment.url || pr.prUrl
-                sendNotificationRef.current(`💬 ${comment.author} commented`, {
-                  body: comment.body,
-                  audio: 'pr-activity',
-                  onClick: () => window.open(commentUrl, '_blank'),
-                })
-              }
-            }
-          }
-
-          // New reviews (skip if from current user or hidden author)
-          if (prev && pr.reviews.length > 0) {
-            const prevReviewKeys = new Set(
-              prev.reviews.map((r) => `${r.author}:${r.state}`),
-            )
-            for (const review of pr.reviews) {
-              if (data.username && review.author === data.username) continue
-              if (hiddenAuthorsRef.current.has(review.author)) continue
-              const reviewKey = `${review.author}:${review.state}`
-              if (!prevReviewKeys.has(reviewKey)) {
-                const emoji =
-                  review.state === 'APPROVED'
-                    ? '✅'
-                    : review.state === 'CHANGES_REQUESTED'
-                      ? '🔄'
-                      : '💬'
-                const action =
-                  review.state === 'APPROVED'
-                    ? 'approved'
-                    : review.state === 'CHANGES_REQUESTED'
-                      ? 'requested changes'
-                      : 'reviewed'
-                const reviewUrl = review.id
-                  ? `${pr.prUrl}#pullrequestreview-${review.id}`
-                  : pr.prUrl
-                sendNotificationRef.current(
-                  `${emoji} ${review.author} ${action}`,
-                  {
-                    body: review.body || pr.prTitle,
-                    audio: 'pr-activity',
-                    onClick: () => window.open(reviewUrl, '_blank'),
-                  },
-                )
-              }
-            }
-          }
-        }
-      }
-
-      // Update previous state
-      const newMap = new Map<string, PRCheckStatus>()
-      for (const pr of data.prs) {
-        newMap.set(`${pr.repo}#${pr.prNumber}`, pr)
-      }
-      previousPRsRef.current = newMap
-
       setGithubPRs(data.prs)
       setPrPoll(true)
+    })
+  }, [subscribe])
+
+  // Subscribe to server-side notifications
+  useEffect(() => {
+    return subscribe<Notification>('notifications:new', (notification) => {
+      const { type, data } = notification
+      const prTitle = data.prTitle || ''
+      const prUrl = data.prUrl || ''
+
+      switch (type) {
+        case 'pr_merged':
+          sendNotificationRef.current('✅ Merged', {
+            body: prTitle,
+            audio: 'pr-activity',
+            onClick: () => window.open(prUrl, '_blank'),
+          })
+          break
+
+        case 'check_failed':
+          sendNotificationRef.current('❌ Check failed', {
+            body: data.checkName ? `${data.checkName} - ${prTitle}` : prTitle,
+            audio: 'error',
+            onClick: () => window.open(data.checkUrl || prUrl, '_blank'),
+          })
+          break
+
+        case 'changes_requested':
+          sendNotificationRef.current('🔄 Changes requested', {
+            body: data.reviewer ? `${data.reviewer} on ${prTitle}` : prTitle,
+            audio: 'error',
+            onClick: () => window.open(prUrl, '_blank'),
+          })
+          break
+
+        case 'pr_approved':
+          sendNotificationRef.current('✅ Approved', {
+            body: data.approver
+              ? `${data.approver} approved ${prTitle}`
+              : prTitle,
+            audio: 'pr-activity',
+            onClick: () => window.open(prUrl, '_blank'),
+          })
+          break
+
+        case 'new_comment':
+          sendNotificationRef.current(
+            `💬 ${data.author || 'Someone'} commented`,
+            {
+              body: data.body || prTitle,
+              audio: 'pr-activity',
+              onClick: () => window.open(data.commentUrl || prUrl, '_blank'),
+            },
+          )
+          break
+
+        case 'new_review': {
+          const emoji =
+            data.state === 'APPROVED'
+              ? '✅'
+              : data.state === 'CHANGES_REQUESTED'
+                ? '🔄'
+                : '💬'
+          const action =
+            data.state === 'APPROVED'
+              ? 'approved'
+              : data.state === 'CHANGES_REQUESTED'
+                ? 'requested changes'
+                : 'reviewed'
+          const reviewUrl = data.reviewId
+            ? `${prUrl}#pullrequestreview-${data.reviewId}`
+            : prUrl
+          sendNotificationRef.current(
+            `${emoji} ${data.author || 'Someone'} ${action}`,
+            {
+              body: data.body || prTitle,
+              audio: 'pr-activity',
+              onClick: () => window.open(reviewUrl, '_blank'),
+            },
+          )
+          break
+        }
+      }
     })
   }, [subscribe])
 

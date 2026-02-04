@@ -6,6 +6,7 @@ export function useSettings() {
   const { data, error, isLoading, mutate } = useSWR<Settings>(
     '/api/settings',
     api.getSettings,
+    { refreshInterval: 5 * 60 * 1000 }, // Refresh every 5 minutes
   )
 
   const updateSettings = async (updates: Partial<Omit<Settings, 'id'>>) => {

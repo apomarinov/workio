@@ -218,31 +218,6 @@ export async function getMergedPRs(
   return res.json()
 }
 
-export async function getPRComments(
-  owner: string,
-  repo: string,
-  prNumber: number,
-  limit: number,
-  offset: number,
-  excludeAuthors?: string[],
-): Promise<{
-  comments: {
-    author: string
-    avatarUrl: string
-    body: string
-    createdAt: string
-  }[]
-  total: number
-}> {
-  let url = `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comments?limit=${limit}&offset=${offset}`
-  if (excludeAuthors && excludeAuthors.length > 0) {
-    url += `&exclude=${excludeAuthors.map(encodeURIComponent).join(',')}`
-  }
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Failed to fetch PR comments')
-  return res.json()
-}
-
 export async function requestPRReview(
   owner: string,
   repo: string,
@@ -426,4 +401,60 @@ export async function pushBranch(
     throw new Error(data.error || 'Failed to push branch')
   }
   return data
+}
+
+// Webhook management
+
+export async function createWebhook(
+  owner: string,
+  repo: string,
+): Promise<{ webhookId?: number }> {
+  const res = await fetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to create webhook')
+  }
+  return res.json()
+}
+
+export async function deleteWebhook(
+  owner: string,
+  repo: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to delete webhook')
+  }
+}
+
+export async function recreateWebhook(
+  owner: string,
+  repo: string,
+): Promise<{ webhookId?: number }> {
+  const res = await fetch(
+    `${API_BASE}/github/webhooks/${owner}/${repo}/recreate`,
+    {
+      method: 'POST',
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to recreate webhook')
+  }
+  return res.json()
+}
+
+export async function testWebhook(owner: string, repo: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to test webhook')
+  }
 }

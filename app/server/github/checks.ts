@@ -8,7 +8,14 @@ import type {
   PRComment,
   PRReview,
 } from '../../shared/types'
-import { getAllTerminals, getTerminalById, updateTerminal } from '../db'
+import type { HiddenGHAuthor } from '../../src/types'
+import {
+  getAllTerminals,
+  getSettings,
+  getTerminalById,
+  insertNotification,
+  updateTerminal,
+} from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
 import { detectGitBranch } from '../pty/manager'
@@ -34,6 +41,17 @@ let lastEmittedPRs: PRCheckStatus[] = []
 const POLL_INTERVAL = 60_000 // 60 seconds
 const CACHE_TTL = 30_000 // 30
 const REFRESH_MIN_INTERVAL = 30_000 // 30 seconds
+
+// Webhook queue for throttling rapid webhook events
+const webhookQueue = {
+  pendingRepos: new Set<string>(),
+  timer: null as NodeJS.Timeout | null,
+}
+const WEBHOOK_THROTTLE_MS = 2000
+
+// Track last PR data for notification diffing
+const lastPRData = new Map<string, PRCheckStatus>()
+let initialFullFetchDone = false
 
 /** Decode GitHub GraphQL node ID to extract database ID (last 4 bytes as big-endian uint32) */
 function decodeNodeId(nodeId: string): number | null {
@@ -164,6 +182,7 @@ interface GhPR {
   }[]
   reviewRequests: { login: string }[]
   comments: {
+    id: string
     url: string
     author: { login: string }
     body: string
@@ -199,7 +218,7 @@ function fetchOpenPRs(
         '--repo',
         `${owner}/${repo}`,
         '--author',
-        '@me',
+        ghUsername || '@me',
         '--state',
         'open',
         '--json',
@@ -285,6 +304,7 @@ function fetchOpenPRs(
             const issueComments: PRComment[] = (pr.comments || [])
               .filter((c) => !c.author.login.includes('[bot]'))
               .map((c) => ({
+                id: decodeNodeId(c.id) ?? undefined,
                 url: c.url,
                 author: c.author.login,
                 avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
@@ -362,6 +382,7 @@ function fetchOpenPRs(
               let codeComments: PRComment[] = []
               try {
                 const codeCommentsRaw: {
+                  id: number
                   html_url: string
                   user: { login: string }
                   body: string
@@ -371,6 +392,7 @@ function fetchOpenPRs(
                 codeComments = codeCommentsRaw
                   .filter((c) => !c.user.login.includes('[bot]'))
                   .map((c) => ({
+                    id: c.id,
                     url: c.html_url,
                     author: c.user.login,
                     avatarUrl: `https://github.com/${c.user.login}.png?size=32`,
@@ -399,7 +421,7 @@ function fetchOpenPRs(
                       new Date(b.createdAt).getTime() -
                       new Date(a.createdAt).getTime(),
                   )
-                  .slice(0, 5)
+                  .slice(0, 50)
                 return { ...result, comments: mergedComments }
               },
             )
@@ -435,7 +457,7 @@ function fetchMergedPRsForBranches(
         '--repo',
         `${owner}/${repo}`,
         '--author',
-        '@me',
+        ghUsername || '@me',
         '--state',
         'merged',
         '--limit',
@@ -496,7 +518,7 @@ export function fetchMergedPRsByMe(
         '--repo',
         `${owner}/${repo}`,
         '--author',
-        '@me',
+        ghUsername || '@me',
         '--state',
         'merged',
         '--limit',
@@ -563,6 +585,11 @@ async function refreshSSHBranch(terminalId: number): Promise<void> {
 async function pollAllPRChecks(force = false): Promise<void> {
   if (ghAvailable === false) return
 
+  // Fetch GitHub username if not cached (needed for --author filter)
+  if (ghUsername === null) {
+    ghUsername = await fetchGhUsername()
+  }
+
   // Collect unique repos and their terminal branches
   const repoData = new Map<
     string,
@@ -613,6 +640,7 @@ async function pollAllPRChecks(force = false): Promise<void> {
       const branchesWithoutOpenPR = new Set(
         [...branches].filter((b) => !openBranches.has(b)),
       )
+
       if (branchesWithoutOpenPR.size > 0) {
         const mergedPRs = await fetchMergedPRsForBranches(
           owner,
@@ -626,10 +654,8 @@ async function pollAllPRChecks(force = false): Promise<void> {
     }
   }
 
-  // Fetch GitHub username if not cached
-  if (ghUsername === null) {
-    ghUsername = await fetchGhUsername()
-  }
+  // Process PR data for server-side notifications
+  await processNewPRData(allPRs)
 
   lastEmittedPRs = allPRs
   getIO()?.emit('github:pr-checks', { prs: allPRs, username: ghUsername })
@@ -808,12 +834,14 @@ export async function fetchPRComments(
   ])
 
   let issueCommentsData: {
+    id: string
     url: string
     author: { login: string }
     body: string
     createdAt: string
   }[] = []
   let codeCommentsData: {
+    id: number
     html_url: string
     user: { login: string }
     body: string
@@ -837,6 +865,7 @@ export async function fetchPRComments(
   const excludeSet = excludeAuthors ? new Set(excludeAuthors) : null
   // Merge issue comments and code review comments
   const issueComments = issueCommentsData.map((c) => ({
+    id: decodeNodeId(c.id) ?? undefined,
     author: c.author.login,
     body: c.body,
     createdAt: c.createdAt,
@@ -844,6 +873,7 @@ export async function fetchPRComments(
     path: undefined as string | undefined,
   }))
   const codeComments = codeCommentsData.map((c) => ({
+    id: c.id,
     author: c.user.login,
     body: c.body,
     createdAt: c.created_at,
@@ -1089,5 +1119,220 @@ export async function initGitHubChecks(): Promise<void> {
 
   if (monitoredTerminals.size > 0) {
     startChecksPolling()
+  }
+}
+
+// Webhook queue functions
+
+export function queueWebhookRefresh(repo: string): void {
+  webhookQueue.pendingRepos.add(repo)
+
+  if (webhookQueue.timer) return
+
+  webhookQueue.timer = setTimeout(async () => {
+    const repos = Array.from(webhookQueue.pendingRepos)
+    webhookQueue.pendingRepos.clear()
+    webhookQueue.timer = null
+
+    log.info(`[github] Webhook triggered PR refresh for: ${repos.join(', ')}`)
+
+    // Clear cache for affected repos and refresh
+    for (const repo of repos) {
+      checksCache.delete(repo)
+    }
+    await refreshPRChecks(true)
+  }, WEBHOOK_THROTTLE_MS)
+}
+
+function isHiddenAuthor(
+  hiddenAuthors: HiddenGHAuthor[] | undefined,
+  repo: string,
+  author: string,
+): boolean {
+  if (!hiddenAuthors) return false
+  return hiddenAuthors.some((h) => h.repo === repo && h.author === author)
+}
+
+async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
+  if (!initialFullFetchDone) {
+    // First fetch - just store data, don't create notifications
+    for (const pr of newPRs) {
+      const key = `${pr.repo}#${pr.prNumber}`
+      lastPRData.set(key, pr)
+    }
+    initialFullFetchDone = true
+    return
+  }
+
+  const settings = await getSettings()
+  const hiddenAuthors = settings.hide_gh_authors
+  const io = getIO()
+
+  for (const pr of newPRs) {
+    const key = `${pr.repo}#${pr.prNumber}`
+    const prev = lastPRData.get(key)
+
+    // PR merged
+    if (prev && prev.state !== 'MERGED' && pr.state === 'MERGED') {
+      const notification = await insertNotification(
+        'pr_merged',
+        pr.repo,
+        pr.prNumber,
+        { prTitle: pr.prTitle, prUrl: pr.prUrl },
+      )
+      if (notification) {
+        io?.emit('notifications:new', notification)
+      }
+    }
+
+    // Check failed
+    const hasFailedChecks = (p: PRCheckStatus) =>
+      p.checks.some(
+        (c) =>
+          c.status === 'COMPLETED' &&
+          c.conclusion !== 'SUCCESS' &&
+          c.conclusion !== 'SKIPPED' &&
+          c.conclusion !== 'NEUTRAL',
+      )
+    if (prev && !hasFailedChecks(prev) && hasFailedChecks(pr)) {
+      const failedCheck = pr.checks.find(
+        (c) =>
+          c.status === 'COMPLETED' &&
+          c.conclusion !== 'SUCCESS' &&
+          c.conclusion !== 'SKIPPED' &&
+          c.conclusion !== 'NEUTRAL',
+      )
+      const notification = await insertNotification(
+        'check_failed',
+        pr.repo,
+        pr.prNumber,
+        {
+          prTitle: pr.prTitle,
+          prUrl: pr.prUrl,
+          checkName: failedCheck?.name,
+          checkUrl: failedCheck?.detailsUrl,
+        },
+        failedCheck?.detailsUrl || failedCheck?.name,
+      )
+      if (notification) {
+        io?.emit('notifications:new', notification)
+      }
+    }
+
+    // Changes requested
+    if (
+      prev &&
+      prev.reviewDecision !== 'CHANGES_REQUESTED' &&
+      pr.reviewDecision === 'CHANGES_REQUESTED'
+    ) {
+      const reviewer = pr.reviews.find(
+        (r) => r.state === 'CHANGES_REQUESTED',
+      )?.author
+      if (!isHiddenAuthor(hiddenAuthors, pr.repo, reviewer || '')) {
+        const notification = await insertNotification(
+          'changes_requested',
+          pr.repo,
+          pr.prNumber,
+          { prTitle: pr.prTitle, prUrl: pr.prUrl, reviewer },
+          reviewer,
+        )
+        if (notification) {
+          io?.emit('notifications:new', notification)
+        }
+      }
+    }
+
+    // Approved
+    if (
+      prev &&
+      prev.reviewDecision !== 'APPROVED' &&
+      pr.reviewDecision === 'APPROVED'
+    ) {
+      const approver = pr.reviews.find((r) => r.state === 'APPROVED')?.author
+      if (!isHiddenAuthor(hiddenAuthors, pr.repo, approver || '')) {
+        const notification = await insertNotification(
+          'pr_approved',
+          pr.repo,
+          pr.prNumber,
+          { prTitle: pr.prTitle, prUrl: pr.prUrl, approver },
+          approver,
+        )
+        if (notification) {
+          io?.emit('notifications:new', notification)
+        }
+      }
+    }
+
+    // New comments
+    if (prev && pr.comments.length > 0) {
+      const prevCommentIds = new Set(
+        prev.comments.map((c) => c.id).filter(Boolean),
+      )
+      for (const comment of pr.comments) {
+        if (ghUsername && comment.author === ghUsername) continue
+        if (isHiddenAuthor(hiddenAuthors, pr.repo, comment.author)) continue
+        // Skip if we've seen this comment before (by ID)
+        if (comment.id && prevCommentIds.has(comment.id)) continue
+        const notification = await insertNotification(
+          'new_comment',
+          pr.repo,
+          pr.prNumber,
+          {
+            prTitle: pr.prTitle,
+            prUrl: pr.prUrl,
+            author: comment.author,
+            body: comment.body.substring(0, 200),
+            commentUrl: comment.url,
+          },
+          comment.id
+            ? String(comment.id)
+            : `${comment.author}:${comment.createdAt}`,
+        )
+        if (notification) {
+          io?.emit('notifications:new', notification)
+        }
+      }
+    }
+
+    // New reviews
+    if (prev && pr.reviews.length > 0) {
+      const prevReviewIds = new Set(
+        prev.reviews.map((r) => r.id).filter(Boolean),
+      )
+      for (const review of pr.reviews) {
+        if (ghUsername && review.author === ghUsername) continue
+        if (isHiddenAuthor(hiddenAuthors, pr.repo, review.author)) continue
+        // Skip if we've seen this review before (by ID)
+        if (review.id && prevReviewIds.has(review.id)) continue
+        const notification = await insertNotification(
+          'new_review',
+          pr.repo,
+          pr.prNumber,
+          {
+            prTitle: pr.prTitle,
+            prUrl: pr.prUrl,
+            author: review.author,
+            state: review.state,
+            body: review.body?.substring(0, 200),
+            reviewId: review.id,
+          },
+          review.id ? String(review.id) : `${review.author}:${review.state}`,
+        )
+        if (notification) {
+          io?.emit('notifications:new', notification)
+        }
+      }
+    }
+
+    // Update stored data
+    lastPRData.set(key, pr)
+  }
+
+  // Clean up removed PRs from lastPRData
+  const currentKeys = new Set(newPRs.map((pr) => `${pr.repo}#${pr.prNumber}`))
+  for (const key of lastPRData.keys()) {
+    if (!currentKeys.has(key)) {
+      lastPRData.delete(key)
+    }
   }
 }

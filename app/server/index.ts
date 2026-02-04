@@ -13,14 +13,24 @@ import {
   detectAllTerminalBranches,
   emitCachedPRChecks,
   fetchMergedPRsByMe,
-  fetchPRComments,
   initGitHubChecks,
   mergePR,
+  queueWebhookRefresh,
   refreshPRChecks,
   requestPRReview,
   rerunAllFailedChecks,
   rerunFailedCheck,
 } from './github/checks'
+import {
+  createRepoWebhook,
+  deleteRepoWebhook,
+  getOrCreateWebhookSecret,
+  initNgrok,
+  recreateRepoWebhook,
+  startWebhookValidationPolling,
+  testWebhook,
+  verifyWebhookSignature,
+} from './github/webhooks'
 import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
@@ -137,20 +147,6 @@ fastify.get<{
   } catch {
     return { repos: [] }
   }
-})
-
-// GitHub PR comments
-fastify.get<{
-  Params: { owner: string; repo: string; pr: string }
-  Querystring: { limit?: string; offset?: string; exclude?: string }
-}>('/api/github/:owner/:repo/pr/:pr/comments', async (request) => {
-  const { owner, repo, pr } = request.params
-  const limit = Math.min(Number(request.query.limit) || 20, 100)
-  const offset = Number(request.query.offset) || 0
-  const excludeAuthors = request.query.exclude
-    ? request.query.exclude.split(',').filter(Boolean)
-    : undefined
-  return fetchPRComments(owner, repo, Number(pr), limit, offset, excludeAuthors)
 })
 
 // Merged PRs by @me for a repo
@@ -285,6 +281,92 @@ fastify.post<{
   },
 )
 
+// GitHub Webhook endpoint
+fastify.post<{
+  Body: unknown
+  Headers: { 'x-hub-signature-256'?: string; 'x-github-event'?: string }
+}>('/api/webhooks/github', async (request, reply) => {
+  const signature = request.headers['x-hub-signature-256']
+  const event = request.headers['x-github-event']
+
+  if (!signature) {
+    return reply.status(401).send({ error: 'Missing signature' })
+  }
+
+  const secret = await getOrCreateWebhookSecret()
+  const payload =
+    typeof request.body === 'string'
+      ? request.body
+      : JSON.stringify(request.body)
+
+  if (!verifyWebhookSignature(payload, signature, secret)) {
+    return reply.status(401).send({ error: 'Invalid signature' })
+  }
+
+  // Extract repo from payload
+  const body = request.body as { repository?: { full_name?: string } }
+  const repo = body?.repository?.full_name
+
+  // Handle ping event (webhook test)
+  if (event === 'ping' && repo) {
+    log.info(`[webhooks] Received ping for ${repo}`)
+    io?.emit('webhook:ping', { repo })
+    return { ok: true }
+  }
+
+  if (repo) {
+    log.info(`[webhooks] Received ${event} event for ${repo}`)
+    queueWebhookRefresh(repo)
+  }
+
+  return { ok: true }
+})
+
+// Webhook management routes
+fastify.post<{
+  Params: { owner: string; repo: string }
+}>('/api/github/webhooks/:owner/:repo', async (request, reply) => {
+  const { owner, repo } = request.params
+  const result = await createRepoWebhook(`${owner}/${repo}`)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  return { ok: true, webhookId: result.webhookId }
+})
+
+fastify.delete<{
+  Params: { owner: string; repo: string }
+}>('/api/github/webhooks/:owner/:repo', async (request, reply) => {
+  const { owner, repo } = request.params
+  const result = await deleteRepoWebhook(`${owner}/${repo}`)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  return { ok: true }
+})
+
+fastify.post<{
+  Params: { owner: string; repo: string }
+}>('/api/github/webhooks/:owner/:repo/recreate', async (request, reply) => {
+  const { owner, repo } = request.params
+  const result = await recreateRepoWebhook(`${owner}/${repo}`)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  return { ok: true, webhookId: result.webhookId }
+})
+
+fastify.post<{
+  Params: { owner: string; repo: string }
+}>('/api/github/webhooks/:owner/:repo/test', async (request, reply) => {
+  const { owner, repo } = request.params
+  const result = await testWebhook(`${owner}/${repo}`)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  return { ok: true }
+})
+
 // Routes
 await fastify.register(terminalRoutes)
 await fastify.register(settingsRoutes)
@@ -355,6 +437,13 @@ const start = async () => {
 
     // Initialize GitHub PR checks polling
     initGitHubChecks()
+
+    try {
+      await initNgrok(port)
+      startWebhookValidationPolling()
+    } catch (err) {
+      log.error({ err }, 'Failed to initialize ngrok')
+    }
   } catch (err) {
     log.error({ err }, 'Server startup failed')
     process.exit(1)

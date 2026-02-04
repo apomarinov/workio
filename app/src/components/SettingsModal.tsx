@@ -1,10 +1,12 @@
 import {
+  AlertTriangle,
   AlignLeft,
   Brain,
   Code,
   Keyboard,
   TerminalSquare,
   Type,
+  Webhook,
   Wrench,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -22,6 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
 import { KeymapModal } from './KeymapModal'
+import { useWebhookWarning, WebhooksModal } from './WebhooksModal'
 
 interface SettingsModalProps {
   open: boolean
@@ -38,6 +41,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [saving, setSaving] = useState(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
+  const [showWebhooksModal, setShowWebhooksModal] = useState(false)
+  const {
+    hasWarning: hasWebhookWarning,
+    missingCount,
+    orphanedCount,
+  } = useWebhookWarning()
 
   useEffect(() => {
     if (settings) {
@@ -128,7 +137,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </p>
           </div>
 
-          <div className="space-y-2]">
+          <div className="space-y-2">
             <label htmlFor="message_line_clamp" className="text-sm font-medium">
               Message Preview Lines
             </label>
@@ -150,7 +159,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 border-t-[1px] mt-1 py-3">
+          <div className="flex flex-col gap-3 border-t-[1px] mt-1 pt-3">
             <span className="font-semibold">Claude Chat</span>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -200,7 +209,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             )}
           </div>
 
-          <div className="flex flex-col gap-3 border-t-[1px] mt-1 py-3">
+          <div className="flex flex-col gap-3 border-t-[1px] pt-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Keyboard className="w-4 h-4 text-muted-foreground" />
@@ -222,17 +231,51 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             onOpenChange={setShowKeymapModal}
           />
 
+          <div className={`flex flex-col gap-3 -mx-1 px-1`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Webhook
+                  className={`w-4 h-4 ${hasWebhookWarning ? 'text-amber-500' : ''}`}
+                />
+                <span className="text-sm font-medium">GitHub Webhooks</span>
+                {hasWebhookWarning && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                    <AlertTriangle className="w-3 h-3" />
+                    {missingCount > 0 && `${missingCount} missing`}
+                    {missingCount > 0 && orphanedCount > 0 && ', '}
+                    {orphanedCount > 0 && `${orphanedCount} orphaned`}
+                  </span>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowWebhooksModal(true)}
+              >
+                Configure
+              </Button>
+            </div>
+          </div>
+
+          <WebhooksModal
+            open={showWebhooksModal}
+            onOpenChange={setShowWebhooksModal}
+          />
+
           <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving || !defaultShell.trim()}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving || !defaultShell.trim()}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
