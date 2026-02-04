@@ -550,6 +550,36 @@ export function CommandPalette() {
     }
   }, [modeStack, modes, currentModeId])
 
+  // Handle clicking on a breadcrumb to navigate to that level
+  const handleBreadcrumbClick = useCallback(
+    (index: number) => {
+      // Breadcrumb at index i corresponds to modeStack[i + 1]
+      // (index 0 in modeStack is root 'search' which has no breadcrumb)
+      const targetStackLength = index + 2
+      if (targetStackLength >= modeStack.length) return
+
+      // Clear state for modes we're leaving
+      const modesBeingLeft = modeStack.slice(targetStackLength)
+      for (const modeId of modesBeingLeft) {
+        if (modeId === 'actions') {
+          setSelectedTerminal(null)
+          setSelectedPR(null)
+          setSelectedSession(null)
+        } else if (modeId === 'branches') {
+          setBranches(null)
+        } else if (modeId === 'branch-actions') {
+          setSelectedBranch(null)
+        } else if (modeId === 'pr-actions') {
+          setActionPR(null)
+        }
+      }
+
+      setModeStack((prev) => prev.slice(0, targetStackLength))
+      setHighlightedId(null)
+    },
+    [modeStack],
+  )
+
   return (
     <>
       <CommandPaletteCore
@@ -560,6 +590,7 @@ export function CommandPalette() {
         highlightedId={highlightedId}
         onHighlightChange={setHighlightedId}
         onBack={handleBack}
+        onBreadcrumbClick={handleBreadcrumbClick}
       />
 
       {editTerminal && (

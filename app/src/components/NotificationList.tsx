@@ -156,8 +156,9 @@ function NotificationItem({
   return (
     <button
       onClick={handleClick}
-      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${read ? 'opacity-60' : ''
-        } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
+      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${
+        read ? 'opacity-60' : ''
+      } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
     >
       <div className="flex-shrink-0 mt-0.5">{getNotificationIcon(type)}</div>
       <div className="flex-1 min-w-0">
@@ -169,11 +170,13 @@ function NotificationItem({
             <MarkdownContent content={data.body || ''} />
           </div>
         )}
-        <div className='flex flex-col'>
+        <div className="flex flex-col">
           <div className="text-xs text-muted-foreground line-clamp-5">
             {subtitle && <MarkdownContent content={subtitle} />}
           </div>
-          <span className='text-[10px] text-muted-foreground'>{formatRelativeTime(created_at)}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {formatRelativeTime(created_at)}
+          </span>
         </div>
       </div>
       {!read && (

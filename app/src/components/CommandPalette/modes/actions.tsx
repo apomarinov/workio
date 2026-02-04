@@ -70,19 +70,6 @@ export function createActionsMode(
       })
     }
 
-    // Open PR if available
-    if (pr) {
-      items.push({
-        id: 'action:open-pr',
-        label: 'PR on GitHub',
-        icon: <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />,
-        onSelect: () => {
-          actions.openPR(pr)
-          api.close()
-        },
-      })
-    }
-
     // Branches (git repos only)
     if (terminal.git_repo) {
       items.push({
@@ -96,6 +83,19 @@ export function createActionsMode(
         onNavigate: () => {
           actions.loadBranches(terminal.id)
           api.navigate({ modeId: 'branches' })
+        },
+      })
+    }
+
+    // Open PR if available
+    if (pr) {
+      items.push({
+        id: 'action:open-pr',
+        label: 'PR on GitHub',
+        icon: <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />,
+        onSelect: () => {
+          actions.openPR(pr)
+          api.close()
         },
       })
     }

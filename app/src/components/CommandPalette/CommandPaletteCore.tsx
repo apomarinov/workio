@@ -20,6 +20,7 @@ type Props = {
   highlightedId: string | null
   onHighlightChange: (id: string | null) => void
   onBack: () => void
+  onBreadcrumbClick: (index: number) => void
 }
 
 export function CommandPaletteCore({
@@ -30,6 +31,7 @@ export function CommandPaletteCore({
   highlightedId,
   onHighlightChange,
   onBack,
+  onBreadcrumbClick,
 }: Props) {
   const mode = modes[currentModeId]
 
@@ -118,6 +120,7 @@ export function CommandPaletteCore({
             <PaletteHeader
               breadcrumbs={mode.breadcrumbs}
               placeholder={mode.placeholder}
+              onBreadcrumbClick={canGoBack ? onBreadcrumbClick : undefined}
               onBack={canGoBack ? onBack : undefined}
             />
             <CommandList
