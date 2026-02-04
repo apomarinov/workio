@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useRef } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +36,24 @@ export function ConfirmModal({
   onCancel,
   children,
 }: ConfirmModalProps) {
+  const confirmedRef = useRef(false)
+
+  const handleConfirm = () => {
+    confirmedRef.current = true
+    onConfirm()
+  }
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      if (!confirmedRef.current) {
+        onCancel()
+      }
+      confirmedRef.current = false
+    }
+  }
+
   return (
-    <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -45,11 +61,11 @@ export function ConfirmModal({
         </AlertDialogHeader>
         {children}
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel} disabled={loading}>
+          <AlertDialogCancel disabled={loading}>
             {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={handleConfirm}
             variant={variant === 'danger' ? 'destructive' : 'default'}
             disabled={loading}
           >

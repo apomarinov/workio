@@ -593,7 +593,9 @@ export function CommandPalette() {
             deleteTerminal(deleteTerminalTarget.id, { deleteDirectory })
             setDeleteTerminalTarget(null)
           }}
-          onCancel={() => setDeleteTerminalTarget(null)}
+          onCancel={() => {
+            setDeleteTerminalTarget(null)
+          }}
         >
           {deleteTerminalTarget.git_repo && (
             <label className="flex items-center gap-2 text-sm cursor-pointer">

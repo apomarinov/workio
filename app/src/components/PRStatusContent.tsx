@@ -744,6 +744,7 @@ export function PRStatusContent({
                 <Button
                   onClick={handleReRequestReview}
                   disabled={reReviewLoading}
+                  autoFocus
                 >
                   {reReviewLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -798,7 +799,7 @@ export function PRStatusContent({
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleMerge} disabled={mergeLoading}>
+                <Button onClick={handleMerge} disabled={mergeLoading} autoFocus>
                   {mergeLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
@@ -837,7 +838,11 @@ export function PRStatusContent({
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleRerunCheck} disabled={rerunLoading}>
+                <Button
+                  onClick={handleRerunCheck}
+                  disabled={rerunLoading}
+                  autoFocus
+                >
                   {rerunLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
@@ -884,6 +889,7 @@ export function PRStatusContent({
                 <Button
                   onClick={handleRerunAllChecks}
                   disabled={rerunAllLoading}
+                  autoFocus
                 >
                   {rerunAllLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -920,6 +926,7 @@ export function PRStatusContent({
                 </Button>
                 <Button
                   disabled={hideLoading}
+                  autoFocus
                   onClick={async () => {
                     if (!hideAuthor) return
                     const current = settings?.hide_gh_authors ?? []
@@ -986,6 +993,7 @@ export function PRStatusContent({
                 rows={4}
                 className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-none"
                 disabled={replyLoading}
+                autoFocus
               />
               <DialogFooter>
                 <Button

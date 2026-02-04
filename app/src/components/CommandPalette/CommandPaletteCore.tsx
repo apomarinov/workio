@@ -113,6 +113,7 @@ export function CommandPaletteCore({
             className="bg-transparent"
             value={highlightedId ?? ''}
             onValueChange={handleValueChange}
+            loop
           >
             <PaletteHeader
               breadcrumbs={mode.breadcrumbs}

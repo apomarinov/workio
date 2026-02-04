@@ -147,14 +147,18 @@ function AlertDialogAction({
   className,
   variant = 'default',
   size = 'default',
+  autoFocus = true,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
-  Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
+  Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'> & {
+    autoFocus?: boolean
+  }) {
   return (
     <Button variant={variant} size={size} asChild>
       <AlertDialogPrimitive.Action
         data-slot="alert-dialog-action"
         className={cn(className)}
+        autoFocus={autoFocus}
         {...props}
       />
     </Button>

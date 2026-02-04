@@ -79,7 +79,7 @@ export function MergePRModal({
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleMerge} disabled={loading}>
+          <Button onClick={handleMerge} disabled={loading} autoFocus>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Merge
           </Button>

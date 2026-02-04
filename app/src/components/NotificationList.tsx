@@ -169,9 +169,11 @@ function NotificationItem({
             <MarkdownContent content={data.body || ''} />
           </div>
         )}
-        <div className="text-xs text-muted-foreground truncate">
-          {subtitle ? `${subtitle} · ` : ''}
-          {formatRelativeTime(created_at)}
+        <div className='flex flex-col'>
+          <div className="text-xs text-muted-foreground line-clamp-5">
+            {subtitle && <MarkdownContent content={subtitle} />}
+          </div>
+          <span className='text-[10px] text-muted-foreground'>{formatRelativeTime(created_at)}</span>
         </div>
       </div>
       {!read && (

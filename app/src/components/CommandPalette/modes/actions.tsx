@@ -74,7 +74,7 @@ export function createActionsMode(
     if (pr) {
       items.push({
         id: 'action:open-pr',
-        label: 'Open PR in new tab',
+        label: 'PR on GitHub',
         icon: <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => {
           actions.openPR(pr)
