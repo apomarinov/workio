@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import {
   AlertDialog,
@@ -17,6 +18,7 @@ interface ConfirmModalProps {
   confirmLabel?: string
   cancelLabel?: string
   variant?: 'danger' | 'default'
+  loading?: boolean
   onConfirm: () => void
   onCancel: () => void
   children?: React.ReactNode
@@ -29,6 +31,7 @@ export function ConfirmModal({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'default',
+  loading = false,
   onConfirm,
   onCancel,
   children,
@@ -42,13 +45,15 @@ export function ConfirmModal({
         </AlertDialogHeader>
         {children}
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>
+          <AlertDialogCancel onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             variant={variant === 'danger' ? 'destructive' : 'default'}
+            disabled={loading}
           >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -7,6 +7,7 @@ import type {
 import type { SessionWithProject, Terminal } from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
+import { createPRActionsMode } from './modes/pr-actions'
 import { createSearchMode } from './modes/search'
 import type { PaletteAPI, PaletteMode } from './types'
 
@@ -33,6 +34,12 @@ export type ModeState = {
     checkingOut?: string
     pulling?: string
     pushing?: { branch: string; force: boolean }
+  }
+  // PR-specific state
+  selectedPR: PRCheckStatus | null
+  prLoadingStates: {
+    merging?: boolean
+    rerunningAll?: boolean
   }
 }
 
@@ -65,6 +72,11 @@ export type AppActions = {
   pushBranch: (name: string, force?: boolean) => Promise<void>
   requestForcePush: (terminalId: number, branch: string) => void
 
+  // PR actions
+  openMergeModal: (pr: PRCheckStatus) => void
+  openRerunAllModal: (pr: PRCheckStatus) => void
+  setSelectedPR: (pr: PRCheckStatus | null) => void
+
   // Mode state setters
   setSelectedTerminal: (
     terminal: Terminal | null,
@@ -88,6 +100,7 @@ export function createPaletteModes(
     actions: createActionsMode(data, state, actions, api),
     branches: createBranchesMode(data, state, actions, api),
     'branch-actions': createBranchActionsMode(data, state, actions, api),
+    'pr-actions': createPRActionsMode(data, state, actions, api),
   }
 }
 

@@ -534,7 +534,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               hasConflict={duplicates.has('togglePip')}
             />
             <ShortcutRow
-              label="Item Actions"
+              label="Project Actions"
               binding={itemActions}
               isRecording={recording === 'itemActions'}
               recordingKeys={recording === 'itemActions' ? recordingKeys : []}

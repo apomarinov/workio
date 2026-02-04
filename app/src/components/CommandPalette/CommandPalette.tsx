@@ -17,6 +17,8 @@ import type { SessionWithProject, Terminal } from '../../types'
 import { ConfirmModal } from '../ConfirmModal'
 import { EditSessionModal } from '../EditSessionModal'
 import { EditTerminalModal } from '../EditTerminalModal'
+import { MergePRModal } from '../MergePRModal'
+import { RerunChecksModal } from '../RerunChecksModal'
 import { CommandPaletteCore } from './CommandPaletteCore'
 import {
   type AppActions,
@@ -70,6 +72,11 @@ export function CommandPalette() {
     branch: string
   } | null>(null)
 
+  // PR action state
+  const [actionPR, setActionPR] = useState<PRCheckStatus | null>(null)
+  const [mergeModal, setMergeModal] = useState<PRCheckStatus | null>(null)
+  const [rerunAllModal, setRerunAllModal] = useState<PRCheckStatus | null>(null)
+
   // Context data
   const {
     terminals,
@@ -110,6 +117,7 @@ export function CommandPalette() {
         setBranches(null)
         setBranchesLoading(false)
         setLoadingStates({})
+        setActionPR(null)
         setHighlightedId(null)
         setModeStack(['search'])
       }, 300)
@@ -146,9 +154,30 @@ export function CommandPalette() {
   // Listen for item-actions event
   useEffect(() => {
     const handler = (
-      e: CustomEvent<{ terminalId: number | null; sessionId: string | null }>,
+      e: CustomEvent<{
+        terminalId: number | null
+        sessionId: string | null
+        prNumber?: number
+        prRepo?: string
+      }>,
     ) => {
-      const { terminalId, sessionId } = e.detail
+      const { terminalId, sessionId, prNumber, prRepo } = e.detail
+
+      // If a PR is specified, open PR actions
+      if (prNumber && prRepo) {
+        const pr = githubPRs.find(
+          (p) => p.prNumber === prNumber && p.repo === prRepo,
+        )
+        if (pr) {
+          setActionPR(pr)
+          setSelectedTerminal(null)
+          setSelectedPR(null)
+          setSelectedSession(null)
+          setModeStack(['search', 'pr-actions'])
+          setOpen(true)
+          return
+        }
+      }
 
       if (sessionId) {
         const session = sessions.find((s) => s.session_id === sessionId)
@@ -156,6 +185,7 @@ export function CommandPalette() {
           setSelectedSession(session)
           setSelectedTerminal(null)
           setSelectedPR(null)
+          setActionPR(null)
           setModeStack(['search', 'actions'])
           setOpen(true)
           return
@@ -171,6 +201,7 @@ export function CommandPalette() {
           setSelectedTerminal(terminal)
           setSelectedPR(pr)
           setSelectedSession(null)
+          setActionPR(null)
           setModeStack(['search', 'actions'])
           setOpen(true)
         }
@@ -179,7 +210,7 @@ export function CommandPalette() {
     window.addEventListener('open-item-actions', handler as EventListener)
     return () =>
       window.removeEventListener('open-item-actions', handler as EventListener)
-  }, [terminals, sessions, branchToPR])
+  }, [terminals, sessions, githubPRs, branchToPR])
 
   // Listen for open-terminal-branches event
   useEffect(() => {
@@ -254,6 +285,8 @@ export function CommandPalette() {
       branches,
       branchesLoading,
       loadingStates,
+      selectedPR: actionPR,
+      prLoadingStates: {},
     }),
     [
       selectedTerminal,
@@ -263,6 +296,7 @@ export function CommandPalette() {
       branches,
       branchesLoading,
       loadingStates,
+      actionPR,
     ],
   )
 
@@ -442,16 +476,31 @@ export function CommandPalette() {
         setForcePushConfirm({ terminalId, branch })
       },
 
+      // PR actions
+      openMergeModal: (pr) => {
+        setMergeModal(pr)
+      },
+      openRerunAllModal: (pr) => {
+        setRerunAllModal(pr)
+      },
+      setSelectedPR: (pr) => {
+        setActionPR(pr)
+        setSelectedTerminal(null)
+        setSelectedSession(null)
+      },
+
       // State setters
       setSelectedTerminal: (terminal, pr) => {
         setSelectedTerminal(terminal)
         setSelectedPR(pr)
         setSelectedSession(null)
+        setActionPR(null)
       },
       setSelectedSession: (session) => {
         setSelectedSession(session)
         setSelectedTerminal(null)
         setSelectedPR(null)
+        setActionPR(null)
       },
       setSelectedBranch,
     }),
@@ -493,6 +542,8 @@ export function CommandPalette() {
         setBranches(null)
       } else if (currentModeId === 'branch-actions') {
         setSelectedBranch(null)
+      } else if (currentModeId === 'pr-actions') {
+        setActionPR(null)
       }
     } else {
       setModeStack((prev) => prev.slice(0, -1))
@@ -602,6 +653,24 @@ export function CommandPalette() {
             setForcePushConfirm(null)
           }}
           onCancel={() => setForcePushConfirm(null)}
+        />
+      )}
+
+      {mergeModal && (
+        <MergePRModal
+          open={!!mergeModal}
+          pr={mergeModal}
+          onClose={() => setMergeModal(null)}
+          onSuccess={closePalette}
+        />
+      )}
+
+      {rerunAllModal && (
+        <RerunChecksModal
+          open={!!rerunAllModal}
+          pr={rerunAllModal}
+          onClose={() => setRerunAllModal(null)}
+          onSuccess={closePalette}
         />
       )}
     </>

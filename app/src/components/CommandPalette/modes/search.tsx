@@ -148,7 +148,14 @@ export function createSearchMode(
       ),
       icon: prInfo.icon?.(),
       keywords: [pr.prTitle, pr.branch],
-      onSelect: () => actions.revealPR(pr),
+      onSelect: () => {
+        actions.setSelectedPR(pr)
+        api.navigate({ modeId: 'pr-actions' })
+      },
+      onNavigate: () => {
+        actions.setSelectedPR(pr)
+        api.navigate({ modeId: 'pr-actions' })
+      },
     }
   })
 

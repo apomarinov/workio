@@ -66,13 +66,12 @@ function AppContent() {
       window.dispatchEvent(new Event('toggle-pip'))
     },
     itemActions: () => {
-      // Only dispatch if there's an active terminal or session
-      if (!activeTerminal && !activeSessionId) return
+      if (!activeTerminal) return
       window.dispatchEvent(
         new CustomEvent('open-item-actions', {
           detail: {
-            terminalId: activeTerminal?.id ?? null,
-            sessionId: activeSessionId ?? null,
+            terminalId: activeTerminal.id,
+            sessionId: null,
           },
         }),
       )

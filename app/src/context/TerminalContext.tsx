@@ -58,6 +58,8 @@ interface TerminalContextValue {
   markPRSeen: (pr: PRCheckStatus) => void
   markAllPRsSeen: () => void
   hasAnyUnseenPRs: boolean
+  activePR: PRCheckStatus | null
+  setActivePR: (pr: PRCheckStatus | null) => void
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -99,6 +101,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
   const previousTerminalIdRef = useRef<number | null>(null)
+  const [activePR, setActivePR] = useState<PRCheckStatus | null>(null)
 
   // Auto-select first terminal when terminals load
   useEffect(() => {
@@ -546,6 +549,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRSeen,
       markAllPRsSeen,
       hasAnyUnseenPRs,
+      activePR,
+      setActivePR,
     }),
     [
       terminals,
@@ -564,6 +569,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRSeen,
       markAllPRsSeen,
       hasAnyUnseenPRs,
+      activePR,
     ],
   )
 

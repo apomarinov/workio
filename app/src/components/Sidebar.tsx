@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import type { PRCheckStatus } from '../../shared/types'
 import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -103,6 +104,8 @@ export function Sidebar({ width }: SidebarProps) {
     markPRSeen,
     markAllPRsSeen,
     hasAnyUnseenPRs,
+    activePR,
+    setActivePR,
   } = useTerminalContext()
   const [bellOpen, setBellOpen] = useState(false)
   const sensors = useSensors(
@@ -218,13 +221,16 @@ export function Sidebar({ width }: SidebarProps) {
     [expandedGitHubPRs],
   )
 
-  const toggleGitHubPR = (branch: string) => {
+  const toggleGitHubPR = (pr: PRCheckStatus) => {
+    const isExpanding = !expandedGitHubPRs.includes(pr.branch)
     setExpandedGitHubPRs((prev) => {
-      if (prev.includes(branch)) {
-        return prev.filter((b) => b !== branch)
+      if (prev.includes(pr.branch)) {
+        return prev.filter((b) => b !== pr.branch)
       }
-      return [...prev, branch]
+      return [...prev, pr.branch]
     })
+    // Set activePR when expanding, clear when collapsing
+    setActivePR(isExpanding ? pr : null)
   }
 
   const collapsedGitHubReposSet = useMemo(
@@ -858,9 +864,13 @@ export function Sidebar({ width }: SidebarProps) {
                                   key={`${pr.repo}:${pr.prNumber}`}
                                   pr={pr}
                                   expanded={expandedGitHubPRsSet.has(pr.branch)}
-                                  onToggle={() => toggleGitHubPR(pr.branch)}
+                                  onToggle={() => toggleGitHubPR(pr)}
                                   hasNewActivity={hasNewActivity(pr)}
                                   onSeen={() => markPRSeen(pr)}
+                                  isActive={
+                                    activePR?.prNumber === pr.prNumber &&
+                                    activePR?.repo === pr.repo
+                                  }
                                 />
                               ))}
                               {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
