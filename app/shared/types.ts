@@ -25,6 +25,7 @@ export interface PRComment {
   avatarUrl: string
   body: string
   createdAt: string
+  path?: string // File path for code review comments
 }
 
 export interface PRReview {

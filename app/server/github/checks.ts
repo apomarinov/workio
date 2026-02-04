@@ -132,6 +132,19 @@ async function detectGitHubRepo(
   }
 }
 
+// Helper to wrap execFile in a Promise
+function execFileAsync(
+  cmd: string,
+  args: string[],
+  options: { timeout: number; maxBuffer: number },
+): Promise<string> {
+  return new Promise((resolve) => {
+    execFile(cmd, args, options, (err, stdout) => {
+      resolve(err ? '' : stdout)
+    })
+  })
+}
+
 interface GhPR {
   number: number
   title: string
@@ -201,7 +214,12 @@ function fetchOpenPRs(
 
         try {
           const prs: GhPR[] = JSON.parse(stdout)
-          const allResults: PRCheckStatus[] = []
+
+          // Build initial results without code review comments
+          const resultsWithoutCodeComments: {
+            result: PRCheckStatus
+            issueComments: PRComment[]
+          }[] = []
 
           for (const pr of prs) {
             const allChecks = pr.statusCheckRollup || []
@@ -263,11 +281,9 @@ function fetchOpenPRs(
               reviewsByAuthor.set(r.author, r)
             }
 
-            // Extract comments, filter bots, newest first, limit 5
-            const comments: PRComment[] = (pr.comments || [])
+            // Extract issue comments (code review comments fetched separately)
+            const issueComments: PRComment[] = (pr.comments || [])
               .filter((c) => !c.author.login.includes('[bot]'))
-              .reverse()
-              .slice(0, 5)
               .map((c) => ({
                 url: c.url,
                 author: c.author.login,
@@ -303,30 +319,97 @@ function fetchOpenPRs(
                 '') as typeof reviewDecision
             }
 
-            allResults.push({
-              prNumber: pr.number,
-              prTitle: pr.title,
-              prUrl: pr.url,
-              prBody: pr.body || '',
-              branch: pr.headRefName,
-              repo: repoKey,
-              state: 'OPEN',
-              reviewDecision,
-              reviews: Array.from(reviewsByAuthor.values()),
-              checks: failedChecks,
-              comments,
-              createdAt: pr.createdAt || '',
-              updatedAt: pr.updatedAt || '',
-              areAllChecksOk,
-              mergeable: pr.mergeable || 'UNKNOWN',
+            resultsWithoutCodeComments.push({
+              result: {
+                prNumber: pr.number,
+                prTitle: pr.title,
+                prUrl: pr.url,
+                prBody: pr.body || '',
+                branch: pr.headRefName,
+                repo: repoKey,
+                state: 'OPEN',
+                reviewDecision,
+                reviews: Array.from(reviewsByAuthor.values()),
+                checks: failedChecks,
+                comments: [], // Will be filled after fetching code review comments
+                createdAt: pr.createdAt || '',
+                updatedAt: pr.updatedAt || '',
+                areAllChecksOk,
+                mergeable: pr.mergeable || 'UNKNOWN',
+              },
+              issueComments,
             })
           }
 
-          checksCache.set(repoKey, {
-            prs: allResults,
-            fetchedAt: Date.now(),
+          // Now fetch code review comments for each PR in parallel
+          if (resultsWithoutCodeComments.length === 0) {
+            checksCache.set(repoKey, { prs: [], fetchedAt: Date.now() })
+            resolve([])
+            return
+          }
+
+          // Fetch code comments for all PRs in parallel using Promise.all
+          Promise.all(
+            resultsWithoutCodeComments.map(async ({ result }) => {
+              const stdout = await execFileAsync(
+                'gh',
+                [
+                  'api',
+                  `repos/${owner}/${repo}/pulls/${result.prNumber}/comments`,
+                ],
+                { timeout: 10000, maxBuffer: 5 * 1024 * 1024 },
+              )
+              let codeComments: PRComment[] = []
+              try {
+                const codeCommentsRaw: {
+                  html_url: string
+                  user: { login: string }
+                  body: string
+                  created_at: string
+                  path: string
+                }[] = JSON.parse(stdout) || []
+                codeComments = codeCommentsRaw
+                  .filter((c) => !c.user.login.includes('[bot]'))
+                  .map((c) => ({
+                    url: c.html_url,
+                    author: c.user.login,
+                    avatarUrl: `https://github.com/${c.user.login}.png?size=32`,
+                    body: c.body,
+                    createdAt: c.created_at,
+                    path: c.path,
+                  }))
+              } catch {
+                // ignore parse errors
+              }
+              return { prNumber: result.prNumber, codeComments }
+            }),
+          ).then((codeCommentsResults) => {
+            const codeCommentsByPR = new Map<number, PRComment[]>()
+            for (const { prNumber, codeComments } of codeCommentsResults) {
+              codeCommentsByPR.set(prNumber, codeComments)
+            }
+
+            // Merge comments for each PR
+            const allResults: PRCheckStatus[] = resultsWithoutCodeComments.map(
+              ({ result, issueComments }) => {
+                const codeComments = codeCommentsByPR.get(result.prNumber) || []
+                const mergedComments = [...issueComments, ...codeComments]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.createdAt).getTime() -
+                      new Date(a.createdAt).getTime(),
+                  )
+                  .slice(0, 5)
+                return { ...result, comments: mergedComments }
+              },
+            )
+
+            checksCache.set(repoKey, {
+              prs: allResults,
+              fetchedAt: Date.now(),
+            })
+            resolve(allResults)
           })
-          resolve(allResults)
         } catch {
           resolve(cached?.prs ?? [])
         }
@@ -690,7 +773,7 @@ export function stopChecksPolling(): void {
   }
 }
 
-export function fetchPRComments(
+export async function fetchPRComments(
   owner: string,
   repo: string,
   prNumber: number,
@@ -698,8 +781,9 @@ export function fetchPRComments(
   offset: number,
   excludeAuthors?: string[],
 ): Promise<{ comments: PRComment[]; total: number }> {
-  return new Promise((resolve) => {
-    execFile(
+  // Fetch both issue comments and code review comments in parallel
+  const [issueCommentsStdout, codeCommentsStdout] = await Promise.all([
+    execFileAsync(
       'gh',
       [
         'pr',
@@ -711,45 +795,80 @@ export function fetchPRComments(
         'comments',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
-      (err, stdout) => {
-        if (err) {
-          resolve({ comments: [], total: 0 })
-          return
-        }
-        try {
-          const data: {
-            comments: {
-              url: string
-              author: { login: string }
-              body: string
-              createdAt: string
-            }[]
-          } = JSON.parse(stdout)
+    ),
+    execFileAsync(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/pulls/${prNumber}/comments`,
+        '--paginate',
+      ],
+      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+    ),
+  ])
 
-          const excludeSet = excludeAuthors ? new Set(excludeAuthors) : null
-          const filtered = (data.comments || []).filter(
-            (c) =>
-              !c.author.login.includes('[bot]') &&
-              (!excludeSet || !excludeSet.has(c.author.login)),
-          )
-          const total = filtered.length
-          const sliced = filtered
-            .reverse()
-            .slice(offset, offset + limit)
-            .map((c) => ({
-              url: c.url,
-              author: c.author.login,
-              avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
-              body: c.body,
-              createdAt: c.createdAt,
-            }))
-          resolve({ comments: sliced, total })
-        } catch {
-          resolve({ comments: [], total: 0 })
-        }
-      },
-    )
-  })
+  let issueCommentsData: {
+    url: string
+    author: { login: string }
+    body: string
+    createdAt: string
+  }[] = []
+  let codeCommentsData: {
+    html_url: string
+    user: { login: string }
+    body: string
+    created_at: string
+    path: string
+  }[] = []
+
+  try {
+    const data = JSON.parse(issueCommentsStdout)
+    issueCommentsData = data.comments || []
+  } catch {
+    // ignore parse errors
+  }
+
+  try {
+    codeCommentsData = JSON.parse(codeCommentsStdout) || []
+  } catch {
+    // ignore parse errors
+  }
+
+  const excludeSet = excludeAuthors ? new Set(excludeAuthors) : null
+  // Merge issue comments and code review comments
+  const issueComments = issueCommentsData.map((c) => ({
+    author: c.author.login,
+    body: c.body,
+    createdAt: c.createdAt,
+    url: c.url,
+    path: undefined as string | undefined,
+  }))
+  const codeComments = codeCommentsData.map((c) => ({
+    author: c.user.login,
+    body: c.body,
+    createdAt: c.created_at,
+    url: c.html_url,
+    path: c.path,
+  }))
+  const allComments = [...issueComments, ...codeComments]
+  const filtered = allComments.filter(
+    (c) =>
+      !c.author.includes('[bot]') && (!excludeSet || !excludeSet.has(c.author)),
+  )
+  const total = filtered.length
+  // Sort by date descending
+  const sorted = filtered.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
+  const sliced = sorted.slice(offset, offset + limit).map((c) => ({
+    url: c.url,
+    author: c.author,
+    avatarUrl: `https://github.com/${c.author}.png?size=32`,
+    body: c.body,
+    createdAt: c.createdAt,
+    path: c.path,
+  }))
+  return { comments: sliced, total }
 }
 
 export function requestPRReview(

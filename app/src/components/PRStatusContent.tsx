@@ -8,6 +8,7 @@ import {
   Loader2,
   MessageSquare,
   RefreshCw,
+  File,
   X,
 } from 'lucide-react'
 import { memo, type ReactNode, useCallback, useMemo, useState } from 'react'
@@ -65,9 +66,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -260,6 +261,7 @@ const CommentItem = memo(function CommentItem({
     avatarUrl: string
     body: string
     createdAt: string
+    path?: string
   }
   prUrl: string
   onHide: (author: string) => void
@@ -332,11 +334,18 @@ const CommentItem = memo(function CommentItem({
         <div
           onClick={() => setModalOpen(true)}
           className={cn(
-            'mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors',
-            !expanded && 'line-clamp-1 leading-[1.5]',
+            'mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded px-1 py-0.5 transition-colors',
           )}
         >
-          <MarkdownContent content={comment.body} />
+          {comment.path && (
+            <span className="text-[10px] flex items-center gap-1 text-muted-foreground/50 truncate">
+              <File className='w-2 h-2 min-w-2 min-h-2' />
+              {comment.path}
+            </span>
+          )}
+          <div className={cn(!expanded && 'line-clamp-1 leading-[1.5]')}>
+            <MarkdownContent content={comment.body} />
+          </div>
         </div>
       </div>
 
@@ -653,7 +662,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
