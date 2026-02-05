@@ -401,6 +401,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [notifications],
   )
 
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  )
+
   const markNotificationRead = useCallback(async (id: number) => {
     await api.markNotificationRead(id)
     setNotifications((prev) =>
@@ -418,6 +423,19 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     await api.deleteAllNotifications()
     setNotifications([])
   }, [])
+
+  // Update app badge based on unread notifications or unseen PRs
+  useEffect(() => {
+    if (!('setAppBadge' in navigator)) return
+
+    if (unreadNotificationCount > 0) {
+      navigator.setAppBadge(unreadNotificationCount)
+    } else if (hasAnyUnseenPRs) {
+      navigator.setAppBadge()
+    } else {
+      navigator.clearAppBadge?.()
+    }
+  }, [unreadNotificationCount, hasAnyUnseenPRs])
 
   // Fetch merged PRs for all repos
   const [mergedPRs, setMergedPRs] = useState<MergedPRSummary[]>([])
