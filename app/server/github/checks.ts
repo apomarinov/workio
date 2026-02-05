@@ -339,6 +339,18 @@ function fetchOpenPRs(
                 '') as typeof reviewDecision
             }
 
+            // Compute status flags
+            const runningChecksCount = failedChecks.filter(
+              (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+            ).length
+            const failedChecksCount = failedChecks.filter(
+              (c) =>
+                c.status === 'COMPLETED' &&
+                c.conclusion !== 'SUCCESS' &&
+                c.conclusion !== 'SKIPPED' &&
+                c.conclusion !== 'NEUTRAL',
+            ).length
+
             resultsWithoutCodeComments.push({
               result: {
                 prNumber: pr.number,
@@ -356,6 +368,15 @@ function fetchOpenPRs(
                 updatedAt: pr.updatedAt || '',
                 areAllChecksOk,
                 mergeable: pr.mergeable || 'UNKNOWN',
+                // Pre-computed status flags
+                isMerged: false,
+                isApproved: reviewDecision === 'APPROVED',
+                hasChangesRequested: reviewDecision === 'CHANGES_REQUESTED',
+                hasConflicts: pr.mergeable === 'CONFLICTING',
+                hasPendingReviews: hasPending,
+                hasFailedChecks: failedChecksCount > 0,
+                runningChecksCount,
+                failedChecksCount,
               },
               issueComments,
             })
@@ -492,6 +513,15 @@ function fetchMergedPRsForBranches(
               createdAt: pr.createdAt || '',
               updatedAt: pr.updatedAt || '',
               areAllChecksOk: false,
+              // Pre-computed status flags for merged PRs
+              isMerged: true,
+              isApproved: false,
+              hasChangesRequested: false,
+              hasConflicts: false,
+              hasPendingReviews: false,
+              hasFailedChecks: false,
+              runningChecksCount: 0,
+              failedChecksCount: 0,
             }))
           resolve(results)
         } catch {
@@ -1212,15 +1242,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
     }
 
     // Check failed
-    const hasFailedChecks = (p: PRCheckStatus) =>
-      p.checks.some(
-        (c) =>
-          c.status === 'COMPLETED' &&
-          c.conclusion !== 'SUCCESS' &&
-          c.conclusion !== 'SKIPPED' &&
-          c.conclusion !== 'NEUTRAL',
-      )
-    if (prev && !hasFailedChecks(prev) && hasFailedChecks(pr)) {
+    if (prev && !prev.hasFailedChecks && pr.hasFailedChecks) {
       const failedCheck = pr.checks.find(
         (c) =>
           c.status === 'COMPLETED' &&

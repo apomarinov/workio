@@ -53,6 +53,15 @@ export interface PRCheckStatus {
   updatedAt: string
   areAllChecksOk: boolean
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
+  // Pre-computed status flags
+  isMerged: boolean
+  isApproved: boolean
+  hasChangesRequested: boolean
+  hasConflicts: boolean
+  hasPendingReviews: boolean
+  hasFailedChecks: boolean
+  runningChecksCount: number
+  failedChecksCount: number
 }
 
 export interface PRChecksPayload {

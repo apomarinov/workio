@@ -6,7 +6,6 @@ import {
   GitMerge,
 } from 'lucide-react'
 import { RefreshIcon } from '@/components/icons'
-import { getPRStatusInfo } from '@/lib/pr-status'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
   PaletteAPI,
@@ -32,29 +31,21 @@ export function createPRActionsMode(
     }
   }
 
-  const statusInfo = getPRStatusInfo(pr)
   const isOpen = pr.state === 'OPEN'
-  const hasFailedChecks =
-    'hasFailedChecks' in statusInfo && statusInfo.hasFailedChecks
 
-  // Count failed checks for display (need the actual count for label)
-  const failedChecksCount = pr.checks.filter(
-    (c) =>
-      c.status === 'COMPLETED' &&
-      c.conclusion !== 'SUCCESS' &&
-      c.conclusion !== 'SKIPPED' &&
-      c.conclusion !== 'NEUTRAL',
-  ).length
+  // Use pre-computed flags from server
+  const {
+    hasFailedChecks,
+    hasConflicts,
+    hasChangesRequested,
+    failedChecksCount,
+  } = pr
 
   // Check if PR can be merged
   const canMerge =
     isOpen &&
     pr.mergeable === 'MERGEABLE' &&
-    (pr.reviewDecision === 'APPROVED' || pr.reviewDecision === '')
-
-  const hasConflicts = 'hasConflicts' in statusInfo && statusInfo.hasConflicts
-  const hasChangesRequested =
-    'hasChangesRequested' in statusInfo && statusInfo.hasChangesRequested
+    (pr.isApproved || pr.reviewDecision === '')
 
   const items: PaletteItem[] = []
 

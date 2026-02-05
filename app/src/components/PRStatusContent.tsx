@@ -384,7 +384,6 @@ export function PRStatusContent({
   onToggle,
   onSeen,
 }: PRStatusContentProps) {
-  const isMerged = pr.state === 'MERGED'
   const hasHeader = onToggle !== undefined
   const expanded = hasHeader ? (expandedProp ?? false) : true
 
@@ -426,7 +425,6 @@ export function PRStatusContent({
     () => pr.comments.some((c) => !hiddenAuthorsSet.has(c.author)),
     [pr.comments, hiddenAuthorsSet],
   )
-  const hasConflicts = pr.mergeable === 'CONFLICTING'
 
   const [visibleCount, setVisibleCount] = useState(5)
 
@@ -530,7 +528,7 @@ export function PRStatusContent({
   if (!hasHeader && !hasContent) return null
 
   // Merged state with header: just show a merged tab
-  if (hasHeader && isMerged) {
+  if (hasHeader && pr.isMerged) {
     return <PRTabButton pr={pr} active onClick={onSeen} />
   }
 
@@ -568,7 +566,7 @@ export function PRStatusContent({
               icon={<Check className="w-3 h-3 flex-shrink-0 text-green-500" />}
               prUrl={pr.prUrl}
               isApproved
-              hasConflicts={hasConflicts}
+              hasConflicts={pr.hasConflicts}
               onReReview={handleReReview}
               onMerge={() => setMergeOpen(true)}
               onReply={handleReply}

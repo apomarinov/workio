@@ -21,22 +21,16 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
     }
   }
 
-  const isMerged = pr.state === 'MERGED'
-  const isApproved = pr.reviewDecision === 'APPROVED'
-  const hasChangesRequested = pr.reviewDecision === 'CHANGES_REQUESTED'
-  const runningChecks = pr.checks.filter(
-    (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-  ).length
-  const failedChecks = pr.checks.filter(
-    (c) =>
-      c.status === 'COMPLETED' &&
-      c.conclusion !== 'SUCCESS' &&
-      c.conclusion !== 'SKIPPED' &&
-      c.conclusion !== 'NEUTRAL',
-  ).length
-  const hasConflicts = pr.mergeable === 'CONFLICTING'
-  const hasPendingReviews =
-    pr.reviews.filter((r) => r.state === 'PENDING').length > 0
+  // Use pre-computed flags from server
+  const {
+    isMerged,
+    isApproved,
+    hasChangesRequested,
+    hasConflicts,
+    hasPendingReviews,
+    runningChecksCount,
+    failedChecksCount,
+  } = pr
 
   if (isMerged) {
     return {
@@ -55,10 +49,10 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       ),
     }
   }
-  if (runningChecks > 0) {
+  if (runningChecksCount > 0) {
     return {
       hasRunningChecks: true,
-      label: `Running checks (${runningChecks})`,
+      label: `Running checks (${runningChecksCount})`,
       colorClass: 'text-yellow-400',
       dimColorClass: 'text-yellow-400/60 hover:text-yellow-400',
       icon: (props?: { cls?: string; group?: string }) => (
@@ -89,11 +83,11 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       ),
     }
   }
-  if (isApproved && (hasConflicts || failedChecks > 0)) {
+  if (isApproved && (hasConflicts || failedChecksCount > 0)) {
     return {
       isApproved,
       hasConflicts,
-      hasFailedChecks: failedChecks > 0,
+      hasFailedChecks: failedChecksCount > 0,
       label: hasConflicts ? 'Conflicts' : 'Failed Checks',
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
@@ -144,10 +138,10 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       },
     }
   }
-  if (failedChecks > 0) {
+  if (failedChecksCount > 0) {
     return {
       hasFailedChecks: true,
-      label: `Failed checks (${failedChecks})`,
+      label: `Failed checks (${failedChecksCount})`,
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
       icon: (props?: { cls?: string; group?: string }) => (
