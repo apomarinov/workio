@@ -65,6 +65,7 @@ import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
+import { SortableRepoGroup } from './SortableRepoGroup'
 import { SortableTerminalItem } from './SortableTerminalItem'
 import { useWebhookWarning } from './WebhooksModal'
 
@@ -116,6 +117,10 @@ export function Sidebar({ width }: SidebarProps) {
   const [collapsedGitHubRepos, setCollapsedGitHubRepos] = useLocalStorage<
     string[]
   >('sidebar-collapsed-github-repos', [])
+  const [repoOrder, setRepoOrder] = useLocalStorage<string[]>(
+    'sidebar-repo-order',
+    [],
+  )
   const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
   const {
@@ -282,6 +287,39 @@ export function Sidebar({ width }: SidebarProps) {
     }
     return grouped
   }, [githubPRs])
+
+  // Sort repos based on saved order
+  const sortedRepos = useMemo(() => {
+    const repos = Array.from(githubPRsByRepo.keys())
+    return repos.sort((a, b) => {
+      const aIndex = repoOrder.indexOf(a)
+      const bIndex = repoOrder.indexOf(b)
+      // If both are in order, sort by order
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+      // If only one is in order, it comes first
+      if (aIndex !== -1) return -1
+      if (bIndex !== -1) return 1
+      // Neither in order, keep original order
+      return 0
+    })
+  }, [githubPRsByRepo, repoOrder])
+
+  const handleRepoDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      const oldIndex = sortedRepos.indexOf(active.id as string)
+      const newIndex = sortedRepos.indexOf(over.id as string)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const newOrder = [...sortedRepos]
+      newOrder.splice(oldIndex, 1)
+      newOrder.splice(newIndex, 0, active.id as string)
+      setRepoOrder(newOrder)
+    },
+    [sortedRepos, setRepoOrder],
+  )
 
   const mergedPRsByRepo = useMemo(() => {
     const grouped = new Map<string, typeof mergedPRs>()
@@ -866,87 +904,104 @@ export function Sidebar({ width }: SidebarProps) {
                   )}
                   Pull requests
                 </button>
-                {!githubSectionCollapsed &&
-                  Array.from(githubPRsByRepo.entries()).map(
-                    ([repo, repoPRs]) => {
-                      const repoName = repo.split('/')[1] || repo
-                      const isCollapsed = collapsedGitHubReposSet.has(repo)
-                      const hiddenPRsForRepo = (
-                        settings?.hidden_prs ?? []
-                      ).filter((h) => h.repo === repo)
-                      return (
-                        <div key={repo}>
-                          <div className="group/repo-header flex items-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleGitHubRepo(repo)}
-                              className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
-                            >
-                              {isCollapsed ? (
-                                <ChevronRight className="w-3 h-3 flex-shrink-0" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3 flex-shrink-0" />
-                              )}
-                              <Github className="w-3 h-3" />
-                              <span className="truncate">{repoName}</span>
-                            </button>
-                            {hiddenPRsForRepo.length > 0 && (
+                {!githubSectionCollapsed && (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[
+                      restrictToVerticalAxis,
+                      restrictToParentElement,
+                    ]}
+                    onDragEnd={handleRepoDragEnd}
+                  >
+                    <SortableContext
+                      items={sortedRepos}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {sortedRepos.map((repo) => {
+                        const repoPRs = githubPRsByRepo.get(repo) ?? []
+                        const repoName = repo.split('/')[1] || repo
+                        const isCollapsed = collapsedGitHubReposSet.has(repo)
+                        const hiddenPRsForRepo = (
+                          settings?.hidden_prs ?? []
+                        ).filter((h) => h.repo === repo)
+                        return (
+                          <SortableRepoGroup key={repo} repo={repo}>
+                            <div className="group/repo-header flex items-center">
                               <button
                                 type="button"
-                                onClick={() => setHiddenPRsModalRepo(repo)}
-                                className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
-                                title={`${hiddenPRsForRepo.length} hidden PR${hiddenPRsForRepo.length > 1 ? 's' : ''}`}
+                                onClick={() => toggleGitHubRepo(repo)}
+                                className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
                               >
-                                <EyeOff className="w-3 h-3" />
+                                {isCollapsed ? (
+                                  <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                                )}
+                                <Github className="w-3 h-3" />
+                                <span className="truncate">{repoName}</span>
                               </button>
-                            )}
-                          </div>
-                          {!isCollapsed && (
-                            <>
-                              {repoPRs.map((pr) => (
-                                <PRStatusGroup
-                                  key={`${pr.repo}:${pr.prNumber}`}
-                                  pr={pr}
-                                  expanded={expandedGitHubPRsSet.has(pr.branch)}
-                                  onToggle={() => toggleGitHubPR(pr)}
-                                  hasNewActivity={hasNewActivity(pr)}
-                                  onSeen={() => markPRSeen(pr)}
-                                  isActive={
-                                    activePR?.prNumber === pr.prNumber &&
-                                    activePR?.repo === pr.repo
-                                  }
-                                />
-                              ))}
-                              {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
-                                <a
-                                  key={pr.prNumber}
-                                  href={pr.prUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                              {hiddenPRsForRepo.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setHiddenPRsModalRepo(repo)}
+                                  className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                                  title={`${hiddenPRsForRepo.length} hidden PR${hiddenPRsForRepo.length > 1 ? 's' : ''}`}
                                 >
-                                  <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-xs truncate block">
-                                      {pr.prTitle}
-                                    </span>
-                                    <div className="flex gap-1 items-center">
-                                      <GitBranch className="w-2.5 h-2.5" />
-                                      <span className="text-[11px] text-muted-foreground/50 truncate">
-                                        {pr.branch}
+                                  <EyeOff className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            {!isCollapsed && (
+                              <>
+                                {repoPRs.map((pr) => (
+                                  <PRStatusGroup
+                                    key={`${pr.repo}:${pr.prNumber}`}
+                                    pr={pr}
+                                    expanded={expandedGitHubPRsSet.has(
+                                      pr.branch,
+                                    )}
+                                    onToggle={() => toggleGitHubPR(pr)}
+                                    hasNewActivity={hasNewActivity(pr)}
+                                    onSeen={() => markPRSeen(pr)}
+                                    isActive={
+                                      activePR?.prNumber === pr.prNumber &&
+                                      activePR?.repo === pr.repo
+                                    }
+                                  />
+                                ))}
+                                {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
+                                  <a
+                                    key={pr.prNumber}
+                                    href={pr.prUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                                  >
+                                    <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                                    <div className="flex-1 min-w-0">
+                                      <span className="text-xs truncate block">
+                                        {pr.prTitle}
                                       </span>
+                                      <div className="flex gap-1 items-center">
+                                        <GitBranch className="w-2.5 h-2.5" />
+                                        <span className="text-[11px] text-muted-foreground/50 truncate">
+                                          {pr.branch}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                </a>
-                              ))}
-                              <OlderMergedPRsList repo={repo} />
-                            </>
-                          )}
-                        </div>
-                      )
-                    },
-                  )}
+                                  </a>
+                                ))}
+                                <OlderMergedPRsList repo={repo} />
+                              </>
+                            )}
+                          </SortableRepoGroup>
+                        )
+                      })}
+                    </SortableContext>
+                  </DndContext>
+                )}
               </>
             )}
           </>

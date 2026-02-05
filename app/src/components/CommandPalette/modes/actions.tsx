@@ -60,16 +60,6 @@ export function createActionsMode(
       })
     }
 
-    // Open in Explorer (non-SSH only)
-    if (!terminal.ssh_host) {
-      items.push({
-        id: 'action:explorer',
-        label: 'Reveal in Finder',
-        icon: <FinderIcon className="h-4 w-4 shrink-0 fill-zinc-400" />,
-        onSelect: () => actions.openInExplorer(terminal),
-      })
-    }
-
     // Branches (git repos only)
     if (terminal.git_repo) {
       items.push({
@@ -121,6 +111,16 @@ export function createActionsMode(
             pr,
           })
         },
+      })
+    }
+
+    // Open in Explorer (non-SSH only)
+    if (!terminal.ssh_host) {
+      items.push({
+        id: 'action:explorer',
+        label: 'Reveal in Finder',
+        icon: <FinderIcon className="h-4 w-4 shrink-0 fill-zinc-400" />,
+        onSelect: () => actions.openInExplorer(terminal),
       })
     }
 
