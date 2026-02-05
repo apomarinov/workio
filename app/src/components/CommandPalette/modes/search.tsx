@@ -246,8 +246,6 @@ export function createSearchMode(
   if (terminalItems.length > 0) {
     groups.push({ heading: 'Projects', items: terminalItems })
   }
-  // Add actions group with logs
-  groups.push({ heading: 'Actions', items: [logsItem] })
   if (openPRItems.length > 0 || mergedPRItems.length > 0) {
     groups.push({
       heading: 'Pull Requests',
@@ -257,6 +255,8 @@ export function createSearchMode(
   if (sessionItems.length > 0) {
     groups.push({ heading: 'Claude Sessions', items: sessionItems })
   }
+  // Add actions group with logs
+  groups.push({ heading: 'Actions', items: [logsItem] })
 
   return {
     id: 'search',

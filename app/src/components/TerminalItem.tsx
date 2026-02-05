@@ -262,7 +262,7 @@ export const TerminalItem = memo(function TerminalItem({
             <button
               type="button"
               onClick={handleActionsClick}
-              className="text-xs text-muted-foreground hidden group-hover:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer"
+              className="text-xs absolute right-1 text-muted-foreground hidden group-hover:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer"
             >
               <MoreVertical className="w-4 h-4" />
             </button>

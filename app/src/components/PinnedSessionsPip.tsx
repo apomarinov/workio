@@ -1,5 +1,5 @@
-import { Minimize2, Minus, MoreVertical, Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Maximize2, Minimize2, Minus, MoreVertical, Plus } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,17 +12,285 @@ import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import type { SessionWithProject } from '../types'
+import { useSessionMessages } from '../hooks/useSessionMessages'
+import { useSettings } from '../hooks/useSettings'
+import type {
+  SessionMessage,
+  SessionWithProject,
+  TodoWriteTool,
+} from '../types'
+import { MessageBubble, ThinkingGroup } from './MessageBubble'
 import { SessionItem } from './SessionItem'
 
 const PIP_CARD_WIDTH = {
   vertical: 500,
   horizontal: 350,
 }
+const PIP_CHAT_HEIGHT = 300
 const PIP_ELEMENT_ID = 'pinned-sessions-pip'
 
 // Module-level ref for the hidden measurement div
 let measureEl: HTMLDivElement | null = null
+
+type GroupedMessage =
+  | { type: 'message'; message: SessionMessage }
+  | { type: 'thinking'; messages: SessionMessage[] }
+
+function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
+  const result: GroupedMessage[] = []
+  let currentThinkingGroup: SessionMessage[] = []
+
+  for (const message of messages) {
+    if (message.thinking) {
+      currentThinkingGroup.push(message)
+    } else {
+      if (currentThinkingGroup.length > 0) {
+        result.push({ type: 'thinking', messages: currentThinkingGroup })
+        currentThinkingGroup = []
+      }
+      result.push({ type: 'message', message })
+    }
+  }
+
+  if (currentThinkingGroup.length > 0) {
+    result.push({ type: 'thinking', messages: currentThinkingGroup })
+  }
+
+  return result
+}
+
+function PipChatItem({
+  session,
+  layout,
+  isFullscreen,
+  onToggleFullscreen,
+}: {
+  session: SessionWithProject
+  layout: 'horizontal' | 'vertical'
+  isFullscreen: boolean
+  onToggleFullscreen: () => void
+}) {
+  const { settings } = useSettings()
+  const { messages, loading } = useSessionMessages(session.session_id)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isNearBottomRef = useRef(true)
+  const prevMessageCountRef = useRef(0)
+  const isInitialLoadRef = useRef(true)
+
+  // Filter messages
+  const filteredMessages = useMemo(() => {
+    let result = messages
+
+    if (settings?.show_tools === false) {
+      result = result.filter((m) => !m.tools || m.todo_id)
+    }
+
+    const hasRecentIncompleteTodos = (m: SessionMessage) => {
+      if (m.tools?.name !== 'TodoWrite') return false
+      const tool = m.tools as TodoWriteTool
+      const hasIncomplete = tool.input.todos?.some(
+        (t) => t.status !== 'completed',
+      )
+      if (!hasIncomplete) return false
+      const updatedAt = m.updated_at || m.created_at
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+      return new Date(updatedAt).getTime() > fiveMinutesAgo
+    }
+
+    const incompleteTodoMsg = result.find(hasRecentIncompleteTodos)
+    if (incompleteTodoMsg) {
+      result = [
+        ...result.filter((m) => m !== incompleteTodoMsg),
+        incompleteTodoMsg,
+      ]
+    }
+
+    return result
+  }, [messages, settings?.show_tools])
+
+  const groupedMessages = useMemo(
+    () => groupMessages(filteredMessages),
+    [filteredMessages],
+  )
+
+  // Handle scroll position
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const threshold = 100
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    isNearBottomRef.current = distanceFromBottom < threshold
+  }, [])
+
+  // Reset on session change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on session change
+  useEffect(() => {
+    isInitialLoadRef.current = true
+    isNearBottomRef.current = true
+  }, [session.session_id])
+
+  // Scroll to bottom
+  useEffect(() => {
+    if (!loading && messages.length > 0 && scrollContainerRef.current) {
+      if (isInitialLoadRef.current) {
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight
+        isInitialLoadRef.current = false
+      } else if (
+        messages.length > prevMessageCountRef.current &&
+        isNearBottomRef.current
+      ) {
+        scrollContainerRef.current.scrollTop =
+          scrollContainerRef.current.scrollHeight
+      }
+      prevMessageCountRef.current = messages.length
+    }
+  }, [loading, messages.length])
+
+  // Handle cmd+click for fullscreen toggle
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        onToggleFullscreen()
+      }
+    },
+    [onToggleFullscreen],
+  )
+
+  const height = isFullscreen
+    ? '100vh'
+    : layout === 'horizontal'
+      ? '100%'
+      : `${PIP_CHAT_HEIGHT}px`
+
+  return (
+    <div
+      onClick={handleClick}
+      className={cn(
+        'group/chat relative flex flex-col bg-sidebar rounded-lg border border-sidebar-border overflow-hidden',
+        isFullscreen && 'fixed inset-0 z-50 rounded-none border-none',
+      )}
+      style={{
+        height,
+        width: isFullscreen
+          ? '100vw'
+          : layout === 'vertical'
+            ? '100%'
+            : PIP_CARD_WIDTH[layout],
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-sidebar-border flex-shrink-0">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-medium text-zinc-100 truncate">
+            {session.name || 'Session Chat'}
+          </h3>
+        </div>
+        {session.status === 'active' && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 300 150"
+            className="w-4 h-4 flex-shrink-0"
+          >
+            <path
+              fill="none"
+              stroke="#D97757"
+              strokeWidth="40"
+              strokeLinecap="round"
+              strokeDasharray="300 385"
+              strokeDashoffset="0"
+              d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+            >
+              <animate
+                attributeName="stroke-dashoffset"
+                calcMode="spline"
+                dur="2s"
+                values="685;-685"
+                keySplines="0 0 1 1"
+                repeatCount="indefinite"
+              />
+            </path>
+          </svg>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-3 py-3"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 300 150"
+              className="w-6 h-6"
+            >
+              <path
+                fill="none"
+                stroke="#D97757"
+                strokeWidth="40"
+                strokeLinecap="round"
+                strokeDasharray="300 385"
+                strokeDashoffset="0"
+                d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+              >
+                <animate
+                  attributeName="stroke-dashoffset"
+                  calcMode="spline"
+                  dur="2s"
+                  values="685;-685"
+                  keySplines="0 0 1 1"
+                  repeatCount="indefinite"
+                />
+              </path>
+            </svg>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-zinc-500 text-xs">
+            No messages
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {groupedMessages.map((item) =>
+              item.type === 'thinking' ? (
+                <ThinkingGroup
+                  key={`thinking-${item.messages[0].id}`}
+                  messages={item.messages}
+                />
+              ) : (
+                <MessageBubble key={item.message.id} message={item.message} />
+              ),
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Fullscreen button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleFullscreen()
+        }}
+        className={cn(
+          'absolute bottom-2 right-2 p-1.5 rounded bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/80 transition-all',
+          'opacity-0 group-hover/chat:opacity-100',
+          isFullscreen && 'opacity-100',
+        )}
+        title={
+          isFullscreen ? 'Exit fullscreen (⌘+click)' : 'Fullscreen (⌘+click)'
+        }
+      >
+        <Maximize2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
 
 export function getPipDimensions(layout: 'horizontal' | 'vertical'): {
   width: number
@@ -142,6 +410,8 @@ export function usePinnedSessionsData() {
 function SettingsMenu({
   layout,
   setLayout,
+  mode,
+  setMode,
   maxSessions,
   setMaxSessions,
   portalContainer,
@@ -150,6 +420,8 @@ function SettingsMenu({
 }: {
   layout: 'horizontal' | 'vertical'
   setLayout: (v: 'horizontal' | 'vertical') => void
+  mode: 'sessions' | 'chat'
+  setMode: (v: 'sessions' | 'chat') => void
   maxSessions: number
   setMaxSessions: (v: number) => void
   portalContainer?: HTMLElement | null
@@ -224,6 +496,33 @@ function SettingsMenu({
             </Button>
           </div>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-zinc-400">Mode</span>
+          <div className="flex gap-1">
+            <Button
+              variant={mode === 'sessions' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-5 text-[10px] px-2"
+              onClick={() => {
+                setMode('sessions')
+                setOpen(false)
+              }}
+            >
+              Sessions
+            </Button>
+            <Button
+              variant={mode === 'chat' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-5 text-[10px] px-2"
+              onClick={() => {
+                setMode('chat')
+                setOpen(false)
+              }}
+            >
+              Chat
+            </Button>
+          </div>
+        </div>
       </PopoverContent>
     </Popover>
   )
@@ -251,8 +550,15 @@ export function PinnedSessionsPip() {
     'pip-max-sessions',
     0,
   )
+  const [mode, setMode] = useLocalStorage<'sessions' | 'chat'>(
+    'pip-mode',
+    'sessions',
+  )
   const [isHoveringMenu, setIsHoveringMenu] = useState(false)
   const [openMenu, setOpenMenu] = useState(false)
+  const [fullscreenSessionId, setFullscreenSessionId] = useState<string | null>(
+    null,
+  )
 
   // Auto-close PiP when there are no sessions
   useEffect(() => {
@@ -331,9 +637,22 @@ export function PinnedSessionsPip() {
     [layout, setMaxSessions, resizePip],
   )
 
+  const handleSetMode = useCallback(
+    (v: 'sessions' | 'chat') => {
+      flushSync(() => setMode(v))
+      setFullscreenSessionId(null)
+      resizePip(layout)
+    },
+    [setMode, resizePip, layout],
+  )
+
   const handleFit = useCallback(() => {
     resizePip(layout)
   }, [layout, resizePip])
+
+  const toggleFullscreen = useCallback((sessionId: string) => {
+    setFullscreenSessionId((prev) => (prev === sessionId ? null : sessionId))
+  }, [])
 
   const pipContainer = pip.getContainer(PIP_ELEMENT_ID)
 
@@ -359,7 +678,10 @@ export function PinnedSessionsPip() {
             <div
               key={session.session_id}
               className="flex-shrink-0"
-              style={{ width: PIP_CARD_WIDTH[layout] }}
+              style={{
+                width: PIP_CARD_WIDTH[layout],
+                height: mode === 'chat' ? PIP_CHAT_HEIGHT : undefined,
+              }}
             >
               <SessionItem
                 session={session}
@@ -407,6 +729,8 @@ export function PinnedSessionsPip() {
                     }}
                     layout={layout}
                     setLayout={handleSetLayout}
+                    mode={mode}
+                    setMode={handleSetMode}
                     maxSessions={maxSessions}
                     setMaxSessions={handleSetMaxSessions}
                     portalContainer={pipContainer}
@@ -422,30 +746,62 @@ export function PinnedSessionsPip() {
                   : 'flex-col overflow-y-auto',
               )}
             >
-              {displayedSessions.map((session) => (
-                <div
-                  key={session.session_id}
-                  className="flex-shrink-0 max-w-[100vw] pinned-sessions"
-                  style={{
-                    width:
-                      layout === 'vertical' ? '100vw' : PIP_CARD_WIDTH[layout],
-                    maxWidth: '100vw',
-                  }}
-                >
-                  <SessionItem
-                    session={session}
-                    terminalName={getTerminalName(session.terminal_id)}
-                    popoverContainer={pipContainer}
-                    onClick={() => {
-                      window.dispatchEvent(
-                        new CustomEvent('reveal-session', {
-                          detail: { sessionId: session.session_id },
-                        }),
-                      )
-                    }}
-                  />
-                </div>
-              ))}
+              {mode === 'sessions'
+                ? displayedSessions.map((session) => (
+                    <div
+                      key={session.session_id}
+                      className="flex-shrink-0 max-w-[100vw] pinned-sessions"
+                      style={{
+                        width:
+                          layout === 'vertical'
+                            ? '100vw'
+                            : PIP_CARD_WIDTH[layout],
+                        maxWidth: '100vw',
+                      }}
+                    >
+                      <SessionItem
+                        session={session}
+                        terminalName={getTerminalName(session.terminal_id)}
+                        popoverContainer={pipContainer}
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('reveal-session', {
+                              detail: { sessionId: session.session_id },
+                            }),
+                          )
+                        }}
+                      />
+                    </div>
+                  ))
+                : displayedSessions.map((session) => (
+                    <div
+                      key={session.session_id}
+                      className={cn(
+                        'flex-shrink-0',
+                        fullscreenSessionId === session.session_id &&
+                          'contents',
+                      )}
+                      style={{
+                        width:
+                          fullscreenSessionId === session.session_id
+                            ? undefined
+                            : layout === 'vertical'
+                              ? '100%'
+                              : PIP_CARD_WIDTH[layout],
+                      }}
+                    >
+                      <PipChatItem
+                        session={session}
+                        layout={layout}
+                        isFullscreen={
+                          fullscreenSessionId === session.session_id
+                        }
+                        onToggleFullscreen={() =>
+                          toggleFullscreen(session.session_id)
+                        }
+                      />
+                    </div>
+                  ))}
             </div>
           </div>,
           pipContainer,

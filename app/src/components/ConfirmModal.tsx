@@ -66,6 +66,7 @@ export function ConfirmModal({
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
+            autoFocus
             variant={variant === 'danger' ? 'destructive' : 'default'}
             disabled={loading}
           >
