@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import crypto from 'node:crypto'
 import { promisify } from 'node:util'
 import ngrok from '@ngrok/ngrok'
+import { WEBHOOK_EVENTS } from '../../shared/types'
 import { getSettings, updateSettings } from '../db'
 import { env } from '../env'
 import { log } from '../logger'
@@ -9,14 +10,6 @@ import { log } from '../logger'
 const execFileAsync = promisify(execFile)
 
 let ngrokListener: ngrok.Listener | null = null
-
-const WEBHOOK_EVENTS = [
-  'pull_request',
-  'pull_request_review',
-  'pull_request_review_comment',
-  'issue_comment',
-  'check_suite',
-]
 
 export async function getOrCreateWebhookSecret(): Promise<string> {
   const settings = await getSettings()

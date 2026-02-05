@@ -28,6 +28,7 @@ import { useTerminalContext } from '@/context/TerminalContext'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
 import * as api from '@/lib/api'
+import { WEBHOOK_EVENTS } from '../../shared/types'
 import { RefreshIcon } from './icons'
 
 interface WebhooksModalProps {
@@ -183,6 +184,21 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
     }
   }
 
+  const copyWebhookCommand = (repo: string) => {
+    const secret = settings?.webhook_secret
+    if (!ngrokUrl || !secret) {
+      toast.error('Missing ngrok URL or webhook secret')
+      return
+    }
+
+    const webhookUrl = `${ngrokUrl}/api/webhooks/github`
+    const eventsArgs = WEBHOOK_EVENTS.map((e) => `-f events[]=${e}`).join(' ')
+    const command = `gh api repos/${repo}/hooks -X POST -f name=web -f 'config[url]=${webhookUrl}' -f config[content_type]=json -f 'config[secret]=${secret}' ${eventsArgs}`
+
+    navigator.clipboard.writeText(command)
+    toast.success('Command copied to clipboard')
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-sidebar max-w-lg">
@@ -294,24 +310,40 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
                     <div className="flex items-center gap-1">
                       <TooltipProvider>
                         {status === 'none' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                disabled={loading[repo] || noNgrok}
-                                onClick={() => handleCreate(repo)}
-                              >
-                                {loading[repo] ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Plus className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Create webhook</TooltipContent>
-                          </Tooltip>
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  disabled={noNgrok}
+                                  onClick={() => copyWebhookCommand(repo)}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Copy gh command</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  disabled={loading[repo] || noNgrok}
+                                  onClick={() => handleCreate(repo)}
+                                >
+                                  {loading[repo] ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Plus className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Create webhook</TooltipContent>
+                            </Tooltip>
+                          </>
                         )}
 
                         {status === 'missing' && (

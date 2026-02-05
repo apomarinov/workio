@@ -115,3 +115,12 @@ export interface WorkspacePayload {
   }
   deleted?: boolean
 }
+
+// GitHub webhook events we subscribe to
+export const WEBHOOK_EVENTS = [
+  'pull_request',
+  'pull_request_review',
+  'pull_request_review_comment',
+  'issue_comment',
+  'check_suite',
+] as const

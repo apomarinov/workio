@@ -1,6 +1,7 @@
 import {
   Copy,
   CornerDownLeft,
+  Eye,
   GitFork,
   GitPullRequest,
   Pencil,
@@ -200,6 +201,12 @@ export function createActionsMode(
     const isPinned = pinnedSessions.includes(session.session_id)
 
     const items: PaletteItem[] = [
+      {
+        id: 'action:reveal',
+        label: 'Reveal',
+        icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
+        onSelect: () => actions.selectSession(session.session_id),
+      },
       {
         id: 'action:pin',
         label: isPinned ? 'Unpin' : 'Pin',
