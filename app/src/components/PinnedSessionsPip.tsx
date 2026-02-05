@@ -434,8 +434,8 @@ export function PinnedSessionsPip() {
                 >
                   <SessionItem
                     session={session}
-                    popoverContainer={pipContainer}
                     terminalName={getTerminalName(session.terminal_id)}
+                    popoverContainer={pipContainer}
                     onClick={() => {
                       window.dispatchEvent(
                         new CustomEvent('reveal-session', {
