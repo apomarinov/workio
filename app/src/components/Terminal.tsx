@@ -1,10 +1,18 @@
 import '@xterm/xterm/css/xterm.css'
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { Plus } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ALargeSmall,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  WholeWord,
+  X,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -26,7 +34,17 @@ export function Terminal({ terminalId }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const searchAddonRef = useRef<SearchAddon | null>(null)
   const [dimensions, setDimensions] = useState({ cols: 80, rows: 24 })
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{
+    index: number
+    count: number
+  } | null>(null)
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [pendingCopy, setPendingCopy] = useState<string | null>(null)
   const pendingCopyRef = useRef<string | null>(null)
@@ -183,6 +201,13 @@ export function Terminal({ terminalId }: TerminalProps) {
     const webLinksAddon = new WebLinksAddon()
     terminal.loadAddon(webLinksAddon)
 
+    const searchAddon = new SearchAddon()
+    terminal.loadAddon(searchAddon)
+    searchAddonRef.current = searchAddon
+    searchAddon.onDidChangeResults((e) => {
+      setSearchResults({ index: e.resultIndex, count: e.resultCount })
+    })
+
     terminal.open(containerRef.current)
 
     // Try to load WebGL addon for better performance
@@ -228,6 +253,14 @@ export function Terminal({ terminalId }: TerminalProps) {
       if (event.key === 'Escape' && pendingCopyRef.current !== null) {
         pendingCopyRef.current = null
         setPendingCopy(null)
+        return false
+      }
+
+      // Cmd+F to open search
+      if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
+        event.preventDefault()
+        setSearchOpen(true)
+        setTimeout(() => searchInputRef.current?.focus(), 0)
         return false
       }
 
@@ -331,6 +364,72 @@ export function Terminal({ terminalId }: TerminalProps) {
     }
   }, [fontSize])
 
+  // Search options with decorations enabled (required for onDidChangeResults)
+  const searchOptions = useMemo(
+    () => ({
+      caseSensitive,
+      wholeWord,
+      decorations: {
+        matchBackground: '#b5890090',
+        matchBorder: '#b58900',
+        matchOverviewRuler: '#b58900',
+        activeMatchBackground: '#dc322f',
+        activeMatchBorder: '#dc322f',
+        activeMatchColorOverviewRuler: '#dc322f',
+      },
+    }),
+    [caseSensitive, wholeWord],
+  )
+
+  // Search functions
+  const handleSearch = useCallback(
+    (query: string, direction: 'next' | 'prev') => {
+      if (!searchAddonRef.current || !query) return
+      if (direction === 'next') {
+        searchAddonRef.current.findNext(query, searchOptions)
+      } else {
+        searchAddonRef.current.findPrevious(query, searchOptions)
+      }
+    },
+    [searchOptions],
+  )
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchQuery('')
+    setSearchResults(null)
+    setCaseSensitive(false)
+    setWholeWord(false)
+    searchAddonRef.current?.clearDecorations()
+    terminalRef.current?.focus()
+  }, [])
+
+  // Re-search when options change
+  useEffect(() => {
+    if (searchOpen && searchQuery && searchAddonRef.current) {
+      searchAddonRef.current.findNext(searchQuery, searchOptions)
+    }
+  }, [searchOpen, searchQuery, searchOptions])
+
+  // Handle search input keydown
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeSearch()
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        handleSearch(searchQuery, e.shiftKey ? 'prev' : 'next')
+      } else if (e.altKey && e.code === 'KeyC') {
+        e.preventDefault()
+        setCaseSensitive((v) => !v)
+      } else if (e.altKey && e.code === 'KeyW') {
+        e.preventDefault()
+        setWholeWord((v) => !v)
+      }
+    },
+    [closeSearch, handleSearch, searchQuery],
+  )
+
   return (
     <div className="h-full flex flex-col bg-[#1a1a1a]">
       {terminalId === null ? (
@@ -370,9 +469,97 @@ export function Terminal({ terminalId }: TerminalProps) {
         )
       )}
       <div
-        ref={containerRef}
-        className={`flex-1 min-h-0 overflow-hidden ${terminalId === null ? 'hidden' : ''}`}
-      />
+        className={`relative flex-1 min-h-0 overflow-hidden ${terminalId === null ? 'hidden' : ''}`}
+      >
+        <div ref={containerRef} className="h-full" />
+        {searchOpen && (
+          <div
+            className="absolute top-2 right-2 flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg p-1 z-10"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                if (e.target.value) {
+                  searchAddonRef.current?.findNext(
+                    e.target.value,
+                    searchOptions,
+                  )
+                } else {
+                  setSearchResults(null)
+                  searchAddonRef.current?.clearDecorations()
+                }
+              }}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Search..."
+              className="w-48 px-2 py-1 text-sm bg-transparent text-white placeholder-zinc-500 outline-none"
+            />
+            {searchResults && searchQuery && (
+              <span className="text-xs text-zinc-400 px-1 whitespace-nowrap">
+                {searchResults.count === 0
+                  ? 'No results'
+                  : `${searchResults.index + 1}/${searchResults.count}`}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setCaseSensitive((v) => !v)
+                searchInputRef.current?.focus()
+              }}
+              className={`p-1 rounded ${caseSensitive ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'}`}
+              title="Case Sensitive (⌥C)"
+            >
+              <ALargeSmall className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setWholeWord((v) => !v)
+                searchInputRef.current?.focus()
+              }}
+              className={`p-1 rounded ${wholeWord ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'}`}
+              title="Whole Word (⌥W)"
+            >
+              <WholeWord className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleSearch(searchQuery, 'prev')
+                searchInputRef.current?.focus()
+              }}
+              className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded"
+              title="Previous (Shift+Enter)"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleSearch(searchQuery, 'next')
+                searchInputRef.current?.focus()
+              }}
+              className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded"
+              title="Next (Enter)"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={closeSearch}
+              className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded"
+              title="Close (Esc)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
       {pendingCopy !== null && (
         <button
           ref={copyBtnRef}
