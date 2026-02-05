@@ -132,12 +132,12 @@ def delete_empty_sessions(conn) -> tuple[int, list[str]]:
 
 
 def end_stale_sessions(conn) -> int:
-    """Set active sessions to 'ended' if not updated in 10 minutes. Returns count updated."""
+    """Set active sessions to 'ended' if not updated in 5 minutes. Returns count updated."""
     cur = conn.cursor()
     cur.execute('''
         UPDATE sessions SET status = 'ended'
-        WHERE (status = 'started' or status = 'active')
-          AND updated_at < NOW() - INTERVAL '10 minutes'
+        WHERE status IN ('started', 'active', 'permission_needed')
+          AND updated_at < NOW() - INTERVAL '5 minutes'
     ''')
     return cur.rowcount
 

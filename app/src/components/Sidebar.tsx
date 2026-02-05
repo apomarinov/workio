@@ -92,6 +92,7 @@ export function Sidebar({ width }: SidebarProps) {
     null,
   )
   const [removingPR, setRemovingPR] = useState<number | null>(null)
+  const [removingAuthor, setRemovingAuthor] = useState<string | null>(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
@@ -612,9 +613,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Projects
@@ -624,9 +624,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -636,9 +635,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -701,9 +699,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Projects
@@ -713,9 +710,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -725,9 +721,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -886,8 +881,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button
@@ -925,6 +920,12 @@ export function Sidebar({ width }: SidebarProps) {
                         const hiddenPRsForRepo = (
                           settings?.hidden_prs ?? []
                         ).filter((h) => h.repo === repo)
+                        const hiddenAuthorsForRepo = (
+                          settings?.hide_gh_authors ?? []
+                        ).filter((h) => h.repo === repo)
+                        const hasHiddenItems =
+                          hiddenPRsForRepo.length > 0 ||
+                          hiddenAuthorsForRepo.length > 0
                         return (
                           <SortableRepoGroup key={repo} repo={repo}>
                             <div className="group/repo-header flex items-center">
@@ -941,12 +942,12 @@ export function Sidebar({ width }: SidebarProps) {
                                 <Github className="w-3 h-3" />
                                 <span className="truncate">{repoName}</span>
                               </button>
-                              {hiddenPRsForRepo.length > 0 && (
+                              {hasHiddenItems && (
                                 <button
                                   type="button"
                                   onClick={() => setHiddenPRsModalRepo(repo)}
                                   className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
-                                  title={`${hiddenPRsForRepo.length} hidden PR${hiddenPRsForRepo.length > 1 ? 's' : ''}`}
+                                  title="Manage hidden items"
                                 >
                                   <EyeOff className="w-3 h-3" />
                                 </button>
@@ -1067,57 +1068,112 @@ export function Sidebar({ width }: SidebarProps) {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Hidden Pull Requests</DialogTitle>
+            <DialogTitle>Hidden Items</DialogTitle>
             <DialogDescription>
-              These PRs are hidden from the sidebar for{' '}
+              Manage hidden PRs and comment authors for{' '}
               {hiddenPRsModalRepo?.split('/')[1] || hiddenPRsModalRepo}.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {(settings?.hidden_prs ?? [])
-              .filter((h) => h.repo === hiddenPRsModalRepo)
-              .map((entry) => (
-                <div
-                  key={entry.prNumber}
-                  className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                >
-                  <div className="min-w-0 flex-1">
-                    <span className="text-sm truncate block">
-                      {entry.title}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      #{entry.prNumber}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setRemovingPR(entry.prNumber)
-                      try {
-                        const current = settings?.hidden_prs ?? []
-                        const updated = current.filter(
-                          (e) =>
-                            !(
-                              e.repo === hiddenPRsModalRepo &&
-                              e.prNumber === entry.prNumber
-                            ),
-                        )
-                        await updateSettings({ hidden_prs: updated })
-                      } finally {
-                        setRemovingPR(null)
-                      }
-                    }}
-                    disabled={removingPR === entry.prNumber}
-                    className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                  >
-                    {removingPR === entry.prNumber ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
+          <div className="space-y-4 max-h-80 overflow-y-auto">
+            {(settings?.hide_gh_authors ?? []).filter(
+              (h) => h.repo === hiddenPRsModalRepo,
+            ).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                    Hidden Comment Authors
+                  </p>
+                  {(settings?.hide_gh_authors ?? [])
+                    .filter((h) => h.repo === hiddenPRsModalRepo)
+                    .map((entry) => (
+                      <div
+                        key={entry.author}
+                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                      >
+                        <span className="text-sm">{entry.author}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRemovingAuthor(entry.author)
+                            try {
+                              const current = settings?.hide_gh_authors ?? []
+                              const updated = current.filter(
+                                (e) =>
+                                  !(
+                                    e.repo === hiddenPRsModalRepo &&
+                                    e.author === entry.author
+                                  ),
+                              )
+                              await updateSettings({ hide_gh_authors: updated })
+                            } finally {
+                              setRemovingAuthor(null)
+                            }
+                          }}
+                          disabled={removingAuthor === entry.author}
+                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                        >
+                          {removingAuthor === entry.author ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
                 </div>
-              ))}
+              )}
+            {(settings?.hidden_prs ?? []).filter(
+              (h) => h.repo === hiddenPRsModalRepo,
+            ).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                    Hidden Pull Requests
+                  </p>
+                  {(settings?.hidden_prs ?? [])
+                    .filter((h) => h.repo === hiddenPRsModalRepo)
+                    .map((entry) => (
+                      <div
+                        key={entry.prNumber}
+                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm truncate block">
+                            {entry.title}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            #{entry.prNumber}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRemovingPR(entry.prNumber)
+                            try {
+                              const current = settings?.hidden_prs ?? []
+                              const updated = current.filter(
+                                (e) =>
+                                  !(
+                                    e.repo === hiddenPRsModalRepo &&
+                                    e.prNumber === entry.prNumber
+                                  ),
+                              )
+                              await updateSettings({ hidden_prs: updated })
+                            } finally {
+                              setRemovingPR(null)
+                            }
+                          }}
+                          disabled={removingPR === entry.prNumber}
+                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                        >
+                          {removingPR === entry.prNumber ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
           </div>
           <DialogFooter>
             <Button

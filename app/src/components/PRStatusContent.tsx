@@ -9,15 +9,9 @@ import {
   File,
   Loader2,
   MessageSquare,
-  MoreHorizontal,
   Reply,
 } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -26,7 +20,6 @@ import type { PRCheckStatus, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
 import {
   ContentDialog,
-  HiddenAuthorsDialog,
   HideAuthorDialog,
   MergeDialog,
   ReplyDialog,
@@ -57,24 +50,6 @@ export const PRTabButton = memo(function PRTabButton({
     [pr],
   )
 
-  const { settings, updateSettings } = useSettings()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [hiddenAuthorsModalOpen, setHiddenAuthorsModalOpen] = useState(false)
-
-  const hiddenAuthorsForRepo = useMemo(() => {
-    return (settings?.hide_gh_authors ?? []).filter(
-      (entry) => entry.repo === pr.repo,
-    )
-  }, [settings?.hide_gh_authors, pr.repo])
-
-  const handleRemoveHiddenAuthor = async (author: string) => {
-    const current = settings?.hide_gh_authors ?? []
-    const updated = current.filter(
-      (e) => !(e.repo === pr.repo && e.author === author),
-    )
-    await updateSettings({ hide_gh_authors: updated })
-  }
-
   return (
     <div className="group/pr-btn flex items-center">
       <button
@@ -85,9 +60,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -97,52 +72,15 @@ export const PRTabButton = memo(function PRTabButton({
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
         )}
       </button>
-      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            onClick={(e) => e.stopPropagation()}
-            className={cn(
-              'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer group-hover/pr-btn:block',
-              menuOpen ? 'block' : 'hidden',
-            )}
-          >
-            <MoreHorizontal className="w-3 h-3" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-1" align="start">
-          <a
-            href={pr.prUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setMenuOpen(false)}
-            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            View on GitHub
-          </a>
-          {hiddenAuthorsForRepo.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                setHiddenAuthorsModalOpen(true)
-              }}
-              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer w-full text-left"
-            >
-              <BellOff className="w-3.5 h-3.5" />
-              Hidden Authors ({hiddenAuthorsForRepo.length})
-            </button>
-          )}
-        </PopoverContent>
-      </Popover>
-      {hiddenAuthorsModalOpen && (
-        <HiddenAuthorsDialog
-          authors={hiddenAuthorsForRepo}
-          onRemove={handleRemoveHiddenAuthor}
-          onClose={() => setHiddenAuthorsModalOpen(false)}
-        />
-      )}
+      <a
+        href={pr.prUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="ml-1 mb-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer hidden group-hover/pr-btn:block"
+      >
+        <ExternalLink className="w-3 h-3" />
+      </a>
     </div>
   )
 })
@@ -622,7 +560,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
