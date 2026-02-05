@@ -146,11 +146,16 @@ export function CommandPaletteCore({
                   ))}
                 </>
               ) : mode.items.length > 0 ? (
-                <CommandGroup>
-                  {mode.items.map((item) => (
-                    <PaletteItem key={item.id} item={item} />
-                  ))}
-                </CommandGroup>
+                <>
+                  <CommandEmpty>
+                    {mode.emptyMessage ?? 'No results found.'}
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {mode.items.map((item) => (
+                      <PaletteItem key={item.id} item={item} />
+                    ))}
+                  </CommandGroup>
+                </>
               ) : (
                 <div className="py-6 text-center text-sm text-zinc-500">
                   {mode.emptyMessage ?? 'No items available'}

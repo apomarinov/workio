@@ -25,7 +25,7 @@ export function createPRCheckoutMode(
   if (!pr) {
     return {
       id: 'pr-checkout',
-      placeholder: 'Select workspace...',
+      placeholder: 'Select project...',
       items: [],
     }
   }
@@ -38,9 +38,9 @@ export function createPRCheckoutMode(
   if (matchingTerminals.length === 0) {
     return {
       id: 'pr-checkout',
-      placeholder: 'Select workspace...',
+      placeholder: 'Select project...',
       items: [],
-      emptyMessage: 'No workspaces found for this repo',
+      emptyMessage: 'No projects found',
     }
   }
 
@@ -86,9 +86,9 @@ export function createPRCheckoutMode(
 
   return {
     id: 'pr-checkout',
-    placeholder: 'Select workspace...',
+    placeholder: 'Select project...',
     items,
-    emptyMessage: 'No workspaces found for this repo',
+    emptyMessage: 'No projects found',
     footer: () => (
       <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
         <span className="flex items-center gap-1.5">
