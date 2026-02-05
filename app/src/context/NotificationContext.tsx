@@ -92,7 +92,7 @@ export function NotificationProvider({
       }
 
       const notification = new Notification(title, {
-        icon: '/icon.png',
+        icon: '/icon2.png',
         ...notificationOptions,
       })
 
