@@ -63,6 +63,7 @@ export type AppActions = {
   openMergeModal: (pr: PRCheckStatus) => void
   openRerunAllModal: (pr: PRCheckStatus) => void
   checkoutPRBranch: (terminalId: number, branch: string) => Promise<void>
+  hidePR: (pr: PRCheckStatus) => Promise<void>
 }
 
 // Factory creates modes with data already bound

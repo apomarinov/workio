@@ -18,19 +18,30 @@ import {
   ChevronRight,
   ChevronsDownUp,
   Ellipsis,
+  EyeOff,
   Folder,
   GitBranch,
   Github,
   GitMerge,
   LayoutList,
+  Loader2,
   PictureInPicture2,
   Plus,
   Search,
   Settings,
   Terminal as TerminalIcon,
+  Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Popover,
   PopoverContent,
@@ -42,6 +53,7 @@ import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
@@ -72,7 +84,12 @@ export function Sidebar({ width }: SidebarProps) {
   )
   const hasAnySessions = pipSessions.length > 0
   const { hasWarning: hasWebhookWarning } = useWebhookWarning()
+  const { settings, updateSettings } = useSettings()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [hiddenPRsModalRepo, setHiddenPRsModalRepo] = useState<string | null>(
+    null,
+  )
+  const [removingPR, setRemovingPR] = useState<number | null>(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
@@ -540,9 +557,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                        }`}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Projects
@@ -552,9 +568,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -564,9 +579,8 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('folder')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
+                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                        }`}
                     >
                       <Folder className="w-4 h-4" />
                       Folders
@@ -629,9 +643,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('all')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'all' ? 'bg-accent' : ''
+                    }`}
                 >
                   <TerminalIcon className="w-4 h-4" />
                   Projects
@@ -641,9 +654,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('sessions')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'sessions' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Bot className="w-4 h-4" />
                   Claude
@@ -653,9 +665,8 @@ export function Sidebar({ width }: SidebarProps) {
                     setGroupingMode('folder')
                     setGroupingOpen(false)
                   }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${groupingMode === 'folder' ? 'bg-accent' : ''
+                    }`}
                 >
                   <Folder className="w-4 h-4" />
                   Folders
@@ -814,8 +825,8 @@ export function Sidebar({ width }: SidebarProps) {
                   className={cn(
                     'border-t border-sidebar-border my-2',
                     terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
+                    orphanSessionGroups.size === 0 &&
+                    'border-none',
                   )}
                 />
                 <button
@@ -837,21 +848,36 @@ export function Sidebar({ width }: SidebarProps) {
                     ([repo, repoPRs]) => {
                       const repoName = repo.split('/')[1] || repo
                       const isCollapsed = collapsedGitHubReposSet.has(repo)
+                      const hiddenPRsForRepo = (
+                        settings?.hidden_prs ?? []
+                      ).filter((h) => h.repo === repo)
                       return (
                         <div key={repo}>
-                          <button
-                            type="button"
-                            onClick={() => toggleGitHubRepo(repo)}
-                            className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
-                          >
-                            {isCollapsed ? (
-                              <ChevronRight className="w-3 h-3 flex-shrink-0" />
-                            ) : (
-                              <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                          <div className="group/repo-header flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleGitHubRepo(repo)}
+                              className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                              )}
+                              <Github className="w-3 h-3" />
+                              <span className="truncate">{repoName}</span>
+                            </button>
+                            {hiddenPRsForRepo.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setHiddenPRsModalRepo(repo)}
+                                className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                                title={`${hiddenPRsForRepo.length} hidden PR${hiddenPRsForRepo.length > 1 ? 's' : ''}`}
+                              >
+                                <EyeOff className="w-3 h-3" />
+                              </button>
                             )}
-                            <Github className="w-3 h-3" />
-                            <span className="truncate">{repoName}</span>
-                          </button>
+                          </div>
                           {!isCollapsed && (
                             <>
                               {repoPRs.map((pr) => (
@@ -956,6 +982,75 @@ export function Sidebar({ width }: SidebarProps) {
         open={showSettingsModal}
         onOpenChange={setShowSettingsModal}
       />
+
+      <Dialog
+        open={hiddenPRsModalRepo !== null}
+        onOpenChange={(open) => !open && setHiddenPRsModalRepo(null)}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Hidden Pull Requests</DialogTitle>
+            <DialogDescription>
+              These PRs are hidden from the sidebar for{' '}
+              {hiddenPRsModalRepo?.split('/')[1] || hiddenPRsModalRepo}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {(settings?.hidden_prs ?? [])
+              .filter((h) => h.repo === hiddenPRsModalRepo)
+              .map((entry) => (
+                <div
+                  key={entry.prNumber}
+                  className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm truncate block">
+                      {entry.title}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      #{entry.prNumber}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setRemovingPR(entry.prNumber)
+                      try {
+                        const current = settings?.hidden_prs ?? []
+                        const updated = current.filter(
+                          (e) =>
+                            !(
+                              e.repo === hiddenPRsModalRepo &&
+                              e.prNumber === entry.prNumber
+                            ),
+                        )
+                        await updateSettings({ hidden_prs: updated })
+                      } finally {
+                        setRemovingPR(null)
+                      }
+                    }}
+                    disabled={removingPR === entry.prNumber}
+                    className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                  >
+                    {removingPR === entry.prNumber ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setHiddenPRsModalRepo(null)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

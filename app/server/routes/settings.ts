@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import type { FastifyInstance } from 'fastify'
 import type { Settings } from '../../src/types'
 import { getAllTerminals, getSettings, updateSettings } from '../db'
+import { refreshPRChecks } from '../github/checks'
 
 type UpdateSettingsBody = Partial<Omit<Settings, 'id'>>
 
@@ -96,6 +97,12 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
       }
 
       const settings = await updateSettings(updates)
+
+      // Refresh PR checks when hidden_prs changes to update the filtered list
+      if (updates.hidden_prs !== undefined) {
+        refreshPRChecks(true)
+      }
+
       return settings
     },
   )

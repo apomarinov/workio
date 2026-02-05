@@ -1,4 +1,10 @@
-import { CornerDownLeft, ExternalLink, GitBranch, GitMerge } from 'lucide-react'
+import {
+  CornerDownLeft,
+  ExternalLink,
+  EyeOff,
+  GitBranch,
+  GitMerge,
+} from 'lucide-react'
 import { RefreshIcon } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -124,6 +130,16 @@ export function createPRActionsMode(
       },
     })
   }
+
+  // Hide PR
+  items.push({
+    id: 'action:hide',
+    label: 'Hide PR',
+    icon: <EyeOff className="h-4 w-4 shrink-0 text-zinc-400" />,
+    onSelect: () => {
+      actions.hidePR(pr)
+    },
+  })
 
   return {
     id: 'pr-actions',

@@ -8,7 +8,7 @@ import type {
   PRComment,
   PRReview,
 } from '../../shared/types'
-import type { HiddenGHAuthor } from '../../src/types'
+import type { HiddenGHAuthor, HiddenPR } from '../../src/types'
 import {
   getAllTerminals,
   getSettings,
@@ -667,8 +667,14 @@ async function pollAllPRChecks(force = false): Promise<void> {
   // Process PR data for server-side notifications
   await processNewPRData(allPRs)
 
-  lastEmittedPRs = allPRs
-  getIO()?.emit('github:pr-checks', { prs: allPRs, username: ghUsername })
+  // Filter out hidden PRs before emitting to clients
+  const settings = await getSettings()
+  const visiblePRs = allPRs.filter(
+    (pr) => !isHiddenPR(settings.hidden_prs, pr.repo, pr.prNumber),
+  )
+
+  lastEmittedPRs = visiblePRs
+  getIO()?.emit('github:pr-checks', { prs: visiblePRs, username: ghUsername })
 
   // Log GraphQL rate limit after fetching PRs
   execFile(
@@ -1161,6 +1167,15 @@ function isHiddenAuthor(
 ): boolean {
   if (!hiddenAuthors) return false
   return hiddenAuthors.some((h) => h.repo === repo && h.author === author)
+}
+
+function isHiddenPR(
+  hiddenPRs: HiddenPR[] | undefined,
+  repo: string,
+  prNumber: number,
+): boolean {
+  if (!hiddenPRs) return false
+  return hiddenPRs.some((h) => h.repo === repo && h.prNumber === prNumber)
 }
 
 async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {

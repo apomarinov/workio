@@ -81,7 +81,7 @@ export function CommandPalette() {
     deleteSession,
   } = useSessionContext()
   const { gitDirtyStatus } = useProcessContext()
-  const { settings } = useSettings()
+  const { settings, updateSettings } = useSettings()
 
   // Pin state (shared localStorage keys with sidebar)
   const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
@@ -586,6 +586,16 @@ export function CommandPalette() {
           }))
         }
       },
+      hidePR: async (pr) => {
+        const current = settings?.hidden_prs ?? []
+        const updated = [
+          ...current,
+          { repo: pr.repo, prNumber: pr.prNumber, title: pr.prTitle },
+        ]
+        await updateSettings({ hidden_prs: updated })
+        toast.success(`Hidden PR #${pr.prNumber}`)
+        closePalette()
+      },
     }),
     [
       selectTerminal,
@@ -598,6 +608,8 @@ export function CommandPalette() {
       currentLevel,
       api,
       preferredIDE,
+      settings,
+      updateSettings,
     ],
   )
 

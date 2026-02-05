@@ -258,6 +258,12 @@ export interface HiddenGHAuthor {
   author: string
 }
 
+export interface HiddenPR {
+  repo: string
+  prNumber: number
+  title: string
+}
+
 export interface NotificationData {
   // PR fields
   prTitle?: string
@@ -305,6 +311,7 @@ export interface Settings {
   ngrok_url?: string
   repo_webhooks?: Record<string, RepoWebhookStatus>
   hide_gh_authors?: HiddenGHAuthor[]
+  hidden_prs?: HiddenPR[]
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number
