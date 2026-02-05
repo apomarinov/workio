@@ -7,6 +7,38 @@ import {
   CommandGroup,
   CommandList,
 } from '@/components/ui/command'
+
+// Simple fuzzy filter: requires all search characters to appear in order
+function fuzzyFilter(
+  value: string,
+  search: string,
+  keywords?: string[],
+): number {
+  const searchLower = search.toLowerCase()
+  const targets = [value, ...(keywords ?? [])].map((s) => s.toLowerCase())
+
+  for (const target of targets) {
+    // Check if search is a substring (best match)
+    if (target.includes(searchLower)) {
+      return 1
+    }
+
+    // Fuzzy: all chars must appear in order
+    let searchIdx = 0
+    for (const char of target) {
+      if (char === searchLower[searchIdx]) {
+        searchIdx++
+        if (searchIdx === searchLower.length) {
+          // Score based on how compact the match is
+          return 0.5
+        }
+      }
+    }
+  }
+
+  return 0
+}
+
 import { cn } from '@/lib/utils'
 import { PaletteHeader } from './PaletteHeader'
 import { PaletteItem } from './PaletteItem'
@@ -117,6 +149,7 @@ export function CommandPaletteCore({
             className="bg-transparent"
             value={highlightedId ?? ''}
             onValueChange={handleValueChange}
+            filter={fuzzyFilter}
             loop
           >
             <PaletteHeader
