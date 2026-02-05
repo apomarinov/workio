@@ -146,6 +146,21 @@ CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_repo ON notifications(repo);
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 
+-- Command logs table (for terminal git operations, workspace setup, GitHub operations)
+CREATE TABLE IF NOT EXISTS command_logs (
+    id SERIAL PRIMARY KEY,
+    terminal_id INTEGER,   -- No FK cascade - logs preserved after terminal deletion
+    pr_id VARCHAR(32),     -- MD5 hash of "owner/repo#prNumber"
+    exit_code INTEGER,
+    category VARCHAR(32),  -- 'git', 'workspace', 'github'
+    data JSONB,            -- { command: string, stdout?: string, stderr?: string }
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_command_logs_terminal_id ON command_logs(terminal_id);
+CREATE INDEX IF NOT EXISTS idx_command_logs_pr_id ON command_logs(pr_id);
+CREATE INDEX IF NOT EXISTS idx_command_logs_created_at ON command_logs(created_at DESC);
+
 -- Insert default settings row if not present
 INSERT INTO settings (id, config) VALUES (1, '{}')
 ON CONFLICT (id) DO NOTHING;

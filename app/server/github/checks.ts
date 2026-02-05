@@ -13,7 +13,9 @@ import {
   getAllTerminals,
   getSettings,
   getTerminalById,
+  hashPrId,
   insertNotification,
+  logCommand,
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'
@@ -953,6 +955,8 @@ export function requestPRReview(
   prNumber: number,
   reviewer: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const prId = hashPrId(owner, repo, prNumber)
+  const cmd = `gh api --method POST repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers -f reviewers[]=${reviewer}`
   return new Promise((resolve) => {
     // Use REST API to avoid deprecated projectCards GraphQL field in `gh pr edit`
     execFile(
@@ -966,7 +970,15 @@ export function requestPRReview(
         `reviewers[]=${reviewer}`,
       ],
       { timeout: 15000 },
-      (err, _stdout, stderr) => {
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
         if (err) {
           resolve({ ok: false, error: stderr || err.message })
           return
@@ -984,6 +996,8 @@ export function mergePR(
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase',
 ): Promise<{ ok: boolean; error?: string }> {
+  const prId = hashPrId(owner, repo, prNumber)
+  const cmd = `gh api --method PUT repos/${owner}/${repo}/pulls/${prNumber}/merge -f merge_method=${method}`
   return new Promise((resolve) => {
     execFile(
       'gh',
@@ -996,7 +1010,15 @@ export function mergePR(
         `merge_method=${method}`,
       ],
       { timeout: 30000 },
-      (err, _stdout, stderr) => {
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
         if (err) {
           resolve({ ok: false, error: stderr || err.message })
           return
@@ -1012,6 +1034,7 @@ export function rerunFailedCheck(
   owner: string,
   repo: string,
   checkUrl: string,
+  prNumber?: number,
 ): Promise<{ ok: boolean; error?: string }> {
   const runMatch = checkUrl.match(/actions\/runs\/(\d+)/)
   if (!runMatch) {
@@ -1021,6 +1044,8 @@ export function rerunFailedCheck(
     })
   }
   const runId = runMatch[1]
+  const prId = prNumber ? hashPrId(owner, repo, prNumber) : undefined
+  const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
   return new Promise((resolve) => {
     execFile(
       'gh',
@@ -1031,7 +1056,15 @@ export function rerunFailedCheck(
         `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
       ],
       { timeout: 30000 },
-      (err, _stdout, stderr) => {
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
         if (err) {
           resolve({ ok: false, error: stderr || err.message })
           return
@@ -1048,6 +1081,7 @@ export async function rerunAllFailedChecks(
   owner: string,
   repo: string,
   checkUrls: string[],
+  prNumber?: number,
 ): Promise<{ ok: boolean; error?: string; rerunCount: number }> {
   // Extract unique run IDs from URLs
   const runIds = new Set<string>()
@@ -1062,6 +1096,7 @@ export async function rerunAllFailedChecks(
     return { ok: false, error: 'No valid action runs found', rerunCount: 0 }
   }
 
+  const prId = prNumber ? hashPrId(owner, repo, prNumber) : undefined
   const errors: string[] = []
   let successCount = 0
 
@@ -1070,6 +1105,7 @@ export async function rerunAllFailedChecks(
     [...runIds].map(
       (runId) =>
         new Promise<void>((resolve) => {
+          const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
           execFile(
             'gh',
             [
@@ -1079,7 +1115,15 @@ export async function rerunAllFailedChecks(
               `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
             ],
             { timeout: 30000 },
-            (err, _stdout, stderr) => {
+            (err, stdout, stderr) => {
+              logCommand({
+                prId,
+                category: 'github',
+                command: cmd,
+                stdout,
+                stderr,
+                failed: !!err,
+              })
               if (err) {
                 errors.push(stderr || err.message)
               } else {
@@ -1107,6 +1151,8 @@ export function addPRComment(
   prNumber: number,
   body: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const prId = hashPrId(owner, repo, prNumber)
+  const cmd = `gh pr comment ${prNumber} --repo ${owner}/${repo} -b "..."`
   return new Promise((resolve) => {
     execFile(
       'gh',
@@ -1120,7 +1166,15 @@ export function addPRComment(
         body,
       ],
       { timeout: 15000 },
-      (err, _stdout, stderr) => {
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
         if (err) {
           resolve({ ok: false, error: stderr || err.message })
           return

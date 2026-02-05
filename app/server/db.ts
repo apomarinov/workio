@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -31,6 +32,25 @@ export async function initDb() {
   } else {
     log.error(`[db] Schema file not found: ${SCHEMA_PATH}`)
     process.exit(1)
+  }
+
+  // Cleanup orphaned command_logs older than 1 week (terminal no longer exists)
+  const orphanedResult = await pool.query(`
+    DELETE FROM command_logs
+    WHERE terminal_id IS NOT NULL
+      AND terminal_id NOT IN (SELECT id FROM terminals)
+      AND created_at < NOW() - INTERVAL '1 week'
+  `)
+  if (orphanedResult.rowCount && orphanedResult.rowCount > 0) {
+    log.info(`[db] Cleaned up ${orphanedResult.rowCount} orphaned command_logs`)
+  }
+
+  // Cleanup general logs older than 1 week
+  const logsResult = await pool.query(`
+    DELETE FROM logs WHERE created_at < NOW() - INTERVAL '1 week'
+  `)
+  if (logsResult.rowCount && logsResult.rowCount > 0) {
+    log.info(`[db] Cleaned up ${logsResult.rowCount} logs`)
   }
 }
 
@@ -572,6 +592,74 @@ export async function markNotificationRead(id: number): Promise<boolean> {
 export async function deleteAllNotifications(): Promise<number> {
   const result = await pool.query('DELETE FROM notifications')
   return result.rowCount ?? 0
+}
+
+// Command logging
+
+interface LogCommandOptions {
+  terminalId?: number
+  prId?: string // MD5 hash (32 chars)
+  category: 'git' | 'workspace' | 'github'
+  command: string
+  stdout?: string
+  stderr?: string
+  failed?: boolean
+}
+
+/** Create pr_id hash from owner/repo and PR number */
+export function hashPrId(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): string {
+  return createHash('md5').update(`${owner}/${repo}#${prNumber}`).digest('hex')
+}
+
+/** Fire-and-forget command logging - does not await at call sites */
+export function logCommand(opts: LogCommandOptions): void {
+  const exitCode = opts.failed ? 1 : 0
+  ;(async () => {
+    let sshHost: string | undefined
+    let terminalName: string | undefined
+    if (opts.terminalId) {
+      const terminal = await getTerminalById(opts.terminalId)
+      if (terminal) {
+        sshHost = terminal.ssh_host ?? undefined
+        terminalName = terminal.name ?? undefined
+      }
+    }
+    // If not failed, combine stderr into stdout (git often outputs progress to stderr)
+    let stdout = opts.stdout ?? ''
+    let stderr: string | undefined
+    if (opts.failed) {
+      stderr = opts.stderr
+    } else if (opts.stderr) {
+      stdout = stdout ? `${stdout}\n${opts.stderr}` : opts.stderr
+    }
+
+    await pool.query(
+      `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        opts.terminalId ?? null,
+        opts.prId ?? null,
+        exitCode,
+        opts.category,
+        JSON.stringify({
+          command: opts.command,
+          stdout: stdout.substring(0, 10000) || undefined,
+          stderr: stderr?.substring(0, 5000),
+          sshHost,
+          terminalName,
+        }),
+      ],
+    )
+  })().catch((err) => {
+    log.error(
+      { err, terminalId: opts.terminalId, prId: opts.prId },
+      '[command_logs] Failed to log',
+    )
+  })
 }
 
 export default pool

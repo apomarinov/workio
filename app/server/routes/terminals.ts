@@ -66,6 +66,7 @@ import {
   deleteTerminal,
   getAllTerminals,
   getTerminalById,
+  logCommand,
   terminalNameExists,
   updateTerminal,
 } from '../db'
@@ -778,8 +779,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         if (terminal.ssh_host) {
-          await execSSHCommand(terminal.ssh_host, gitCmd, {
+          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
             cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: gitCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
           })
         } else {
           await new Promise<void>((resolve, reject) => {
@@ -787,7 +795,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               'git',
               ['checkout', branch],
               { cwd: expandPath(terminal.cwd), timeout: 30000 },
-              (err) => {
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: gitCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
                 if (err) reject(err)
                 else resolve()
               },
@@ -843,8 +859,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           // On target branch: pull with rebase
           const pullCmd = `git pull --rebase origin ${branch.replace(/'/g, "'\\''")}`
           if (terminal.ssh_host) {
-            await execSSHCommand(terminal.ssh_host, pullCmd, {
+            const result = await execSSHCommand(terminal.ssh_host, pullCmd, {
               cwd: terminal.cwd,
+            })
+            logCommand({
+              terminalId: id,
+              category: 'git',
+              command: pullCmd,
+              stdout: result.stdout,
+              stderr: result.stderr,
             })
           } else {
             await new Promise<void>((resolve, reject) => {
@@ -852,7 +875,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
                 'git',
                 ['pull', '--rebase', 'origin', branch],
                 { cwd: expandPath(terminal.cwd), timeout: 60000 },
-                (err) => {
+                (err, stdout, stderr) => {
+                  logCommand({
+                    terminalId: id,
+                    category: 'git',
+                    command: pullCmd,
+                    stdout,
+                    stderr: err ? err.message : stderr,
+                  })
                   if (err) reject(err)
                   else resolve()
                 },
@@ -864,8 +894,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           // This fails if branches have diverged (which requires manual resolution)
           const fetchCmd = `git fetch origin ${branch.replace(/'/g, "'\\''")}:${branch.replace(/'/g, "'\\''")}`
           if (terminal.ssh_host) {
-            await execSSHCommand(terminal.ssh_host, fetchCmd, {
+            const result = await execSSHCommand(terminal.ssh_host, fetchCmd, {
               cwd: terminal.cwd,
+            })
+            logCommand({
+              terminalId: id,
+              category: 'git',
+              command: fetchCmd,
+              stdout: result.stdout,
+              stderr: result.stderr,
             })
           } else {
             await new Promise<void>((resolve, reject) => {
@@ -873,7 +910,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
                 'git',
                 ['fetch', 'origin', `${branch}:${branch}`],
                 { cwd: expandPath(terminal.cwd), timeout: 60000 },
-                (err) => {
+                (err, stdout, stderr) => {
+                  logCommand({
+                    terminalId: id,
+                    category: 'git',
+                    command: fetchCmd,
+                    stdout,
+                    stderr: err ? err.message : stderr,
+                  })
                   if (err) reject(err)
                   else resolve()
                 },
@@ -930,8 +974,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         if (terminal.ssh_host) {
-          await execSSHCommand(terminal.ssh_host, gitCmd, {
+          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
             cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: gitCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
           })
         } else {
           await new Promise<void>((resolve, reject) => {
@@ -939,7 +990,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               'git',
               pushArgs,
               { cwd: expandPath(terminal.cwd), timeout: 60000 },
-              (err) => {
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: gitCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
                 if (err) reject(err)
                 else resolve()
               },
@@ -1004,8 +1063,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         // git rebase <selected> rebases current onto selected
         const rebaseCmd = `git rebase ${branch.replace(/'/g, "'\\''")}`
         if (terminal.ssh_host) {
-          await execSSHCommand(terminal.ssh_host, rebaseCmd, {
+          const result = await execSSHCommand(terminal.ssh_host, rebaseCmd, {
             cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: rebaseCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
           })
         } else {
           await new Promise<void>((resolve, reject) => {
@@ -1013,7 +1079,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               'git',
               ['rebase', branch],
               { cwd: expandPath(terminal.cwd), timeout: 60000 },
-              (err) => {
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: rebaseCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
                 if (err) reject(err)
                 else resolve()
               },
@@ -1090,8 +1164,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         // Delete the local branch with -D (force delete)
         const deleteCmd = `git branch -D ${branch.replace(/'/g, "'\\''")}`
         if (terminal.ssh_host) {
-          await execSSHCommand(terminal.ssh_host, deleteCmd, {
+          const result = await execSSHCommand(terminal.ssh_host, deleteCmd, {
             cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: deleteCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
           })
         } else {
           await new Promise<void>((resolve, reject) => {
@@ -1099,7 +1180,15 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               'git',
               ['branch', '-D', branch],
               { cwd: expandPath(terminal.cwd), timeout: 10000 },
-              (err) => {
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: deleteCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
                 if (err) reject(err)
                 else resolve()
               },
@@ -1111,8 +1200,17 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         if (deleteRemote) {
           const deleteRemoteCmd = `git push origin --delete ${branch.replace(/'/g, "'\\''")}`
           if (terminal.ssh_host) {
-            await execSSHCommand(terminal.ssh_host, deleteRemoteCmd, {
-              cwd: terminal.cwd,
+            const result = await execSSHCommand(
+              terminal.ssh_host,
+              deleteRemoteCmd,
+              { cwd: terminal.cwd },
+            )
+            logCommand({
+              terminalId: id,
+              category: 'git',
+              command: deleteRemoteCmd,
+              stdout: result.stdout,
+              stderr: result.stderr,
             })
           } else {
             await new Promise<void>((resolve, reject) => {
@@ -1120,7 +1218,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
                 'git',
                 ['push', 'origin', '--delete', branch],
                 { cwd: expandPath(terminal.cwd), timeout: 30000 },
-                (err) => {
+                (err, stdout, stderr) => {
+                  logCommand({
+                    terminalId: id,
+                    category: 'git',
+                    command: deleteRemoteCmd,
+                    stdout,
+                    stderr: err ? err.message : stderr,
+                  })
                   if (err) reject(err)
                   else resolve()
                 },

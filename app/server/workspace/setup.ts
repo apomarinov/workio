@@ -8,6 +8,7 @@ import {
   deleteTerminal,
   getTerminalById,
   insertNotification,
+  logCommand,
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'
@@ -523,27 +524,48 @@ export async function setupTerminalWorkspace(
     if (worktreeSource) {
       // --- Worktree mode ---
       // First prune any orphaned worktrees from previous deletions
-      await runCmd(
-        'git',
-        ['worktree', 'prune'],
-        worktreeSource,
-        sshHost,
-        10000,
-      ).catch(() => {})
+      const pruneCmd = 'git worktree prune'
+      try {
+        const pruneResult = await runCmd(
+          'git',
+          ['worktree', 'prune'],
+          worktreeSource,
+          sshHost,
+          10000,
+        )
+        logCommand({
+          terminalId,
+          category: 'workspace',
+          command: pruneCmd,
+          stdout: pruneResult.stdout,
+          stderr: pruneResult.stderr,
+        })
+      } catch {
+        // Ignore prune errors
+      }
 
       targetPath = joinPath(sshHost, parentDir, slug)
-      await runCmd(
+      const worktreeCmd = `git worktree add ${targetPath} -b feature/${slug}`
+      const worktreeResult = await runCmd(
         'git',
         ['worktree', 'add', targetPath, '-b', `feature/${slug}`],
         worktreeSource,
         sshHost,
         LONG_TIMEOUT,
       )
+      logCommand({
+        terminalId,
+        category: 'workspace',
+        command: worktreeCmd,
+        stdout: worktreeResult.stdout,
+        stderr: worktreeResult.stderr,
+      })
     } else {
       // --- Clone mode (shallow) ---
       targetPath = joinPath(sshHost, parentDir, slug)
       await mkdirp(targetPath, sshHost)
-      await runCmd(
+      const cloneCmd = `git clone --depth 1 --single-branch ${cloneUrl(repo)} ${targetPath}`
+      const cloneResult = await runCmd(
         'git',
         [
           'clone',
@@ -557,6 +579,13 @@ export async function setupTerminalWorkspace(
         sshHost,
         LONG_TIMEOUT,
       )
+      logCommand({
+        terminalId,
+        category: 'workspace',
+        command: cloneCmd,
+        stdout: cloneResult.stdout,
+        stderr: cloneResult.stderr,
+      })
     }
 
     // Update terminal cwd (and name if not user-provided)
@@ -611,6 +640,7 @@ export async function setupTerminalWorkspace(
         sshHost,
       )
       if (setupScript) {
+        const setupCmd = `bash "${setupScript}"`
         const hasSession = await waitForSession(terminalId, 30_000)
         if (hasSession) {
           writeToSession(
@@ -618,6 +648,13 @@ export async function setupTerminalWorkspace(
             `cd "${targetPath}" && bash "${setupScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
           )
           const exitCode = await waitForMarker(terminalId)
+          logCommand({
+            terminalId,
+            category: 'workspace',
+            command: setupCmd,
+            stderr: exitCode !== 0 ? `Exit code: ${exitCode}` : undefined,
+            failed: exitCode !== 0,
+          })
           if (exitCode !== 0) {
             throw new Error(`Setup script exited with code ${exitCode}`)
           }
@@ -673,6 +710,7 @@ export async function deleteTerminalWorkspace(
       sshHost,
     )
     if (deleteScript) {
+      const deleteCmd = `bash "${deleteScript}"`
       const session = getSession(terminalId)
       if (session) {
         interruptSession(terminalId)
@@ -682,6 +720,13 @@ export async function deleteTerminalWorkspace(
           `cd "${terminal.cwd}" && bash "${deleteScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
         )
         const exitCode = await waitForMarker(terminalId)
+        logCommand({
+          terminalId,
+          category: 'workspace',
+          command: deleteCmd,
+          stderr: exitCode !== 0 ? `Exit code: ${exitCode}` : undefined,
+          failed: exitCode !== 0,
+        })
         if (exitCode !== 0) {
           throw new Error(`Teardown script exited with code ${exitCode}`)
         }
@@ -690,7 +735,13 @@ export async function deleteTerminalWorkspace(
 
     // Cleanup: destroy session, remove files, delete from DB
     destroySession(terminalId)
+    const rmCmd = `rm -rf ${terminal.cwd}`
     await rmrf(terminal.cwd, sshHost)
+    logCommand({
+      terminalId,
+      category: 'workspace',
+      command: rmCmd,
+    })
     await deleteTerminal(terminalId)
 
     // Notify clients
