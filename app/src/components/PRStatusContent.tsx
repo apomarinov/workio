@@ -11,36 +11,29 @@ import {
   MessageSquare,
   MoreHorizontal,
   Reply,
-  Trash2,
 } from 'lucide-react'
-import { memo, type ReactNode, useCallback, useMemo, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { memo, useCallback, useMemo, useState } from 'react'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
+import {
+  ContentDialog,
+  HiddenAuthorsDialog,
+  HideAuthorDialog,
+  MergeDialog,
+  ReplyDialog,
+  ReReviewDialog,
+  RerunAllChecksDialog,
+  RerunCheckDialog,
+} from './dialogs'
 import { RefreshIcon } from './icons'
 import { MarkdownContent } from './MarkdownContent'
 
@@ -67,7 +60,6 @@ export const PRTabButton = memo(function PRTabButton({
   const { settings, updateSettings } = useSettings()
   const [menuOpen, setMenuOpen] = useState(false)
   const [hiddenAuthorsModalOpen, setHiddenAuthorsModalOpen] = useState(false)
-  const [removingAuthor, setRemovingAuthor] = useState<string | null>(null)
 
   const hiddenAuthorsForRepo = useMemo(() => {
     return (settings?.hide_gh_authors ?? []).filter(
@@ -76,18 +68,11 @@ export const PRTabButton = memo(function PRTabButton({
   }, [settings?.hide_gh_authors, pr.repo])
 
   const handleRemoveHiddenAuthor = async (author: string) => {
-    setRemovingAuthor(author)
-    try {
-      const current = settings?.hide_gh_authors ?? []
-      const updated = current.filter(
-        (e) => !(e.repo === pr.repo && e.author === author),
-      )
-      await updateSettings({ hide_gh_authors: updated })
-    } catch {
-      // Error handling is silent - the UI will show the author still there
-    } finally {
-      setRemovingAuthor(null)
-    }
+    const current = settings?.hide_gh_authors ?? []
+    const updated = current.filter(
+      (e) => !(e.repo === pr.repo && e.author === author),
+    )
+    await updateSettings({ hide_gh_authors: updated })
   }
 
   return (
@@ -151,49 +136,13 @@ export const PRTabButton = memo(function PRTabButton({
           )}
         </PopoverContent>
       </Popover>
-      <Dialog
-        open={hiddenAuthorsModalOpen}
-        onOpenChange={setHiddenAuthorsModalOpen}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Hidden Comment Authors</DialogTitle>
-            <DialogDescription>
-              Comments from these authors are hidden for this repo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            {hiddenAuthorsForRepo.map((entry) => (
-              <div
-                key={entry.author}
-                className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-              >
-                <span className="text-sm">{entry.author}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveHiddenAuthor(entry.author)}
-                  disabled={removingAuthor === entry.author}
-                  className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {removingAuthor === entry.author ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setHiddenAuthorsModalOpen(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {hiddenAuthorsModalOpen && (
+        <HiddenAuthorsDialog
+          authors={hiddenAuthorsForRepo}
+          onRemove={handleRemoveHiddenAuthor}
+          onClose={() => setHiddenAuthorsModalOpen(false)}
+        />
+      )}
     </div>
   )
 })
@@ -204,42 +153,6 @@ interface PRStatusContentProps {
   onToggle?: () => void
   hasNewActivity?: boolean
   onSeen?: () => void
-}
-
-function ContentDialog({
-  author,
-  avatarUrl,
-  content,
-  open,
-  onOpenChange,
-}: {
-  author: string | ReactNode
-  avatarUrl?: string
-  content: string
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {avatarUrl && typeof author === 'string' && (
-              <img
-                src={avatarUrl}
-                alt={author}
-                className="w-5 h-5 rounded-full"
-              />
-            )}
-            {author}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="text-sm">
-          <MarkdownContent content={content} />
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
 }
 
 const ReviewRow = memo(function ReviewRow({
@@ -341,13 +254,12 @@ const ReviewRow = memo(function ReviewRow({
           <MarkdownContent content={review.body} />
         </div>
       )}
-      {review.body && (
+      {review.body && bodyOpen && (
         <ContentDialog
           author={review.author}
           avatarUrl={review.avatarUrl}
           content={review.body}
-          open={bodyOpen}
-          onOpenChange={setBodyOpen}
+          onClose={() => setBodyOpen(false)}
         />
       )}
     </div>
@@ -454,13 +366,14 @@ const CommentItem = memo(function CommentItem({
         </div>
       </div>
 
-      <ContentDialog
-        author={comment.author}
-        avatarUrl={comment.avatarUrl}
-        content={comment.body}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-      />
+      {modalOpen && (
+        <ContentDialog
+          author={comment.author}
+          avatarUrl={comment.avatarUrl}
+          content={comment.body}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </>
   )
 })
@@ -477,7 +390,6 @@ export function PRStatusContent({
 
   const { settings, updateSettings } = useSettings()
   const [hideAuthor, setHideAuthor] = useState<string | null>(null)
-  const [hideLoading, setHideLoading] = useState(false)
   const hiddenAuthorsSet = useMemo(() => {
     const set = new Set<string>()
     for (const entry of settings?.hide_gh_authors ?? []) {
@@ -534,50 +446,23 @@ export function PRStatusContent({
   }
 
   const [reReviewAuthor, setReReviewAuthor] = useState<string | null>(null)
-  const [reReviewLoading, setReReviewLoading] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
-  const [mergeMethod, setMergeMethod] = useState<'merge' | 'squash' | 'rebase'>(
-    'squash',
-  )
-  const [mergeLoading, setMergeLoading] = useState(false)
   const [rerunCheck, setRerunCheck] = useState<{
     name: string
     url: string
   } | null>(null)
-  const [rerunLoading, setRerunLoading] = useState(false)
   const [rerunAllOpen, setRerunAllOpen] = useState(false)
-  const [rerunAllLoading, setRerunAllLoading] = useState(false)
   const [replyAuthor, setReplyAuthor] = useState<string | null>(null)
-  const [replyBody, setReplyBody] = useState('')
-  const [replyLoading, setReplyLoading] = useState(false)
 
-  const handleMerge = async () => {
-    setMergeLoading(true)
-    try {
-      await api.mergePR(owner, repo, pr.prNumber, mergeMethod)
-      toast.success('PR merged successfully')
-      setMergeOpen(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to merge PR')
-    } finally {
-      setMergeLoading(false)
-    }
+  const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
+    await api.mergePR(owner, repo, pr.prNumber, method)
+    toast.success('PR merged successfully')
   }
 
   const handleReRequestReview = async () => {
     if (!reReviewAuthor) return
-    setReReviewLoading(true)
-    try {
-      await api.requestPRReview(owner, repo, pr.prNumber, reReviewAuthor)
-      toast.success(`Review requested from ${reReviewAuthor}`)
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to request review',
-      )
-    } finally {
-      setReReviewLoading(false)
-      setReReviewAuthor(null)
-    }
+    await api.requestPRReview(owner, repo, pr.prNumber, reReviewAuthor)
+    toast.success(`Review requested from ${reReviewAuthor}`)
   }
 
   const handleReReview = useCallback(
@@ -587,36 +472,17 @@ export function PRStatusContent({
 
   const handleReply = useCallback((author: string) => {
     setReplyAuthor(author)
-    setReplyBody(`@${author} `)
   }, [])
 
-  const handleSendReply = async () => {
-    if (!replyBody.trim()) return
-    setReplyLoading(true)
-    try {
-      await api.addPRComment(owner, repo, pr.prNumber, replyBody)
-      toast.success('Comment posted')
-      setReplyAuthor(null)
-      setReplyBody('')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to post comment')
-    } finally {
-      setReplyLoading(false)
-    }
+  const handleSendReply = async (body: string) => {
+    await api.addPRComment(owner, repo, pr.prNumber, body)
+    toast.success('Comment posted')
   }
 
   const handleRerunCheck = async () => {
     if (!rerunCheck) return
-    setRerunLoading(true)
-    try {
-      await api.rerunFailedCheck(owner, repo, pr.prNumber, rerunCheck.url)
-      toast.success('Re-running failed jobs')
-      setRerunCheck(null)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to rerun check')
-    } finally {
-      setRerunLoading(false)
-    }
+    await api.rerunFailedCheck(owner, repo, pr.prNumber, rerunCheck.url)
+    toast.success('Re-running failed jobs')
   }
 
   // Filter for completed failed checks (not in-progress or queued)
@@ -627,28 +493,33 @@ export function PRStatusContent({
 
   const handleRerunAllChecks = async () => {
     if (failedCompletedChecks.length === 0) return
-    setRerunAllLoading(true)
-    try {
-      const checkUrls = failedCompletedChecks.map((c) => c.detailsUrl)
-      const result = await api.rerunAllFailedChecks(
-        owner,
-        repo,
-        pr.prNumber,
-        checkUrls,
-      )
-      toast.success(`Re-running ${result.rerunCount} failed workflow(s)`)
-      setRerunAllOpen(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to rerun checks')
-    } finally {
-      setRerunAllLoading(false)
-    }
+    const checkUrls = failedCompletedChecks.map((c) => c.detailsUrl)
+    const result = await api.rerunAllFailedChecks(
+      owner,
+      repo,
+      pr.prNumber,
+      checkUrls,
+    )
+    toast.success(`Re-running ${result.rerunCount} failed workflow(s)`)
   }
 
   const handleHideComment = useCallback(
     (author: string) => setHideAuthor(author),
     [],
   )
+
+  const handleHideAuthor = async () => {
+    if (!hideAuthor) return
+    const current = settings?.hide_gh_authors ?? []
+    const alreadyHidden = current.some(
+      (e) => e.repo === pr.repo && e.author === hideAuthor,
+    )
+    if (alreadyHidden) return
+    await updateSettings({
+      hide_gh_authors: [...current, { repo: pr.repo, author: hideAuthor }],
+    })
+    toast.success(`Comments from ${hideAuthor} hidden`)
+  }
 
   const hasBody = !!pr.prBody
   const [bodyModalOpen, setBodyModalOpen] = useState(false)
@@ -676,7 +547,7 @@ export function PRStatusContent({
               <MarkdownContent content={pr.prBody} />
             </div>
           )}
-          {hasBody && (
+          {hasBody && bodyModalOpen && (
             <ContentDialog
               author={
                 <div className="flex items-center justify-between w-full">
@@ -685,8 +556,7 @@ export function PRStatusContent({
                 </div>
               }
               content={pr.prBody}
-              open={bodyModalOpen}
-              onOpenChange={setBodyModalOpen}
+              onClose={() => setBodyModalOpen(false)}
             />
           )}
 
@@ -816,313 +686,53 @@ export function PRStatusContent({
             )}
           </div>
 
-          <Dialog
-            open={reReviewAuthor !== null}
-            onOpenChange={(open) => {
-              if (!open && reReviewLoading) return
-              if (!open) setReReviewAuthor(null)
-            }}
-          >
-            <DialogContent
-              className="sm:max-w-sm"
-              showCloseButton={false}
-              onPointerDownOutside={(e) =>
-                reReviewLoading && e.preventDefault()
-              }
-              onEscapeKeyDown={(e) => reReviewLoading && e.preventDefault()}
-            >
-              <DialogHeader>
-                <DialogTitle>Request re-review</DialogTitle>
-                <DialogDescription>
-                  Ask <span className="font-medium">{reReviewAuthor}</span> to
-                  review this PR again?
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setReReviewAuthor(null)}
-                  disabled={reReviewLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleReRequestReview}
-                  disabled={reReviewLoading}
-                  autoFocus
-                >
-                  {reReviewLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Request review'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {reReviewAuthor && (
+            <ReReviewDialog
+              author={reReviewAuthor}
+              onConfirm={handleReRequestReview}
+              onClose={() => setReReviewAuthor(null)}
+            />
+          )}
 
-          <Dialog
-            open={mergeOpen}
-            onOpenChange={(open) => {
-              if (!open && mergeLoading) return
-              setMergeOpen(open)
-            }}
-          >
-            <DialogContent
-              showCloseButton={false}
-              className="sm:max-w-sm"
-              onPointerDownOutside={(e) => mergeLoading && e.preventDefault()}
-              onEscapeKeyDown={(e) => mergeLoading && e.preventDefault()}
-            >
-              <DialogHeader>
-                <DialogTitle>Merge pull request</DialogTitle>
-                <DialogDescription>
-                  Merge <span className="font-medium">#{pr.prNumber}</span> into
-                  the base branch?
-                </DialogDescription>
-              </DialogHeader>
-              <Select
-                value={mergeMethod}
-                onValueChange={(v) =>
-                  setMergeMethod(v as 'merge' | 'squash' | 'rebase')
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="squash">Squash and merge</SelectItem>
-                  <SelectItem value="merge">Create a merge commit</SelectItem>
-                  <SelectItem value="rebase">Rebase and merge</SelectItem>
-                </SelectContent>
-              </Select>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setMergeOpen(false)}
-                  disabled={mergeLoading}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleMerge} disabled={mergeLoading} autoFocus>
-                  {mergeLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Merge'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {mergeOpen && (
+            <MergeDialog
+              prNumber={pr.prNumber}
+              onConfirm={handleMerge}
+              onClose={() => setMergeOpen(false)}
+            />
+          )}
 
-          <Dialog
-            open={rerunCheck !== null}
-            onOpenChange={(open) => {
-              if (!open && rerunLoading) return
-              if (!open) setRerunCheck(null)
-            }}
-          >
-            <DialogContent
-              showCloseButton={false}
-              className="sm:max-w-sm"
-              onPointerDownOutside={(e) => rerunLoading && e.preventDefault()}
-              onEscapeKeyDown={(e) => rerunLoading && e.preventDefault()}
-            >
-              <DialogHeader>
-                <DialogTitle>Re-run failed check</DialogTitle>
-                <DialogDescription>
-                  Re-run failed jobs for{' '}
-                  <span className="font-medium">{rerunCheck?.name}</span>?
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setRerunCheck(null)}
-                  disabled={rerunLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleRerunCheck}
-                  disabled={rerunLoading}
-                  autoFocus
-                >
-                  {rerunLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Re-run'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {rerunCheck && (
+            <RerunCheckDialog
+              checkName={rerunCheck.name}
+              onConfirm={handleRerunCheck}
+              onClose={() => setRerunCheck(null)}
+            />
+          )}
 
-          <Dialog
-            open={rerunAllOpen}
-            onOpenChange={(open) => {
-              if (!open && rerunAllLoading) return
-              setRerunAllOpen(open)
-            }}
-          >
-            <DialogContent
-              showCloseButton={false}
-              className="sm:max-w-sm"
-              onPointerDownOutside={(e) =>
-                rerunAllLoading && e.preventDefault()
-              }
-              onEscapeKeyDown={(e) => rerunAllLoading && e.preventDefault()}
-            >
-              <DialogHeader>
-                <DialogTitle>Re-run all failed checks</DialogTitle>
-                <DialogDescription>
-                  Re-run failed jobs for all{' '}
-                  <span className="font-medium">
-                    {failedCompletedChecks.length}
-                  </span>{' '}
-                  failed checks?
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setRerunAllOpen(false)}
-                  disabled={rerunAllLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleRerunAllChecks}
-                  disabled={rerunAllLoading}
-                  autoFocus
-                >
-                  {rerunAllLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Re-run All'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {rerunAllOpen && (
+            <RerunAllChecksDialog
+              checkCount={failedCompletedChecks.length}
+              onConfirm={handleRerunAllChecks}
+              onClose={() => setRerunAllOpen(false)}
+            />
+          )}
 
-          <Dialog
-            open={hideAuthor !== null}
-            onOpenChange={(open) => {
-              if (!open && hideLoading) return
-              if (!open) setHideAuthor(null)
-            }}
-          >
-            <DialogContent className="sm:max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Hide comments</DialogTitle>
-                <DialogDescription>
-                  Hide all comments from{' '}
-                  <span className="font-medium">{hideAuthor}</span>?
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setHideAuthor(null)}
-                  disabled={hideLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  disabled={hideLoading}
-                  autoFocus
-                  onClick={async () => {
-                    if (!hideAuthor) return
-                    const current = settings?.hide_gh_authors ?? []
-                    const alreadyHidden = current.some(
-                      (e) => e.repo === pr.repo && e.author === hideAuthor,
-                    )
-                    if (alreadyHidden) {
-                      setHideAuthor(null)
-                      return
-                    }
-                    setHideLoading(true)
-                    try {
-                      await updateSettings({
-                        hide_gh_authors: [
-                          ...current,
-                          { repo: pr.repo, author: hideAuthor },
-                        ],
-                      })
-                      toast.success(`Comments from ${hideAuthor} hidden`)
-                    } catch {
-                      toast.error('Failed to hide author')
-                    } finally {
-                      setHideLoading(false)
-                      setHideAuthor(null)
-                    }
-                  }}
-                >
-                  {hideLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Hide'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {hideAuthor && (
+            <HideAuthorDialog
+              author={hideAuthor}
+              onConfirm={handleHideAuthor}
+              onClose={() => setHideAuthor(null)}
+            />
+          )}
 
-          <Dialog
-            open={replyAuthor !== null}
-            onOpenChange={(open) => {
-              if (!open && replyLoading) return
-              if (!open) {
-                setReplyAuthor(null)
-                setReplyBody('')
-              }
-            }}
-          >
-            <DialogContent
-              className="sm:max-w-md"
-              showCloseButton={false}
-              onPointerDownOutside={(e) => replyLoading && e.preventDefault()}
-              onEscapeKeyDown={(e) => replyLoading && e.preventDefault()}
-            >
-              <DialogHeader>
-                <DialogTitle>Reply to {replyAuthor}</DialogTitle>
-                <DialogDescription>
-                  Add a comment to this pull request
-                </DialogDescription>
-              </DialogHeader>
-              <textarea
-                value={replyBody}
-                onChange={(e) => setReplyBody(e.target.value)}
-                placeholder="Write your comment..."
-                rows={4}
-                className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-none"
-                disabled={replyLoading}
-              />
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setReplyAuthor(null)
-                    setReplyBody('')
-                  }}
-                  disabled={replyLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSendReply}
-                  disabled={replyLoading || !replyBody.trim()}
-                >
-                  {replyLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Send'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {replyAuthor && (
+            <ReplyDialog
+              author={replyAuthor}
+              onConfirm={handleSendReply}
+              onClose={() => setReplyAuthor(null)}
+            />
+          )}
         </div>
       )}
     </>
