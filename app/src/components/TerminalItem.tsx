@@ -13,7 +13,7 @@ import {
   Pin,
   TerminalSquare as TerminalIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -36,15 +36,15 @@ interface TerminalItemProps {
   hideFolder?: boolean
   sessions?: SessionWithProject[]
   sessionsExpanded?: boolean
-  onToggleSessions?: () => void
+  onToggleTerminalSessions?: (terminalId: number) => void
 }
 
-export function TerminalItem({
+export const TerminalItem = memo(function TerminalItem({
   terminal,
   hideFolder,
   sessions = [],
   sessionsExpanded = true,
-  onToggleSessions,
+  onToggleTerminalSessions,
 }: TerminalItemProps) {
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { clearSession } = useSessionContext()
@@ -127,7 +127,7 @@ export function TerminalItem({
   const handleChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!isSettingUp && !isDeleting) {
-      onToggleSessions?.()
+      onToggleTerminalSessions?.(terminal.id)
     }
   }
 
@@ -151,7 +151,7 @@ export function TerminalItem({
           selectTerminal(terminal.id)
           clearSession()
           if (!sessionsExpanded && !isSettingUp && !isDeleting) {
-            onToggleSessions?.()
+            onToggleTerminalSessions?.(terminal.id)
           }
         }}
         className={cn(
@@ -521,4 +521,4 @@ export function TerminalItem({
         )}
     </div>
   )
-}
+})

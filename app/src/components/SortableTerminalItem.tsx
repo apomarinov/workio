@@ -1,5 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { memo } from 'react'
 import type { SessionWithProject, Terminal } from '../types'
 import { TerminalItem } from './TerminalItem'
 
@@ -7,14 +8,14 @@ interface SortableTerminalItemProps {
   terminal: Terminal
   sessions: SessionWithProject[]
   sessionsExpanded: boolean
-  onToggleSessions: () => void
+  onToggleTerminalSessions: (terminalId: number) => void
 }
 
-export function SortableTerminalItem({
+export const SortableTerminalItem = memo(function SortableTerminalItem({
   terminal,
   sessions,
   sessionsExpanded,
-  onToggleSessions,
+  onToggleTerminalSessions,
 }: SortableTerminalItemProps) {
   const {
     attributes,
@@ -37,8 +38,8 @@ export function SortableTerminalItem({
         terminal={terminal}
         sessions={sessions}
         sessionsExpanded={sessionsExpanded}
-        onToggleSessions={onToggleSessions}
+        onToggleTerminalSessions={onToggleTerminalSessions}
       />
     </div>
   )
-}
+})

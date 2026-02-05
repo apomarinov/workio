@@ -244,7 +244,7 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span>
                 {orphanedCount} webhook{orphanedCount > 1 ? 's' : ''} for repos
-                without terminals. Consider deleting them.
+                without projects. Consider deleting them.
               </span>
             </div>
           )}
@@ -254,7 +254,7 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
             <div className="text-sm font-medium">Repositories</div>
             {repos.length === 0 ? (
               <div className="text-sm text-muted-foreground">
-                No GitHub repositories found in terminals.
+                No GitHub repositories found in projects.
               </div>
             ) : (
               <div className="space-y-2 max-h-[300px] overflow-y-auto">

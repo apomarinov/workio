@@ -57,15 +57,17 @@ Before running WorkIO, make sure the following are installed on your machine:
 - **GitHub CLI (`gh`)** -- install from [cli.github.com](https://cli.github.com/) (optional, but needed for PR features)
 - **Git** and **SSH** (for repository and remote machine features)
 
-You also need a `DATABASE_URL` environment variable pointing to your PostgreSQL instance. Set it in `.env.local` file in the project root:
+You also need to set up environment variables. Create a `.env.local` file in the project root:
 
-```
-DATABASE_URL=postgresql://localhost/workio
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string (e.g., `postgresql://localhost/workio`) |
+| `NGROK_AUTHTOKEN` | No | Enables GitHub webhook support for real-time PR updates. Get a token from [ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken). Without this, PR data only refreshes on manual actions. |
+| `NGROK_DOMAIN` | No | Use a static ngrok domain instead of a random URL. Requires `NGROK_AUTHTOKEN`. Get a free static domain from your [ngrok dashboard](https://dashboard.ngrok.com/domains). |
 
 ---
 
-## Running in Production
+## Run
 
 The quickest way to get started:
 
@@ -73,7 +75,7 @@ The quickest way to get started:
 ./run.sh
 ```
 
-This script handles everything: checks dependencies, sets up the database, builds the app, and starts the server. The dashboard will be available at `http://localhost:5175`.
+This script handles everything: checks dependencies, adds Claude hooks, sets up the database, builds the app, and starts the server. The dashboard will be available at `http://localhost:5175`.
 
 **Flags:**
 

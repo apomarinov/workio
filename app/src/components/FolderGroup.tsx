@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
+import { memo } from 'react'
 import type { SessionWithProject, Terminal } from '../types'
 import { TerminalItem } from './TerminalItem'
 import { TruncatedPath } from './TruncatedPath'
@@ -13,7 +14,7 @@ interface FolderGroupProps {
   onToggleTerminalSessions: (terminalId: number) => void
 }
 
-export function FolderGroup({
+export const FolderGroup = memo(function FolderGroup({
   cwd,
   terminals,
   expanded,
@@ -52,11 +53,11 @@ export function FolderGroup({
               hideFolder
               sessions={sessionsForTerminal.get(terminal.id) || []}
               sessionsExpanded={expandedTerminalSessions.has(terminal.id)}
-              onToggleSessions={() => onToggleTerminalSessions(terminal.id)}
+              onToggleTerminalSessions={onToggleTerminalSessions}
             />
           ))}
         </div>
       )}
     </div>
   )
-}
+})
