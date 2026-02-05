@@ -29,6 +29,7 @@ import { useTerminalContext } from '@/context/TerminalContext'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
 import * as api from '@/lib/api'
+import { RefreshIcon } from './icons'
 
 interface WebhooksModalProps {
   open: boolean
@@ -327,7 +328,7 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
                                 {loading[repo] ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
-                                  <RefreshCw className="w-4 h-4" />
+                                  <RefreshIcon className="w-4 h-4" />
                                 )}
                               </Button>
                             </TooltipTrigger>

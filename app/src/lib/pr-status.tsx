@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
+import { RefreshIcon } from '@/components/icons'
 
 export function getPRStatusInfo(pr?: PRCheckStatus) {
   const iconClass = 'w-5 h-5'
@@ -79,7 +80,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       colorClass: 'text-orange-400',
       dimColorClass: 'text-orange-400/60 hover:text-orange-400',
       icon: (props?: { cls?: string; group?: string }) => (
-        <RefreshCw
+        <RefreshIcon
           className={cn(
             iconClass,
             `text-orange-400/70 ${props?.group ? `${props.group}:text-orange-400` : ''}`,

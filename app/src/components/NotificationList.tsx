@@ -12,6 +12,7 @@ import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '@/context/TerminalContext'
 import type { Notification } from '@/types'
+import { RefreshIcon } from './icons'
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString)
@@ -37,7 +38,7 @@ function getNotificationIcon(type: string) {
     case 'check_failed':
       return <CircleX className="w-4 h-4 text-red-400" />
     case 'changes_requested':
-      return <RefreshCw className="w-4 h-4 text-orange-400" />
+      return <RefreshIcon className="w-4 h-4 text-orange-400" />
     case 'pr_approved':
       return <Check className="w-4 h-4 text-green-500" />
     case 'new_comment':
@@ -156,9 +157,8 @@ function NotificationItem({
   return (
     <button
       onClick={handleClick}
-      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${
-        read ? 'opacity-60' : ''
-      } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
+      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${read ? 'opacity-60' : ''
+        } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
     >
       <div className="flex-shrink-0 mt-0.5">{getNotificationIcon(type)}</div>
       <div className="flex-1 min-w-0">

@@ -9,7 +9,10 @@ import {
   File,
   Loader2,
   MessageSquare,
+  RefreshCcw,
   RefreshCw,
+  Reply,
+  RotateCw,
   Trash2,
 } from 'lucide-react'
 import { memo, type ReactNode, useCallback, useMemo, useState } from 'react'
@@ -36,6 +39,7 @@ import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
 import { MarkdownContent } from './MarkdownContent'
+import { RefreshIcon } from './icons'
 
 export const PRTabButton = memo(function PRTabButton({
   pr,
@@ -84,52 +88,50 @@ export const PRTabButton = memo(function PRTabButton({
 
   return (
     <div className="group/pr-btn flex items-center">
-      <div className="flex justify-between items-center w-full pr-2">
-        <button
-          type="button"
-          onClick={onClick}
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'text-[10px] flex items-center uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+          active
+            ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
+            : cn(
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
+          className,
+        )}
+      >
+        {withIcon && icon({ cls: 'w-2.5 h-2.5 mr-1' })}
+        {label}
+        {hasNewActivity && (
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
+        )}
+        <a
+          href={pr.prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className={cn(
-            'text-[10px] flex items-center uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
-            active
-              ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
-              : cn(
-                  dimColorClass ||
-                    'text-muted-foreground/60 hover:text-muted-foreground',
-                ),
-            className,
+            'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
           )}
         >
-          {withIcon && icon({ cls: 'w-2.5 h-2.5 mr-1' })}
-          {label}
-          {hasNewActivity && (
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
-          )}
-          <a
-            href={pr.prUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className={cn(
-              'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
-            )}
-          >
-            <ExternalLink className="w-3 h-3 max-w-3 max-h-3" />
-          </a>
+          <ExternalLink className="w-3 h-3 max-w-3 max-h-3" />
+        </a>
+      </button>
+      {hiddenAuthorsForRepo.length > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setHiddenAuthorsModalOpen(true)
+          }}
+          className="ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer"
+          title="Hidden comment authors"
+        >
+          <BellOff className="w-3 h-3" />
         </button>
-        {hiddenAuthorsForRepo.length > 0 && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              setHiddenAuthorsModalOpen(true)
-            }}
-            className="ml-1 hidden group-hover/pr-btn:block text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer"
-            title="Hidden comment authors"
-          >
-            <BellOff className="w-3 h-3" />
-          </button>
-        )}
-      </div>
+      )}
       <Dialog
         open={hiddenAuthorsModalOpen}
         onOpenChange={setHiddenAuthorsModalOpen}
@@ -284,15 +286,15 @@ const ReviewRow = memo(function ReviewRow({
           onClick={handleReply}
           className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
         >
-          Reply
+          <Reply className="w-3.5 h-3.5" />
         </button>
-        {showReReview && (
+        {!showReReview && (
           <button
             type="button"
             onClick={handleReReview}
             className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
           >
-            Re-review
+            <RefreshIcon className="w-3.5 h-3.5" />
           </button>
         )}
         {isApproved && onMerge && (
@@ -405,7 +407,7 @@ const CommentItem = memo(function CommentItem({
             onClick={handleReply}
             className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
           >
-            Reply
+            <Reply className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
@@ -688,7 +690,7 @@ export function PRStatusContent({
               key={`changes-${review.author}`}
               review={review}
               icon={
-                <RefreshCw className="w-3 h-3 flex-shrink-0 text-orange-400" />
+                <RefreshIcon className="w-3 h-3 flex-shrink-0 text-orange-400" />
               }
               prUrl={pr.prUrl}
               showReReview
@@ -733,7 +735,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
@@ -751,7 +753,7 @@ export function PRStatusContent({
                     }
                     className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
                   >
-                    Re-run
+                    <RefreshIcon className="w-4 h-4 hover:animate-spin" />
                   </button>
                 )}
               </div>
@@ -763,7 +765,7 @@ export function PRStatusContent({
                 onClick={() => setRerunAllOpen(true)}
                 className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshIcon className="w-3 h-3" />
                 Re-run All ({failedCompletedChecks.length})
               </button>
             )}

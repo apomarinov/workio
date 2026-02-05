@@ -13,6 +13,7 @@ import type {
   PaletteLevel,
   PaletteMode,
 } from '../types'
+import { RefreshIcon } from '@/components/icons'
 
 export function createPRActionsMode(
   data: AppData,
@@ -99,7 +100,7 @@ export function createPRActionsMode(
     items.push({
       id: 'action:rerun-all',
       label: `Re-run ${failedChecksCount} failed check${failedChecksCount > 1 ? 's' : ''}`,
-      icon: <RefreshCw className="h-4 w-4 shrink-0 text-zinc-400" />,
+      icon: <RefreshIcon className="h-4 w-4 shrink-0 text-zinc-400" />,
       onSelect: () => {
         actions.openRerunAllModal(pr)
       },

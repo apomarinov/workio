@@ -1,3 +1,6 @@
+import { cn } from "@/lib/utils"
+import { RefreshCcw } from "lucide-react"
+
 export function CursorIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -56,4 +59,8 @@ export function FinderIcon({ className }: { className?: string }) {
       </g>
     </svg>
   )
+}
+
+export function RefreshIcon({ className }: { className?: string }) {
+  return <RefreshCcw className={cn("rotate-[-30deg]", className)} />
 }
