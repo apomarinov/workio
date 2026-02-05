@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -598,21 +597,12 @@ export async function deleteAllNotifications(): Promise<number> {
 
 interface LogCommandOptions {
   terminalId?: number
-  prId?: string // MD5 hash (32 chars)
+  prId?: string // "owner/repo#123" format
   category: 'git' | 'workspace' | 'github'
   command: string
   stdout?: string
   stderr?: string
   failed?: boolean
-}
-
-/** Create pr_id hash from owner/repo and PR number */
-export function hashPrId(
-  owner: string,
-  repo: string,
-  prNumber: number,
-): string {
-  return createHash('md5').update(`${owner}/${repo}#${prNumber}`).digest('hex')
 }
 
 /** Fire-and-forget command logging - does not await at call sites */

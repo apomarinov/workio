@@ -13,7 +13,6 @@ import {
   getAllTerminals,
   getSettings,
   getTerminalById,
-  hashPrId,
   insertNotification,
   logCommand,
   updateTerminal,
@@ -955,7 +954,7 @@ export function requestPRReview(
   prNumber: number,
   reviewer: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const prId = hashPrId(owner, repo, prNumber)
+  const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method POST repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers -f reviewers[]=${reviewer}`
   return new Promise((resolve) => {
     // Use REST API to avoid deprecated projectCards GraphQL field in `gh pr edit`
@@ -996,7 +995,7 @@ export function mergePR(
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase',
 ): Promise<{ ok: boolean; error?: string }> {
-  const prId = hashPrId(owner, repo, prNumber)
+  const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method PUT repos/${owner}/${repo}/pulls/${prNumber}/merge -f merge_method=${method}`
   return new Promise((resolve) => {
     execFile(
@@ -1044,7 +1043,7 @@ export function rerunFailedCheck(
     })
   }
   const runId = runMatch[1]
-  const prId = prNumber ? hashPrId(owner, repo, prNumber) : undefined
+  const prId = prNumber ? `${owner}/${repo}#${prNumber}` : undefined
   const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
   return new Promise((resolve) => {
     execFile(
@@ -1096,7 +1095,7 @@ export async function rerunAllFailedChecks(
     return { ok: false, error: 'No valid action runs found', rerunCount: 0 }
   }
 
-  const prId = prNumber ? hashPrId(owner, repo, prNumber) : undefined
+  const prId = prNumber ? `${owner}/${repo}#${prNumber}` : undefined
   const errors: string[] = []
   let successCount = 0
 
@@ -1151,7 +1150,7 @@ export function addPRComment(
   prNumber: number,
   body: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const prId = hashPrId(owner, repo, prNumber)
+  const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh pr comment ${prNumber} --repo ${owner}/${repo} -b "..."`
   return new Promise((resolve) => {
     execFile(

@@ -57,6 +57,7 @@ import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { FolderGroup } from './FolderGroup'
+import { LogsModal } from './LogsModal'
 import { OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
@@ -129,6 +130,10 @@ export function Sidebar({ width }: SidebarProps) {
     setActivePR,
   } = useTerminalContext()
   const [bellOpen, setBellOpen] = useState(false)
+  const [logsModal, setLogsModal] = useState<{
+    open: boolean
+    initialFilter?: { terminalId?: number; prName?: string }
+  }>({ open: false })
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -347,6 +352,18 @@ export function Sidebar({ width }: SidebarProps) {
     const handler = () => setShowSettingsModal(true)
     window.addEventListener('open-settings', handler)
     return () => window.removeEventListener('open-settings', handler)
+  }, [])
+
+  // Listen for open-logs events from command palette
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { terminalId?: number; prName?: string }
+        | undefined
+      setLogsModal({ open: true, initialFilter: detail })
+    }
+    window.addEventListener('open-logs', handler)
+    return () => window.removeEventListener('open-logs', handler)
   }, [])
 
   // Listen for reveal-pr events from the command palette
@@ -1057,6 +1074,14 @@ export function Sidebar({ width }: SidebarProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LogsModal
+        open={logsModal.open}
+        onOpenChange={(open) =>
+          setLogsModal({ open, initialFilter: undefined })
+        }
+        initialFilter={logsModal.initialFilter}
+      />
     </div>
   )
 }

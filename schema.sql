@@ -150,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 CREATE TABLE IF NOT EXISTS command_logs (
     id SERIAL PRIMARY KEY,
     terminal_id INTEGER,   -- No FK cascade - logs preserved after terminal deletion
-    pr_id VARCHAR(32),     -- MD5 hash of "owner/repo#prNumber"
+    pr_id VARCHAR(100),    -- "owner/repo#prNumber" format
     exit_code INTEGER,
     category VARCHAR(32),  -- 'git', 'workspace', 'github'
     data JSONB,            -- { command: string, stdout?: string, stderr?: string }

@@ -41,6 +41,7 @@ import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import { startGitDirtyPolling } from './pty/manager'
+import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
@@ -433,6 +434,7 @@ fastify.delete('/api/notifications', async () => {
 await fastify.register(terminalRoutes)
 await fastify.register(settingsRoutes)
 await fastify.register(sessionRoutes)
+await fastify.register(logsRoutes)
 
 // Start monitor daemon (persistent Python process for hook events)
 const projectRoot = path.resolve(__dirname, '../..')

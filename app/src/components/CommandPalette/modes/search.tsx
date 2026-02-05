@@ -6,6 +6,7 @@ import {
   GitBranch,
   GitMerge,
   Globe,
+  ScrollText,
   TerminalSquare,
 } from 'lucide-react'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -227,11 +228,26 @@ export function createSearchMode(
     },
   }))
 
+  // Logs action
+  const logsItem: PaletteItem = {
+    id: 'action:logs',
+    label: 'Logs',
+    description: 'View command logs',
+    icon: <ScrollText className="h-4 w-4 shrink-0 text-zinc-400" />,
+    keywords: ['logs', 'command', 'history'],
+    onSelect: () => {
+      window.dispatchEvent(new CustomEvent('open-logs'))
+      api.close()
+    },
+  }
+
   // Build groups
   const groups = []
   if (terminalItems.length > 0) {
     groups.push({ heading: 'Projects', items: terminalItems })
   }
+  // Add actions group with logs
+  groups.push({ heading: 'Actions', items: [logsItem] })
   if (openPRItems.length > 0 || mergedPRItems.length > 0) {
     groups.push({
       heading: 'Pull Requests',

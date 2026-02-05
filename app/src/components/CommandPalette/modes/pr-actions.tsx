@@ -4,6 +4,7 @@ import {
   EyeOff,
   GitBranch,
   GitMerge,
+  ScrollText,
 } from 'lucide-react'
 import { RefreshIcon } from '@/components/icons'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -129,6 +130,18 @@ export function createPRActionsMode(
     icon: <EyeOff className="h-4 w-4 shrink-0 text-zinc-400" />,
     onSelect: () => {
       actions.hidePR(pr)
+    },
+  })
+
+  // View Logs
+  const prName = `${pr.repo}#${pr.prNumber}`
+  items.push({
+    id: 'action:logs',
+    label: 'Logs',
+    icon: <ScrollText className="h-4 w-4 shrink-0 text-zinc-400" />,
+    onSelect: () => {
+      window.dispatchEvent(new CustomEvent('open-logs', { detail: { prName } }))
+      api.close()
     },
   })
 

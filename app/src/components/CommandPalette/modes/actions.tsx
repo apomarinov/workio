@@ -6,6 +6,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  ScrollText,
   Trash2,
 } from 'lucide-react'
 import { CursorIcon, FinderIcon, VSCodeIcon } from '../../icons'
@@ -162,6 +163,19 @@ export function createActionsMode(
       label: 'Delete',
       icon: <Trash2 className="h-4 w-4 shrink-0 text-red-400" />,
       onSelect: () => actions.openDeleteModal(terminal),
+    })
+
+    // View Logs
+    items.push({
+      id: 'action:logs',
+      label: 'Logs',
+      icon: <ScrollText className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => {
+        window.dispatchEvent(
+          new CustomEvent('open-logs', { detail: { terminalId: terminal.id } }),
+        )
+        api.close()
+      },
     })
 
     return {
