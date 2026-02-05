@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fastifyStatic from '@fastify/static'
+import { format } from 'date-fns'
 import Fastify from 'fastify'
 import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
@@ -56,9 +57,20 @@ const port = env.NODE_ENV === 'production' ? env.CLIENT_PORT : env.SERVER_PORT
 // Write logs to file (and stdout in development)
 const logsDir = path.join(__dirname, 'logs')
 fs.mkdirSync(logsDir, { recursive: true })
+
+// Keep only the last 10 server logs
+const existingLogs = fs
+  .readdirSync(logsDir)
+  .filter((f) => f.startsWith('server-') && f.endsWith('.jsonl'))
+  .sort()
+  .reverse()
+for (const oldLog of existingLogs.slice(10)) {
+  fs.unlinkSync(path.join(logsDir, oldLog))
+}
+
 const logFile = path.join(
   logsDir,
-  `server-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`,
+  `server-${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.jsonl`,
 )
 const logStreams: pino.StreamEntry[] = [{ stream: pino.destination(logFile) }]
 if (env.NODE_ENV !== 'production') {
@@ -489,7 +501,7 @@ function stopDaemon() {
   const sockPath = path.join(projectRoot, 'daemon.sock')
   try {
     fs.unlinkSync(sockPath)
-  } catch {}
+  } catch { }
 }
 
 process.on('exit', stopDaemon)
