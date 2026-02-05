@@ -1,4 +1,4 @@
-import { Maximize2, Minus, MoreVertical, Plus } from 'lucide-react'
+import { Minimize2, Minus, MoreVertical, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { Button } from '@/components/ui/button'
@@ -395,7 +395,7 @@ export function PinnedSessionsPip() {
                     onClick={handleFit}
                     title="Fit to content"
                   >
-                    <Maximize2 className="w-3.5 h-3.5" />
+                    <Minimize2 className="w-3.5 h-3.5" />
                   </Button>
                   <SettingsMenu
                     open={openMenu}

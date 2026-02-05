@@ -19,6 +19,7 @@ import {
   detectAllTerminalBranches,
   emitCachedPRChecks,
   fetchMergedPRsByMe,
+  getGhUsername,
   initGitHubChecks,
   mergePR,
   queueWebhookRefresh,
@@ -338,8 +339,12 @@ fastify.post<{
     return reply.status(401).send({ error: 'Invalid signature' })
   }
 
-  // Extract repo from payload
-  const body = request.body as { repository?: { full_name?: string } }
+  // Extract repo and PR author from payload
+  const body = request.body as {
+    repository?: { full_name?: string }
+    pull_request?: { user?: { login?: string } }
+    issue?: { user?: { login?: string } }
+  }
   const repo = body?.repository?.full_name
 
   // Handle ping event (webhook test)
@@ -350,8 +355,27 @@ fastify.post<{
   }
 
   if (repo) {
-    log.info(`[webhooks] Received ${event} event for ${repo}`)
-    queueWebhookRefresh(repo)
+    // Extract PR author based on event type
+    // - pull_request, pull_request_review, pull_request_review_comment: pull_request.user.login
+    // - issue_comment (on PRs): issue.user.login
+    // - check_suite: let all through (CI status is important for our PRs)
+    const prAuthor = body?.pull_request?.user?.login || body?.issue?.user?.login
+    const currentUser = getGhUsername()
+
+    // Only queue refresh if it's our PR or we can't determine the author
+    if (
+      event === 'check_suite' ||
+      !prAuthor ||
+      !currentUser ||
+      prAuthor === currentUser
+    ) {
+      log.info(`[webhooks] Received ${event} event for ${repo}`)
+      queueWebhookRefresh(repo)
+    } else {
+      log.info(
+        `[webhooks] Ignoring ${event} event for ${repo} (author: ${prAuthor}, not ${currentUser})`,
+      )
+    }
   }
 
   return { ok: true }

@@ -102,6 +102,10 @@ function fetchGhUsername(): Promise<string | null> {
   })
 }
 
+export function getGhUsername(): string | null {
+  return ghUsername
+}
+
 async function detectGitHubRepo(
   cwd: string,
   sshHost?: string | null,
@@ -1329,7 +1333,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       const reviewer = pr.reviews.find(
         (r) => r.state === 'CHANGES_REQUESTED',
       )?.author
-      if (!isHiddenAuthor(hiddenAuthors, pr.repo, reviewer || '')) {
+      if (reviewer && reviewer !== ghUsername) {
         const notification = await insertNotification(
           'changes_requested',
           pr.repo,
@@ -1350,7 +1354,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       pr.reviewDecision === 'APPROVED'
     ) {
       const approver = pr.reviews.find((r) => r.state === 'APPROVED')?.author
-      if (!isHiddenAuthor(hiddenAuthors, pr.repo, approver || '')) {
+      if (approver && approver !== ghUsername) {
         const notification = await insertNotification(
           'pr_approved',
           pr.repo,
@@ -1402,7 +1406,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       )
       for (const review of pr.reviews) {
         if (ghUsername && review.author === ghUsername) continue
-        if (isHiddenAuthor(hiddenAuthors, pr.repo, review.author)) continue
         // Skip if we've seen this review before (by ID)
         if (review.id && prevReviewIds.has(review.id)) continue
         // Skip reviews with no body - these are just containers for code comments
