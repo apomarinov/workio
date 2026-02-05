@@ -4,7 +4,6 @@ import {
   ExternalLink,
   Loader2,
   Plus,
-  RefreshCw,
   TestTube,
   Trash2,
   Webhook,

@@ -1,4 +1,9 @@
-import { AlertCircle, CornerDownLeft, GitBranch, TerminalSquare } from 'lucide-react'
+import {
+  AlertCircle,
+  CornerDownLeft,
+  GitBranch,
+  TerminalSquare,
+} from 'lucide-react'
 import type { AppActions, AppData } from '../createPaletteModes'
 import { getLastPathSegment } from '../createPaletteModes'
 import type {
@@ -53,7 +58,7 @@ export function createPRCheckoutMode(
       label: terminal.name || getLastPathSegment(terminal.cwd),
       description: terminal.git_branch ? (
         <span className="flex items-center gap-1">
-          <GitBranch className='text-muted-foreground w-2.5 h-2.5 max-w-2.5 max-h-2.5' />
+          <GitBranch className="text-muted-foreground w-2.5 h-2.5 max-w-2.5 max-h-2.5" />
           <span className="font-medium text-xs">{terminal.git_branch}</span>
           {isDirty && (
             <span className="text-amber-500 flex items-center gap-0.5">

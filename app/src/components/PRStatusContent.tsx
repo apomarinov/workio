@@ -9,10 +9,8 @@ import {
   File,
   Loader2,
   MessageSquare,
-  RefreshCcw,
-  RefreshCw,
+  MoreHorizontal,
   Reply,
-  RotateCw,
   Trash2,
 } from 'lucide-react'
 import { memo, type ReactNode, useCallback, useMemo, useState } from 'react'
@@ -26,6 +24,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -38,8 +41,8 @@ import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus, PRReview } from '../../shared/types'
 import * as api from '../lib/api'
-import { MarkdownContent } from './MarkdownContent'
 import { RefreshIcon } from './icons'
+import { MarkdownContent } from './MarkdownContent'
 
 export const PRTabButton = memo(function PRTabButton({
   pr,
@@ -62,6 +65,7 @@ export const PRTabButton = memo(function PRTabButton({
   )
 
   const { settings, updateSettings } = useSettings()
+  const [menuOpen, setMenuOpen] = useState(false)
   const [hiddenAuthorsModalOpen, setHiddenAuthorsModalOpen] = useState(false)
   const [removingAuthor, setRemovingAuthor] = useState<string | null>(null)
 
@@ -96,9 +100,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
@@ -107,31 +111,46 @@ export const PRTabButton = memo(function PRTabButton({
         {hasNewActivity && (
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
         )}
-        <a
-          href={pr.prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            'ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors hidden group-hover/pr-btn:block',
-          )}
-        >
-          <ExternalLink className="w-3 h-3 max-w-3 max-h-3" />
-        </a>
       </button>
-      {hiddenAuthorsForRepo.length > 0 && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            setHiddenAuthorsModalOpen(true)
-          }}
-          className="ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer"
-          title="Hidden comment authors"
-        >
-          <BellOff className="w-3 h-3" />
-        </button>
-      )}
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer group-hover/pr-btn:block',
+              menuOpen ? 'block' : 'hidden',
+            )}
+          >
+            <MoreHorizontal className="w-3 h-3" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-1" align="start">
+          <a
+            href={pr.prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMenuOpen(false)}
+            className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View on GitHub
+          </a>
+          {hiddenAuthorsForRepo.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false)
+                setHiddenAuthorsModalOpen(true)
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer w-full text-left"
+            >
+              <BellOff className="w-3.5 h-3.5" />
+              Hidden Authors ({hiddenAuthorsForRepo.length})
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
       <Dialog
         open={hiddenAuthorsModalOpen}
         onOpenChange={setHiddenAuthorsModalOpen}
@@ -735,7 +754,7 @@ export function PRStatusContent({
                   className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                 >
                   {check.status === 'IN_PROGRESS' ||
-                    check.status === 'QUEUED' ? (
+                  check.status === 'QUEUED' ? (
                     <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                   ) : (
                     <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils"
-import { RefreshCcw } from "lucide-react"
+import { RefreshCcw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export function CursorIcon({ className }: { className?: string }) {
   return (
@@ -62,5 +62,5 @@ export function FinderIcon({ className }: { className?: string }) {
 }
 
 export function RefreshIcon({ className }: { className?: string }) {
-  return <RefreshCcw className={cn("rotate-[-30deg]", className)} />
+  return <RefreshCcw className={cn('rotate-[-30deg]', className)} />
 }

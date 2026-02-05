@@ -1,10 +1,5 @@
-import {
-  CornerDownLeft,
-  ExternalLink,
-  GitBranch,
-  GitMerge,
-  RefreshCw,
-} from 'lucide-react'
+import { CornerDownLeft, ExternalLink, GitBranch, GitMerge } from 'lucide-react'
+import { RefreshIcon } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
@@ -13,7 +8,6 @@ import type {
   PaletteLevel,
   PaletteMode,
 } from '../types'
-import { RefreshIcon } from '@/components/icons'
 
 export function createPRActionsMode(
   data: AppData,

@@ -5,11 +5,10 @@ import {
   Clock,
   GitMerge,
   Loader2,
-  RefreshCw,
 } from 'lucide-react'
+import { RefreshIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
-import { RefreshIcon } from '@/components/icons'
 
 export function getPRStatusInfo(pr?: PRCheckStatus) {
   const iconClass = 'w-5 h-5'

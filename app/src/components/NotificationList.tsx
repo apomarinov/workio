@@ -4,7 +4,6 @@ import {
   Eye,
   GitMerge,
   MessageSquare,
-  RefreshCw,
   Terminal,
   Trash2,
 } from 'lucide-react'
@@ -157,8 +156,9 @@ function NotificationItem({
   return (
     <button
       onClick={handleClick}
-      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${read ? 'opacity-60' : ''
-        } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
+      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${
+        read ? 'opacity-60' : ''
+      } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
     >
       <div className="flex-shrink-0 mt-0.5">{getNotificationIcon(type)}</div>
       <div className="flex-1 min-w-0">
