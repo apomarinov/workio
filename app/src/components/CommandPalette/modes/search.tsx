@@ -244,16 +244,69 @@ export function createSearchMode(
     },
   }
 
+  // Group terminals by repo
+  const terminalsByRepo = new Map<string, PaletteItem[]>()
+  const terminalsNoRepo: PaletteItem[] = []
+  for (let i = 0; i < terminals.length; i++) {
+    const repo = terminals[i].git_repo?.repo
+    if (repo) {
+      const existing = terminalsByRepo.get(repo) || []
+      existing.push(terminalItems[i])
+      terminalsByRepo.set(repo, existing)
+    } else {
+      terminalsNoRepo.push(terminalItems[i])
+    }
+  }
+
+  // Group PRs by repo
+  const allPRItems = [...openPRItems, ...mergedPRItems]
+  const prsByRepo = new Map<string, PaletteItem[]>()
+  const allPRSources = [...openPRs, ...mergedPRs]
+  for (let i = 0; i < allPRSources.length; i++) {
+    const repo = allPRSources[i].repo
+    const existing = prsByRepo.get(repo) || []
+    existing.push(allPRItems[i])
+    prsByRepo.set(repo, existing)
+  }
+
+  // Collect all unique repos
+  const allRepos = new Set([...terminalsByRepo.keys(), ...prsByRepo.keys()])
+  const needsRepoSubheadings =
+    allRepos.size > 1 || (allRepos.size === 1 && terminalsNoRepo.length > 0)
+
   // Build groups
   const groups = []
-  if (terminalItems.length > 0) {
-    groups.push({ heading: 'Projects', items: terminalItems })
-  }
-  if (openPRItems.length > 0 || mergedPRItems.length > 0) {
-    groups.push({
-      heading: 'Pull Requests',
-      items: [...openPRItems, ...mergedPRItems],
-    })
+  if (needsRepoSubheadings) {
+    for (const repo of allRepos) {
+      const repoName = repo.split('/')[1] || repo
+      const repoTerminals = terminalsByRepo.get(repo)
+      if (repoTerminals && repoTerminals.length > 0) {
+        groups.push({
+          heading: `Projects — ${repoName}`,
+          items: repoTerminals,
+        })
+      }
+    }
+    if (terminalsNoRepo.length > 0) {
+      groups.push({ heading: 'Projects', items: terminalsNoRepo })
+    }
+    for (const repo of allRepos) {
+      const repoName = repo.split('/')[1] || repo
+      const repoPRs = prsByRepo.get(repo)
+      if (repoPRs && repoPRs.length > 0) {
+        groups.push({
+          heading: `Pull Requests — ${repoName}`,
+          items: repoPRs,
+        })
+      }
+    }
+  } else {
+    if (terminalItems.length > 0) {
+      groups.push({ heading: 'Projects', items: terminalItems })
+    }
+    if (allPRItems.length > 0) {
+      groups.push({ heading: 'Pull Requests', items: allPRItems })
+    }
   }
   if (sessionItems.length > 0) {
     groups.push({ heading: 'Claude Sessions', items: sessionItems })

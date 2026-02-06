@@ -19,7 +19,6 @@ import {
   ChevronsDownUp,
   Ellipsis,
   EyeOff,
-  Folder,
   GitBranch,
   Github,
   GitMerge,
@@ -57,7 +56,6 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
-import { FolderGroup } from './FolderGroup'
 import { LogsModal } from './LogsModal'
 import { OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
@@ -66,11 +64,10 @@ import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
 import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
-import { SortableRepoGroup } from './SortableRepoGroup'
 import { SortableTerminalItem } from './SortableTerminalItem'
 import { useWebhookWarning } from './WebhooksModal'
 
-type GroupingMode = 'all' | 'folder' | 'sessions'
+type GroupingMode = 'all' | 'sessions'
 
 interface SidebarProps {
   width?: number
@@ -100,9 +97,6 @@ export function Sidebar({ width }: SidebarProps) {
     'sidebar-grouping',
     'all',
   )
-  const [expandedFoldersArray, setExpandedFoldersArray] = useLocalStorage<
-    string[]
-  >('sidebar-expanded-folders', [])
   const [expandedSessionGroups, setExpandedSessionGroups] = useLocalStorage<
     string[]
   >('sidebar-expanded-session-groups', [])
@@ -119,10 +113,9 @@ export function Sidebar({ width }: SidebarProps) {
   const [collapsedGitHubRepos, setCollapsedGitHubRepos] = useLocalStorage<
     string[]
   >('sidebar-collapsed-github-repos', [])
-  const [repoOrder, setRepoOrder] = useLocalStorage<string[]>(
-    'sidebar-repo-order',
-    [],
-  )
+  const [collapsedProjectRepos, setCollapsedProjectRepos] = useLocalStorage<
+    string[]
+  >('sidebar-collapsed-project-repos', [])
   const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
   const {
@@ -163,21 +156,6 @@ export function Sidebar({ width }: SidebarProps) {
     [terminals, setTerminalOrder],
   )
 
-  const expandedFolders = useMemo(
-    () => new Set(expandedFoldersArray),
-    [expandedFoldersArray],
-  )
-
-  const groupedTerminals = useMemo(() => {
-    const groups = new Map<string, Terminal[]>()
-    for (const terminal of terminals) {
-      const existing = groups.get(terminal.cwd) || []
-      existing.push(terminal)
-      groups.set(terminal.cwd, existing)
-    }
-    return groups
-  }, [terminals])
-
   // Compute session assignments:
   // - sessionsForTerminal: sessions with terminal_id matching an existing terminal
   // - orphanSessionGroups: sessions with no matching terminal_id, grouped by project_path
@@ -206,16 +184,34 @@ export function Sidebar({ width }: SidebarProps) {
     }
   }, [sessions, terminals])
 
-  const toggleFolder = useCallback(
-    (cwd: string) => {
-      setExpandedFoldersArray((prev) => {
-        if (prev.includes(cwd)) {
-          return prev.filter((f) => f !== cwd)
-        }
-        return [...prev, cwd]
-      })
+  const repoGroupedTerminals = useMemo(() => {
+    const repoGroups = new Map<string, Terminal[]>()
+    const ungrouped: Terminal[] = []
+    for (const terminal of terminals) {
+      const repo = terminal.git_repo?.repo
+      if (repo) {
+        const existing = repoGroups.get(repo) || []
+        existing.push(terminal)
+        repoGroups.set(repo, existing)
+      } else {
+        ungrouped.push(terminal)
+      }
+    }
+    return { repoGroups, ungrouped }
+  }, [terminals])
+
+  const collapsedProjectReposSet = useMemo(
+    () => new Set(collapsedProjectRepos),
+    [collapsedProjectRepos],
+  )
+
+  const toggleProjectRepo = useCallback(
+    (repo: string) => {
+      setCollapsedProjectRepos((prev) =>
+        prev.includes(repo) ? prev.filter((r) => r !== repo) : [...prev, repo],
+      )
     },
-    [setExpandedFoldersArray],
+    [setCollapsedProjectRepos],
   )
 
   const toggleSessionGroup = (path: string) => {
@@ -296,39 +292,6 @@ export function Sidebar({ width }: SidebarProps) {
     return grouped
   }, [githubPRs])
 
-  // Sort repos based on saved order
-  const sortedRepos = useMemo(() => {
-    const repos = Array.from(githubPRsByRepo.keys())
-    return repos.sort((a, b) => {
-      const aIndex = repoOrder.indexOf(a)
-      const bIndex = repoOrder.indexOf(b)
-      // If both are in order, sort by order
-      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-      // If only one is in order, it comes first
-      if (aIndex !== -1) return -1
-      if (bIndex !== -1) return 1
-      // Neither in order, keep original order
-      return 0
-    })
-  }, [githubPRsByRepo, repoOrder])
-
-  const handleRepoDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-      if (!over || active.id === over.id) return
-
-      const oldIndex = sortedRepos.indexOf(active.id as string)
-      const newIndex = sortedRepos.indexOf(over.id as string)
-      if (oldIndex === -1 || newIndex === -1) return
-
-      const newOrder = [...sortedRepos]
-      newOrder.splice(oldIndex, 1)
-      newOrder.splice(newIndex, 0, active.id as string)
-      setRepoOrder(newOrder)
-    },
-    [sortedRepos, setRepoOrder],
-  )
-
   const mergedPRsByRepo = useMemo(() => {
     const grouped = new Map<string, typeof mergedPRs>()
     for (const pr of mergedPRs) {
@@ -348,18 +311,19 @@ export function Sidebar({ width }: SidebarProps) {
   )
 
   const collapseAll = useCallback(() => {
-    setExpandedFoldersArray([])
     setExpandedSessionGroups([])
     setExpandedTerminalSessions([])
     setCollapsedSessions(allSessionIds)
     setExpandedGitHubPRs([])
+    setCollapsedProjectRepos(Array.from(repoGroupedTerminals.repoGroups.keys()))
   }, [
     allSessionIds,
-    setExpandedFoldersArray,
+    repoGroupedTerminals.repoGroups,
     setExpandedSessionGroups,
     setExpandedTerminalSessions,
     setCollapsedSessions,
     setExpandedGitHubPRs,
+    setCollapsedProjectRepos,
   ])
 
   const handlePipToggle = useCallback(() => {
@@ -451,11 +415,10 @@ export function Sidebar({ width }: SidebarProps) {
       // Expand the terminals section
       setTerminalsSectionCollapsed(false)
 
-      // If in folder mode, expand the terminal's folder
-      if (groupingMode === 'folder') {
-        setExpandedFoldersArray((prev) =>
-          prev.includes(terminal.cwd) ? prev : [...prev, terminal.cwd],
-        )
+      // If terminal has a repo, uncollapse that repo group
+      const repo = terminal.git_repo?.repo
+      if (repo) {
+        setCollapsedProjectRepos((prev) => prev.filter((r) => r !== repo))
       }
 
       // Expand the terminal itself
@@ -475,9 +438,8 @@ export function Sidebar({ width }: SidebarProps) {
     return () => window.removeEventListener('reveal-terminal', handler)
   }, [
     terminals,
-    groupingMode,
     setTerminalsSectionCollapsed,
-    setExpandedFoldersArray,
+    setCollapsedProjectRepos,
     setExpandedTerminalSessions,
   ])
 
@@ -496,14 +458,11 @@ export function Sidebar({ width }: SidebarProps) {
 
       if (parentTerminal) {
         selectTerminal(parentTerminal.id)
-        // Session is under a terminal - expand terminals section, folder, and terminal sessions
+        // Session is under a terminal - expand terminals section, repo group, and terminal sessions
         setTerminalsSectionCollapsed(false)
-        if (groupingMode === 'folder') {
-          setExpandedFoldersArray((prev) =>
-            prev.includes(parentTerminal.cwd)
-              ? prev
-              : [...prev, parentTerminal.cwd],
-          )
+        const repo = parentTerminal.git_repo?.repo
+        if (repo) {
+          setCollapsedProjectRepos((prev) => prev.filter((r) => r !== repo))
         }
         setExpandedTerminalSessions((prev) =>
           prev.includes(parentTerminal.id)
@@ -535,18 +494,16 @@ export function Sidebar({ width }: SidebarProps) {
   }, [
     sessions,
     terminals,
-    groupingMode,
     selectTerminal,
     selectSession,
     setTerminalsSectionCollapsed,
-    setExpandedFoldersArray,
+    setCollapsedProjectRepos,
     setExpandedTerminalSessions,
     setOtherSessionsSectionCollapsed,
     setExpandedSessionGroups,
   ])
 
   const hasAnythingExpanded =
-    expandedFoldersArray.length > 0 ||
     expandedSessionGroups.length > 0 ||
     expandedTerminalSessions.length > 0 ||
     collapsedSessions.length < allSessionIds.length ||
@@ -639,18 +596,6 @@ export function Sidebar({ width }: SidebarProps) {
                       <Bot className="w-4 h-4" />
                       Claude
                     </button>
-                    <button
-                      onClick={() => {
-                        setGroupingMode('folder')
-                        setGroupingOpen(false)
-                      }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'folder' ? 'bg-accent' : ''
-                      }`}
-                    >
-                      <Folder className="w-4 h-4" />
-                      Folders
-                    </button>
                   </PopoverContent>
                 </Popover>
                 {hasAnythingExpanded && (
@@ -727,18 +672,6 @@ export function Sidebar({ width }: SidebarProps) {
                 >
                   <Bot className="w-4 h-4" />
                   Claude
-                </button>
-                <button
-                  onClick={() => {
-                    setGroupingMode('folder')
-                    setGroupingOpen(false)
-                  }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'folder' ? 'bg-accent' : ''
-                  }`}
-                >
-                  <Folder className="w-4 h-4" />
-                  Folders
                 </button>
               </PopoverContent>
             </Popover>
@@ -836,37 +769,67 @@ export function Sidebar({ width }: SidebarProps) {
                   )}
                   Projects
                 </button>
-                {!terminalsSectionCollapsed &&
-                  (groupingMode === 'folder' ? (
-                    Array.from(groupedTerminals.entries()).map(
-                      ([folderCwd, folderTerminals]) => (
-                        <FolderGroup
-                          key={folderCwd}
-                          cwd={folderCwd}
-                          terminals={folderTerminals}
-                          expanded={expandedFolders.has(folderCwd)}
-                          onToggle={() => toggleFolder(folderCwd)}
-                          sessionsForTerminal={sessionsForTerminal}
-                          expandedTerminalSessions={expandedTerminalSessionsSet}
-                          onToggleTerminalSessions={toggleTerminalSessions}
-                        />
-                      ),
-                    )
-                  ) : (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      modifiers={[
-                        restrictToVerticalAxis,
-                        restrictToParentElement,
-                      ]}
-                      onDragEnd={handleDragEnd}
-                    >
+                {!terminalsSectionCollapsed && (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[
+                      restrictToVerticalAxis,
+                      restrictToParentElement,
+                    ]}
+                    onDragEnd={handleDragEnd}
+                  >
+                    {Array.from(repoGroupedTerminals.repoGroups.entries()).map(
+                      ([repo, repoTerminals]) => {
+                        const isCollapsed = collapsedProjectReposSet.has(repo)
+                        const repoName = repo.split('/')[1] || repo
+                        return (
+                          <div key={repo}>
+                            <button
+                              type="button"
+                              onClick={() => toggleProjectRepo(repo)}
+                              className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                              )}
+                              <Github className="w-3 h-3" />
+                              <span className="truncate">{repoName}</span>
+                            </button>
+                            {!isCollapsed && (
+                              <SortableContext
+                                items={repoTerminals.map((t) => t.id)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                {repoTerminals.map((terminal) => (
+                                  <SortableTerminalItem
+                                    key={terminal.id}
+                                    terminal={terminal}
+                                    sessions={
+                                      sessionsForTerminal.get(terminal.id) || []
+                                    }
+                                    sessionsExpanded={expandedTerminalSessionsSet.has(
+                                      terminal.id,
+                                    )}
+                                    onToggleTerminalSessions={
+                                      toggleTerminalSessions
+                                    }
+                                  />
+                                ))}
+                              </SortableContext>
+                            )}
+                          </div>
+                        )
+                      },
+                    )}
+                    {repoGroupedTerminals.ungrouped.length > 0 && (
                       <SortableContext
-                        items={terminals.map((t) => t.id)}
+                        items={repoGroupedTerminals.ungrouped.map((t) => t.id)}
                         strategy={verticalListSortingStrategy}
                       >
-                        {terminals.map((terminal) => (
+                        {repoGroupedTerminals.ungrouped.map((terminal) => (
                           <SortableTerminalItem
                             key={terminal.id}
                             terminal={terminal}
@@ -880,8 +843,9 @@ export function Sidebar({ width }: SidebarProps) {
                           />
                         ))}
                       </SortableContext>
-                    </DndContext>
-                  ))}
+                    )}
+                  </DndContext>
+                )}
               </>
             )}
 
@@ -910,124 +874,106 @@ export function Sidebar({ width }: SidebarProps) {
                   )}
                   Pull requests
                 </button>
-                {!githubSectionCollapsed && (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    modifiers={[
-                      restrictToVerticalAxis,
-                      restrictToParentElement,
-                    ]}
-                    onDragEnd={handleRepoDragEnd}
-                  >
-                    <SortableContext
-                      items={sortedRepos}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {sortedRepos.map((repo) => {
-                        const repoPRs = githubPRsByRepo.get(repo) ?? []
-                        const repoName = repo.split('/')[1] || repo
-                        const isCollapsed = collapsedGitHubReposSet.has(repo)
-                        const hiddenPRsForRepo = (
-                          settings?.hidden_prs ?? []
-                        ).filter((h) => h.repo === repo)
-                        const hiddenAuthorsForRepo = (
-                          settings?.hide_gh_authors ?? []
-                        ).filter((h) => h.repo === repo)
-                        const hasHiddenItems =
-                          hiddenPRsForRepo.length > 0 ||
-                          hiddenAuthorsForRepo.length > 0
-                        return (
-                          <SortableRepoGroup key={repo} repo={repo}>
-                            <div className="group/repo-header flex items-center">
-                              <button
-                                type="button"
-                                onClick={() => toggleGitHubRepo(repo)}
-                                className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
-                              >
-                                {isCollapsed ? (
-                                  <ChevronRight className="w-3 h-3 flex-shrink-0" />
-                                ) : (
-                                  <ChevronDown className="w-3 h-3 flex-shrink-0" />
-                                )}
-                                <Github className="w-3 h-3" />
-                                <span className="truncate">{repoName}</span>
-                              </button>
-                              {hasHiddenItems && (
-                                <button
-                                  type="button"
-                                  onClick={() => setHiddenPRsModalRepo(repo)}
-                                  className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
-                                  title="Manage hidden items"
-                                >
-                                  <EyeOff className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                            {!isCollapsed && (
-                              <>
-                                {repoPRs.map((pr) => (
-                                  <PRStatusGroup
-                                    key={`${pr.repo}:${pr.prNumber}`}
-                                    pr={pr}
-                                    expanded={expandedGitHubPRsSet.has(
-                                      pr.branch,
-                                    )}
-                                    onToggle={() => toggleGitHubPR(pr)}
-                                    hasNewActivity={hasNewActivity(pr)}
-                                    onSeen={() => markPRSeen(pr)}
-                                    isActive={
-                                      activePR?.prNumber === pr.prNumber &&
-                                      activePR?.repo === pr.repo
-                                    }
-                                  />
-                                ))}
-                                {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
-                                  <a
-                                    key={pr.prNumber}
-                                    href={pr.prUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
-                                  >
-                                    {pr.state === 'MERGED' ? (
-                                      <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
-                                    ) : (
-                                      <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <span className="text-xs truncate block">
-                                        {pr.prTitle}
-                                      </span>
-                                      <div className="flex gap-1 items-center">
-                                        <GitBranch className="w-2.5 h-2.5" />
-                                        <span className="text-[11px] text-muted-foreground/50 truncate">
-                                          {pr.branch}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </a>
-                                ))}
-                                <OlderMergedPRsList
-                                  repo={repo}
-                                  excludePRNumbers={
-                                    new Set([
-                                      ...repoPRs.map((pr) => pr.prNumber),
-                                      ...(mergedPRsByRepo.get(repo) ?? []).map(
-                                        (pr) => pr.prNumber,
-                                      ),
-                                    ])
-                                  }
-                                />
-                              </>
+                {!githubSectionCollapsed &&
+                  Array.from(githubPRsByRepo.keys()).map((repo) => {
+                    const repoPRs = githubPRsByRepo.get(repo) ?? []
+                    const repoName = repo.split('/')[1] || repo
+                    const isCollapsed = collapsedGitHubReposSet.has(repo)
+                    const hiddenPRsForRepo = (
+                      settings?.hidden_prs ?? []
+                    ).filter((h) => h.repo === repo)
+                    const hiddenAuthorsForRepo = (
+                      settings?.hide_gh_authors ?? []
+                    ).filter((h) => h.repo === repo)
+                    const hasHiddenItems =
+                      hiddenPRsForRepo.length > 0 ||
+                      hiddenAuthorsForRepo.length > 0
+                    return (
+                      <div key={repo}>
+                        <div className="group/repo-header flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleGitHubRepo(repo)}
+                            className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 flex-shrink-0" />
                             )}
-                          </SortableRepoGroup>
-                        )
-                      })}
-                    </SortableContext>
-                  </DndContext>
-                )}
+                            <Github className="w-3 h-3" />
+                            <span className="truncate">{repoName}</span>
+                          </button>
+                          {hasHiddenItems && (
+                            <button
+                              type="button"
+                              onClick={() => setHiddenPRsModalRepo(repo)}
+                              className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                              title="Manage hidden items"
+                            >
+                              <EyeOff className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {!isCollapsed && (
+                          <>
+                            {repoPRs.map((pr) => (
+                              <PRStatusGroup
+                                key={`${pr.repo}:${pr.prNumber}`}
+                                pr={pr}
+                                expanded={expandedGitHubPRsSet.has(pr.branch)}
+                                onToggle={() => toggleGitHubPR(pr)}
+                                hasNewActivity={hasNewActivity(pr)}
+                                onSeen={() => markPRSeen(pr)}
+                                isActive={
+                                  activePR?.prNumber === pr.prNumber &&
+                                  activePR?.repo === pr.repo
+                                }
+                              />
+                            ))}
+                            {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
+                              <a
+                                key={pr.prNumber}
+                                href={pr.prUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                              >
+                                {pr.state === 'MERGED' ? (
+                                  <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                                ) : (
+                                  <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-xs truncate block">
+                                    {pr.prTitle}
+                                  </span>
+                                  <div className="flex gap-1 items-center">
+                                    <GitBranch className="w-2.5 h-2.5" />
+                                    <span className="text-[11px] text-muted-foreground/50 truncate">
+                                      {pr.branch}
+                                    </span>
+                                  </div>
+                                </div>
+                              </a>
+                            ))}
+                            <OlderMergedPRsList
+                              repo={repo}
+                              excludePRNumbers={
+                                new Set([
+                                  ...repoPRs.map((pr) => pr.prNumber),
+                                  ...(mergedPRsByRepo.get(repo) ?? []).map(
+                                    (pr) => pr.prNumber,
+                                  ),
+                                ])
+                              }
+                            />
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
               </>
             )}
           </>
