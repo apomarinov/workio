@@ -4,6 +4,7 @@ import {
   CircleX,
   Eye,
   GitMerge,
+  GitPullRequestArrow,
   MessageSquare,
   Terminal,
   Trash2,
@@ -35,6 +36,8 @@ function getNotificationIcon(type: string) {
   switch (type) {
     case 'pr_merged':
       return <GitMerge className="w-4 h-4 text-purple-400" />
+    case 'pr_closed':
+      return <GitPullRequestArrow className="w-4 h-4 text-red-400" />
     case 'checks_passed':
       return <CircleCheck className="w-4 h-4 text-green-500" />
     case 'check_failed':
@@ -63,11 +66,13 @@ function getNotificationTitle(notification: Notification): string {
   const { type, data } = notification
   switch (type) {
     case 'pr_merged':
-      return data.prTitle ? `${data.prTitle}` : 'PR Merged'
+      return data.prTitle ? `Merged ${data.prTitle}` : 'PR Merged'
+    case 'pr_closed':
+      return data.prTitle ? `Closed ${data.prTitle}` : 'PR Closed'
     case 'checks_passed':
       return 'All checks passed'
     case 'check_failed':
-      return data.checkName ? `${data.checkName}` : 'Check failed'
+      return data.checkName ? `${data.checkName} Failed` : 'Check failed'
     case 'changes_requested':
       return data.reviewer
         ? `${data.reviewer} requested changes`
@@ -96,6 +101,7 @@ function getNotificationSubtitle(notification: Notification): string {
   const { type, data, repo } = notification
   switch (type) {
     case 'pr_merged':
+    case 'pr_closed':
       return repo
     case 'checks_passed':
     case 'check_failed':
@@ -113,6 +119,7 @@ function getNotificationUrl(notification: Notification): string | undefined {
   const { type, data } = notification
   switch (type) {
     case 'pr_merged':
+    case 'pr_closed':
       return data.prUrl
     case 'checks_passed':
       return data.prUrl
@@ -205,7 +212,7 @@ export function NotificationList() {
   } = useTerminalContext()
 
   return (
-    <div className="w-[400px]">
+    <div className="w-[330px]">
       <div className="p-2 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium">Notifications</span>
         <div className="flex items-center gap-1">

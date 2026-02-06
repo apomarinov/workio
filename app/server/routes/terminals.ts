@@ -778,7 +778,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const gitCmd = `git checkout ${branch.replace(/'/g, "'\\''")}`
 
       try {
+        const cwd = expandPath(terminal.cwd)
+
         if (terminal.ssh_host) {
+          // Prune stale worktrees before checkout
+          await execSSHCommand(terminal.ssh_host, 'git worktree prune', {
+            cwd: terminal.cwd,
+          }).catch(() => {})
+
           const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
             cwd: terminal.cwd,
           })
@@ -790,11 +797,18 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             stderr: result.stderr,
           })
         } else {
+          // Prune stale worktrees before checkout
+          await new Promise<void>((resolve) => {
+            execFile('git', ['worktree', 'prune'], { cwd, timeout: 5000 }, () =>
+              resolve(),
+            )
+          })
+
           await new Promise<void>((resolve, reject) => {
             execFile(
               'git',
               ['checkout', branch],
-              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              { cwd, timeout: 30000 },
               (err, stdout, stderr) => {
                 logCommand({
                   terminalId: id,

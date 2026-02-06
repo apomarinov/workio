@@ -1345,6 +1345,20 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       }
     }
 
+    // PR closed (not merged)
+    if (prev && prev.state !== 'CLOSED' && pr.state === 'CLOSED') {
+      const notification = await insertNotification(
+        'pr_closed',
+        pr.repo,
+        { prTitle: pr.prTitle, prUrl: pr.prUrl },
+        undefined,
+        pr.prNumber,
+      )
+      if (notification) {
+        io?.emit('notifications:new', notification)
+      }
+    }
+
     // Check failed
     if (prev && !prev.hasFailedChecks && pr.hasFailedChecks) {
       const failedCheck = pr.checks.find(

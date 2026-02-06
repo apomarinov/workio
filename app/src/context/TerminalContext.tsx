@@ -209,8 +209,16 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           })
           break
 
+        case 'pr_closed':
+          sendNotificationRef.current('🚫 Closed', {
+            body: prTitle,
+            audio: 'pr-activity',
+            onClick: () => window.open(prUrl, '_blank'),
+          })
+          break
+
         case 'checks_passed':
-          sendNotificationRef.current('✅ Checks passed', {
+          sendNotificationRef.current('✅ All checks passed', {
             body: prTitle,
             audio: 'done',
             onClick: () => window.open(prUrl, '_blank'),
