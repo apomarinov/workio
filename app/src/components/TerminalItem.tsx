@@ -23,6 +23,7 @@ import {
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import { useProcessContext } from '../context/ProcessContext'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -143,6 +144,10 @@ export const TerminalItem = memo(function TerminalItem({
     )
   }
 
+  const prInfo = useMemo(() => {
+    return getPRStatusInfo(prForBranch)
+  }, [prForBranch])
+
   return (
     <div>
       <div
@@ -188,6 +193,8 @@ export const TerminalItem = memo(function TerminalItem({
           >
             {sessionsExpanded ? (
               <ChevronDown className="w-4 h-4" />
+            ) : prForBranch ? (
+              prInfo.icon()
             ) : (
               <ChevronRight className="w-4 h-4" />
             )}

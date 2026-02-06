@@ -103,6 +103,7 @@ export function createSearchMode(
     const matchedPR = t.git_branch
       ? (branchToPR.get(t.git_branch) ?? null)
       : null
+    const prInfo = matchedPR ? getPRStatusInfo(matchedPR) : null
     return {
       id: `t:${t.id}`,
       label: t.name || getLastPathSegment(t.cwd),
@@ -115,7 +116,9 @@ export function createSearchMode(
           {matchedPR && <PRTabButton pr={matchedPR} />}
         </div>
       ),
-      icon: t.ssh_host ? (
+      icon: prInfo ? (
+        prInfo.icon()
+      ) : t.ssh_host ? (
         <Globe className="h-4 w-4 shrink-0 text-blue-400" />
       ) : (
         <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />

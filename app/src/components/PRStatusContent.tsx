@@ -578,7 +578,7 @@ export function PRStatusContent({
                     }
                     className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
                   >
-                    <RefreshIcon className="w-4 h-4 hover:animate-spin" />
+                    <RefreshIcon className="w-3 h-3" />
                   </button>
                 )}
               </div>
