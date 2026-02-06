@@ -23,6 +23,7 @@ import {
   GitBranch,
   Github,
   GitMerge,
+  GitPullRequestArrow,
   LayoutList,
   Loader2,
   PictureInPicture2,
@@ -990,7 +991,11 @@ export function Sidebar({ width }: SidebarProps) {
                                     onClick={(e) => e.stopPropagation()}
                                     className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
                                   >
-                                    <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                                    {pr.state === 'MERGED' ? (
+                                      <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                                    ) : (
+                                      <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
+                                    )}
                                     <div className="flex-1 min-w-0">
                                       <span className="text-xs truncate block">
                                         {pr.prTitle}
@@ -1004,7 +1009,17 @@ export function Sidebar({ width }: SidebarProps) {
                                     </div>
                                   </a>
                                 ))}
-                                <OlderMergedPRsList repo={repo} />
+                                <OlderMergedPRsList
+                                  repo={repo}
+                                  excludePRNumbers={
+                                    new Set([
+                                      ...repoPRs.map((pr) => pr.prNumber),
+                                      ...(mergedPRsByRepo.get(repo) ?? []).map(
+                                        (pr) => pr.prNumber,
+                                      ),
+                                    ])
+                                  }
+                                />
                               </>
                             )}
                           </SortableRepoGroup>

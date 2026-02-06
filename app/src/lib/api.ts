@@ -205,7 +205,7 @@ export async function deleteSessions(ids: string[]): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete sessions')
 }
 
-export async function getMergedPRs(
+export async function getClosedPRs(
   owner: string,
   repo: string,
   limit: number,
@@ -217,13 +217,14 @@ export async function getMergedPRs(
     prUrl: string
     branch: string
     repo: string
+    state: 'MERGED' | 'CLOSED'
   }[]
   hasMore: boolean
 }> {
   const res = await fetch(
-    `${API_BASE}/github/${owner}/${repo}/merged-prs?limit=${limit}&offset=${offset}`,
+    `${API_BASE}/github/${owner}/${repo}/closed-prs?limit=${limit}&offset=${offset}`,
   )
-  if (!res.ok) throw new Error('Failed to fetch merged PRs')
+  if (!res.ok) throw new Error('Failed to fetch closed PRs')
   return res.json()
 }
 

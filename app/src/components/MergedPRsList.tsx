@@ -1,24 +1,27 @@
 import {
   ChevronDown,
-  ChevronRight,
   GitBranch,
   GitMerge,
   GitPullRequestArrow,
   Loader2,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { getMergedPRs } from '@/lib/api'
+import { getClosedPRs } from '@/lib/api'
 import type { MergedPRSummary } from '../../shared/types'
 import { TruncatedPath } from './TruncatedPath'
 
 const RECENT_COUNT = 3 // Skip first 3 (shown from context)
-const PAGE_SIZE = 5
+const PAGE_SIZE = 10
 
 interface OlderMergedPRsListProps {
   repo: string
+  excludePRNumbers?: Set<number>
 }
 
-export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
+export function OlderMergedPRsList({
+  repo,
+  excludePRNumbers,
+}: OlderMergedPRsListProps) {
   const [expanded, setExpanded] = useState(false)
   const [prs, setPrs] = useState<MergedPRSummary[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -33,7 +36,7 @@ export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
     async function checkForMore() {
       try {
         // Just check if there's at least one PR after the first 3
-        const result = await getMergedPRs(owner, repoName, 1, RECENT_COUNT)
+        const result = await getClosedPRs(owner, repoName, 1, RECENT_COUNT)
         if (!cancelled) {
           setHasMore(result.prs.length > 0)
           setCheckedForMore(true)
@@ -54,7 +57,7 @@ export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
     async (offset: number) => {
       setLoading(true)
       try {
-        const result = await getMergedPRs(
+        const result = await getClosedPRs(
           owner,
           repoName,
           PAGE_SIZE,
@@ -93,42 +96,48 @@ export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
       <button
         type="button"
         onClick={toggle}
-        className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/50 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
+        className="flex cursor-pointer items-center pl-3.5 gap-1.5 text-[11px] text-muted-foreground/50 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
       >
         {loading && prs.length === 0 ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : expanded ? (
           <ChevronDown className="w-3 h-3 flex-shrink-0" />
         ) : (
-          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+          <div className="w-3 h-3 flex-shrink-0" />
         )}
-        <GitPullRequestArrow className="w-3 h-3" />
-        <span>Older merged PRs</span>
+
+        <span>Show More</span>
       </button>
       {expanded && (
         <>
-          {prs.map((pr) => (
-            <a
-              href={pr.prUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              key={pr.prNumber}
-              className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
-            >
-              <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
-              <div className="flex-1 min-w-0">
-                <span className="text-xs truncate block">{pr.prTitle}</span>
-                <div className="flex gap-1 items-center">
-                  <GitBranch className="w-2.5 h-2.5" />
-                  <TruncatedPath
-                    className="text-[11px] text-muted-foreground/50"
-                    path={pr.branch}
-                  />
+          {prs
+            .filter((pr) => !excludePRNumbers?.has(pr.prNumber))
+            .map((pr) => (
+              <a
+                href={pr.prUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                key={pr.prNumber}
+                className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+              >
+                {pr.state === 'MERGED' ? (
+                  <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500/70" />
+                ) : (
+                  <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500/70" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs truncate block">{pr.prTitle}</span>
+                  <div className="flex gap-1 items-center">
+                    <GitBranch className="w-2.5 h-2.5" />
+                    <TruncatedPath
+                      className="text-[11px] text-muted-foreground/50"
+                      path={pr.branch}
+                    />
+                  </div>
                 </div>
-              </div>
-            </a>
-          ))}
+              </a>
+            ))}
           {loading && prs.length > 0 && (
             <div className="flex items-center justify-center py-1">
               <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />

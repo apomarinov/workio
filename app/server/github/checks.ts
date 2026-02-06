@@ -466,79 +466,85 @@ function fetchOpenPRs(
   })
 }
 
-/** Fetch merged PRs for specific branches (lightweight, no reviews/comments/checks). */
-function fetchMergedPRsForBranches(
+/** Fetch closed/merged PRs for specific branches (lightweight, no reviews/comments/checks). */
+function fetchClosedPRsForBranches(
   owner: string,
   repo: string,
   branches: Set<string>,
 ): Promise<PRCheckStatus[]> {
   if (branches.size === 0) return Promise.resolve([])
 
-  return new Promise((resolve) => {
-    execFile(
-      'gh',
-      [
-        'pr',
-        'list',
-        '--repo',
-        `${owner}/${repo}`,
-        '--author',
-        ghUsername || '@me',
-        '--state',
-        'merged',
-        '--limit',
-        '30',
-        '--json',
-        'number,title,headRefName,url,createdAt,updatedAt',
-      ],
-      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
-      (err, stdout) => {
-        if (err) {
-          resolve([])
-          return
-        }
+  const repoKey = `${owner}/${repo}`
 
-        try {
-          const prs: GhPR[] = JSON.parse(stdout)
-          const repoKey = `${owner}/${repo}`
-          const results: PRCheckStatus[] = prs
-            .filter((pr) => branches.has(pr.headRefName))
-            .map((pr) => ({
-              prNumber: pr.number,
-              prTitle: pr.title,
-              prUrl: pr.url,
-              prBody: '',
-              branch: pr.headRefName,
-              repo: repoKey,
-              state: 'MERGED' as const,
-              reviewDecision: '' as const,
-              reviews: [],
-              checks: [],
-              comments: [],
-              createdAt: pr.createdAt || '',
-              updatedAt: pr.updatedAt || '',
-              areAllChecksOk: false,
-              // Pre-computed status flags for merged PRs
-              isMerged: true,
-              isApproved: false,
-              hasChangesRequested: false,
-              hasConflicts: false,
-              hasPendingReviews: false,
-              hasFailedChecks: false,
-              runningChecksCount: 0,
-              failedChecksCount: 0,
-            }))
-          resolve(results)
-        } catch {
-          resolve([])
-        }
-      },
-    )
-  })
+  const fetches = [...branches].map(
+    (branch) =>
+      new Promise<PRCheckStatus[]>((resolve) => {
+        execFile(
+          'gh',
+          [
+            'pr',
+            'list',
+            '--repo',
+            `${owner}/${repo}`,
+            '--author',
+            ghUsername || '@me',
+            '--state',
+            'closed',
+            '--head',
+            branch,
+            '--limit',
+            '5',
+            '--json',
+            'number,title,headRefName,url,createdAt,updatedAt,state',
+          ],
+          { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+          (err, stdout) => {
+            if (err) {
+              resolve([])
+              return
+            }
+
+            try {
+              const prs: GhPR[] = JSON.parse(stdout)
+              resolve(
+                prs.map((pr) => ({
+                  prNumber: pr.number,
+                  prTitle: pr.title,
+                  prUrl: pr.url,
+                  prBody: '',
+                  branch: pr.headRefName,
+                  repo: repoKey,
+                  state: pr.state as 'MERGED' | 'CLOSED',
+                  reviewDecision: '' as const,
+                  reviews: [],
+                  checks: [],
+                  comments: [],
+                  createdAt: pr.createdAt || '',
+                  updatedAt: pr.updatedAt || '',
+                  areAllChecksOk: false,
+                  isMerged: pr.state === 'MERGED',
+                  isApproved: false,
+                  hasChangesRequested: false,
+                  hasConflicts: false,
+                  hasPendingReviews: false,
+                  hasFailedChecks: false,
+                  runningChecksCount: 0,
+                  failedChecksCount: 0,
+                })),
+              )
+            } catch {
+              resolve([])
+            }
+          },
+        )
+      }),
+  )
+
+  return Promise.all(fetches).then((results) => results.flat())
 }
 
-/** Fetch merged PRs by @me for a repo, with pagination. */
-export function fetchMergedPRsByMe(
+/** Fetch closed/merged PRs by @me for a repo, with pagination. */
+export function fetchClosedPRsByMe(
   owner: string,
   repo: string,
   limit: number,
@@ -555,11 +561,11 @@ export function fetchMergedPRsByMe(
         '--author',
         ghUsername || '@me',
         '--state',
-        'merged',
+        'closed',
         '--limit',
         String(offset + limit + 1),
         '--json',
-        'number,title,headRefName,url',
+        'number,title,headRefName,url,state',
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -573,6 +579,7 @@ export function fetchMergedPRsByMe(
             title: string
             headRefName: string
             url: string
+            state: 'MERGED' | 'CLOSED'
           }[] = JSON.parse(stdout)
           const sliced = all.slice(offset, offset + limit)
           const repoKey = `${owner}/${repo}`
@@ -583,6 +590,7 @@ export function fetchMergedPRsByMe(
               prUrl: pr.url,
               branch: pr.headRefName,
               repo: repoKey,
+              state: pr.state,
             })),
             hasMore: all.length > offset + limit,
           })
@@ -687,7 +695,7 @@ async function pollAllPRChecks(force = false): Promise<void> {
       )
 
       if (branchesWithoutOpenPR.size > 0) {
-        const mergedPRs = await fetchMergedPRsForBranches(
+        const mergedPRs = await fetchClosedPRsForBranches(
           owner,
           repo,
           branchesWithoutOpenPR,

@@ -51,6 +51,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <ChevronDown className="w-4 h-4 flex-shrink-0" />
         ) : prInfo.hasChangesRequested ||
           prInfo.hasRunningChecks ||
+          prInfo.isClosed ||
           prInfo.hasFailedChecks ||
           prInfo.isMerged ||
           prInfo.areAllChecksOk ||

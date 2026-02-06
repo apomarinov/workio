@@ -464,7 +464,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             const [owner, repoName] = repo.split('/')
             if (!owner || !repoName) return []
             try {
-              const result = await api.getMergedPRs(owner, repoName, 3, 0)
+              const result = await api.getClosedPRs(owner, repoName, 3, 0)
               return result.prs
             } catch {
               return []

@@ -75,6 +75,7 @@ export interface MergedPRSummary {
   prUrl: string
   branch: string
   repo: string
+  state: 'MERGED' | 'CLOSED'
 }
 
 export interface GitDiffStat {
