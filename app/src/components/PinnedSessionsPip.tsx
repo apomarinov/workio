@@ -1,4 +1,11 @@
-import { Maximize2, Minimize2, Minus, MoreVertical, Plus } from 'lucide-react'
+import {
+  Maximize2,
+  Minimize2,
+  Minus,
+  MoreVertical,
+  Mouse,
+  Plus,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { Button } from '@/components/ui/button'
@@ -37,11 +44,15 @@ function PipChatItem({
   session,
   layout,
   isFullscreen,
+  isFocused,
+  onFocus,
   onToggleFullscreen,
 }: {
   session: SessionWithProject
   layout: 'horizontal' | 'vertical'
   isFullscreen: boolean
+  isFocused: boolean
+  onFocus: () => void
   onToggleFullscreen: () => void
 }) {
   const { settings } = useSettings()
@@ -122,16 +133,19 @@ function PipChatItem({
     }
   }, [loading, messages.length])
 
-  // Handle cmd+click for fullscreen toggle
+  // Handle click: cmd+click for fullscreen, normal click for focus
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault()
         e.stopPropagation()
         onToggleFullscreen()
+      } else if (!isFocused) {
+        e.stopPropagation()
+        onFocus()
       }
     },
-    [onToggleFullscreen],
+    [onToggleFullscreen, isFocused, onFocus],
   )
 
   const height = isFullscreen
@@ -144,7 +158,8 @@ function PipChatItem({
     <div
       onClick={handleClick}
       className={cn(
-        'group/chat relative flex flex-col bg-sidebar rounded-lg border border-sidebar-border overflow-hidden',
+        'group/chat relative flex flex-col bg-sidebar rounded-lg border overflow-hidden transition-colors',
+        isFocused ? 'border-green-500' : 'border-sidebar-border cursor-pointer',
         isFullscreen && 'fixed inset-0 z-50 rounded-none border-none',
       )}
       style={{
@@ -160,7 +175,7 @@ function PipChatItem({
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-sidebar-border flex-shrink-0">
         <div className="flex-1 min-w-0">
           <h3 className="text-xs font-medium text-zinc-100 truncate">
-            {session.name || 'Session Chat'}
+            {session.name || 'Untitled'}
           </h3>
         </div>
         {session.status === 'active' && (
@@ -195,7 +210,10 @@ function PipChatItem({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-3 py-3"
+        className={cn(
+          'flex-1 px-3 py-3',
+          isFocused ? 'overflow-y-auto' : 'overflow-hidden',
+        )}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -244,24 +262,36 @@ function PipChatItem({
         )}
       </div>
 
-      {/* Fullscreen button */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggleFullscreen()
-        }}
-        className={cn(
-          'absolute bottom-2 right-2 p-1.5 rounded bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/80 transition-all',
-          'opacity-0 group-hover/chat:opacity-100',
-          isFullscreen && 'opacity-100',
-        )}
-        title={
-          isFullscreen ? 'Exit fullscreen (⌘+click)' : 'Fullscreen (⌘+click)'
-        }
-      >
-        <Maximize2 className="w-3.5 h-3.5" />
-      </button>
+      {/* Bottom-right overlay */}
+      {isFocused ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleFullscreen()
+          }}
+          className={cn(
+            'absolute bottom-2 right-2 p-1.5 rounded bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/80 transition-all',
+            'opacity-0 group-hover/chat:opacity-100',
+            isFullscreen && 'opacity-100',
+          )}
+          title={
+            isFullscreen ? 'Exit fullscreen (⌘+click)' : 'Fullscreen (⌘+click)'
+          }
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+      ) : (
+        <div
+          className={cn(
+            'absolute bottom-2 right-2 flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-800/80 text-zinc-500 transition-all',
+            'opacity-0 group-hover/chat:opacity-100',
+          )}
+        >
+          <Mouse className="w-3 h-3" />
+          <span className="text-[10px]">Click to scroll</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -533,6 +563,7 @@ export function PinnedSessionsPip() {
   const [fullscreenSessionId, setFullscreenSessionId] = useState<string | null>(
     null,
   )
+  const [focusedChatId, setFocusedChatId] = useState<string | null>(null)
 
   // Auto-close PiP when there are no sessions
   useEffect(() => {
@@ -541,19 +572,28 @@ export function PinnedSessionsPip() {
     }
   }, [allSessions.length, pip.isOpen, pip.close])
 
-  // Close PiP on Escape key press inside the PiP window
+  // Escape: unfocus chat first, then close PiP. Blur: unfocus chat.
   useEffect(() => {
     const pipWin = pip.window
     if (!pipWin) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        pip.closeAll()
+        if (focusedChatId) {
+          setFocusedChatId(null)
+        } else {
+          pip.closeAll()
+        }
       }
     }
+    const handleBlur = () => setFocusedChatId(null)
     pipWin.addEventListener('keydown', handleKeyDown)
-    return () => pipWin.removeEventListener('keydown', handleKeyDown)
-  }, [pip.window, pip.closeAll])
+    pipWin.addEventListener('blur', handleBlur)
+    return () => {
+      pipWin.removeEventListener('keydown', handleKeyDown)
+      pipWin.removeEventListener('blur', handleBlur)
+    }
+  }, [pip.window, pip.closeAll, focusedChatId])
 
   const displayedSessions = useMemo(() => {
     // Combine pinned first, then non-pinned, deduped by session_id
@@ -615,6 +655,7 @@ export function PinnedSessionsPip() {
     (v: 'sessions' | 'chat') => {
       flushSync(() => setMode(v))
       setFullscreenSessionId(null)
+      setFocusedChatId(null)
       resizePip(layout)
     },
     [setMode, resizePip, layout],
@@ -751,7 +792,7 @@ export function PinnedSessionsPip() {
                     <div
                       key={session.session_id}
                       className={cn(
-                        'flex-shrink-0',
+                        'flex-shrink-0 px-2 first:pt-2 last:pb-2',
                         fullscreenSessionId === session.session_id &&
                           'contents',
                       )}
@@ -770,6 +811,8 @@ export function PinnedSessionsPip() {
                         isFullscreen={
                           fullscreenSessionId === session.session_id
                         }
+                        isFocused={focusedChatId === session.session_id}
+                        onFocus={() => setFocusedChatId(session.session_id)}
                         onToggleFullscreen={() =>
                           toggleFullscreen(session.session_id)
                         }

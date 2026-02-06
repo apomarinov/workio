@@ -158,7 +158,7 @@ const ReviewRow = memo(function ReviewRow({
         >
           <Reply className="w-3.5 h-3.5" />
         </button>
-        {!showReReview && (
+        {showReReview && (
           <button
             type="button"
             onClick={handleReReview}

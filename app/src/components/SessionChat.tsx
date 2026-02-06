@@ -134,7 +134,7 @@ export function SessionChat() {
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-medium text-zinc-100 truncate">
-              {session?.name || 'Session Chat'}
+              {session?.name || 'Untitled'}
             </h2>
             {session?.project_path && (
               <div className="flex gap-1 items-center">
