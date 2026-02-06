@@ -167,6 +167,10 @@ export function Terminal({ terminalId }: TerminalProps) {
 
     const terminal = new XTerm({
       cursorBlink: true,
+      cursorStyle: 'underline',
+      fastScrollSensitivity: 5,
+      scrollSensitivity: 10,
+      scrollback: 50000,
       fontSize: fontSizeRef.current,
       macOptionIsMeta: true,
       fontFamily:

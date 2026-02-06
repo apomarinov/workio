@@ -133,19 +133,20 @@ function PipChatItem({
     }
   }, [loading, messages.length])
 
-  // Handle click: cmd+click for fullscreen, normal click for focus
+  // Handle click: click to maximize + focus, cmd+click for toggle
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault()
         e.stopPropagation()
         onToggleFullscreen()
-      } else if (!isFocused) {
+      } else if (!isFullscreen) {
         e.stopPropagation()
         onFocus()
+        if (!isFullscreen) onToggleFullscreen()
       }
     },
-    [onToggleFullscreen, isFocused, onFocus],
+    [onToggleFullscreen, isFullscreen, onFocus],
   )
 
   const height = isFullscreen
@@ -158,8 +159,8 @@ function PipChatItem({
     <div
       onClick={handleClick}
       className={cn(
-        'group/chat relative flex flex-col bg-sidebar rounded-lg border overflow-hidden transition-colors',
-        isFocused ? 'border-green-500' : 'border-sidebar-border cursor-pointer',
+        'group/chat border-sidebar-border relative flex flex-col bg-sidebar rounded-lg border overflow-hidden transition-colors',
+        !isFocused && 'cursor-pointer',
         isFullscreen && 'fixed inset-0 z-50 rounded-none border-none',
       )}
       style={{
@@ -255,7 +256,11 @@ function PipChatItem({
                   messages={item.messages}
                 />
               ) : (
-                <MessageBubble key={item.message.id} message={item.message} />
+                <MessageBubble
+                  key={item.message.id}
+                  message={item.message}
+                  hideAvatars
+                />
               ),
             )}
           </div>
@@ -572,28 +577,32 @@ export function PinnedSessionsPip() {
     }
   }, [allSessions.length, pip.isOpen, pip.close])
 
-  // Escape: unfocus chat first, then close PiP. Blur: unfocus chat.
+  // Escape: unmaximize first, then close PiP. Blur: unfocus chat.
   useEffect(() => {
     const pipWin = pip.window
     if (!pipWin) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        if (focusedChatId) {
+        if (fullscreenSessionId) {
+          setFullscreenSessionId(null)
           setFocusedChatId(null)
         } else {
           pip.closeAll()
         }
       }
     }
-    const handleBlur = () => setFocusedChatId(null)
+    const handleBlur = () => {
+      setFocusedChatId(null)
+      setFullscreenSessionId(null)
+    }
     pipWin.addEventListener('keydown', handleKeyDown)
     pipWin.addEventListener('blur', handleBlur)
     return () => {
       pipWin.removeEventListener('keydown', handleKeyDown)
       pipWin.removeEventListener('blur', handleBlur)
     }
-  }, [pip.window, pip.closeAll, focusedChatId])
+  }, [pip.window, pip.closeAll, fullscreenSessionId])
 
   const displayedSessions = useMemo(() => {
     // Combine pinned first, then non-pinned, deduped by session_id
@@ -763,65 +772,65 @@ export function PinnedSessionsPip() {
             >
               {mode === 'sessions'
                 ? displayedSessions.map((session) => (
-                    <div
-                      key={session.session_id}
-                      className="flex-shrink-0 max-w-[100vw] pinned-sessions"
-                      style={{
-                        width:
-                          layout === 'vertical'
-                            ? '100vw'
-                            : PIP_CARD_WIDTH[layout],
-                        maxWidth: '100vw',
-                      }}
-                    >
-                      <SessionItem
-                        session={session}
-                        terminalName={getTerminalName(session.terminal_id)}
-                        popoverContainer={pipContainer}
-                        onClick={() => {
-                          window.dispatchEvent(
-                            new CustomEvent('reveal-session', {
-                              detail: { sessionId: session.session_id },
-                            }),
-                          )
-                        }}
-                      />
-                    </div>
-                  ))
-                : displayedSessions.map((session) => (
-                    <div
-                      key={session.session_id}
-                      className={cn(
-                        'flex-shrink-0',
+                  <div
+                    key={session.session_id}
+                    className="flex-shrink-0 max-w-[100vw] pinned-sessions"
+                    style={{
+                      width:
                         layout === 'vertical'
-                          ? 'px-2 first:pt-2 last:pb-2'
-                          : 'py-2 first:pl-2 first:mr-2 last:mr-2',
-                        fullscreenSessionId === session.session_id &&
-                          'contents',
-                      )}
-                      style={{
-                        width:
-                          fullscreenSessionId === session.session_id
-                            ? undefined
-                            : layout === 'vertical'
-                              ? '100%'
-                              : PIP_CARD_WIDTH[layout],
+                          ? '100vw'
+                          : PIP_CARD_WIDTH[layout],
+                      maxWidth: '100vw',
+                    }}
+                  >
+                    <SessionItem
+                      session={session}
+                      terminalName={getTerminalName(session.terminal_id)}
+                      popoverContainer={pipContainer}
+                      onClick={() => {
+                        window.dispatchEvent(
+                          new CustomEvent('reveal-session', {
+                            detail: { sessionId: session.session_id },
+                          }),
+                        )
                       }}
-                    >
-                      <PipChatItem
-                        session={session}
-                        layout={layout}
-                        isFullscreen={
-                          fullscreenSessionId === session.session_id
-                        }
-                        isFocused={focusedChatId === session.session_id}
-                        onFocus={() => setFocusedChatId(session.session_id)}
-                        onToggleFullscreen={() =>
-                          toggleFullscreen(session.session_id)
-                        }
-                      />
-                    </div>
-                  ))}
+                    />
+                  </div>
+                ))
+                : displayedSessions.map((session) => (
+                  <div
+                    key={session.session_id}
+                    className={cn(
+                      'flex-shrink-0',
+                      layout === 'vertical'
+                        ? 'px-2 first:pt-2 last:pb-2'
+                        : 'py-2 first:pl-2 first:mr-2 last:mr-2',
+                      fullscreenSessionId === session.session_id &&
+                      'contents',
+                    )}
+                    style={{
+                      width:
+                        fullscreenSessionId === session.session_id
+                          ? undefined
+                          : layout === 'vertical'
+                            ? '100%'
+                            : PIP_CARD_WIDTH[layout],
+                    }}
+                  >
+                    <PipChatItem
+                      session={session}
+                      layout={layout}
+                      isFullscreen={
+                        fullscreenSessionId === session.session_id
+                      }
+                      isFocused={focusedChatId === session.session_id}
+                      onFocus={() => setFocusedChatId(session.session_id)}
+                      onToggleFullscreen={() =>
+                        toggleFullscreen(session.session_id)
+                      }
+                    />
+                  </div>
+                ))}
             </div>
           </div>,
           pipContainer,
