@@ -1,4 +1,7 @@
 import {
+  AlertTriangle,
+  Bot,
+  CheckIcon,
   Maximize2,
   Minimize2,
   Minus,
@@ -173,38 +176,51 @@ function PipChatItem({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-sidebar-border flex-shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-sidebar-border flex-shrink-0">
+        {/* Status icon */}
+        <div className="flex-shrink-0 flex items-center gap-1">
+          {session.status === 'done' ? (
+            <CheckIcon className="w-3.5 h-3.5 text-green-500/70" />
+          ) : session.status === 'active' ||
+            session.status === 'permission_needed' ? (
+            <>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 300 150"
+                className="w-3.5 h-3.5"
+              >
+                <path
+                  fill="none"
+                  stroke="#D97757"
+                  strokeWidth="40"
+                  strokeLinecap="round"
+                  strokeDasharray="300 385"
+                  strokeDashoffset="0"
+                  d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+                >
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    calcMode="spline"
+                    dur="2s"
+                    values="685;-685"
+                    keySplines="0 0 1 1"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              </svg>
+              {session.status === 'permission_needed' && (
+                <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 animate-pulse" />
+              )}
+            </>
+          ) : (
+            <Bot className="w-3.5 h-3.5 text-gray-400" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-xs font-medium text-zinc-100 truncate">
             {session.name || 'Untitled'}
           </h3>
         </div>
-        {session.status === 'active' && (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 300 150"
-            className="w-4 h-4 flex-shrink-0"
-          >
-            <path
-              fill="none"
-              stroke="#D97757"
-              strokeWidth="40"
-              strokeLinecap="round"
-              strokeDasharray="300 385"
-              strokeDashoffset="0"
-              d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
-            >
-              <animate
-                attributeName="stroke-dashoffset"
-                calcMode="spline"
-                dur="2s"
-                values="685;-685"
-                keySplines="0 0 1 1"
-                repeatCount="indefinite"
-              />
-            </path>
-          </svg>
-        )}
       </div>
 
       {/* Messages */}
@@ -772,65 +788,65 @@ export function PinnedSessionsPip() {
             >
               {mode === 'sessions'
                 ? displayedSessions.map((session) => (
-                  <div
-                    key={session.session_id}
-                    className="flex-shrink-0 max-w-[100vw] pinned-sessions"
-                    style={{
-                      width:
-                        layout === 'vertical'
-                          ? '100vw'
-                          : PIP_CARD_WIDTH[layout],
-                      maxWidth: '100vw',
-                    }}
-                  >
-                    <SessionItem
-                      session={session}
-                      terminalName={getTerminalName(session.terminal_id)}
-                      popoverContainer={pipContainer}
-                      onClick={() => {
-                        window.dispatchEvent(
-                          new CustomEvent('reveal-session', {
-                            detail: { sessionId: session.session_id },
-                          }),
-                        )
-                      }}
-                    />
-                  </div>
-                ))
-                : displayedSessions.map((session) => (
-                  <div
-                    key={session.session_id}
-                    className={cn(
-                      'flex-shrink-0',
-                      layout === 'vertical'
-                        ? 'px-2 first:pt-2 last:pb-2'
-                        : 'py-2 first:pl-2 first:mr-2 last:mr-2',
-                      fullscreenSessionId === session.session_id &&
-                      'contents',
-                    )}
-                    style={{
-                      width:
-                        fullscreenSessionId === session.session_id
-                          ? undefined
-                          : layout === 'vertical'
-                            ? '100%'
+                    <div
+                      key={session.session_id}
+                      className="flex-shrink-0 max-w-[100vw] pinned-sessions"
+                      style={{
+                        width:
+                          layout === 'vertical'
+                            ? '100vw'
                             : PIP_CARD_WIDTH[layout],
-                    }}
-                  >
-                    <PipChatItem
-                      session={session}
-                      layout={layout}
-                      isFullscreen={
-                        fullscreenSessionId === session.session_id
-                      }
-                      isFocused={focusedChatId === session.session_id}
-                      onFocus={() => setFocusedChatId(session.session_id)}
-                      onToggleFullscreen={() =>
-                        toggleFullscreen(session.session_id)
-                      }
-                    />
-                  </div>
-                ))}
+                        maxWidth: '100vw',
+                      }}
+                    >
+                      <SessionItem
+                        session={session}
+                        terminalName={getTerminalName(session.terminal_id)}
+                        popoverContainer={pipContainer}
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('reveal-session', {
+                              detail: { sessionId: session.session_id },
+                            }),
+                          )
+                        }}
+                      />
+                    </div>
+                  ))
+                : displayedSessions.map((session) => (
+                    <div
+                      key={session.session_id}
+                      className={cn(
+                        'flex-shrink-0',
+                        layout === 'vertical'
+                          ? 'px-2 first:pt-2 last:pb-2'
+                          : 'py-2 first:pl-2 first:mr-2 last:mr-2',
+                        fullscreenSessionId === session.session_id &&
+                          'contents',
+                      )}
+                      style={{
+                        width:
+                          fullscreenSessionId === session.session_id
+                            ? undefined
+                            : layout === 'vertical'
+                              ? '100%'
+                              : PIP_CARD_WIDTH[layout],
+                      }}
+                    >
+                      <PipChatItem
+                        session={session}
+                        layout={layout}
+                        isFullscreen={
+                          fullscreenSessionId === session.session_id
+                        }
+                        isFocused={focusedChatId === session.session_id}
+                        onFocus={() => setFocusedChatId(session.session_id)}
+                        onToggleFullscreen={() =>
+                          toggleFullscreen(session.session_id)
+                        }
+                      />
+                    </div>
+                  ))}
             </div>
           </div>,
           pipContainer,
