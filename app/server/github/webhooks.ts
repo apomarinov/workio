@@ -95,19 +95,34 @@ async function updateWebhookUrl(
   ])
 }
 
+/**
+ * Check if a webhook exists. Returns:
+ * - 'exists' if the webhook is accessible
+ * - 'missing' if it was deleted (404)
+ * - 'no_access' if the user lacks admin permissions (403)
+ */
 async function checkWebhookExists(
   repo: string,
   hookId: number,
-): Promise<boolean> {
+): Promise<'exists' | 'missing' | 'no_access'> {
   try {
     const [owner, repoName] = repo.split('/')
     await execFileAsync('gh', [
       'api',
       `repos/${owner}/${repoName}/hooks/${hookId}`,
     ])
-    return true
-  } catch {
-    return false
+    return 'exists'
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    // No admin access: gh returns 404 with scope hint, or 403
+    if (
+      message.includes('admin:repo_hook') ||
+      message.includes('403') ||
+      message.includes('Resource not accessible')
+    ) {
+      return 'no_access'
+    }
+    return 'missing'
   }
 }
 
@@ -181,18 +196,17 @@ export async function deleteRepoWebhook(
     return { ok: false, error: 'Invalid repo format' }
   }
 
-  // Only call GitHub API if not marked as missing
-  if (!webhook.missing) {
-    try {
-      await execFileAsync('gh', [
-        'api',
-        `repos/${owner}/${repoName}/hooks/${webhook.id}`,
-        '-X',
-        'DELETE',
-      ])
-    } catch {
-      // Already deleted or no access - fine
-    }
+  try {
+    await execFileAsync('gh', [
+      'api',
+      `repos/${owner}/${repoName}/hooks/${webhook.id}`,
+      '-X',
+      'DELETE',
+    ])
+  } catch {
+    log.warn(
+      `[webhooks] Could not delete webhook from GitHub for ${repo}, removing from DB anyway`,
+    )
   }
 
   // Always remove from DB
@@ -281,15 +295,28 @@ async function validateStoredWebhooks(): Promise<void> {
   let hasChanges = false
 
   for (const [repo, webhook] of Object.entries(repoWebhooks)) {
-    const exists = await checkWebhookExists(repo, webhook.id)
+    const result = await checkWebhookExists(repo, webhook.id)
 
-    if (!exists && !webhook.missing) {
+    if (result === 'no_access') {
+      // User doesn't have admin access to check webhooks - skip validation
+      // If it was previously marked missing due to this, clear the flag
+      if (webhook.missing) {
+        updatedWebhooks[repo] = { id: webhook.id }
+        hasChanges = true
+        log.info(
+          `[webhooks] No admin access for ${repo}, cleared incorrect missing flag`,
+        )
+      }
+      continue
+    }
+
+    if (result === 'missing' && !webhook.missing) {
       updatedWebhooks[repo] = { ...webhook, missing: true }
       hasChanges = true
       log.warn(
         `[webhooks] Webhook ${webhook.id} for ${repo} not found in GitHub, marked as missing`,
       )
-    } else if (exists && webhook.missing) {
+    } else if (result === 'exists' && webhook.missing) {
       // Webhook exists again (recreated externally?) - clear missing flag
       updatedWebhooks[repo] = { id: webhook.id }
       hasChanges = true

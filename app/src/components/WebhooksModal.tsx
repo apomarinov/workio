@@ -2,13 +2,14 @@ import {
   AlertTriangle,
   Copy,
   ExternalLink,
+  Link,
   Loader2,
   Plus,
   TestTube,
   Trash2,
   Webhook,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
 import {
   Tooltip,
@@ -177,6 +179,27 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
     }
   }
 
+  // Link existing webhook by ID
+  const [linkWebhookRepo, setLinkWebhookRepo] = useState<string | null>(null)
+  const linkInputRef = useRef<HTMLInputElement>(null)
+
+  const handleLinkWebhook = async (repo: string, webhookId: number) => {
+    setLoading((prev) => ({ ...prev, [repo]: true }))
+    try {
+      const currentWebhooks = settings?.repo_webhooks || {}
+      await api.updateSettings({
+        repo_webhooks: { ...currentWebhooks, [repo]: { id: webhookId } },
+      })
+      toast.success(`Webhook ${webhookId} linked for ${repo}`)
+      setLinkWebhookRepo(null)
+      refetch()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to link webhook')
+    } finally {
+      setLoading((prev) => ({ ...prev, [repo]: false }))
+    }
+  }
+
   const copyNgrokUrl = () => {
     if (ngrokUrl) {
       navigator.clipboard.writeText(ngrokUrl)
@@ -275,56 +298,96 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
             ) : (
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
                 {repoWebhookInfos.map(({ repo, status }) => (
-                  <div
-                    key={repo}
-                    className="flex items-center gap-2 bg-muted/30 p-2 rounded"
-                  >
-                    {/* Status indicator */}
-                    <div className="flex-shrink-0">
-                      {status === 'active' && (
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
-                      )}
-                      {status === 'missing' && (
-                        <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      )}
-                      {status === 'orphaned' && (
-                        <div className="w-2 h-2 rounded-full bg-orange-500" />
-                      )}
-                      {status === 'none' && (
-                        <div className="w-2 h-2 rounded-full bg-gray-500" />
-                      )}
-                    </div>
-
-                    {/* Repo name */}
-                    <a
-                      href={`https://github.com/${repo}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm flex-1 truncate hover:underline flex items-center gap-1"
-                    >
-                      {repo}
-                      <ExternalLink className="w-3 h-3 opacity-50" />
-                    </a>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1">
-                      <TooltipProvider>
+                  <div key={repo} className="space-y-1">
+                    <div className="flex items-center gap-2 bg-muted/30 p-2 rounded">
+                      {/* Status indicator */}
+                      <div className="flex-shrink-0">
+                        {status === 'active' && (
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                        )}
+                        {status === 'missing' && (
+                          <div className="w-2 h-2 rounded-full bg-amber-500" />
+                        )}
+                        {status === 'orphaned' && (
+                          <div className="w-2 h-2 rounded-full bg-orange-500" />
+                        )}
                         {status === 'none' && (
-                          <>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  disabled={noNgrok}
-                                  onClick={() => copyWebhookCommand(repo)}
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Copy gh command</TooltipContent>
-                            </Tooltip>
+                          <div className="w-2 h-2 rounded-full bg-gray-500" />
+                        )}
+                      </div>
+
+                      {/* Repo name */}
+                      <a
+                        href={`https://github.com/${repo}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm flex-1 truncate hover:underline flex items-center gap-1"
+                      >
+                        {repo}
+                        <ExternalLink className="w-3 h-3 opacity-50" />
+                      </a>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider>
+                          {status === 'none' && (
+                            <>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    disabled={noNgrok}
+                                    onClick={() => copyWebhookCommand(repo)}
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy gh command</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => {
+                                      setLinkWebhookRepo(repo)
+                                      requestAnimationFrame(() =>
+                                        linkInputRef.current?.focus(),
+                                      )
+                                    }}
+                                  >
+                                    <Link className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Link existing webhook by ID
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    disabled={loading[repo] || noNgrok}
+                                    onClick={() => handleCreate(repo)}
+                                  >
+                                    {loading[repo] ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Plus className="w-4 h-4" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Create webhook</TooltipContent>
+                              </Tooltip>
+                            </>
+                          )}
+
+                          {status === 'missing' && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -332,86 +395,112 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
                                   size="icon"
                                   className="h-7 w-7"
                                   disabled={loading[repo] || noNgrok}
-                                  onClick={() => handleCreate(repo)}
+                                  onClick={() => handleRecreate(repo)}
                                 >
                                   {loading[repo] ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
-                                    <Plus className="w-4 h-4" />
+                                    <RefreshIcon className="w-4 h-4" />
                                   )}
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Create webhook</TooltipContent>
+                              <TooltipContent>Recreate webhook</TooltipContent>
                             </Tooltip>
-                          </>
-                        )}
+                          )}
 
-                        {status === 'missing' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                disabled={loading[repo] || noNgrok}
-                                onClick={() => handleRecreate(repo)}
-                              >
-                                {loading[repo] ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <RefreshIcon className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Recreate webhook</TooltipContent>
-                          </Tooltip>
-                        )}
+                          {(status === 'active' || status === 'orphaned') && (
+                            <>
+                              {status === 'active' && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      disabled={loading[`${repo}-test`]}
+                                      onClick={() => handleTest(repo)}
+                                    >
+                                      {loading[`${repo}-test`] ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <TestTube className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Test webhook</TooltipContent>
+                                </Tooltip>
+                              )}
 
-                        {(status === 'active' || status === 'orphaned') && (
-                          <>
-                            {status === 'active' && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7"
-                                    disabled={loading[`${repo}-test`]}
-                                    onClick={() => handleTest(repo)}
+                                    disabled={loading[repo]}
+                                    onClick={() => handleDelete(repo)}
                                   >
-                                    {loading[`${repo}-test`] ? (
+                                    {loading[repo] ? (
                                       <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
-                                      <TestTube className="w-4 h-4" />
+                                      <Trash2 className="w-4 h-4" />
                                     )}
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Test webhook</TooltipContent>
+                                <TooltipContent>Delete webhook</TooltipContent>
                               </Tooltip>
-                            )}
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  disabled={loading[repo]}
-                                  onClick={() => handleDelete(repo)}
-                                >
-                                  {loading[repo] ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Delete webhook</TooltipContent>
-                            </Tooltip>
-                          </>
-                        )}
-                      </TooltipProvider>
+                            </>
+                          )}
+                        </TooltipProvider>
+                      </div>
                     </div>
+                    {linkWebhookRepo === repo && (
+                      <form
+                        className="flex items-center gap-2 px-2"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const value = linkInputRef.current?.value?.trim()
+                          const id = value
+                            ? Number.parseInt(value, 10)
+                            : Number.NaN
+                          if (!Number.isFinite(id) || id <= 0) {
+                            toast.error('Enter a valid webhook ID')
+                            return
+                          }
+                          handleLinkWebhook(repo, id)
+                        }}
+                      >
+                        <Input
+                          ref={linkInputRef}
+                          type="number"
+                          placeholder="Webhook ID"
+                          className="h-7 text-xs flex-1"
+                          min={1}
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          disabled={loading[repo]}
+                        >
+                          {loading[repo] ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            'Save'
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => setLinkWebhookRepo(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </form>
+                    )}
                   </div>
                 ))}
               </div>
