@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { groupMessages } from '@/lib/messageUtils'
 import { cn } from '@/lib/utils'
 import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
@@ -31,33 +32,6 @@ const PIP_ELEMENT_ID = 'pinned-sessions-pip'
 
 // Module-level ref for the hidden measurement div
 let measureEl: HTMLDivElement | null = null
-
-type GroupedMessage =
-  | { type: 'message'; message: SessionMessage }
-  | { type: 'thinking'; messages: SessionMessage[] }
-
-function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
-  const result: GroupedMessage[] = []
-  let currentThinkingGroup: SessionMessage[] = []
-
-  for (const message of messages) {
-    if (message.thinking) {
-      currentThinkingGroup.push(message)
-    } else {
-      if (currentThinkingGroup.length > 0) {
-        result.push({ type: 'thinking', messages: currentThinkingGroup })
-        currentThinkingGroup = []
-      }
-      result.push({ type: 'message', message })
-    }
-  }
-
-  if (currentThinkingGroup.length > 0) {
-    result.push({ type: 'thinking', messages: currentThinkingGroup })
-  }
-
-  return result
-}
 
 function PipChatItem({
   session,

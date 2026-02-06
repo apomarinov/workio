@@ -198,6 +198,10 @@ export interface SessionMessage extends Message {
   prompt_text: string | null
 }
 
+export type GroupedMessage =
+  | { type: 'message'; message: SessionMessage }
+  | { type: 'thinking'; messages: SessionMessage[] }
+
 export interface SessionMessagesResponse {
   messages: SessionMessage[]
   total: number
@@ -293,6 +297,28 @@ export interface Notification {
   read: boolean
   created_at: string
   data: NotificationData
+}
+
+export interface CommandLog {
+  id: number
+  terminal_id: number | null
+  pr_id: string | null // "owner/repo#123" format
+  exit_code: number
+  category: string
+  data: {
+    command: string
+    stdout?: string
+    stderr?: string
+    sshHost?: string
+    terminalName?: string
+  }
+  created_at: string
+}
+
+export interface LogTerminal {
+  id: number
+  name: string
+  deleted: boolean
 }
 
 export type PreferredIDE = 'cursor' | 'vscode'

@@ -3,22 +3,16 @@ import {
   ChevronRight,
   GitBranch,
   GitMerge,
+  GitPullRequestArrow,
   Loader2,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { getMergedPRs } from '@/lib/api'
+import type { MergedPRSummary } from '../../shared/types'
 import { TruncatedPath } from './TruncatedPath'
 
 const RECENT_COUNT = 3 // Skip first 3 (shown from context)
 const PAGE_SIZE = 5
-
-interface MergedPR {
-  prNumber: number
-  prTitle: string
-  prUrl: string
-  branch: string
-  repo: string
-}
 
 interface OlderMergedPRsListProps {
   repo: string
@@ -26,7 +20,7 @@ interface OlderMergedPRsListProps {
 
 export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
   const [expanded, setExpanded] = useState(false)
-  const [prs, setPrs] = useState<MergedPR[]>([])
+  const [prs, setPrs] = useState<MergedPRSummary[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checkedForMore, setCheckedForMore] = useState(false)
@@ -108,7 +102,7 @@ export function OlderMergedPRsList({ repo }: OlderMergedPRsListProps) {
         ) : (
           <ChevronRight className="w-3 h-3 flex-shrink-0" />
         )}
-        <GitMerge className="w-3 h-3" />
+        <GitPullRequestArrow className="w-3 h-3" />
         <span>Older merged PRs</span>
       </button>
       {expanded && (

@@ -9,6 +9,7 @@ import {
 } from 'react'
 import useSWR from 'swr'
 import type {
+  MergedPRSummary,
   PRCheckStatus,
   PRChecksPayload,
   WorkspacePayload,
@@ -18,14 +19,6 @@ import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
 import type { Notification, Terminal } from '../types'
 import { useNotifications } from './NotificationContext'
-
-export interface MergedPRSummary {
-  prNumber: number
-  prTitle: string
-  prUrl: string
-  branch: string
-  repo: string
-}
 
 interface TerminalContextValue {
   terminals: Terminal[]

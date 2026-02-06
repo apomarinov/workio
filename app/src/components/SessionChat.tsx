@@ -3,35 +3,9 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSessionContext } from '../context/SessionContext'
 import { useSessionMessages } from '../hooks/useSessionMessages'
 import { useSettings } from '../hooks/useSettings'
+import { groupMessages } from '../lib/messageUtils'
 import type { SessionMessage, TodoWriteTool } from '../types'
 import { MessageBubble, ThinkingGroup } from './MessageBubble'
-
-type GroupedMessage =
-  | { type: 'message'; message: SessionMessage }
-  | { type: 'thinking'; messages: SessionMessage[] }
-
-function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
-  const result: GroupedMessage[] = []
-  let currentThinkingGroup: SessionMessage[] = []
-
-  for (const message of messages) {
-    if (message.thinking) {
-      currentThinkingGroup.push(message)
-    } else {
-      if (currentThinkingGroup.length > 0) {
-        result.push({ type: 'thinking', messages: currentThinkingGroup })
-        currentThinkingGroup = []
-      }
-      result.push({ type: 'message', message })
-    }
-  }
-
-  if (currentThinkingGroup.length > 0) {
-    result.push({ type: 'thinking', messages: currentThinkingGroup })
-  }
-
-  return result
-}
 
 export function SessionChat() {
   const { activeSessionId, sessions } = useSessionContext()

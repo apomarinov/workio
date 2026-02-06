@@ -4,6 +4,7 @@ import {
   CircleX,
   Clock,
   GitMerge,
+  GitPullRequestArrow,
   Loader2,
 } from 'lucide-react'
 import { RefreshIcon } from '@/components/icons'
@@ -188,7 +189,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
     colorClass: '',
     dimColorClass: '',
     icon: (props?: { cls?: string; group?: string }) => (
-      <GitMerge
+      <GitPullRequestArrow
         className={cn(iconClass, `text-muted-foreground`, props?.cls)}
       />
     ),

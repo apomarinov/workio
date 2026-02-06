@@ -192,8 +192,8 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
     }
 
     const webhookUrl = `${ngrokUrl}/api/webhooks/github`
-    const eventsArgs = WEBHOOK_EVENTS.map((e) => `-f events[]=${e}`).join(' ')
-    const command = `gh api repos/${repo}/hooks -X POST -f name=web -f 'config[url]=${webhookUrl}' -f config[content_type]=json -f 'config[secret]=${secret}' ${eventsArgs}`
+    const eventsArgs = WEBHOOK_EVENTS.map((e) => `-f 'events[]=${e}'`).join(' ')
+    const command = `gh api repos/${repo}/hooks -X POST -f name=web -f 'config[url]=${webhookUrl}' -f 'config[content_type]=json' -f 'config[secret]=${secret}' ${eventsArgs}`
 
     navigator.clipboard.writeText(command)
     toast.success('Command copied to clipboard')

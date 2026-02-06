@@ -9,7 +9,7 @@ import {
   Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -29,28 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-
-interface CommandLog {
-  id: number
-  terminal_id: number | null
-  pr_id: string | null // "owner/repo#123" format
-  exit_code: number
-  category: string
-  data: {
-    command: string
-    stdout?: string
-    stderr?: string
-    sshHost?: string
-    terminalName?: string
-  }
-  created_at: string
-}
-
-interface LogTerminal {
-  id: number
-  name: string
-  deleted: boolean
-}
+import type { CommandLog, LogTerminal } from '@/types'
 
 interface LogsModalProps {
   open: boolean
@@ -96,9 +75,13 @@ export function LogsModal({
       .catch(console.error)
   }, [open])
 
+  // Track when initial filter is being applied to skip stale fetch
+  const pendingInitialFilter = useRef(false)
+
   // Apply initial filter when modal opens
   useEffect(() => {
     if (open && initialFilter) {
+      pendingInitialFilter.current = true
       if (initialFilter.terminalId) {
         setTerminalFilter(initialFilter.terminalId)
       }
@@ -111,15 +94,17 @@ export function LogsModal({
   // Reset filters when modal closes
   useEffect(() => {
     if (!open) {
-      setLogs([])
-      setTerminalFilter('all')
-      setPrNameFilter(undefined)
-      setCategoryFilter('all')
-      setFailedOnly(false)
-      setDateRange(undefined)
-      setSearchQuery('')
-      setExpandedId(null)
-      setHasMore(true)
+      setTimeout(() => {
+        setLogs([])
+        setTerminalFilter('all')
+        setPrNameFilter(undefined)
+        setCategoryFilter('all')
+        setFailedOnly(false)
+        setDateRange(undefined)
+        setSearchQuery('')
+        setExpandedId(null)
+        setHasMore(true)
+      }, 200)
     }
   }, [open])
 
@@ -194,9 +179,15 @@ export function LogsModal({
 
   // Fetch logs when filters change
   useEffect(() => {
-    if (open) {
-      fetchLogs(0, false)
+    if (!open) return
+
+    // Skip fetch if initial filter was just applied - wait for state to update
+    if (pendingInitialFilter.current) {
+      pendingInitialFilter.current = false
+      return
     }
+
+    fetchLogs(0, false)
   }, [open, fetchLogs])
 
   const loadMore = () => {
@@ -291,14 +282,14 @@ export function LogsModal({
             }}
           >
             <SelectTrigger className="w-fit max-w-[300px]">
-              <SelectValue placeholder="All terminals" />
+              <SelectValue placeholder="All Projects" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All terminals</SelectItem>
+              <SelectItem value="all">All Projects</SelectItem>
               <SelectItem value="deleted">
                 <span className="flex items-center gap-1.5">
                   <Trash2 className="w-3 h-3" />
-                  Deleted terminals
+                  Deleted Projects
                 </span>
               </SelectItem>
               {terminals.map((t) => (

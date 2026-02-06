@@ -33,10 +33,12 @@
 
 ## Types
 
-- Define types/interfaces once in designated files, then import where needed.
-- Client types: `src/types.ts`
+- **Before defining any type**, check if it already exists in `shared/types.ts` or `src/types.ts`.
+- Client-only types: `src/types.ts`
 - Shared types (client + server): `shared/types.ts`
-- Never duplicate type definitions across multiple files.
+- **Never duplicate type definitions** across files. Always import from the designated type files.
+- Component props interfaces (e.g., `FooProps`) are OK to keep local to their component file.
+- Utility functions go in `src/lib/`, not in type files.
 
 ## UI
 
