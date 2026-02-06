@@ -7,11 +7,22 @@ import { groupMessages } from '../lib/messageUtils'
 import type { SessionMessage, TodoWriteTool } from '../types'
 import { MessageBubble, ThinkingGroup } from './MessageBubble'
 
-export function SessionChat() {
+export function SessionChat({
+  sessionId: sessionIdProp,
+  hideHeader,
+  hideAvatars,
+  isMaximizedInPip,
+}: {
+  sessionId?: string | null
+  hideHeader?: boolean
+  hideAvatars?: boolean
+  isMaximizedInPip?: boolean
+} = {}) {
   const { activeSessionId, sessions } = useSessionContext()
+  const resolvedSessionId = sessionIdProp ?? activeSessionId
   const { settings } = useSettings()
   const { messages, loading, isLoadingMore, hasMore, loadMore } =
-    useSessionMessages(activeSessionId)
+    useSessionMessages(resolvedSessionId)
 
   const sentinelRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -19,7 +30,7 @@ export function SessionChat() {
   const isInitialLoadRef = useRef(true)
   const isNearBottomRef = useRef(true)
 
-  const session = sessions.find((s) => s.session_id === activeSessionId)
+  const session = sessions.find((s) => s.session_id === resolvedSessionId)
 
   // Filter and reorder messages
   const filteredMessages = useMemo(() => {
@@ -91,7 +102,7 @@ export function SessionChat() {
   useEffect(() => {
     isInitialLoadRef.current = true
     isNearBottomRef.current = true
-  }, [activeSessionId])
+  }, [resolvedSessionId])
 
   // Track if user is near bottom of scroll container
   const handleScroll = useCallback(() => {
@@ -113,7 +124,7 @@ export function SessionChat() {
         isInitialLoadRef.current = false
       } else if (
         messages.length > prevMessageCountRef.current &&
-        isNearBottomRef.current
+        (isMaximizedInPip === false || isNearBottomRef.current)
       ) {
         // Auto-scroll to bottom for new messages if user is near bottom
         scrollContainerRef.current.scrollTop =
@@ -121,9 +132,9 @@ export function SessionChat() {
       }
       prevMessageCountRef.current = messages.length
     }
-  }, [loading, messages.length])
+  }, [loading, messages.length, isMaximizedInPip])
 
-  if (!activeSessionId) {
+  if (!resolvedSessionId) {
     return null
   }
 
@@ -131,21 +142,23 @@ export function SessionChat() {
     <div className="relative h-full">
       <div className="absolute inset-0 flex flex-col bg-sidebar">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-medium text-zinc-100 truncate">
-              {session?.name || 'Untitled'}
-            </h2>
-            {session?.project_path && (
-              <div className="flex gap-1 items-center">
-                <Folder className="w-3 h-3 text-zinc-500" />
-                <p className="text-xs text-zinc-500 truncate">
-                  {session.project_path}
-                </p>
-              </div>
-            )}
+        {!hideHeader && (
+          <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-medium text-zinc-100 truncate">
+                {session?.name || 'Untitled'}
+              </h2>
+              {session?.project_path && (
+                <div className="flex gap-1 items-center">
+                  <Folder className="w-3 h-3 text-zinc-500" />
+                  <p className="text-xs text-zinc-500 truncate">
+                    {session.project_path}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Messages */}
         <div
@@ -181,7 +194,11 @@ export function SessionChat() {
                     messages={item.messages}
                   />
                 ) : (
-                  <MessageBubble key={item.message.id} message={item.message} />
+                  <MessageBubble
+                    key={item.message.id}
+                    message={item.message}
+                    hideAvatars={hideAvatars}
+                  />
                 ),
               )}
               {session &&
