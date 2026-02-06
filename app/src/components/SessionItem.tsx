@@ -206,7 +206,7 @@ export const SessionItem = memo(function SessionItem({
           )}
         </button>
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 max-w-[100%]">
         {isExpanded ? (
           <>
             <span
@@ -237,7 +237,7 @@ export const SessionItem = memo(function SessionItem({
               </div>
             )}
             {session.latest_agent_message && (
-              <div className="relative w-fit h-fit">
+              <div className="relative w-full h-fit">
                 {isExpanded && (
                   <div className={cn('absolute top-1/2 left-[-15px]')}>
                     <div className="w-[15px] border-l-[1px] border-b-[1px] h-[1220px] -translate-y-full"></div>
