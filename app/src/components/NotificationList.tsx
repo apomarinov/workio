@@ -1,5 +1,6 @@
 import {
   Check,
+  CircleCheck,
   CircleX,
   Eye,
   GitMerge,
@@ -34,6 +35,8 @@ function getNotificationIcon(type: string) {
   switch (type) {
     case 'pr_merged':
       return <GitMerge className="w-4 h-4 text-purple-400" />
+    case 'checks_passed':
+      return <CircleCheck className="w-4 h-4 text-green-500" />
     case 'check_failed':
       return <CircleX className="w-4 h-4 text-red-400" />
     case 'changes_requested':
@@ -61,6 +64,8 @@ function getNotificationTitle(notification: Notification): string {
   switch (type) {
     case 'pr_merged':
       return data.prTitle ? `${data.prTitle}` : 'PR Merged'
+    case 'checks_passed':
+      return 'All checks passed'
     case 'check_failed':
       return data.checkName ? `${data.checkName}` : 'Check failed'
     case 'changes_requested':
@@ -92,6 +97,7 @@ function getNotificationSubtitle(notification: Notification): string {
   switch (type) {
     case 'pr_merged':
       return repo
+    case 'checks_passed':
     case 'check_failed':
     case 'changes_requested':
     case 'pr_approved':
@@ -107,6 +113,8 @@ function getNotificationUrl(notification: Notification): string | undefined {
   const { type, data } = notification
   switch (type) {
     case 'pr_merged':
+      return data.prUrl
+    case 'checks_passed':
       return data.prUrl
     case 'check_failed':
       return data.checkUrl || data.prUrl

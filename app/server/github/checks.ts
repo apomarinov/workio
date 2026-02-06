@@ -1324,6 +1324,20 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       }
     }
 
+    // Checks passed
+    if (prev && !prev.areAllChecksOk && pr.areAllChecksOk) {
+      const notification = await insertNotification(
+        'checks_passed',
+        pr.repo,
+        { prTitle: pr.prTitle, prUrl: pr.prUrl },
+        undefined,
+        pr.prNumber,
+      )
+      if (notification) {
+        io?.emit('notifications:new', notification)
+      }
+    }
+
     // Changes requested
     if (
       prev &&

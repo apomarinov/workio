@@ -209,6 +209,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           })
           break
 
+        case 'checks_passed':
+          sendNotificationRef.current('✅ Checks passed', {
+            body: prTitle,
+            audio: 'done',
+            onClick: () => window.open(prUrl, '_blank'),
+          })
+          break
+
         case 'check_failed':
           sendNotificationRef.current('❌ Check failed', {
             body: data.checkName ? `${data.checkName} - ${prTitle}` : prTitle,
