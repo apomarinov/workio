@@ -17,6 +17,7 @@ import {
 import { env } from './env'
 import {
   addPRComment,
+  closePR,
   detectAllTerminalBranches,
   emitCachedPRChecks,
   fetchMergedPRsByMe,
@@ -247,6 +248,23 @@ fastify.post<{
     repo: `${owner}/${repo}`,
     prNumber: Number(pr),
     until: (pr) => !pr || pr.state === 'MERGED',
+  })
+  return { ok: true }
+})
+
+// Close PR
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+}>('/api/github/:owner/:repo/pr/:pr/close', async (request, reply) => {
+  const { owner, repo, pr } = request.params
+  const result = await closePR(owner, repo, Number(pr))
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  await refreshPRChecks(true, {
+    repo: `${owner}/${repo}`,
+    prNumber: Number(pr),
+    until: (pr) => !pr || pr.state === 'CLOSED',
   })
   return { ok: true }
 })

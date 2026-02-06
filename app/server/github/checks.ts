@@ -1033,6 +1033,45 @@ export function mergePR(
   })
 }
 
+export function closePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<{ ok: boolean; error?: string }> {
+  const prId = `${owner}/${repo}#${prNumber}`
+  const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f state=closed`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        '--method',
+        'PATCH',
+        `repos/${owner}/${repo}/pulls/${prNumber}`,
+        '-f',
+        'state=closed',
+      ],
+      { timeout: 30000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        checksCache.delete(`${owner}/${repo}`)
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
 export function rerunFailedCheck(
   owner: string,
   repo: string,

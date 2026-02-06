@@ -8,6 +8,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import {
   checkoutBranch,
+  closePR,
   deleteBranch,
   getBranches,
   openInExplorer,
@@ -61,6 +62,8 @@ export function CommandPalette() {
 
   // PR action modals
   const [mergeModal, setMergeModal] = useState<PRCheckStatus | null>(null)
+  const [closeModal, setCloseModal] = useState<PRCheckStatus | null>(null)
+  const [closeLoading, setCloseLoading] = useState(false)
   const [rerunAllModal, setRerunAllModal] = useState<PRCheckStatus | null>(null)
 
   // Context data
@@ -560,6 +563,10 @@ export function CommandPalette() {
       openMergeModal: (pr) => {
         setMergeModal(pr)
       },
+      openCloseModal: (pr) => {
+        closePalette()
+        setTimeout(() => setCloseModal(pr), 150)
+      },
       openRerunAllModal: (pr) => {
         setRerunAllModal(pr)
       },
@@ -806,6 +813,33 @@ export function CommandPalette() {
           pr={mergeModal}
           onClose={() => setMergeModal(null)}
           onSuccess={closePalette}
+        />
+      )}
+
+      {closeModal && (
+        <ConfirmModal
+          open={!!closeModal}
+          title="Close Pull Request"
+          message={`Are you sure you want to close "${closeModal.prTitle}"? This will not delete the branch.`}
+          confirmLabel="Close PR"
+          variant="danger"
+          loading={closeLoading}
+          onConfirm={async () => {
+            const [owner, repo] = closeModal.repo.split('/')
+            setCloseLoading(true)
+            try {
+              await closePR(owner, repo, closeModal.prNumber)
+              toast.success(`Closed PR #${closeModal.prNumber}`)
+              setCloseModal(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to close PR',
+              )
+            } finally {
+              setCloseLoading(false)
+            }
+          }}
+          onCancel={() => setCloseModal(null)}
         />
       )}
 

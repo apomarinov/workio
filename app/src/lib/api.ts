@@ -267,6 +267,21 @@ export async function mergePR(
   }
 }
 
+export async function closePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/close`,
+    { method: 'POST' },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to close PR')
+  }
+}
+
 export async function rerunFailedCheck(
   owner: string,
   repo: string,

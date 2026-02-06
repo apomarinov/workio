@@ -1,4 +1,5 @@
 import {
+  CircleX,
   CornerDownLeft,
   ExternalLink,
   EyeOff,
@@ -103,7 +104,7 @@ export function createPRActionsMode(
   if (isOpen) {
     items.push({
       id: 'action:merge',
-      label: 'Merge PR',
+      label: 'Merge',
       icon: <GitMerge className="h-4 w-4 shrink-0 text-purple-400" />,
       disabled: !canMerge,
       disabledReason: !canMerge
@@ -123,10 +124,22 @@ export function createPRActionsMode(
     })
   }
 
+  // Close PR (only for open, unmerged PRs)
+  if (isOpen) {
+    items.push({
+      id: 'action:close',
+      label: 'Close',
+      icon: <CircleX className="h-4 w-4 shrink-0 text-red-400" />,
+      onSelect: () => {
+        actions.openCloseModal(pr)
+      },
+    })
+  }
+
   // Hide PR
   items.push({
     id: 'action:hide',
-    label: 'Hide PR',
+    label: 'Hide',
     icon: <EyeOff className="h-4 w-4 shrink-0 text-zinc-400" />,
     onSelect: () => {
       actions.hidePR(pr)
