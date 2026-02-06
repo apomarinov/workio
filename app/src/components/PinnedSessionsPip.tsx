@@ -792,7 +792,10 @@ export function PinnedSessionsPip() {
                     <div
                       key={session.session_id}
                       className={cn(
-                        'flex-shrink-0 px-2 first:pt-2 last:pb-2',
+                        'flex-shrink-0',
+                        layout === 'vertical'
+                          ? 'px-2 first:pt-2 last:pb-2'
+                          : 'py-2 first:pl-2 first:mr-2 last:mr-2',
                         fullscreenSessionId === session.session_id &&
                           'contents',
                       )}

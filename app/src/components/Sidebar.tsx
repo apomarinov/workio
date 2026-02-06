@@ -315,15 +315,12 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedTerminalSessions([])
     setCollapsedSessions(allSessionIds)
     setExpandedGitHubPRs([])
-    setCollapsedProjectRepos(Array.from(repoGroupedTerminals.repoGroups.keys()))
   }, [
     allSessionIds,
-    repoGroupedTerminals.repoGroups,
     setExpandedSessionGroups,
     setExpandedTerminalSessions,
     setCollapsedSessions,
     setExpandedGitHubPRs,
-    setCollapsedProjectRepos,
   ])
 
   const handlePipToggle = useCallback(() => {

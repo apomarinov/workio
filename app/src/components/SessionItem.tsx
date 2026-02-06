@@ -55,12 +55,19 @@ export const SessionItem = memo(function SessionItem({
     [],
   )
   const inList = collapsedSessions.includes(session.session_id)
-  const isExpanded = defaultCollapsed ? inList : !inList
+  const isExpanded = popoverContainer
+    ? true
+    : defaultCollapsed
+      ? inList
+      : !inList
   const displayName = terminalName || session.name || 'Untitled'
   const isSelected = activeSessionId === session.session_id
 
   const toggleExpanded = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (popoverContainer) {
+      return
+    }
     setCollapsedSessions((prev) =>
       prev.includes(session.session_id)
         ? prev.filter((id) => id !== session.session_id)
