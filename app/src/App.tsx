@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
 import {
@@ -6,8 +7,10 @@ import {
   Separator,
   useDefaultLayout,
 } from 'react-resizable-panels'
+import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
+import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
 import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
@@ -44,6 +47,7 @@ function AppContent() {
   const { sendNotification } = useNotifications()
   const { clearSession } = useSessionContext()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
 
@@ -206,14 +210,37 @@ function AppContent() {
         </Panel>
         <Separator className="panel-resize-handle" />
         <Panel id="main">
-          {activeSessionId ? (
-            <SessionChat />
-          ) : (
-            <Terminal
-              key={activeTerminal?.id ?? 'none'}
-              terminalId={activeTerminal?.id ?? null}
-            />
-          )}
+          <div className="h-full relative">
+            {activeSessionId ? (
+              <div className="absolute inset-0 z-20">
+                <SessionChat />
+              </div>
+            ) : terminals.length === 0 ? (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#1a1a1a]">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="gap-2 text-base"
+                  onClick={() => setCreateModalOpen(true)}
+                >
+                  <Plus className="w-5 h-5" />
+                  Create New Project
+                </Button>
+                <CreateTerminalModal
+                  open={createModalOpen}
+                  onOpenChange={setCreateModalOpen}
+                  onCreated={(id) => selectTerminal(id)}
+                />
+              </div>
+            ) : null}
+            {terminals.map((t) => (
+              <Terminal
+                key={t.id}
+                terminalId={t.id}
+                isVisible={!activeSessionId && t.id === activeTerminal?.id}
+              />
+            ))}
+          </div>
         </Panel>
       </Group>
       <Toaster />

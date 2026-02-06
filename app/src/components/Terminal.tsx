@@ -4,31 +4,24 @@ import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
-import {
-  ALargeSmall,
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  WholeWord,
-  X,
-} from 'lucide-react'
+import { ALargeSmall, ChevronDown, ChevronUp, WholeWord, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
-import { CreateTerminalModal } from './CreateTerminalModal'
 
 interface TerminalProps {
-  terminalId: number | null
+  terminalId: number
+  isVisible: boolean
 }
 
-export function Terminal({ terminalId }: TerminalProps) {
-  const { activeTerminal, selectTerminal } = useTerminalContext()
-  const isCloning = activeTerminal?.git_repo?.status === 'setup'
-  const isSettingUp = activeTerminal?.setup?.status === 'setup'
-  const isDeleting = activeTerminal?.setup?.status === 'delete'
+export function Terminal({ terminalId, isVisible }: TerminalProps) {
+  const { terminals } = useTerminalContext()
+  const terminal = terminals.find((t) => t.id === terminalId)
+  const isCloning = terminal?.git_repo?.status === 'setup'
+  const isSettingUp = terminal?.setup?.status === 'setup'
+  const isDeleting = terminal?.setup?.status === 'delete'
   const isBusy = isCloning || isSettingUp || isDeleting
   const isBusyRef = useRef(isBusy)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,13 +38,13 @@ export function Terminal({ terminalId }: TerminalProps) {
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [wholeWord, setWholeWord] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [pendingCopy, setPendingCopy] = useState<string | null>(null)
   const pendingCopyRef = useRef<string | null>(null)
   const copyBtnRef = useRef<HTMLButtonElement>(null)
   const cursorRef = useRef({ x: 0, y: 0 })
   const sessionLiveRef = useRef(false)
   const sessionLiveAtRef = useRef(0)
+  const isVisibleRef = useRef(isVisible)
   const { settings } = useSettings()
 
   const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
@@ -61,6 +54,11 @@ export function Terminal({ terminalId }: TerminalProps) {
   useEffect(() => {
     fontSizeRef.current = fontSize
   }, [fontSize])
+
+  // Keep isVisibleRef in sync
+  useEffect(() => {
+    isVisibleRef.current = isVisible
+  }, [isVisible])
 
   // Keep isBusyRef in sync so the onData closure can read it
   useEffect(() => {
@@ -78,7 +76,9 @@ export function Terminal({ terminalId }: TerminalProps) {
   }, [])
 
   const handleReady = useCallback(() => {
-    terminalRef.current?.focus()
+    if (isVisibleRef.current) {
+      terminalRef.current?.focus()
+    }
     // Defer marking session live until xterm.js has finished processing all
     // queued writes (buffer replay). write('', cb) queues after replay data,
     // so the callback fires only after replay parsing is complete.
@@ -366,14 +366,18 @@ export function Terminal({ terminalId }: TerminalProps) {
     }
   }, []) // No dependencies - initialize once
 
-  // Clear terminal when terminalId changes
+  // Re-fit and focus when becoming visible
   useEffect(() => {
-    if (terminalRef.current && terminalId !== null) {
-      terminalRef.current.clear()
+    if (isVisible && terminalRef.current && fitAddonRef.current) {
+      fitAddonRef.current.fit()
+      const cols = terminalRef.current.cols + plusCols
+      const rows = terminalRef.current.rows
+      terminalRef.current.resize(cols, rows)
+      setDimensions({ cols, rows })
+      sendResizeRef.current(cols, rows)
+      terminalRef.current.focus()
     }
-    // Reset live flag — new connection will replay buffer before sending ready
-    sessionLiveRef.current = false
-  }, [terminalId])
+  }, [isVisible])
 
   // Update font size when settings change
   useEffect(() => {
@@ -453,46 +457,26 @@ export function Terminal({ terminalId }: TerminalProps) {
   )
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1a1a]">
-      {terminalId === null ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2 text-base"
-            onClick={() => setCreateModalOpen(true)}
-          >
-            <Plus className="w-5 h-5" />
-            Create New Project
-          </Button>
-          <CreateTerminalModal
-            open={createModalOpen}
-            onOpenChange={setCreateModalOpen}
-            onCreated={(id) => selectTerminal(id)}
+    <div
+      className={`absolute inset-0 flex flex-col bg-[#1a1a1a] ${isVisible ? '' : 'invisible'}`}
+    >
+      {showStatus && status !== 'connected' && (
+        <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              status === 'connecting'
+                ? 'bg-yellow-400 animate-pulse'
+                : status === 'error'
+                  ? 'bg-red-400'
+                  : 'bg-gray-400'
+            }`}
           />
+          {status === 'connecting' && 'Connecting...'}
+          {status === 'disconnected' && 'Disconnected - Reconnecting...'}
+          {status === 'error' && 'Connection error'}
         </div>
-      ) : (
-        showStatus &&
-        status !== 'connected' && (
-          <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                status === 'connecting'
-                  ? 'bg-yellow-400 animate-pulse'
-                  : status === 'error'
-                    ? 'bg-red-400'
-                    : 'bg-gray-400'
-              }`}
-            />
-            {status === 'connecting' && 'Connecting...'}
-            {status === 'disconnected' && 'Disconnected - Reconnecting...'}
-            {status === 'error' && 'Connection error'}
-          </div>
-        )
       )}
-      <div
-        className={`relative flex-1 min-h-0 overflow-hidden ${terminalId === null ? 'hidden' : ''}`}
-      >
+      <div className="relative flex-1 min-h-0 overflow-hidden">
         <div ref={containerRef} className="h-full" />
         {searchOpen && (
           <div
