@@ -2,6 +2,7 @@ import {
   Copy,
   CornerDownLeft,
   Eye,
+  GitBranch,
   GitFork,
   GitPullRequest,
   Pencil,
@@ -64,6 +65,28 @@ export function createActionsMode(
 
     // Branches (git repos only)
     if (terminal.git_repo) {
+      if (terminal.git_branch) {
+        const branchNav = () =>
+          api.push({
+            mode: 'branch-actions',
+            title: terminal.git_branch!,
+            terminal,
+            pr,
+            branch: {
+              name: terminal.git_branch!,
+              isRemote: false,
+              isCurrent: true,
+            },
+          })
+        items.push({
+          id: 'action:current-branch',
+          label: terminal.git_branch,
+          icon: <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />,
+          onSelect: branchNav,
+          onNavigate: branchNav,
+        })
+      }
+
       items.push({
         id: 'action:branches',
         label: 'Branches',
