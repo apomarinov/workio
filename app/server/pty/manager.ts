@@ -489,7 +489,10 @@ async function scanAndEmitGitDirty() {
             // Only update if branch changed
             if (branch && branch !== terminal.git_branch) {
               await updateTerminal(terminal.id, { git_branch: branch })
-              getIO()?.emit('terminal:updated', { terminalId: terminal.id })
+              getIO()?.emit('terminal:updated', {
+                terminalId: terminal.id,
+                data: { git_branch: branch },
+              })
             }
           } catch {
             // skip this terminal
@@ -613,7 +616,10 @@ export async function detectGitBranch(
 
     if (branch) {
       await updateTerminal(terminalId, { git_branch: branch })
-      getIO()?.emit('terminal:updated', { terminalId })
+      getIO()?.emit('terminal:updated', {
+        terminalId,
+        data: { git_branch: branch },
+      })
       if (!options?.skipPRRefresh) {
         refreshPRChecks()
       }

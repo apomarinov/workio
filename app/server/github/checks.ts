@@ -615,7 +615,10 @@ async function refreshSSHBranch(terminalId: number): Promise<void> {
     const branch = result.stdout.trim()
     if (branch) {
       await updateTerminal(terminalId, { git_branch: branch })
-      getIO()?.emit('terminal:updated', { terminalId })
+      getIO()?.emit('terminal:updated', {
+        terminalId,
+        data: { git_branch: branch },
+      })
     }
   } catch (err) {
     log.error(

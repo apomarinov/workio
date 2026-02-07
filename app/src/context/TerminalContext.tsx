@@ -117,11 +117,24 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [terminals, activeTerminalId])
 
-  // Refetch terminals when server emits an update
+  // Update terminal state in-place when server emits changes
   useEffect(() => {
-    return subscribe('terminal:updated', () => {
-      mutate()
-    })
+    return subscribe(
+      'terminal:updated',
+      ({
+        terminalId,
+        data,
+      }: {
+        terminalId: number
+        data: Partial<Terminal>
+      }) => {
+        mutate(
+          (prev) =>
+            prev?.map((t) => (t.id === terminalId ? { ...t, ...data } : t)),
+          false,
+        )
+      },
+    )
   }, [subscribe, mutate])
 
   // Handle terminal:workspace events for state updates
