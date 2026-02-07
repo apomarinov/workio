@@ -118,6 +118,18 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
     sendResizeRef.current = sendResize
   }, [sendInput, sendResize])
 
+  // Listen for terminal-paste events (e.g. from file picker)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number; text: string }>) => {
+      if (e.detail.terminalId === terminalId) {
+        sendInputRef.current(e.detail.text)
+      }
+    }
+    window.addEventListener('terminal-paste', handler as EventListener)
+    return () =>
+      window.removeEventListener('terminal-paste', handler as EventListener)
+  }, [terminalId])
+
   // Track cursor position for clipboard copy button (throttled to once per frame)
   useEffect(() => {
     let rafId: number | null = null

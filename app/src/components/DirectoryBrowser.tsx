@@ -26,6 +26,9 @@ interface DirectoryBrowserProps {
   value: string
   onSelect: (path: string) => void
   sshHost?: string
+  mode?: 'directory' | 'file'
+  onSelectPaths?: (paths: string[]) => void
+  title?: string
 }
 
 export function DirectoryBrowser({
@@ -34,11 +37,15 @@ export function DirectoryBrowser({
   value,
   onSelect,
   sshHost,
+  mode = 'directory',
+  onSelectPaths,
+  title,
 }: DirectoryBrowserProps) {
   const [columns, setColumns] = useState<Column[]>([])
   const [inputPath, setInputPath] = useState('')
   const [showHidden, setShowHidden] = useState(false)
   const [hiddenVersion, setHiddenVersion] = useState(0)
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
 
   const defaultRoot = '~'
 
@@ -116,6 +123,22 @@ export function DirectoryBrowser({
         setInputPath(newPath)
         return updated
       })
+      if (mode === 'file') setSelectedPaths(new Set())
+    },
+    [mode],
+  )
+
+  const handleSelectEntry = useCallback(
+    (fullPath: string, metaKey: boolean) => {
+      setSelectedPaths((prev) => {
+        if (metaKey) {
+          const next = new Set(prev)
+          if (next.has(fullPath)) next.delete(fullPath)
+          else next.add(fullPath)
+          return next
+        }
+        return new Set([fullPath])
+      })
     },
     [],
   )
@@ -131,6 +154,11 @@ export function DirectoryBrowser({
   }
 
   const handleSave = () => {
+    if (mode === 'file' && onSelectPaths) {
+      onSelectPaths(Array.from(selectedPaths))
+      onOpenChange(false)
+      return
+    }
     const selected = inputPath.trim() || defaultRoot
     onSelect(selected)
     onOpenChange(false)
@@ -147,7 +175,9 @@ export function DirectoryBrowser({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="px-6 pt-6 pb-3">
-          <DialogTitle>Select Folder</DialogTitle>
+          <DialogTitle>
+            {title ?? (mode === 'file' ? 'Select Files' : 'Select Folder')}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="px-6 pb-3 flex items-center gap-3">
@@ -179,14 +209,23 @@ export function DirectoryBrowser({
           hiddenVersion={hiddenVersion}
           sshHost={sshHost}
           onSelect={handleColumnSelect}
+          fileMode={mode === 'file'}
+          selectedPaths={selectedPaths}
+          onSelectEntry={mode === 'file' ? handleSelectEntry : undefined}
         />
 
         <DialogFooter className="px-6 py-4 border-t">
           <Button variant="outline" type="button" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleSave}>
-            Select
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={mode === 'file' && selectedPaths.size === 0}
+          >
+            {mode === 'file' && selectedPaths.size > 0
+              ? `Select (${selectedPaths.size})`
+              : 'Select'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -236,12 +275,18 @@ function ColumnView({
   hiddenVersion,
   sshHost,
   onSelect,
+  fileMode,
+  selectedPaths,
+  onSelectEntry,
 }: {
   columns: Column[]
   showHidden: boolean
   hiddenVersion: number
   sshHost?: string
   onSelect: (colIndex: number, dirName: string) => void
+  fileMode?: boolean
+  selectedPaths?: Set<string>
+  onSelectEntry?: (fullPath: string, metaKey: boolean) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [columnWidths, setColumnWidths] = useState<number[]>([])
@@ -290,6 +335,9 @@ function ColumnView({
               initialEntries={col.initialEntries}
               initialHasMore={col.initialHasMore}
               onSelectDir={(dirName) => onSelect(i, dirName)}
+              fileMode={fileMode}
+              selectedPaths={selectedPaths}
+              onSelectEntry={onSelectEntry}
             />
           </div>
           <ColumnResizeHandle onDrag={(delta) => handleDrag(i, delta)} />
@@ -307,6 +355,9 @@ function BrowserColumn({
   initialEntries,
   initialHasMore,
   onSelectDir,
+  fileMode,
+  selectedPaths,
+  onSelectEntry,
 }: {
   path: string
   selectedDir: string | null
@@ -315,6 +366,9 @@ function BrowserColumn({
   initialEntries?: DirEntry[]
   initialHasMore?: boolean
   onSelectDir: (dirName: string) => void
+  fileMode?: boolean
+  selectedPaths?: Set<string>
+  onSelectEntry?: (fullPath: string, metaKey: boolean) => void
 }) {
   const [entries, setEntries] = useState<DirEntry[]>(initialEntries ?? [])
   const [page, setPage] = useState(0)
@@ -440,30 +494,49 @@ function BrowserColumn({
 
   return (
     <div ref={containerRef} className="h-full overflow-y-auto">
-      {entries.map((entry) => (
-        <div
-          key={entry.name}
-          className={cn(
-            'flex items-center gap-2 px-3 py-1.5 text-sm',
-            entry.isDir
-              ? 'cursor-pointer hover:bg-accent/50'
-              : 'cursor-default text-muted-foreground',
-            entry.isDir && selectedDir === entry.name && 'bg-accent',
-            entry.name.startsWith('.') && 'opacity-50',
-          )}
-          onClick={entry.isDir ? () => onSelectDir(entry.name) : undefined}
-        >
-          {entry.isDir ? (
-            <Folder className="w-4 h-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <File className="w-4 h-4 shrink-0 text-muted-foreground/50" />
-          )}
-          <span className="truncate flex-1">{entry.name}</span>
-          {entry.isDir && (
-            <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground/50" />
-          )}
-        </div>
-      ))}
+      {entries.map((entry) => {
+        const fullPath =
+          path === '/' ? `/${entry.name}` : `${path}/${entry.name}`
+        const isSelected = fileMode && selectedPaths?.has(fullPath)
+
+        return (
+          <div
+            key={entry.name}
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 text-sm',
+              entry.isDir
+                ? 'cursor-pointer hover:bg-accent/50'
+                : fileMode
+                  ? 'cursor-pointer hover:bg-accent/50'
+                  : 'cursor-default text-muted-foreground',
+              entry.isDir && selectedDir === entry.name && 'bg-accent',
+              isSelected && 'bg-accent',
+              entry.name.startsWith('.') && 'opacity-50',
+            )}
+            onClick={(e) => {
+              if (entry.isDir) {
+                if (fileMode && (e.metaKey || e.ctrlKey) && onSelectEntry) {
+                  onSelectEntry(fullPath, true)
+                  return
+                }
+                onSelectDir(entry.name)
+              } else if (fileMode && onSelectEntry) {
+                onSelectEntry(fullPath, e.metaKey || e.ctrlKey)
+              }
+            }}
+          >
+            {entry.isDir ? (
+              <Folder className="w-4 h-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <File className="w-4 h-4 shrink-0 text-muted-foreground/50" />
+            )}
+            <span className="truncate flex-1">{entry.name}</span>
+            {entry.isDir && (
+              <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground/50" />
+            )}
+          </div>
+        )
+      })}
       {hasMore && (
         <div ref={sentinelRef} className="flex justify-center py-2">
           {loadingMore && (

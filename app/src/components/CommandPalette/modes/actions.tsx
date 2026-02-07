@@ -8,6 +8,7 @@ import {
   Pin,
   PinOff,
   ScrollText,
+  Terminal,
   Trash2,
 } from 'lucide-react'
 import { CursorIcon, FinderIcon, VSCodeIcon } from '../../icons'
@@ -115,15 +116,14 @@ export function createActionsMode(
       })
     }
 
-    // Open in Explorer (non-SSH only)
-    if (!terminal.ssh_host) {
-      items.push({
-        id: 'action:explorer',
-        label: 'Reveal in Finder',
-        icon: <FinderIcon className="h-4 w-4 shrink-0 fill-zinc-400" />,
-        onSelect: () => actions.openInExplorer(terminal),
-      })
-    }
+    // Shell sub-menu
+    items.push({
+      id: 'action:shell',
+      label: 'Shell',
+      icon: <Terminal className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => api.push({ mode: 'shell', title: 'Shell', terminal }),
+      onNavigate: () => api.push({ mode: 'shell', title: 'Shell', terminal }),
+    })
 
     // Add Workspace (git repos only)
     if (terminal.git_repo) {
@@ -149,6 +149,16 @@ export function createActionsMode(
         api.close()
       },
     })
+
+    // Open in Explorer (non-SSH only)
+    if (!terminal.ssh_host) {
+      items.push({
+        id: 'action:explorer',
+        label: 'Reveal in Finder',
+        icon: <FinderIcon className="h-4 w-4 shrink-0 fill-zinc-400" />,
+        onSelect: () => actions.openInExplorer(terminal),
+      })
+    }
 
     // Edit
     items.push({

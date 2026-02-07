@@ -19,6 +19,7 @@ import {
 import type { PRCheckStatus } from '../../../shared/types'
 import type { SessionWithProject, Terminal } from '../../types'
 import { ConfirmModal } from '../ConfirmModal'
+import { DirectoryBrowser } from '../DirectoryBrowser'
 import { EditSessionModal } from '../EditSessionModal'
 import { EditTerminalModal } from '../EditTerminalModal'
 import { MergePRModal } from '../MergePRModal'
@@ -65,6 +66,9 @@ export function CommandPalette() {
   const [closeModal, setCloseModal] = useState<PRCheckStatus | null>(null)
   const [closeLoading, setCloseLoading] = useState(false)
   const [rerunAllModal, setRerunAllModal] = useState<PRCheckStatus | null>(null)
+  const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
+    null,
+  )
 
   // Context data
   const {
@@ -603,6 +607,12 @@ export function CommandPalette() {
         toast.success(`Hidden PR #${pr.prNumber}`)
         closePalette()
       },
+
+      // Shell actions
+      openFilePicker: (terminal) => {
+        closePalette()
+        setTimeout(() => setFilePickerTerminal(terminal), 150)
+      },
     }),
     [
       selectTerminal,
@@ -849,6 +859,34 @@ export function CommandPalette() {
           pr={rerunAllModal}
           onClose={() => setRerunAllModal(null)}
           onSuccess={closePalette}
+        />
+      )}
+
+      {filePickerTerminal && (
+        <DirectoryBrowser
+          open={!!filePickerTerminal}
+          onOpenChange={(open) => {
+            if (!open) setFilePickerTerminal(null)
+          }}
+          value={filePickerTerminal.cwd}
+          onSelect={() => {}}
+          mode="file"
+          title="Select Files"
+          onSelectPaths={(paths) => {
+            const escaped = paths
+              .map((p) => p.replace(/([ {2}\\'"()&|;$`!#{}[\]*?<>])/g, '\\$1'))
+              .join(' ')
+            window.dispatchEvent(
+              new CustomEvent('terminal-paste', {
+                detail: {
+                  terminalId: filePickerTerminal.id,
+                  text: escaped,
+                },
+              }),
+            )
+            setFilePickerTerminal(null)
+          }}
+          sshHost={filePickerTerminal.ssh_host ?? undefined}
         />
       )}
     </>

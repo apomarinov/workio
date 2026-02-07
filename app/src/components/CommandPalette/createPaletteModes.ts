@@ -9,6 +9,7 @@ import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createPRActionsMode } from './modes/pr-actions'
 import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
+import { createShellMode } from './modes/shell'
 import type { PaletteAPI, PaletteLevel, PaletteMode } from './types'
 
 // App-specific data that modes need
@@ -59,6 +60,9 @@ export type AppActions = {
     hasRemote: boolean,
   ) => void
 
+  // Shell actions
+  openFilePicker: (terminal: Terminal) => void
+
   // PR actions
   openMergeModal: (pr: PRCheckStatus) => void
   openCloseModal: (pr: PRCheckStatus) => void
@@ -81,6 +85,7 @@ export function createPaletteModes(
     'branch-actions': createBranchActionsMode(data, level, actions, api),
     'pr-actions': createPRActionsMode(data, level, actions, api),
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
+    shell: createShellMode(data, level, actions, api),
   }
 }
 
