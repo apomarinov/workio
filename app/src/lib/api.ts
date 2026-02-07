@@ -1,3 +1,4 @@
+import type { MergedPRSummary } from '../../shared/types'
 import type {
   SessionMessagesResponse,
   SessionWithProject,
@@ -206,26 +207,15 @@ export async function deleteSessions(ids: string[]): Promise<void> {
 }
 
 export async function getClosedPRs(
-  owner: string,
-  repo: string,
+  repos: string[],
   limit: number,
-  offset: number,
-): Promise<{
-  prs: {
-    prNumber: number
-    prTitle: string
-    prUrl: string
-    branch: string
-    repo: string
-    state: 'MERGED' | 'CLOSED'
-  }[]
-  hasMore: boolean
-}> {
+): Promise<MergedPRSummary[]> {
   const res = await fetch(
-    `${API_BASE}/github/${owner}/${repo}/closed-prs?limit=${limit}&offset=${offset}`,
+    `${API_BASE}/github/closed-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
   )
   if (!res.ok) throw new Error('Failed to fetch closed PRs')
-  return res.json()
+  const data: { prs: MergedPRSummary[] } = await res.json()
+  return data.prs
 }
 
 export async function requestPRReview(

@@ -480,33 +480,21 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
     async function fetchMergedPRs() {
       try {
-        const results = await Promise.all(
-          repos.map(async (repo) => {
-            const [owner, repoName] = repo.split('/')
-            if (!owner || !repoName) return []
-            try {
-              const result = await api.getClosedPRs(owner, repoName, 3, 0)
-              return result.prs
-            } catch {
-              return []
-            }
-          }),
-        )
+        const limit = Math.min(repos.length * 10, 100)
+        const prs = await api.getClosedPRs(repos, limit)
 
         if (!cancelled) {
-          // Flatten, dedupe, and exclude PRs already in githubPRs
+          // Dedupe and exclude PRs already in githubPRs
           const existingPRs = new Set(
             githubPRs.map((pr) => `${pr.repo}#${pr.prNumber}`),
           )
           const seen = new Set<string>()
           const allPRs: MergedPRSummary[] = []
-          for (const prs of results) {
-            for (const pr of prs) {
-              const key = `${pr.repo}#${pr.prNumber}`
-              if (!seen.has(key) && !existingPRs.has(key)) {
-                seen.add(key)
-                allPRs.push(pr)
-              }
+          for (const pr of prs) {
+            const key = `${pr.repo}#${pr.prNumber}`
+            if (!seen.has(key) && !existingPRs.has(key)) {
+              seen.add(key)
+              allPRs.push(pr)
             }
           }
           setMergedPRs(allPRs)

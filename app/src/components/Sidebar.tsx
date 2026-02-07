@@ -928,43 +928,39 @@ export function Sidebar({ width }: SidebarProps) {
                                 }
                               />
                             ))}
-                            {(mergedPRsByRepo.get(repo) ?? []).map((pr) => (
-                              <a
-                                key={pr.prNumber}
-                                href={pr.prUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
-                              >
-                                {pr.state === 'MERGED' ? (
-                                  <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
-                                ) : (
-                                  <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-xs truncate block">
-                                    {pr.prTitle}
-                                  </span>
-                                  <div className="flex gap-1 items-center">
-                                    <GitBranch className="w-2.5 h-2.5" />
-                                    <span className="text-[11px] text-muted-foreground/50 truncate">
-                                      {pr.branch}
+                            {(mergedPRsByRepo.get(repo) ?? [])
+                              .slice(0, 3)
+                              .map((pr) => (
+                                <a
+                                  key={pr.prNumber}
+                                  href={pr.prUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                                >
+                                  {pr.state === 'MERGED' ? (
+                                    <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                                  ) : (
+                                    <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs truncate block">
+                                      {pr.prTitle}
                                     </span>
+                                    <div className="flex gap-1 items-center">
+                                      <GitBranch className="w-2.5 h-2.5" />
+                                      <span className="text-[11px] text-muted-foreground/50 truncate">
+                                        {pr.branch}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              </a>
-                            ))}
+                                </a>
+                              ))}
                             <OlderMergedPRsList
-                              repo={repo}
-                              excludePRNumbers={
-                                new Set([
-                                  ...repoPRs.map((pr) => pr.prNumber),
-                                  ...(mergedPRsByRepo.get(repo) ?? []).map(
-                                    (pr) => pr.prNumber,
-                                  ),
-                                ])
-                              }
+                              olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(
+                                3,
+                              )}
                             />
                           </>
                         )}

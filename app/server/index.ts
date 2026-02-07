@@ -20,7 +20,7 @@ import {
   closePR,
   detectAllTerminalBranches,
   emitCachedPRChecks,
-  fetchClosedPRsByMe,
+  fetchAllClosedPRs,
   getGhUsername,
   initGitHubChecks,
   mergePR,
@@ -197,15 +197,13 @@ fastify.get<{
   }
 })
 
-// Merged PRs by @me for a repo
+// Merged/closed PRs by @me across all repos (single GraphQL call)
 fastify.get<{
-  Params: { owner: string; repo: string }
-  Querystring: { limit?: string; offset?: string }
-}>('/api/github/:owner/:repo/closed-prs', async (request) => {
-  const { owner, repo } = request.params
-  const limit = Math.min(Number(request.query.limit) || 5, 50)
-  const offset = Number(request.query.offset) || 0
-  return fetchClosedPRsByMe(owner, repo, limit, offset)
+  Querystring: { repos?: string; limit?: string }
+}>('/api/github/closed-prs', async (request) => {
+  const repos = (request.query.repos || '').split(',').filter(Boolean)
+  const limit = Math.min(Number(request.query.limit) || 20, 100)
+  return { prs: await fetchAllClosedPRs(repos, limit) }
 })
 
 // Re-request PR review

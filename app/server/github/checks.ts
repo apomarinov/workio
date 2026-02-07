@@ -543,59 +543,72 @@ function fetchClosedPRsForBranches(
   return Promise.all(fetches).then((results) => results.flat())
 }
 
-/** Fetch closed/merged PRs by @me for a repo, with pagination. */
-export function fetchClosedPRsByMe(
-  owner: string,
-  repo: string,
+/** Fetch closed/merged PRs by @me across all repos in a single GraphQL call. */
+export function fetchAllClosedPRs(
+  repos: string[],
   limit: number,
-  offset: number,
-): Promise<{ prs: MergedPRSummary[]; hasMore: boolean }> {
+): Promise<MergedPRSummary[]> {
+  if (repos.length === 0) return Promise.resolve([])
+  const repoFilter = repos.map((r) => `repo:${r}`).join(' ')
+  const author = ghUsername || '@me'
+  const searchQuery = `is:pr is:closed author:${author} ${repoFilter}`
+  const graphqlQuery = `query($q: String!, $first: Int!) {
+  search(query: $q, type: ISSUE, first: $first) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        state
+        headRefName
+        repository { nameWithOwner }
+      }
+    }
+  }
+}`
   return new Promise((resolve) => {
     execFile(
       'gh',
       [
-        'pr',
-        'list',
-        '--repo',
-        `${owner}/${repo}`,
-        '--author',
-        ghUsername || '@me',
-        '--state',
-        'closed',
-        '--limit',
-        String(offset + limit + 1),
-        '--json',
-        'number,title,headRefName,url,state',
+        'api',
+        'graphql',
+        '-f',
+        `query=${graphqlQuery}`,
+        '-f',
+        `q=${searchQuery}`,
+        '-F',
+        `first=${Math.min(limit, 100)}`,
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
         if (err) {
-          resolve({ prs: [], hasMore: false })
+          resolve([])
           return
         }
         try {
-          const all: {
+          const resp = JSON.parse(stdout)
+          const nodes: {
             number: number
             title: string
-            headRefName: string
             url: string
             state: 'MERGED' | 'CLOSED'
-          }[] = JSON.parse(stdout)
-          const sliced = all.slice(offset, offset + limit)
-          const repoKey = `${owner}/${repo}`
-          resolve({
-            prs: sliced.map((pr) => ({
-              prNumber: pr.number,
-              prTitle: pr.title,
-              prUrl: pr.url,
-              branch: pr.headRefName,
-              repo: repoKey,
-              state: pr.state,
-            })),
-            hasMore: all.length > offset + limit,
-          })
+            headRefName: string
+            repository: { nameWithOwner: string }
+          }[] = resp.data.search.nodes
+          resolve(
+            nodes
+              .filter((n) => n.number != null)
+              .map((n) => ({
+                prNumber: n.number,
+                prTitle: n.title,
+                prUrl: n.url,
+                branch: n.headRefName,
+                repo: n.repository.nameWithOwner,
+                state: n.state,
+              })),
+          )
         } catch {
-          resolve({ prs: [], hasMore: false })
+          resolve([])
         }
       },
     )
