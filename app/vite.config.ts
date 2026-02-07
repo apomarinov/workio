@@ -53,6 +53,42 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            xterm: [
+              '@xterm/xterm',
+              '@xterm/addon-fit',
+              '@xterm/addon-search',
+              '@xterm/addon-web-links',
+              '@xterm/addon-webgl',
+            ],
+            markdown: [
+              'react-markdown',
+              'react-syntax-highlighter',
+              'rehype-katex',
+              'remark-gfm',
+              'remark-math',
+              'katex',
+            ],
+            dndkit: [
+              '@dnd-kit/core',
+              '@dnd-kit/sortable',
+              '@dnd-kit/modifiers',
+              '@dnd-kit/utilities',
+            ],
+            vendor: [
+              'react',
+              'react-dom',
+              'react-resizable-panels',
+              'socket.io-client',
+              'swr',
+            ],
+          },
+        },
+      },
+    },
     server: {
       port: clientPort,
       proxy: {

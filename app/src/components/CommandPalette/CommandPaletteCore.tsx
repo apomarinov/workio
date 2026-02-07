@@ -195,7 +195,16 @@ export function CommandPaletteCore({
                 </div>
               )}
             </CommandList>
-            {mode.footer?.(highlightedItem)}
+            {(breadcrumbs.length > 0 || mode.footer) && (
+              <div className="flex h-9 items-center border-t border-zinc-700 px-3 text-xs text-zinc-500">
+                {breadcrumbs.length > 0 && (
+                  <span className="truncate text-zinc-500 mr-auto">
+                    {breadcrumbs[breadcrumbs.length - 1]}
+                  </span>
+                )}
+                {mode.footer?.(highlightedItem)}
+              </div>
+            )}
           </Command>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

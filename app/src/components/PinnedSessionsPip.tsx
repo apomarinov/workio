@@ -9,7 +9,14 @@ import {
   Mouse,
   Plus,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,8 +30,11 @@ import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject } from '../types'
-import { SessionChat } from './SessionChat'
 import { SessionItem } from './SessionItem'
+
+const SessionChat = lazy(() =>
+  import('./SessionChat').then((m) => ({ default: m.SessionChat })),
+)
 
 const PIP_CARD_WIDTH = {
   vertical: 500,
@@ -155,12 +165,20 @@ function PipChatItem({
       <div
         className={cn('flex-1 min-h-0', !isFullscreen && 'pointer-events-none')}
       >
-        <SessionChat
-          sessionId={session.session_id}
-          hideHeader
-          hideAvatars
-          isMaximizedInPip={isFullscreen}
-        />
+        <Suspense
+          fallback={
+            <div className="h-full flex items-center justify-center text-zinc-400 text-xs">
+              Loading...
+            </div>
+          }
+        >
+          <SessionChat
+            sessionId={session.session_id}
+            hideHeader
+            hideAvatars
+            isMaximizedInPip={isFullscreen}
+          />
+        </Suspense>
       </div>
 
       {/* "Click to scroll" tooltip on hover when not maximized */}

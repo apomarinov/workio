@@ -64,7 +64,9 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <ChevronRight className="w-4 h-4 flex-shrink-0" />
         )}
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium truncate block">
+          <span
+            className={cn('text-xs font-medium block', !expanded && 'truncate')}
+          >
             {pr.prTitle}
           </span>
           <div className="flex gap-1 items-center justify-between min-w-0">

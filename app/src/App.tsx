@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
 import {
   Group,
@@ -12,8 +12,12 @@ import { Toaster } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
-import { SessionChat } from './components/SessionChat'
 import { Sidebar } from './components/Sidebar'
+
+const SessionChat = lazy(() =>
+  import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
+)
+
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
 import { useNotifications } from './context/NotificationContext'
@@ -213,7 +217,15 @@ function AppContent() {
           <div className="h-full relative">
             {activeSessionId ? (
               <div className="absolute inset-0 z-20">
-                <SessionChat />
+                <Suspense
+                  fallback={
+                    <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
+                      Loading...
+                    </div>
+                  }
+                >
+                  <SessionChat />
+                </Suspense>
               </div>
             ) : terminals.length === 0 ? (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#1a1a1a]">

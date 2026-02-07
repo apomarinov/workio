@@ -140,14 +140,12 @@ export function createBranchesMode(
     groups: groups.length > 0 ? groups : undefined,
     emptyMessage: 'No branches found',
     footer: () => (
-      <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
-        <span className="flex items-center gap-1.5">
-          <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
-            <CornerDownLeft className="h-3 w-3" />
-          </kbd>
-          to select
-        </span>
-      </div>
+      <span className="flex items-center gap-1.5 ml-auto">
+        <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
+          <CornerDownLeft className="h-3 w-3" />
+        </kbd>
+        to select
+      </span>
     ),
   }
 }
@@ -303,14 +301,12 @@ export function createBranchActionsMode(
     items,
     width: 'wide',
     footer: () => (
-      <div className="flex h-9 items-center justify-end border-t border-zinc-700 px-3 text-xs text-zinc-500">
-        <span className="flex items-center gap-1.5">
-          <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
-            <CornerDownLeft className="h-3 w-3" />
-          </kbd>
-          to select
-        </span>
-      </div>
+      <span className="flex items-center gap-1.5 ml-auto">
+        <kbd className="inline-flex items-center rounded bg-zinc-800 p-1 text-zinc-400">
+          <CornerDownLeft className="h-3 w-3" />
+        </kbd>
+        to select
+      </span>
     ),
   }
 }
