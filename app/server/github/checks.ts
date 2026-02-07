@@ -25,11 +25,13 @@ import { execSSHCommand } from '../ssh/exec'
 // Cache: cwd -> { owner, repo } or null
 const repoCache = new Map<string, { owner: string; repo: string } | null>()
 
-// Cache: "owner/repo" -> { prs, fetchedAt }
-const checksCache = new Map<
-  string,
-  { prs: PRCheckStatus[]; fetchedAt: number }
->()
+// Unified cache for all PRs
+let lastFetchedAt = 0
+let lastFetchedPRs: PRCheckStatus[] = []
+
+function invalidateChecksCache(): void {
+  lastFetchedAt = 0
+}
 
 // Track which terminals we're monitoring: terminalId -> cwd
 const monitoredTerminals = new Map<number, string>()
@@ -53,19 +55,6 @@ const WEBHOOK_THROTTLE_MS = 2000
 // Track last PR data for notification diffing
 const lastPRData = new Map<string, PRCheckStatus>()
 let initialFullFetchDone = false
-
-/** Decode GitHub GraphQL node ID to extract database ID (last 4 bytes as big-endian uint32) */
-function decodeNodeId(nodeId: string): number | null {
-  try {
-    const base64Part = nodeId.split('_')[1]
-    if (!base64Part) return null
-    const buffer = Buffer.from(base64Part, 'base64')
-    if (buffer.length < 4) return null
-    return buffer.readUInt32BE(buffer.length - 4)
-  } catch {
-    return null
-  }
-}
 
 export function parseGitHubRemoteUrl(
   url: string,
@@ -168,7 +157,132 @@ function execFileAsync(
   })
 }
 
-interface GhPR {
+/** Decode GitHub GraphQL node ID to extract database ID (last 4 bytes as big-endian uint32) */
+function decodeNodeId(nodeId: string): number | null {
+  try {
+    const base64Part = nodeId.split('_')[1]
+    if (!base64Part) return null
+    const buffer = Buffer.from(base64Part, 'base64')
+    if (buffer.length < 4) return null
+    return buffer.readUInt32BE(buffer.length - 4)
+  } catch {
+    return null
+  }
+}
+
+// GitHub GraphQL rate limit cost = sum of (first/last values multiplied across nesting levels).
+// Keep limits low: we rarely have >10 open PRs, >20 checks, >10 reviews, etc.
+const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int!, $closedFirst: Int!) {
+  rateLimit { cost remaining }
+  openPRs: search(query: $openQ, type: ISSUE, first: $openFirst) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        body
+        headRefName
+        url
+        createdAt
+        updatedAt
+        state
+        mergeable
+        reviewDecision
+        repository { nameWithOwner }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 30) {
+                  nodes {
+                    __typename
+                    ... on CheckRun {
+                      name
+                      status
+                      conclusion
+                      detailsUrl
+                    }
+                    ... on StatusContext {
+                      context
+                      state
+                      targetUrl
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        reviews(last: 10) {
+          nodes {
+            databaseId
+            author { login }
+            state
+            body
+          }
+        }
+        reviewRequests(first: 10) {
+          nodes {
+            requestedReviewer {
+              ... on User { login }
+            }
+          }
+        }
+        comments(last: 20) {
+          nodes {
+            databaseId
+            url
+            author { login }
+            body
+            createdAt
+          }
+        }
+        reviewThreads(last: 20) {
+          nodes {
+            comments(last: 5) {
+              nodes {
+                databaseId
+                url
+                author { login }
+                body
+                createdAt
+                path
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  closedPRs: search(query: $closedQ, type: ISSUE, first: $closedFirst) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        headRefName
+        url
+        createdAt
+        updatedAt
+        state
+        repository { nameWithOwner }
+      }
+    }
+  }
+}`
+
+interface GraphQLCheckContext {
+  __typename: 'CheckRun' | 'StatusContext'
+  // CheckRun fields
+  name?: string
+  status?: string
+  conclusion?: string | null
+  detailsUrl?: string
+  // StatusContext fields
+  context?: string
+  state?: string
+  targetUrl?: string
+}
+
+interface GraphQLOpenPR {
   number: number
   title: string
   body: string
@@ -176,371 +290,399 @@ interface GhPR {
   url: string
   createdAt: string
   updatedAt: string
-  state: 'OPEN' | 'MERGED' | 'CLOSED'
+  state: 'OPEN'
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
-  reviewDecision: string
+  reviewDecision: string | null
+  repository: { nameWithOwner: string }
+  commits: {
+    nodes: {
+      commit: {
+        statusCheckRollup: {
+          contexts: { nodes: GraphQLCheckContext[] }
+        } | null
+      }
+    }[]
+  }
   reviews: {
-    id: string
-    author: { login: string }
-    state: string
-    body: string
-  }[]
-  reviewRequests: { login: string }[]
+    nodes: {
+      databaseId: number
+      author: { login: string }
+      state: string
+      body: string
+    }[]
+  }
+  reviewRequests: {
+    nodes: { requestedReviewer: { login?: string } }[]
+  }
   comments: {
-    id: string
-    url: string
-    author: { login: string }
-    body: string
-    createdAt: string
-  }[]
-  statusCheckRollup: {
-    name: string
-    status: string
-    conclusion: string
-    detailsUrl: string
-  }[]
+    nodes: {
+      databaseId: number
+      url: string
+      author: { login: string }
+      body: string
+      createdAt: string
+    }[]
+  }
+  reviewThreads: {
+    nodes: {
+      comments: {
+        nodes: {
+          databaseId: number
+          url: string
+          author: { login: string }
+          body: string
+          createdAt: string
+          path: string
+        }[]
+      }
+    }[]
+  }
 }
 
-function fetchOpenPRs(
-  owner: string,
-  repo: string,
-  force = false,
-): Promise<PRCheckStatus[]> {
-  return new Promise((resolve) => {
-    const repoKey = `${owner}/${repo}`
-    const cached = checksCache.get(repoKey)
+interface GraphQLClosedPR {
+  number: number
+  title: string
+  headRefName: string
+  url: string
+  createdAt: string
+  updatedAt: string
+  state: 'MERGED' | 'CLOSED'
+  repository: { nameWithOwner: string }
+}
 
-    if (!force && cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
-      resolve(cached.prs)
-      return
+function normalizeCheckContext(ctx: GraphQLCheckContext): {
+  name: string
+  status: string
+  conclusion: string
+  detailsUrl: string
+} {
+  if (ctx.__typename === 'CheckRun') {
+    return {
+      name: ctx.name || '',
+      status: ctx.status || '',
+      conclusion: ctx.conclusion || '',
+      detailsUrl: ctx.detailsUrl || '',
     }
+  }
+  // StatusContext
+  const name = ctx.context || ''
+  const ghState = ctx.state || ''
+  let status: string
+  let conclusion: string
+  if (ghState === 'SUCCESS') {
+    status = 'COMPLETED'
+    conclusion = 'SUCCESS'
+  } else if (ghState === 'PENDING') {
+    status = 'IN_PROGRESS'
+    conclusion = ''
+  } else {
+    // FAILURE, ERROR
+    status = 'COMPLETED'
+    conclusion = 'FAILURE'
+  }
+  return { name, status, conclusion, detailsUrl: ctx.targetUrl || '' }
+}
 
+function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
+  const repoKey = pr.repository.nameWithOwner
+
+  // Normalize checks from commits → statusCheckRollup → contexts
+  const commitNode = pr.commits.nodes[0]
+  const contexts = commitNode?.commit?.statusCheckRollup?.contexts?.nodes || []
+  const allChecks = contexts.map(normalizeCheckContext)
+
+  const areAllChecksOk =
+    allChecks.length > 0 &&
+    allChecks.every(
+      (c) =>
+        c.status === 'COMPLETED' &&
+        (c.conclusion === 'SUCCESS' ||
+          c.conclusion === 'SKIPPED' ||
+          c.conclusion === 'NEUTRAL'),
+    )
+
+  const failedChecks: FailedPRCheck[] = allChecks
+    .filter(
+      (c) =>
+        c.status === 'IN_PROGRESS' ||
+        c.status === 'QUEUED' ||
+        (c.status === 'COMPLETED' &&
+          c.conclusion !== 'SUCCESS' &&
+          c.conclusion !== 'SKIPPED' &&
+          c.conclusion !== 'NEUTRAL'),
+    )
+    .map((c) => ({
+      name: c.name,
+      status: c.status,
+      conclusion: c.conclusion,
+      detailsUrl: c.detailsUrl,
+    }))
+
+  // Reviews
+  const pendingReviewers = new Set(
+    (pr.reviewRequests?.nodes || [])
+      .map((r) => r.requestedReviewer?.login)
+      .filter(Boolean) as string[],
+  )
+
+  const reviews: PRReview[] = (pr.reviews?.nodes || [])
+    .filter(
+      (r) =>
+        r.state === 'APPROVED' ||
+        r.state === 'CHANGES_REQUESTED' ||
+        r.state === 'COMMENTED',
+    )
+    .map((r) => ({
+      id: r.databaseId,
+      author: r.author.login,
+      avatarUrl: `https://github.com/${r.author.login}.png?size=32`,
+      state:
+        r.state === 'CHANGES_REQUESTED' && pendingReviewers.has(r.author.login)
+          ? 'PENDING'
+          : r.state,
+      body: r.body || '',
+    }))
+
+  const reviewsByAuthor = new Map<string, PRReview>()
+  for (const r of reviews) {
+    reviewsByAuthor.set(r.author, r)
+  }
+
+  // Issue comments
+  const issueComments: PRComment[] = (pr.comments?.nodes || [])
+    .filter((c) => !c.author.login.includes('[bot]'))
+    .map((c) => ({
+      id: c.databaseId,
+      url: c.url,
+      author: c.author.login,
+      avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
+      body: c.body,
+      createdAt: c.createdAt,
+    }))
+
+  // Code comments from reviewThreads
+  const codeComments: PRComment[] = (pr.reviewThreads?.nodes || []).flatMap(
+    (thread) =>
+      (thread.comments?.nodes || [])
+        .filter((c) => !c.author.login.includes('[bot]'))
+        .map((c) => ({
+          id: c.databaseId,
+          url: c.url,
+          author: c.author.login,
+          avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
+          body: c.body,
+          createdAt: c.createdAt,
+          path: c.path,
+        })),
+  )
+
+  // Merge and deduplicate comments by id, sort by date desc, cap at 50
+  const seenIds = new Set<number>()
+  const mergedComments: PRComment[] = []
+  for (const c of [...issueComments, ...codeComments]) {
+    if (c.id && seenIds.has(c.id)) continue
+    if (c.id) seenIds.add(c.id)
+    mergedComments.push(c)
+  }
+  mergedComments.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
+  const comments = mergedComments.slice(0, 50)
+
+  // Review decision
+  const dedupedReviews = Array.from(reviewsByAuthor.values())
+  const hasActiveChangesRequested = dedupedReviews.some(
+    (r) => r.state === 'CHANGES_REQUESTED',
+  )
+  const hasApproval = dedupedReviews.some((r) => r.state === 'APPROVED')
+  const hasPending = dedupedReviews.some((r) => r.state === 'PENDING')
+
+  let reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | ''
+  if (hasActiveChangesRequested) {
+    reviewDecision = 'CHANGES_REQUESTED'
+  } else if (hasPending) {
+    reviewDecision = 'REVIEW_REQUIRED'
+  } else if (hasApproval) {
+    reviewDecision = 'APPROVED'
+  } else {
+    reviewDecision = (pr.reviewDecision || '') as typeof reviewDecision
+  }
+
+  const runningChecksCount = failedChecks.filter(
+    (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
+  ).length
+  const failedChecksCount = failedChecks.filter(
+    (c) =>
+      c.status === 'COMPLETED' &&
+      c.conclusion !== 'SUCCESS' &&
+      c.conclusion !== 'SKIPPED' &&
+      c.conclusion !== 'NEUTRAL',
+  ).length
+
+  return {
+    prNumber: pr.number,
+    prTitle: pr.title,
+    prUrl: pr.url,
+    prBody: pr.body || '',
+    branch: pr.headRefName,
+    repo: repoKey,
+    state: 'OPEN',
+    reviewDecision,
+    reviews: dedupedReviews,
+    checks: failedChecks,
+    comments,
+    createdAt: pr.createdAt || '',
+    updatedAt: pr.updatedAt || '',
+    areAllChecksOk,
+    mergeable: pr.mergeable || 'UNKNOWN',
+    isMerged: false,
+    isApproved: reviewDecision === 'APPROVED',
+    hasChangesRequested: reviewDecision === 'CHANGES_REQUESTED',
+    hasConflicts: pr.mergeable === 'CONFLICTING',
+    hasPendingReviews: hasPending,
+    hasFailedChecks: failedChecksCount > 0,
+    runningChecksCount,
+    failedChecksCount,
+  }
+}
+
+function mapClosedPRNode(pr: GraphQLClosedPR): PRCheckStatus {
+  return {
+    prNumber: pr.number,
+    prTitle: pr.title,
+    prUrl: pr.url,
+    prBody: '',
+    branch: pr.headRefName,
+    repo: pr.repository.nameWithOwner,
+    state: pr.state,
+    reviewDecision: '',
+    reviews: [],
+    checks: [],
+    comments: [],
+    createdAt: pr.createdAt || '',
+    updatedAt: pr.updatedAt || '',
+    areAllChecksOk: false,
+    isMerged: pr.state === 'MERGED',
+    isApproved: false,
+    hasChangesRequested: false,
+    hasConflicts: false,
+    hasPendingReviews: false,
+    hasFailedChecks: false,
+    runningChecksCount: 0,
+    failedChecksCount: 0,
+  }
+}
+
+/** Fetch all open + closed PRs across all repos in a single GraphQL call. */
+function fetchAllPRsViaGraphQL(
+  repos: string[],
+  trackedBranches: Map<string, Set<string>>,
+  force = false,
+): Promise<{ openPRs: PRCheckStatus[]; closedPRs: PRCheckStatus[] }> {
+  if (!force && Date.now() - lastFetchedAt < CACHE_TTL) {
+    // Filter cached results to only repos we care about
+    const repoSet = new Set(repos)
+    return Promise.resolve({
+      openPRs: lastFetchedPRs.filter(
+        (pr) => pr.state === 'OPEN' && repoSet.has(pr.repo),
+      ),
+      closedPRs: lastFetchedPRs.filter(
+        (pr) => pr.state !== 'OPEN' && repoSet.has(pr.repo),
+      ),
+    })
+  }
+
+  if (repos.length === 0) {
+    return Promise.resolve({ openPRs: [], closedPRs: [] })
+  }
+
+  const author = ghUsername || '@me'
+  const repoFilter = repos.map((r) => `repo:${r}`).join(' ')
+  const openQ = `is:pr is:open author:${author} ${repoFilter}`
+  const closedQ = `is:pr is:closed author:${author} ${repoFilter} sort:updated-desc`
+
+  return new Promise((resolve) => {
     execFile(
       'gh',
       [
-        'pr',
-        'list',
-        '--repo',
-        `${owner}/${repo}`,
-        '--author',
-        ghUsername || '@me',
-        '--state',
-        'open',
-        '--json',
-        'number,title,body,headRefName,url,createdAt,updatedAt,statusCheckRollup,reviewDecision,reviews,reviewRequests,comments,mergeable',
+        'api',
+        'graphql',
+        '-f',
+        `query=${GRAPHQL_QUERY}`,
+        '-f',
+        `openQ=${openQ}`,
+        '-f',
+        `closedQ=${closedQ}`,
+        '-F',
+        'openFirst=20',
+        '-F',
+        'closedFirst=20',
       ],
-      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
         if (err) {
-          resolve(cached?.prs ?? [])
+          resolve({
+            openPRs: lastFetchedPRs.filter((pr) => pr.state === 'OPEN'),
+            closedPRs: lastFetchedPRs.filter((pr) => pr.state !== 'OPEN'),
+          })
           return
         }
 
         try {
-          const prs: GhPR[] = JSON.parse(stdout)
+          const resp = JSON.parse(stdout)
 
-          // Build initial results without code review comments
-          const resultsWithoutCodeComments: {
-            result: PRCheckStatus
-            issueComments: PRComment[]
-          }[] = []
-
-          for (const pr of prs) {
-            const allChecks = pr.statusCheckRollup || []
-            const areAllChecksOk =
-              allChecks.length > 0 &&
-              allChecks.every(
-                (c) =>
-                  c.status === 'COMPLETED' &&
-                  (c.conclusion === 'SUCCESS' ||
-                    c.conclusion === 'SKIPPED' ||
-                    c.conclusion === 'NEUTRAL'),
-              )
-
-            // Filter checks to non-success
-            const failedChecks: FailedPRCheck[] = allChecks
-              .filter(
-                (c) =>
-                  c.status === 'IN_PROGRESS' ||
-                  c.status === 'QUEUED' ||
-                  (c.status === 'COMPLETED' &&
-                    c.conclusion !== 'SUCCESS' &&
-                    c.conclusion !== 'SKIPPED' &&
-                    c.conclusion !== 'NEUTRAL'),
-              )
-              .map((c) => ({
-                name: c.name,
-                status: c.status,
-                conclusion: c.conclusion || '',
-                detailsUrl: c.detailsUrl || '',
-              }))
-
-            // Extract reviews (APPROVED / CHANGES_REQUESTED / COMMENTED)
-            const pendingReviewers = new Set(
-              (pr.reviewRequests || []).map((r) => r.login),
+          // Log rate limit from the response itself
+          const rl = resp.data?.rateLimit
+          if (rl) {
+            log.info(
+              `[github] GraphQL rate limit: cost=${rl.cost} remaining=${rl.remaining}`,
             )
-            const reviews: PRReview[] = (pr.reviews || [])
-              .filter(
-                (r) =>
-                  r.state === 'APPROVED' ||
-                  r.state === 'CHANGES_REQUESTED' ||
-                  r.state === 'COMMENTED',
-              )
-              .map((r) => ({
-                id: decodeNodeId(r.id) ?? undefined,
-                author: r.author.login,
-                avatarUrl: `https://github.com/${r.author.login}.png?size=32`,
-                // If reviewer has a pending re-review request, mark as PENDING
-                state:
-                  r.state === 'CHANGES_REQUESTED' &&
-                  pendingReviewers.has(r.author.login)
-                    ? 'PENDING'
-                    : r.state,
-                body: r.body || '',
-              }))
+          }
 
-            // Deduplicate reviews: keep latest per author
-            const reviewsByAuthor = new Map<string, PRReview>()
-            for (const r of reviews) {
-              reviewsByAuthor.set(r.author, r)
-            }
+          const openNodes: GraphQLOpenPR[] = (
+            resp.data.openPRs.nodes as GraphQLOpenPR[]
+          ).filter((n) => n.number != null)
+          const closedNodes: GraphQLClosedPR[] = (
+            resp.data.closedPRs.nodes as GraphQLClosedPR[]
+          ).filter((n) => n.number != null)
 
-            // Extract issue comments (code review comments fetched separately)
-            const issueComments: PRComment[] = (pr.comments || [])
-              .filter((c) => !c.author.login.includes('[bot]'))
-              .map((c) => ({
-                id: decodeNodeId(c.id) ?? undefined,
-                url: c.url,
-                author: c.author.login,
-                avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
-                body: c.body,
-                createdAt: c.createdAt,
-              }))
+          const openPRs = openNodes.map(mapOpenPRNode)
 
-            // Derive review decision, accounting for re-requested reviews
-            const dedupedReviews = Array.from(reviewsByAuthor.values())
-            const hasActiveChangesRequested = dedupedReviews.some(
-              (r) => r.state === 'CHANGES_REQUESTED',
-            )
-            const hasApproval = dedupedReviews.some(
-              (r) => r.state === 'APPROVED',
-            )
-            const hasPending = dedupedReviews.some((r) => r.state === 'PENDING')
-
-            let reviewDecision:
-              | 'APPROVED'
-              | 'CHANGES_REQUESTED'
-              | 'REVIEW_REQUIRED'
-              | ''
-            if (hasActiveChangesRequested) {
-              reviewDecision = 'CHANGES_REQUESTED'
-            } else if (hasPending) {
-              // All changes-requested reviewers have been re-requested
-              reviewDecision = 'REVIEW_REQUIRED'
-            } else if (hasApproval) {
-              reviewDecision = 'APPROVED'
+          // Filter closed PRs: only branches in trackedBranches without an open PR
+          const openBranches = new Map<string, Set<string>>()
+          for (const pr of openPRs) {
+            const existing = openBranches.get(pr.repo)
+            if (existing) {
+              existing.add(pr.branch)
             } else {
-              reviewDecision = (pr.reviewDecision ||
-                '') as typeof reviewDecision
+              openBranches.set(pr.repo, new Set([pr.branch]))
             }
-
-            // Compute status flags
-            const runningChecksCount = failedChecks.filter(
-              (c) => c.status === 'IN_PROGRESS' || c.status === 'QUEUED',
-            ).length
-            const failedChecksCount = failedChecks.filter(
-              (c) =>
-                c.status === 'COMPLETED' &&
-                c.conclusion !== 'SUCCESS' &&
-                c.conclusion !== 'SKIPPED' &&
-                c.conclusion !== 'NEUTRAL',
-            ).length
-
-            resultsWithoutCodeComments.push({
-              result: {
-                prNumber: pr.number,
-                prTitle: pr.title,
-                prUrl: pr.url,
-                prBody: pr.body || '',
-                branch: pr.headRefName,
-                repo: repoKey,
-                state: 'OPEN',
-                reviewDecision,
-                reviews: Array.from(reviewsByAuthor.values()),
-                checks: failedChecks,
-                comments: [], // Will be filled after fetching code review comments
-                createdAt: pr.createdAt || '',
-                updatedAt: pr.updatedAt || '',
-                areAllChecksOk,
-                mergeable: pr.mergeable || 'UNKNOWN',
-                // Pre-computed status flags
-                isMerged: false,
-                isApproved: reviewDecision === 'APPROVED',
-                hasChangesRequested: reviewDecision === 'CHANGES_REQUESTED',
-                hasConflicts: pr.mergeable === 'CONFLICTING',
-                hasPendingReviews: hasPending,
-                hasFailedChecks: failedChecksCount > 0,
-                runningChecksCount,
-                failedChecksCount,
-              },
-              issueComments,
-            })
           }
 
-          // Now fetch code review comments for each PR in parallel
-          if (resultsWithoutCodeComments.length === 0) {
-            checksCache.set(repoKey, { prs: [], fetchedAt: Date.now() })
-            resolve([])
-            return
-          }
-
-          // Fetch code comments for all PRs in parallel using Promise.all
-          Promise.all(
-            resultsWithoutCodeComments.map(async ({ result }) => {
-              const stdout = await execFileAsync(
-                'gh',
-                [
-                  'api',
-                  `repos/${owner}/${repo}/pulls/${result.prNumber}/comments`,
-                ],
-                { timeout: 10000, maxBuffer: 5 * 1024 * 1024 },
-              )
-              let codeComments: PRComment[] = []
-              try {
-                const codeCommentsRaw: {
-                  id: number
-                  html_url: string
-                  user: { login: string }
-                  body: string
-                  created_at: string
-                  path: string
-                }[] = JSON.parse(stdout) || []
-                codeComments = codeCommentsRaw
-                  .filter((c) => !c.user.login.includes('[bot]'))
-                  .map((c) => ({
-                    id: c.id,
-                    url: c.html_url,
-                    author: c.user.login,
-                    avatarUrl: `https://github.com/${c.user.login}.png?size=32`,
-                    body: c.body,
-                    createdAt: c.created_at,
-                    path: c.path,
-                  }))
-              } catch {
-                // ignore parse errors
-              }
-              return { prNumber: result.prNumber, codeComments }
-            }),
-          ).then((codeCommentsResults) => {
-            const codeCommentsByPR = new Map<number, PRComment[]>()
-            for (const { prNumber, codeComments } of codeCommentsResults) {
-              codeCommentsByPR.set(prNumber, codeComments)
-            }
-
-            // Merge comments for each PR
-            const allResults: PRCheckStatus[] = resultsWithoutCodeComments.map(
-              ({ result, issueComments }) => {
-                const codeComments = codeCommentsByPR.get(result.prNumber) || []
-                const mergedComments = [...issueComments, ...codeComments]
-                  .sort(
-                    (a, b) =>
-                      new Date(b.createdAt).getTime() -
-                      new Date(a.createdAt).getTime(),
-                  )
-                  .slice(0, 50)
-                return { ...result, comments: mergedComments }
-              },
-            )
-
-            checksCache.set(repoKey, {
-              prs: allResults,
-              fetchedAt: Date.now(),
+          const closedPRs = closedNodes
+            .filter((n) => {
+              const repo = n.repository.nameWithOwner
+              const branchSet = trackedBranches.get(repo)
+              if (!branchSet || !branchSet.has(n.headRefName)) return false
+              const openSet = openBranches.get(repo)
+              return !openSet || !openSet.has(n.headRefName)
             })
-            resolve(allResults)
-          })
+            .map(mapClosedPRNode)
+
+          // Update cache
+          lastFetchedAt = Date.now()
+          lastFetchedPRs = [...openPRs, ...closedPRs]
+
+          resolve({ openPRs, closedPRs })
         } catch {
-          resolve(cached?.prs ?? [])
+          resolve({
+            openPRs: lastFetchedPRs.filter((pr) => pr.state === 'OPEN'),
+            closedPRs: lastFetchedPRs.filter((pr) => pr.state !== 'OPEN'),
+          })
         }
       },
     )
   })
-}
-
-/** Fetch closed/merged PRs for specific branches (lightweight, no reviews/comments/checks). */
-function fetchClosedPRsForBranches(
-  owner: string,
-  repo: string,
-  branches: Set<string>,
-): Promise<PRCheckStatus[]> {
-  if (branches.size === 0) return Promise.resolve([])
-
-  const repoKey = `${owner}/${repo}`
-
-  const fetches = [...branches].map(
-    (branch) =>
-      new Promise<PRCheckStatus[]>((resolve) => {
-        execFile(
-          'gh',
-          [
-            'pr',
-            'list',
-            '--repo',
-            `${owner}/${repo}`,
-            '--author',
-            ghUsername || '@me',
-            '--state',
-            'closed',
-            '--head',
-            branch,
-            '--limit',
-            '5',
-            '--json',
-            'number,title,headRefName,url,createdAt,updatedAt,state',
-          ],
-          { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
-          (err, stdout) => {
-            if (err) {
-              resolve([])
-              return
-            }
-
-            try {
-              const prs: GhPR[] = JSON.parse(stdout)
-              resolve(
-                prs.map((pr) => ({
-                  prNumber: pr.number,
-                  prTitle: pr.title,
-                  prUrl: pr.url,
-                  prBody: '',
-                  branch: pr.headRefName,
-                  repo: repoKey,
-                  state: pr.state as 'MERGED' | 'CLOSED',
-                  reviewDecision: '' as const,
-                  reviews: [],
-                  checks: [],
-                  comments: [],
-                  createdAt: pr.createdAt || '',
-                  updatedAt: pr.updatedAt || '',
-                  areAllChecksOk: false,
-                  isMerged: pr.state === 'MERGED',
-                  isApproved: false,
-                  hasChangesRequested: false,
-                  hasConflicts: false,
-                  hasPendingReviews: false,
-                  hasFailedChecks: false,
-                  runningChecksCount: 0,
-                  failedChecksCount: 0,
-                })),
-              )
-            } catch {
-              resolve([])
-            }
-          },
-        )
-      }),
-  )
-
-  return Promise.all(fetches).then((results) => results.flat())
 }
 
 /** Fetch closed/merged PRs by @me across all repos in a single GraphQL call. */
@@ -687,40 +829,32 @@ async function pollAllPRChecks(force = false): Promise<void> {
     }
   }
 
-  const allPRs: PRCheckStatus[] = []
-
-  for (const [, { owner, repo, branches }] of repoData) {
-    try {
-      const openPRs = await fetchOpenPRs(owner, repo, force)
-      allPRs.push(...openPRs)
-
-      // Only check merged for branches that don't already have an open PR
-      const openBranches = new Set(openPRs.map((pr) => pr.branch))
-
-      // Also include branches from previously-open PRs in lastPRData
-      // This ensures we detect merges even if terminal switched branches
-      const repoKey = `${owner}/${repo}`
-      for (const [, pr] of lastPRData) {
-        if (pr.repo === repoKey && pr.state === 'OPEN' && pr.branch) {
-          branches.add(pr.branch)
-        }
+  // Collect all repos + tracked branches (including previously-open PRs from lastPRData)
+  const allRepos = [...repoData.keys()]
+  const allBranches = new Map<string, Set<string>>()
+  for (const [key, { branches }] of repoData) {
+    const branchSet = allBranches.get(key) || new Set<string>()
+    for (const b of branches) branchSet.add(b)
+    // Also include branches from previously-open PRs in lastPRData
+    for (const [, pr] of lastPRData) {
+      if (pr.repo === key && pr.state === 'OPEN' && pr.branch) {
+        branchSet.add(pr.branch)
       }
-
-      const branchesWithoutOpenPR = new Set(
-        [...branches].filter((b) => !openBranches.has(b)),
-      )
-
-      if (branchesWithoutOpenPR.size > 0) {
-        const mergedPRs = await fetchClosedPRsForBranches(
-          owner,
-          repo,
-          branchesWithoutOpenPR,
-        )
-        allPRs.push(...mergedPRs)
-      }
-    } catch (err) {
-      log.error({ err }, `[github] Failed to fetch PRs for ${owner}/${repo}`)
     }
+    allBranches.set(key, branchSet)
+  }
+
+  let allPRs: PRCheckStatus[]
+  try {
+    const { openPRs, closedPRs } = await fetchAllPRsViaGraphQL(
+      allRepos,
+      allBranches,
+      force,
+    )
+    allPRs = [...openPRs, ...closedPRs]
+  } catch (err) {
+    log.error({ err }, '[github] Failed to fetch PRs via GraphQL')
+    allPRs = []
   }
 
   // Process PR data for server-side notifications
@@ -734,18 +868,6 @@ async function pollAllPRChecks(force = false): Promise<void> {
 
   lastEmittedPRs = visiblePRs
   getIO()?.emit('github:pr-checks', { prs: visiblePRs, username: ghUsername })
-
-  // Log GraphQL rate limit after fetching PRs
-  execFile(
-    'gh',
-    ['api', 'rate_limit', '--jq', '.resources.graphql.remaining'],
-    { timeout: 5000 },
-    (err, stdout) => {
-      if (!err && stdout) {
-        log.info(`[github] GraphQL rate limit remaining: ${stdout.trim()}`)
-      }
-    },
-  )
 }
 
 let lastRefreshAt = 0
@@ -773,7 +895,7 @@ export async function refreshPRChecks(
   if (poll) {
     const myPollId = ++activePollId
     for (let i = 0; i < 6; i++) {
-      checksCache.delete(poll.repo)
+      invalidateChecksCache()
       await pollAllPRChecks(true)
       lastRefreshAt = Date.now()
       const match = lastEmittedPRs.find(
@@ -1010,7 +1132,7 @@ export function requestPRReview(
           resolve({ ok: false, error: stderr || err.message })
           return
         }
-        checksCache.delete(`${owner}/${repo}`)
+        invalidateChecksCache()
         resolve({ ok: true })
       },
     )
@@ -1050,7 +1172,7 @@ export function mergePR(
           resolve({ ok: false, error: stderr || err.message })
           return
         }
-        checksCache.delete(`${owner}/${repo}`)
+        invalidateChecksCache()
         resolve({ ok: true })
       },
     )
@@ -1089,7 +1211,7 @@ export function closePR(
           resolve({ ok: false, error: stderr || err.message })
           return
         }
-        checksCache.delete(`${owner}/${repo}`)
+        invalidateChecksCache()
         resolve({ ok: true })
       },
     )
@@ -1135,7 +1257,7 @@ export function rerunFailedCheck(
           resolve({ ok: false, error: stderr || err.message })
           return
         }
-        checksCache.delete(`${owner}/${repo}`)
+        invalidateChecksCache()
         resolve({ ok: true })
       },
     )
@@ -1202,7 +1324,7 @@ export async function rerunAllFailedChecks(
     ),
   )
 
-  checksCache.delete(`${owner}/${repo}`)
+  invalidateChecksCache()
 
   if (successCount === 0) {
     return { ok: false, error: errors[0] || 'All reruns failed', rerunCount: 0 }
@@ -1245,7 +1367,7 @@ export function addPRComment(
           resolve({ ok: false, error: stderr || err.message })
           return
         }
-        checksCache.delete(`${owner}/${repo}`)
+        invalidateChecksCache()
         resolve({ ok: true })
       },
     )
@@ -1302,10 +1424,7 @@ export function queueWebhookRefresh(repo: string): void {
 
     log.info(`[github] Webhook triggered PR refresh for: ${repos.join(', ')}`)
 
-    // Clear cache for affected repos and refresh
-    for (const repo of repos) {
-      checksCache.delete(repo)
-    }
+    invalidateChecksCache()
     await refreshPRChecks(true)
   }, WEBHOOK_THROTTLE_MS)
 }
