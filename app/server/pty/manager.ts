@@ -53,6 +53,7 @@ export interface PtySession {
   isIdle: boolean
   lastActiveProcesses: string // For change detection
   onDoneMarker: ((exitCode: number) => void) | null
+  processPollTimeoutId: NodeJS.Timeout | null
 }
 
 // In-memory map of active PTY sessions
@@ -801,6 +802,7 @@ export async function createSession(
     isIdle: true,
     lastActiveProcesses: '',
     onDoneMarker: null,
+    processPollTimeoutId: null,
   }
 
   // Create OSC parser to intercept command events
@@ -838,15 +840,24 @@ export async function createSession(
             active_cmd: event.command || null,
           }).catch(() => {})
           log.info(`[pty:${terminalId}] Command started: ${event.command}`)
-          scanAndEmitProcessesForTerminal(terminalId)
+          session.processPollTimeoutId = setTimeout(() => {
+            session.processPollTimeoutId = null
+            scanAndEmitProcessesForTerminal(terminalId)
+          }, 1000)
           break
         case 'command_end':
+          if (session.processPollTimeoutId) {
+            clearTimeout(session.processPollTimeoutId)
+            session.processPollTimeoutId = null
+          }
           log.info(
             `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
           )
           detectGitBranch(terminalId)
           checkAndEmitSingleGitDirty(terminalId)
-          scanAndEmitProcessesForTerminal(terminalId)
+          setTimeout(() => {
+            scanAndEmitProcessesForTerminal(terminalId)
+          }, 1000)
           break
       }
       // Forward event to callback
