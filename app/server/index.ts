@@ -17,6 +17,7 @@ import {
 import { env } from './env'
 import {
   addPRComment,
+  applyWebhookAndRefresh,
   closePR,
   detectAllTerminalBranches,
   emitCachedPRChecks,
@@ -24,7 +25,6 @@ import {
   getGhUsername,
   initGitHubChecks,
   mergePR,
-  queueWebhookRefresh,
   refreshPRChecks,
   requestPRReview,
   rerunAllFailedChecks,
@@ -382,7 +382,7 @@ fastify.post<{
     return { ok: true }
   }
 
-  if (repo) {
+  if (repo && event) {
     // Extract PR author based on event type
     // - pull_request, pull_request_review, pull_request_review_comment: pull_request.user.login
     // - issue_comment (on PRs): issue.user.login
@@ -390,7 +390,7 @@ fastify.post<{
     const prAuthor = body?.pull_request?.user?.login || body?.issue?.user?.login
     const currentUser = getGhUsername()
 
-    // Only queue refresh if it's our PR or we can't determine the author
+    // Only process if it's our PR or we can't determine the author
     if (
       event === 'check_suite' ||
       !prAuthor ||
@@ -398,7 +398,7 @@ fastify.post<{
       prAuthor === currentUser
     ) {
       log.info(`[webhooks] Received ${event} event for ${repo}`)
-      queueWebhookRefresh(repo)
+      applyWebhookAndRefresh(event, request.body as Record<string, unknown>)
     } else {
       log.info(
         `[webhooks] Ignoring ${event} event for ${repo} (author: ${prAuthor}, not ${currentUser})`,

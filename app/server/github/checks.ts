@@ -860,12 +860,14 @@ async function pollAllPRChecks(force = false): Promise<void> {
   // Process PR data for server-side notifications
   await processNewPRData(allPRs)
 
-  // Filter out hidden PRs before emitting to clients
+  await emitPRChecks(allPRs)
+}
+
+async function emitPRChecks(allPRs: PRCheckStatus[]): Promise<void> {
   const settings = await getSettings()
   const visiblePRs = allPRs.filter(
     (pr) => !isHiddenPR(settings.hidden_prs, pr.repo, pr.prNumber),
   )
-
   lastEmittedPRs = visiblePRs
   getIO()?.emit('github:pr-checks', { prs: visiblePRs, username: ghUsername })
 }
@@ -1512,7 +1514,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           checkName: failedCheck?.name,
           checkUrl: failedCheck?.detailsUrl,
         },
-        failedCheck?.detailsUrl || failedCheck?.name,
+        `${failedCheck?.detailsUrl || failedCheck?.name}:${pr.updatedAt}`,
         pr.prNumber,
       )
       if (notification) {
@@ -1526,7 +1528,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         'checks_passed',
         pr.repo,
         { prTitle: pr.prTitle, prUrl: pr.prUrl },
-        undefined,
+        pr.updatedAt,
         pr.prNumber,
       )
       if (notification) {
@@ -1548,7 +1550,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           'changes_requested',
           pr.repo,
           { prTitle: pr.prTitle, prUrl: pr.prUrl, reviewer },
-          reviewer,
+          `${reviewer}:${pr.updatedAt}`,
           pr.prNumber,
         )
         if (notification) {
@@ -1569,7 +1571,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           'pr_approved',
           pr.repo,
           { prTitle: pr.prTitle, prUrl: pr.prUrl, approver },
-          approver,
+          `${approver}:${pr.updatedAt}`,
           pr.prNumber,
         )
         if (notification) {
@@ -1641,8 +1643,8 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       }
     }
 
-    // Update stored data
-    lastPRData.set(key, pr)
+    // Update stored data (clone so in-place mutations don't alias prev snapshots)
+    lastPRData.set(key, structuredClone(pr))
   }
 
   // Clean up removed PRs from lastPRData
@@ -1652,4 +1654,301 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       lastPRData.delete(key)
     }
   }
+}
+
+// --- Webhook optimistic patching ---
+
+interface WebhookPayload {
+  repository?: { full_name?: string }
+  action?: string
+  pull_request?: {
+    number: number
+    title: string
+    body?: string
+    head?: { ref: string }
+    html_url: string
+    state: string
+    merged?: boolean
+    mergeable?: boolean | null
+    mergeable_state?: string
+    created_at: string
+    updated_at: string
+    user?: { login?: string }
+  }
+  review?: {
+    id: number
+    user: { login: string }
+    state: string
+    body: string
+    submitted_at: string
+  }
+  comment?: {
+    id: number
+    html_url: string
+    user: { login: string }
+    body: string
+    created_at: string
+    path?: string
+  }
+  issue?: {
+    number: number
+    user?: { login?: string }
+    pull_request?: { url: string }
+  }
+}
+
+function findPR(repo: string, prNumber: number): PRCheckStatus | undefined {
+  return lastFetchedPRs.find(
+    (pr) => pr.repo === repo && pr.prNumber === prNumber,
+  )
+}
+
+function patchPullRequest(repo: string, payload: WebhookPayload): boolean {
+  const prData = payload.pull_request
+  if (!prData) return false
+
+  const existing = findPR(repo, prData.number)
+
+  if (payload.action === 'opened') {
+    if (existing) return false // already tracked
+    const newPR: PRCheckStatus = {
+      prNumber: prData.number,
+      prTitle: prData.title,
+      prUrl: prData.html_url,
+      prBody: prData.body || '',
+      branch: prData.head?.ref || '',
+      repo,
+      state: 'OPEN',
+      reviewDecision: '',
+      reviews: [],
+      checks: [],
+      comments: [],
+      createdAt: prData.created_at || '',
+      updatedAt: prData.updated_at || '',
+      areAllChecksOk: false,
+      mergeable: 'UNKNOWN',
+      isMerged: false,
+      isApproved: false,
+      hasChangesRequested: false,
+      hasConflicts: false,
+      hasPendingReviews: false,
+      hasFailedChecks: false,
+      runningChecksCount: 0,
+      failedChecksCount: 0,
+    }
+    lastFetchedPRs = [...lastFetchedPRs, newPR]
+    return true
+  }
+
+  if (!existing) return false
+
+  if (
+    payload.action === 'closed' ||
+    payload.action === 'reopened' ||
+    payload.action === 'edited' ||
+    payload.action === 'synchronize'
+  ) {
+    if (payload.action === 'closed') {
+      existing.state = prData.merged ? 'MERGED' : 'CLOSED'
+      existing.isMerged = !!prData.merged
+    } else if (payload.action === 'reopened') {
+      existing.state = 'OPEN'
+      existing.isMerged = false
+    }
+
+    existing.prTitle = prData.title
+    existing.prBody = prData.body ?? existing.prBody
+    existing.branch = prData.head?.ref ?? existing.branch
+    existing.updatedAt = prData.updated_at || existing.updatedAt
+
+    if (prData.mergeable === true) {
+      existing.mergeable = 'MERGEABLE'
+      existing.hasConflicts = false
+    } else if (prData.mergeable === false) {
+      existing.mergeable = 'CONFLICTING'
+      existing.hasConflicts = true
+    }
+
+    return true
+  }
+
+  return false
+}
+
+function patchPullRequestReview(
+  repo: string,
+  payload: WebhookPayload,
+): boolean {
+  if (payload.action !== 'submitted') return false
+  const review = payload.review
+  const prNumber = payload.pull_request?.number
+  if (!review || !prNumber) return false
+
+  const existing = findPR(repo, prNumber)
+  if (!existing) return false
+
+  const mappedState =
+    review.state === 'approved'
+      ? 'APPROVED'
+      : review.state === 'changes_requested'
+        ? 'CHANGES_REQUESTED'
+        : review.state === 'commented'
+          ? 'COMMENTED'
+          : review.state.toUpperCase()
+
+  // Only track meaningful review states
+  if (
+    mappedState !== 'APPROVED' &&
+    mappedState !== 'CHANGES_REQUESTED' &&
+    mappedState !== 'COMMENTED'
+  ) {
+    return false
+  }
+
+  const newReview: PRReview = {
+    id: review.id,
+    author: review.user.login,
+    avatarUrl: `https://github.com/${review.user.login}.png?size=32`,
+    state: mappedState,
+    body: review.body || '',
+  }
+
+  // Dedup by author: replace existing review from same author, or append
+  const idx = existing.reviews.findIndex((r) => r.author === review.user.login)
+  if (idx >= 0) {
+    existing.reviews[idx] = newReview
+  } else {
+    existing.reviews.push(newReview)
+  }
+
+  // Recompute review decision
+  const hasChangesRequested = existing.reviews.some(
+    (r) => r.state === 'CHANGES_REQUESTED',
+  )
+  const hasApproval = existing.reviews.some((r) => r.state === 'APPROVED')
+  const hasPending = existing.reviews.some((r) => r.state === 'PENDING')
+
+  if (hasChangesRequested) {
+    existing.reviewDecision = 'CHANGES_REQUESTED'
+  } else if (hasPending) {
+    existing.reviewDecision = 'REVIEW_REQUIRED'
+  } else if (hasApproval) {
+    existing.reviewDecision = 'APPROVED'
+  }
+  existing.isApproved = existing.reviewDecision === 'APPROVED'
+  existing.hasChangesRequested = existing.reviewDecision === 'CHANGES_REQUESTED'
+  existing.hasPendingReviews = hasPending
+
+  return true
+}
+
+function patchIssueComment(repo: string, payload: WebhookPayload): boolean {
+  if (payload.action !== 'created') return false
+  const comment = payload.comment
+  const issueNumber = payload.issue?.number
+  // Only patch if this issue is actually a PR (has pull_request field)
+  if (!comment || !issueNumber || !payload.issue?.pull_request) return false
+
+  const existing = findPR(repo, issueNumber)
+  if (!existing) return false
+
+  // Skip bot comments
+  if (comment.user.login.includes('[bot]')) return false
+
+  const newComment: PRComment = {
+    id: comment.id,
+    url: comment.html_url,
+    author: comment.user.login,
+    avatarUrl: `https://github.com/${comment.user.login}.png?size=32`,
+    body: comment.body,
+    createdAt: comment.created_at,
+  }
+
+  // Prepend and maintain sort + cap at 50
+  existing.comments = [newComment, ...existing.comments]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, 50)
+
+  return true
+}
+
+function patchReviewComment(repo: string, payload: WebhookPayload): boolean {
+  if (payload.action !== 'created') return false
+  const comment = payload.comment
+  const prNumber = payload.pull_request?.number
+  if (!comment || !prNumber) return false
+
+  const existing = findPR(repo, prNumber)
+  if (!existing) return false
+
+  // Skip bot comments
+  if (comment.user.login.includes('[bot]')) return false
+
+  const newComment: PRComment = {
+    id: comment.id,
+    url: comment.html_url,
+    author: comment.user.login,
+    avatarUrl: `https://github.com/${comment.user.login}.png?size=32`,
+    body: comment.body,
+    createdAt: comment.created_at,
+    path: comment.path,
+  }
+
+  // Dedup by id, prepend, sort, cap at 50
+  const existingIdx = existing.comments.findIndex(
+    (c) => c.id && c.id === comment.id,
+  )
+  if (existingIdx >= 0) return false // already have it
+
+  existing.comments = [newComment, ...existing.comments]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, 50)
+
+  return true
+}
+
+function tryApplyWebhookPatch(event: string, payload: WebhookPayload): boolean {
+  const repo = payload.repository?.full_name
+  if (!repo) return false
+
+  switch (event) {
+    case 'pull_request':
+      return patchPullRequest(repo, payload)
+    case 'pull_request_review':
+      return patchPullRequestReview(repo, payload)
+    case 'issue_comment':
+      return patchIssueComment(repo, payload)
+    case 'pull_request_review_comment':
+      return patchReviewComment(repo, payload)
+    default:
+      return false
+  }
+}
+
+export async function applyWebhookAndRefresh(
+  event: string,
+  payload: WebhookPayload,
+): Promise<void> {
+  const repo = payload.repository?.full_name
+  if (!repo) return
+
+  // Try to apply optimistic patch
+  const patched = tryApplyWebhookPatch(event, payload)
+
+  if (patched) {
+    // Process notifications for patched data
+    await processNewPRData(lastFetchedPRs)
+    // Emit patched data to client immediately
+    await emitPRChecks(lastFetchedPRs)
+    log.info(`[webhooks] Applied optimistic patch for ${event} on ${repo}`)
+  }
+
+  // Always queue background reconcile
+  queueWebhookRefresh(repo)
 }

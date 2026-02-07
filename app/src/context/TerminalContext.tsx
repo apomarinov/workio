@@ -166,6 +166,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const { sendNotification } = useNotifications()
   const sendNotificationRef = useRef(sendNotification)
   sendNotificationRef.current = sendNotification
+  const notifDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  )
   const [prPoll, setPrPoll] = useState(true)
   const lastDetectEmitRef = useRef(0)
 
@@ -264,15 +267,28 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           })
           break
 
-        case 'new_comment':
-          sendNotificationRef.current(`💬 ${data.author || 'Someone'}`, {
-            body: data.body || prTitle,
-            audio: 'pr-activity',
-            onClick: () => window.open(data.commentUrl || prUrl, '_blank'),
-          })
+        case 'new_comment': {
+          const commentKey = `comment:${prUrl}`
+          const existingComment = notifDebounceRef.current.get(commentKey)
+          if (existingComment) clearTimeout(existingComment)
+          notifDebounceRef.current.set(
+            commentKey,
+            setTimeout(() => {
+              notifDebounceRef.current.delete(commentKey)
+              sendNotificationRef.current(`💬 ${data.author || 'Someone'}`, {
+                body: data.body || prTitle,
+                audio: 'pr-activity',
+                onClick: () => window.open(data.commentUrl || prUrl, '_blank'),
+              })
+            }, 2000),
+          )
           break
+        }
 
         case 'new_review': {
+          const reviewKey = `review:${prUrl}`
+          const existingReview = notifDebounceRef.current.get(reviewKey)
+          if (existingReview) clearTimeout(existingReview)
           const emoji =
             data.state === 'APPROVED'
               ? '✅'
@@ -288,13 +304,19 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           const reviewUrl = data.reviewId
             ? `${prUrl}#pullrequestreview-${data.reviewId}`
             : prUrl
-          sendNotificationRef.current(
-            `${emoji} ${data.author || 'Someone'} ${action}`,
-            {
-              body: data.body || prTitle,
-              audio: 'pr-activity',
-              onClick: () => window.open(reviewUrl, '_blank'),
-            },
+          notifDebounceRef.current.set(
+            reviewKey,
+            setTimeout(() => {
+              notifDebounceRef.current.delete(reviewKey)
+              sendNotificationRef.current(
+                `${emoji} ${data.author || 'Someone'} ${action}`,
+                {
+                  body: data.body || prTitle,
+                  audio: 'pr-activity',
+                  onClick: () => window.open(reviewUrl, '_blank'),
+                },
+              )
+            }, 2000),
           )
           break
         }
@@ -326,6 +348,17 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       }
     })
   }, [subscribe])
+
+  // Clean up notification debounce timers on unmount
+  useEffect(() => {
+    const debounceMap = notifDebounceRef.current
+    return () => {
+      for (const timer of debounceMap.values()) {
+        clearTimeout(timer)
+      }
+      debounceMap.clear()
+    }
+  }, [])
 
   // PR seen tracking
   const [prSeenTimes, setPRSeenTimes] = useLocalStorage<Record<string, string>>(
