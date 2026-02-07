@@ -369,6 +369,24 @@ export async function getListeningPortsForTerminal(
   return [...ports].sort((a, b) => a - b)
 }
 
+// Get all active zellij session names via `zellij list-sessions`
+export async function getActiveZellijSessionNames(): Promise<Set<string>> {
+  try {
+    const { stdout } = await execFileAsync('zellij', ['list-sessions', '-ns'], {
+      encoding: 'utf8',
+      timeout: 2000,
+    })
+    const names = new Set<string>()
+    for (const line of stdout.trim().split('\n')) {
+      const name = line.trim()
+      if (name) names.add(name)
+    }
+    return names
+  } catch {
+    return new Set()
+  }
+}
+
 export async function getChildProcesses(
   shellPid: number,
   terminalId?: number,

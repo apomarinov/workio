@@ -4,6 +4,7 @@ export interface ActiveProcess {
   command: string
   terminalId?: number
   source?: 'direct' | 'zellij'
+  isZellij?: boolean
 }
 
 export interface ProcessesPayload {

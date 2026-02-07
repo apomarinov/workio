@@ -24,6 +24,7 @@ import { execSSHCommand } from '../ssh/exec'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
 import { type CommandEvent, createOscParser } from './osc-parser'
 import {
+  getActiveZellijSessionNames,
   getListeningPortsForTerminal,
   getSystemListeningPorts,
   getZellijSessionProcesses,
@@ -199,6 +200,35 @@ async function scanAndEmitAllProcesses() {
     if (ports.length > 0) {
       terminalPorts[terminalId] = ports
     }
+  }
+
+  // Check for active zellij sessions matching each terminal
+  try {
+    const zellijSessions = await getActiveZellijSessionNames()
+    if (zellijSessions.size > 0) {
+      const terminals = await getAllTerminals()
+      for (const terminal of terminals) {
+        // Try the PTY session name first (set at creation, may differ from current name)
+        const ptySession = sessions.get(terminal.id)
+        const sessionName = ptySession?.sessionName
+        const terminalName = terminal.name || `terminal-${terminal.id}`
+        if (
+          (sessionName && zellijSessions.has(sessionName)) ||
+          zellijSessions.has(terminalName)
+        ) {
+          allProcesses.push({
+            pid: 0,
+            name: 'zellij',
+            command: 'zellij',
+            terminalId: terminal.id,
+            source: 'zellij',
+            isZellij: true,
+          })
+        }
+      }
+    }
+  } catch {
+    // Ignore zellij detection errors
   }
 
   getIO()?.emit('processes', { processes: allProcesses, ports: terminalPorts })

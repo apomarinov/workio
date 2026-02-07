@@ -10,6 +10,7 @@ import { Server as SocketIOServer } from 'socket.io'
 import {
   deleteAllNotifications,
   getNotifications,
+  getTerminalById,
   initDb,
   markAllNotificationsRead,
   markNotificationRead,
@@ -43,7 +44,7 @@ import {
 import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
-import { startGitDirtyPolling } from './pty/manager'
+import { getSession, startGitDirtyPolling, writeToSession } from './pty/manager'
 import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -133,6 +134,16 @@ io.on('connection', (socket) => {
 
   socket.on('detect-branches', () => {
     detectAllTerminalBranches()
+  })
+
+  socket.on('zellij-attach', async (data: { terminalId: number }) => {
+    const { terminalId } = data
+    const session = getSession(terminalId)
+    const sessionName =
+      session?.sessionName ||
+      (await getTerminalById(terminalId))?.name ||
+      `terminal-${terminalId}`
+    writeToSession(terminalId, `zellij attach ${sessionName}\n`)
   })
 
   socket.on('disconnect', () => {
