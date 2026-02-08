@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Bot,
   CheckIcon,
+  Eye,
   Minimize2,
   Minus,
   MoreVertical,
@@ -193,6 +194,23 @@ function PipChatItem({
           <span className="text-[10px]">Click to scroll</span>
         </div>
       )}
+      <div
+        onClick={(e) => {
+          e.preventDefault()
+          window.dispatchEvent(
+            new CustomEvent('reveal-session', {
+              detail: { sessionId: session.session_id },
+            }),
+          )
+        }}
+        className={cn(
+          'absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-800/80 text-zinc-500 transition-all',
+          'opacity-0 group-hover/chat:opacity-100 hover:text-white',
+        )}
+      >
+        <Eye className="w-3 h-3" />
+        <span className="text-[10px]">Reveal</span>
+      </div>
     </div>
   )
 }

@@ -12,6 +12,7 @@ import {
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '@/context/TerminalContext'
+import { cn } from '@/lib/utils'
 import type { Notification } from '@/types'
 import { RefreshIcon } from './icons'
 
@@ -171,7 +172,7 @@ function NotificationItem({
   return (
     <button
       onClick={handleClick}
-      className={`w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${
+      className={`group relative w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5 ${
         read ? 'opacity-60' : ''
       } ${isWorkspace || !url ? 'cursor-default' : 'cursor-pointer'}`}
     >
@@ -185,7 +186,12 @@ function NotificationItem({
             <MarkdownContent content={data.body || ''} />
           </div>
         )}
-        <div className="flex flex-col">
+        <div
+          className={cn(
+            'flex flex-col pt-0.5 mt-0.5',
+            hasBody && 'border-t-[1px]',
+          )}
+        >
           <div className="text-xs text-muted-foreground line-clamp-5">
             {subtitle && <MarkdownContent content={subtitle} />}
           </div>
@@ -195,7 +201,24 @@ function NotificationItem({
         </div>
       </div>
       {!read && (
-        <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
+        <div
+          className="absolute top-1 right-1"
+          onClick={(e) => {
+            e.stopPropagation()
+            onMarkRead(id)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.stopPropagation()
+              onMarkRead(id)
+            }
+          }}
+        >
+          <div className="w-1.5 h-1.5 mt-2 mr-1 rounded-full bg-green-500 group-hover:hidden" />
+          <div className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded hover:bg-zinc-700 text-muted-foreground hover:text-foreground">
+            <Check className="w-3 h-3" />
+          </div>
+        </div>
       )}
     </button>
   )

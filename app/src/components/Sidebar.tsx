@@ -75,7 +75,8 @@ interface SidebarProps {
 
 export function Sidebar({ width }: SidebarProps) {
   const pip = useDocumentPip()
-  const { terminals, selectTerminal, setTerminalOrder } = useTerminalContext()
+  const { terminals, activeTerminal, selectTerminal, setTerminalOrder } =
+    useTerminalContext()
   const { clearSession, selectSession, sessions } = useSessionContext()
   const { allSessions: pipSessions } = usePinnedSessionsData()
   const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(
@@ -498,6 +499,41 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedTerminalSessions,
     setOtherSessionsSectionCollapsed,
     setExpandedSessionGroups,
+  ])
+
+  // Auto-expand parent repo group when a terminal becomes active
+  useEffect(() => {
+    if (!activeTerminal) return
+    const repo = activeTerminal.git_repo?.repo
+    if (repo && collapsedProjectReposSet.has(repo)) {
+      setCollapsedProjectRepos((prev) => prev.filter((r) => r !== repo))
+    }
+    if (terminalsSectionCollapsed) {
+      setTerminalsSectionCollapsed(false)
+    }
+  }, [
+    activeTerminal,
+    collapsedProjectReposSet,
+    setCollapsedProjectRepos,
+    terminalsSectionCollapsed,
+    setTerminalsSectionCollapsed,
+  ])
+
+  // Auto-expand parent repo group when a PR becomes active
+  useEffect(() => {
+    if (!activePR) return
+    if (collapsedGitHubReposSet.has(activePR.repo)) {
+      setCollapsedGitHubRepos((prev) => prev.filter((r) => r !== activePR.repo))
+    }
+    if (githubSectionCollapsed) {
+      setGithubSectionCollapsed(false)
+    }
+  }, [
+    activePR,
+    collapsedGitHubReposSet,
+    setCollapsedGitHubRepos,
+    githubSectionCollapsed,
+    setGithubSectionCollapsed,
   ])
 
   const hasAnythingExpanded =

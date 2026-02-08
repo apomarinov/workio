@@ -174,15 +174,14 @@ export function CommandPalette() {
 
       if (sessionId) {
         const session = sessions.find((s) => s.session_id === sessionId)
+        const terminal = terminals.find((t) => t.id === terminalId)
         if (session) {
+          const sessionName = terminal?.name ?? session.name ?? 'Untitled'
           setStack([
             initialLevel,
             {
               mode: 'actions',
-              title:
-                session.name ||
-                session.latest_user_message ||
-                session.session_id,
+              title: sessionName,
               session,
             },
           ])
