@@ -197,6 +197,33 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     })
   })
 
+  // Open directory in IDE (Cursor or VS Code) via CLI
+  fastify.post<{ Body: { path: string; ide: 'cursor' | 'vscode' } }>(
+    '/api/open-in-ide',
+    async (request, reply) => {
+      const { path: rawPath, ide } = request.body
+      if (!rawPath) {
+        return reply.status(400).send({ error: 'Path is required' })
+      }
+
+      const targetPath = expandPath(rawPath)
+      const cmd = ide === 'vscode' ? 'code' : 'cursor'
+
+      return new Promise<void>((resolve) => {
+        execFile(cmd, [targetPath], { timeout: 5000 }, (err) => {
+          if (err) {
+            reply
+              .status(500)
+              .send({ error: `Failed to open ${cmd}: ${err.message}` })
+          } else {
+            reply.status(204).send()
+          }
+          resolve()
+        })
+      })
+    },
+  )
+
   // Open directory in native file explorer (Finder on macOS, xdg-open on Linux)
   fastify.post<{ Body: { path: string } }>(
     '/api/open-in-explorer',

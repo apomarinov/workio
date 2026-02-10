@@ -12,6 +12,7 @@ import {
   deleteBranch,
   getBranches,
   openInExplorer,
+  openInIDE,
   pullBranch,
   pushBranch,
   rebaseBranch,
@@ -357,10 +358,14 @@ export function CommandPalette() {
       },
 
       // Terminal actions
-      openInIDE: (terminal) => {
-        const url = `${preferredIDE}://file/${terminal.cwd}`
-        window.open(url, '_blank')
+      openInIDE: async (terminal) => {
         closePalette()
+        try {
+          await openInIDE(terminal.cwd, preferredIDE)
+        } catch {
+          // CLI not available — fall back to URL scheme
+          window.open(`${preferredIDE}://file/${terminal.cwd}`, '_blank')
+        }
       },
       openInExplorer: async (terminal) => {
         try {
@@ -868,7 +873,7 @@ export function CommandPalette() {
             if (!open) setFilePickerTerminal(null)
           }}
           value={filePickerTerminal.cwd}
-          onSelect={() => {}}
+          onSelect={() => { }}
           mode="file"
           title="Select Files"
           onSelectPaths={(paths) => {

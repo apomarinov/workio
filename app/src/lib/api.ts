@@ -98,6 +98,18 @@ export async function openFullDiskAccess(): Promise<void> {
   await fetch(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
 }
 
+export async function openInIDE(
+  path: string,
+  ide: 'cursor' | 'vscode',
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/open-in-ide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, ide }),
+  })
+  if (!res.ok) throw new Error('Failed to open IDE')
+}
+
 export async function openInExplorer(path: string): Promise<void> {
   const res = await fetch(`${API_BASE}/open-in-explorer`, {
     method: 'POST',
