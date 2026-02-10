@@ -3,12 +3,18 @@ import type {
   MergedPRSummary,
   PRCheckStatus,
 } from '../../../shared/types'
-import type { PreferredIDE, SessionWithProject, Terminal } from '../../types'
+import type {
+  PreferredIDE,
+  SessionSearchMatch,
+  SessionWithProject,
+  Terminal,
+} from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createPRActionsMode } from './modes/pr-actions'
 import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
+import { createSessionSearchMode } from './modes/session-search'
 import { createShellMode } from './modes/shell'
 import type { PaletteAPI, PaletteLevel, PaletteMode } from './types'
 
@@ -22,6 +28,8 @@ export type AppData = {
   pinnedTerminalSessions: number[]
   pinnedSessions: string[]
   preferredIDE: PreferredIDE
+  sessionSearchResults: SessionSearchMatch[] | null
+  sessionSearchLoading: boolean
 }
 
 // Actions that modes can trigger
@@ -86,6 +94,7 @@ export function createPaletteModes(
     'pr-actions': createPRActionsMode(data, level, actions, api),
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
     shell: createShellMode(data, level, actions, api),
+    'session-search': createSessionSearchMode(data, level, actions, api),
   }
 }
 

@@ -53,6 +53,7 @@ export type PaletteMode = {
   groups?: PaletteGroup[] // optional grouping
   emptyMessage?: string
   loading?: boolean
+  shouldFilter?: boolean // when false, cmdk skips client-side filtering (for server-filtered modes)
   footer?: (highlighted: PaletteItem | null) => ReactNode
   width?: 'default' | 'wide' // palette width (default: default)
 }

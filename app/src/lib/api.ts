@@ -1,6 +1,7 @@
 import type { MergedPRSummary } from '../../shared/types'
 import type {
   SessionMessagesResponse,
+  SessionSearchMatch,
   SessionWithProject,
   Settings,
   Terminal,
@@ -216,6 +217,18 @@ export async function deleteSessions(ids: string[]): Promise<void> {
     body: JSON.stringify({ ids }),
   })
   if (!res.ok) throw new Error('Failed to delete sessions')
+}
+
+export async function searchSessionMessages(
+  query: string,
+  signal?: AbortSignal,
+): Promise<SessionSearchMatch[]> {
+  const res = await fetch(
+    `${API_BASE}/sessions/search?q=${encodeURIComponent(query)}`,
+    { signal },
+  )
+  if (!res.ok) throw new Error('Failed to search sessions')
+  return res.json()
 }
 
 export async function getClosedPRs(

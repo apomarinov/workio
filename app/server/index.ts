@@ -528,7 +528,7 @@ function stopDaemon() {
   const sockPath = path.join(projectRoot, 'daemon.sock')
   try {
     fs.unlinkSync(sockPath)
-  } catch { }
+  } catch {}
 }
 
 process.on('exit', stopDaemon)

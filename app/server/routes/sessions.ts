@@ -5,6 +5,7 @@ import {
   getAllSessions,
   getSessionById,
   getSessionMessages,
+  searchSessionMessages,
   updateSession,
 } from '../db'
 
@@ -13,6 +14,20 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
   fastify.get('/api/sessions', async () => {
     return await getAllSessions()
   })
+
+  // Search session messages
+  fastify.get<{ Querystring: { q?: string } }>(
+    '/api/sessions/search',
+    async (request, reply) => {
+      const q = request.query.q?.trim()
+      if (!q || q.length < 2) {
+        return reply
+          .status(400)
+          .send({ error: 'Query must be at least 2 characters' })
+      }
+      return await searchSessionMessages(q)
+    },
+  )
 
   // Get a single session by ID
   fastify.get<{ Params: { id: string } }>(

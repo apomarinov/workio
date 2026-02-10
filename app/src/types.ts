@@ -53,6 +53,15 @@ export interface SessionWithProject extends Session {
   latest_agent_message: string | null
 }
 
+export interface SessionSearchMatch {
+  session_id: string
+  name: string | null
+  terminal_name: string | null
+  project_path: string
+  status: string
+  messages: { body: string; is_user: boolean }[]
+}
+
 export interface Prompt {
   id: number
   session_id: string

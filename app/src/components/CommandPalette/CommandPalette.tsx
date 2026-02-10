@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
 import { useProcessContext } from '@/context/ProcessContext'
@@ -16,9 +16,14 @@ import {
   pullBranch,
   pushBranch,
   rebaseBranch,
+  searchSessionMessages,
 } from '@/lib/api'
 import type { PRCheckStatus } from '../../../shared/types'
-import type { SessionWithProject, Terminal } from '../../types'
+import type {
+  SessionSearchMatch,
+  SessionWithProject,
+  Terminal,
+} from '../../types'
 import { ConfirmModal } from '../ConfirmModal'
 import { DirectoryBrowser } from '../DirectoryBrowser'
 import { EditSessionModal } from '../EditSessionModal'
@@ -70,6 +75,14 @@ export function CommandPalette() {
   const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
     null,
   )
+
+  // Session search state
+  const [searchText, setSearchText] = useState('')
+  const [sessionSearchResults, setSessionSearchResults] = useState<
+    SessionSearchMatch[] | null
+  >(null)
+  const [sessionSearchLoading, setSessionSearchLoading] = useState(false)
+  const searchAbortRef = useRef<AbortController | null>(null)
 
   // Context data
   const {
@@ -284,6 +297,48 @@ export function CommandPalette() {
       )
   }, [terminals, branchToPR])
 
+  // Debounced session search
+  useEffect(() => {
+    if (currentModeId !== 'session-search' || searchText.length < 2) {
+      setSessionSearchResults(null)
+      setSessionSearchLoading(false)
+      return
+    }
+    setSessionSearchLoading(true)
+    const timer = setTimeout(() => {
+      searchAbortRef.current?.abort()
+      const controller = new AbortController()
+      searchAbortRef.current = controller
+      searchSessionMessages(searchText, controller.signal)
+        .then((results) => {
+          if (!controller.signal.aborted) {
+            setSessionSearchResults(results)
+            setSessionSearchLoading(false)
+          }
+        })
+        .catch((err) => {
+          if (!controller.signal.aborted) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+              setSessionSearchLoading(false)
+            }
+          }
+        })
+    }, 300)
+    return () => {
+      clearTimeout(timer)
+      searchAbortRef.current?.abort()
+    }
+  }, [searchText, currentModeId])
+
+  // Reset search state when palette closes or mode changes away
+  useEffect(() => {
+    if (!open || currentModeId !== 'session-search') {
+      setSearchText('')
+      setSessionSearchResults(null)
+      setSessionSearchLoading(false)
+    }
+  }, [open, currentModeId])
+
   // Build app data
   const preferredIDE = settings?.preferred_ide ?? 'cursor'
   const appData: AppData = useMemo(
@@ -296,6 +351,8 @@ export function CommandPalette() {
       pinnedTerminalSessions,
       pinnedSessions,
       preferredIDE,
+      sessionSearchResults,
+      sessionSearchLoading,
     }),
     [
       terminals,
@@ -306,6 +363,8 @@ export function CommandPalette() {
       pinnedTerminalSessions,
       pinnedSessions,
       preferredIDE,
+      sessionSearchResults,
+      sessionSearchLoading,
     ],
   )
 
@@ -681,6 +740,7 @@ export function CommandPalette() {
         onHighlightChange={handleHighlightChange}
         onBack={handleBack}
         onBreadcrumbClick={handleBreadcrumbClick}
+        onSearchChange={setSearchText}
       />
 
       {editTerminal && (

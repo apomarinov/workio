@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import type {
   Project,
+  SessionSearchMatch,
   SessionWithProject,
   Settings,
   Terminal,
@@ -266,6 +267,100 @@ export async function deleteSessions(sessionIds: string[]): Promise<number> {
     if (await deleteSession(sessionId)) deleted++
   }
   return deleted
+}
+
+export async function searchSessionMessages(
+  query: string,
+  limit = 100,
+): Promise<SessionSearchMatch[]> {
+  // Step 1: Find matching messages (exclude thinking, null body)
+  const { rows: matchRows } = await pool.query(
+    `
+    SELECT
+      m.body,
+      m.is_user,
+      p.session_id,
+      m.created_at
+    FROM messages m
+    JOIN prompts p ON m.prompt_id = p.id
+    WHERE m.body ILIKE $1
+      AND m.thinking = false
+      AND m.body IS NOT NULL
+    ORDER BY m.created_at DESC
+    LIMIT $2
+    `,
+    [`%${query}%`, limit],
+  )
+
+  if (matchRows.length === 0) return []
+
+  // Step 2: Group by session_id in JS, cap messages per session
+  const sessionMessages = new Map<
+    string,
+    { body: string; is_user: boolean }[]
+  >()
+  for (const row of matchRows) {
+    const msgs = sessionMessages.get(row.session_id) || []
+    if (msgs.length < 5) {
+      msgs.push({ body: row.body, is_user: row.is_user })
+    }
+    sessionMessages.set(row.session_id, msgs)
+  }
+
+  // Step 3: Fetch session + terminal info for matching session_ids
+  const sessionIds = [...sessionMessages.keys()]
+  const { rows: sessionRows } = await pool.query(
+    `
+    SELECT
+      s.session_id,
+      s.name,
+      s.status,
+      s.terminal_id,
+      s.updated_at,
+      p.path as project_path,
+      t.name as terminal_name
+    FROM sessions s
+    JOIN projects p ON s.project_id = p.id
+    LEFT JOIN terminals t ON s.terminal_id = t.id
+    WHERE s.session_id = ANY($1)
+    `,
+    [sessionIds],
+  )
+
+  // Step 4: Build results, sort: sessions with terminal_id first, then by updated_at DESC
+  const sessionInfo = new Map(
+    sessionRows.map((r: Record<string, unknown>) => [r.session_id, r]),
+  )
+
+  const results: SessionSearchMatch[] = []
+  for (const [sessionId, messages] of sessionMessages) {
+    const info = sessionInfo.get(sessionId) as
+      | Record<string, unknown>
+      | undefined
+    if (!info) continue
+    results.push({
+      session_id: sessionId,
+      name: info.name as string | null,
+      terminal_name: info.terminal_name as string | null,
+      project_path: info.project_path as string,
+      status: info.status as string,
+      messages,
+    })
+  }
+
+  results.sort((a, b) => {
+    const aInfo = sessionInfo.get(a.session_id) as Record<string, unknown>
+    const bInfo = sessionInfo.get(b.session_id) as Record<string, unknown>
+    const aHasTerminal = aInfo.terminal_id != null ? 0 : 1
+    const bHasTerminal = bInfo.terminal_id != null ? 0 : 1
+    if (aHasTerminal !== bHasTerminal) return aHasTerminal - bHasTerminal
+    return (
+      new Date(bInfo.updated_at as string).getTime() -
+      new Date(aInfo.updated_at as string).getTime()
+    )
+  })
+
+  return results
 }
 
 // Terminal queries

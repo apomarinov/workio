@@ -5,6 +5,7 @@ type Props = {
   placeholder: string
   onBreadcrumbClick?: (index: number) => void
   onBack?: () => void
+  onSearchChange?: (value: string) => void
 }
 
 export function PaletteHeader({
@@ -12,9 +13,16 @@ export function PaletteHeader({
   placeholder,
   onBreadcrumbClick,
   onBack,
+  onSearchChange,
 }: Props) {
   if (breadcrumbs.length === 0) {
-    return <CommandInput placeholder={placeholder} autoFocus />
+    return (
+      <CommandInput
+        placeholder={placeholder}
+        autoFocus
+        onValueChange={onSearchChange}
+      />
+    )
   }
 
   return (
@@ -54,6 +62,7 @@ export function PaletteHeader({
         placeholder={placeholder}
         autoFocus
         className="border-0 px-0 focus-visible:ring-0"
+        onValueChange={onSearchChange}
       />
     </div>
   )

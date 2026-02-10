@@ -54,6 +54,7 @@ type Props = {
   onHighlightChange: (id: string | null) => void
   onBack: () => void
   onBreadcrumbClick: (index: number) => void
+  onSearchChange?: (value: string) => void
 }
 
 export function CommandPaletteCore({
@@ -66,6 +67,7 @@ export function CommandPaletteCore({
   onHighlightChange,
   onBack,
   onBreadcrumbClick,
+  onSearchChange,
 }: Props) {
   const mode = modes[currentModeId]
 
@@ -150,6 +152,7 @@ export function CommandPaletteCore({
             value={highlightedId ?? ''}
             onValueChange={handleValueChange}
             filter={fuzzyFilter}
+            shouldFilter={mode.shouldFilter !== false}
             loop
           >
             <PaletteHeader
@@ -157,6 +160,7 @@ export function CommandPaletteCore({
               placeholder={mode.placeholder}
               onBreadcrumbClick={canGoBack ? onBreadcrumbClick : undefined}
               onBack={canGoBack ? onBack : undefined}
+              onSearchChange={onSearchChange}
             />
             <CommandList
               className={totalItems >= 10 ? 'max-h-[480px]' : 'max-h-[360px]'}

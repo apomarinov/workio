@@ -102,6 +102,10 @@ CREATE INDEX IF NOT EXISTS idx_messages_todo_id ON messages(todo_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 
+-- Trigram index for ILIKE session message search
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_messages_body_trgm ON messages USING gin (body gin_trgm_ops);
+
 -- Trigger function: auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$

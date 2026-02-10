@@ -7,6 +7,7 @@ import {
   GitMerge,
   Globe,
   ScrollText,
+  Search,
   TerminalSquare,
 } from 'lucide-react'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -309,7 +310,18 @@ export function createSearchMode(
     }
   }
   if (sessionItems.length > 0) {
-    groups.push({ heading: 'Claude Sessions', items: sessionItems })
+    const findSessionsItem: PaletteItem = {
+      id: 'action:find-sessions',
+      label: 'Find Sessions',
+      icon: <Search className="h-4 w-4 shrink-0 text-zinc-400" />,
+      keywords: ['find', 'search', 'sessions', 'messages'],
+      onSelect: () =>
+        api.push({ mode: 'session-search', title: 'Find Sessions' }),
+    }
+    groups.push({
+      heading: 'Claude Sessions',
+      items: [findSessionsItem, ...sessionItems],
+    })
   }
   // Add actions group with logs
   groups.push({ heading: 'Actions', items: [logsItem] })

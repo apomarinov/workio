@@ -1,4 +1,5 @@
 import {
+  ClipboardCopy,
   Copy,
   CornerDownLeft,
   Eye,
@@ -12,6 +13,7 @@ import {
   Terminal,
   Trash2,
 } from 'lucide-react'
+import { toast } from '@/components/ui/sonner'
 import { CursorIcon, FinderIcon, VSCodeIcon } from '../../icons'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
@@ -237,6 +239,16 @@ export function createActionsMode(
         label: 'Reveal',
         icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => actions.selectSession(session.session_id),
+      },
+      {
+        id: 'action:copy-id',
+        label: 'Copy ID',
+        icon: <ClipboardCopy className="h-4 w-4 shrink-0 text-zinc-400" />,
+        onSelect: () => {
+          navigator.clipboard.writeText(session.session_id)
+          toast.success('Session ID copied to clipboard')
+          api.close()
+        },
       },
       {
         id: 'action:pin',
