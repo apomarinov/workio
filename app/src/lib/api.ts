@@ -486,6 +486,34 @@ export async function deleteBranch(
   return data
 }
 
+export async function commitChanges(
+  terminalId: number,
+  message: string,
+  amend?: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/commit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, amend }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to commit')
+  }
+  return data
+}
+
+export async function getHeadMessage(
+  terminalId: number,
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/head-message`)
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to get HEAD message')
+  }
+  return res.json()
+}
+
 // Webhook management
 
 export async function createWebhook(

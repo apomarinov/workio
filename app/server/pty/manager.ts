@@ -554,7 +554,7 @@ async function scanAndEmitGitDirty() {
   getIO()?.emit('git:remote-sync', { syncStatus: currentSyncStatus })
 }
 
-async function checkAndEmitSingleGitDirty(terminalId: number) {
+export async function checkAndEmitSingleGitDirty(terminalId: number) {
   try {
     const terminal = await getTerminalById(terminalId)
     if (!terminal || !terminal.git_branch) return

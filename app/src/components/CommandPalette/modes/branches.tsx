@@ -4,6 +4,7 @@ import {
   Check,
   CornerDownLeft,
   GitBranch,
+  GitCommitHorizontal,
   GitMerge,
   Trash2,
 } from 'lucide-react'
@@ -181,7 +182,8 @@ export function createBranchActionsMode(
   const isLoading =
     !!loadingStates.checkingOut ||
     !!loadingStates.pulling ||
-    !!loadingStates.pushing
+    !!loadingStates.pushing ||
+    !!loadingStates.committing
 
   // Build items
   const items: PaletteItem[] = []
@@ -202,6 +204,22 @@ export function createBranchActionsMode(
       }
     },
   })
+
+  // Commit (only for current dirty branch)
+  if (branch.isCurrent && isDirty) {
+    items.push({
+      id: 'action:commit',
+      label: 'Commit',
+      icon: <GitCommitHorizontal className="h-4 w-4 shrink-0 text-zinc-400" />,
+      disabled: isLoading,
+      loading: !!loadingStates.committing,
+      onSelect: () => {
+        if (!isLoading) {
+          actions.requestCommit(terminal.id)
+        }
+      },
+    })
+  }
 
   // Pull (if has remote)
   if (hasRemote) {

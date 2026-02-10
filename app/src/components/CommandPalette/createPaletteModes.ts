@@ -67,6 +67,7 @@ export type AppActions = {
     branch: string,
     hasRemote: boolean,
   ) => void
+  requestCommit: (terminalId: number) => void
 
   // Shell actions
   openFilePicker: (terminal: Terminal) => void

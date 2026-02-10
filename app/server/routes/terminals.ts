@@ -72,7 +72,11 @@ import {
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { log } from '../logger'
-import { destroySession, detectGitBranch } from '../pty/manager'
+import {
+  checkAndEmitSingleGitDirty,
+  destroySession,
+  detectGitBranch,
+} from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import {
@@ -1094,6 +1098,201 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
     },
   )
+
+  // Get HEAD commit message
+  fastify.get<{ Params: TerminalParams }>(
+    '/api/terminals/:id/head-message',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      try {
+        const gitCmd = 'git log -1 --format=%B'
+        let message: string
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
+            cwd: terminal.cwd,
+          })
+          message = result.stdout.trim()
+        } else {
+          message = await new Promise<string>((resolve, reject) => {
+            execFile(
+              'git',
+              ['log', '-1', '--format=%B'],
+              { cwd: expandPath(terminal.cwd), timeout: 10000 },
+              (err, stdout) => {
+                if (err) reject(err)
+                else resolve(stdout.trim())
+              },
+            )
+          })
+        }
+
+        return { message }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to get HEAD message'
+        return reply.status(400).send({ error: errorMessage })
+      }
+    },
+  )
+
+  // Commit changes
+  fastify.post<{
+    Params: TerminalParams
+    Body: { message: string; amend?: boolean }
+  }>('/api/terminals/:id/commit', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
+
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
+
+    if (!terminal.git_repo) {
+      return reply.status(400).send({ error: 'Terminal has no git repo' })
+    }
+
+    const { message, amend } = request.body
+
+    try {
+      // Stage all changes first (for both commit and amend)
+      const addCmd = 'git add -A'
+      if (terminal.ssh_host) {
+        const addResult = await execSSHCommand(terminal.ssh_host, addCmd, {
+          cwd: terminal.cwd,
+        })
+        logCommand({
+          terminalId: id,
+          category: 'git',
+          command: addCmd,
+          stdout: addResult.stdout,
+          stderr: addResult.stderr,
+        })
+      } else {
+        await new Promise<void>((resolve, reject) => {
+          execFile(
+            'git',
+            ['add', '-A'],
+            { cwd: expandPath(terminal.cwd), timeout: 30000 },
+            (err, stdout, stderr) => {
+              logCommand({
+                terminalId: id,
+                category: 'git',
+                command: addCmd,
+                stdout,
+                stderr: err ? err.message : stderr,
+              })
+              if (err) reject(err)
+              else resolve()
+            },
+          )
+        })
+      }
+
+      if (amend) {
+        // Amend with no-edit
+        const amendCmd = 'git commit --amend --no-edit'
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, amendCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: amendCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['commit', '--amend', '--no-edit'],
+              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: amendCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+      } else {
+        if (!message?.trim()) {
+          return reply.status(400).send({ error: 'Commit message is required' })
+        }
+
+        // Commit
+        const safeMessage = message.replace(/'/g, "'\\''")
+        const commitCmd = `git commit -m '${safeMessage}'`
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, commitCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: commitCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['commit', '-m', message],
+              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: commitCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+      }
+
+      // Refresh git state
+      detectGitBranch(id).catch(() => {})
+      checkAndEmitSingleGitDirty(id).catch(() => {})
+
+      return { success: true }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to commit'
+      return reply.status(400).send({
+        success: false,
+        error: errorMessage,
+      })
+    }
+  })
 
   // Rebase a branch onto the current branch
   fastify.post<{ Params: TerminalParams; Body: RebaseBranchBody }>(

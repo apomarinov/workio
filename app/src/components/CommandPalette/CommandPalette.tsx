@@ -24,6 +24,7 @@ import type {
   SessionWithProject,
   Terminal,
 } from '../../types'
+import { CommitDialog } from '../CommitDialog'
 import { ConfirmModal } from '../ConfirmModal'
 import { DirectoryBrowser } from '../DirectoryBrowser'
 import { EditSessionModal } from '../EditSessionModal'
@@ -75,6 +76,7 @@ export function CommandPalette() {
   const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
     null,
   )
+  const [commitTerminalId, setCommitTerminalId] = useState<number | null>(null)
 
   // Session search state
   const [searchText, setSearchText] = useState('')
@@ -625,6 +627,10 @@ export function CommandPalette() {
         setDeleteRemoteBranch(false)
         setDeleteBranchConfirm({ terminalId, branch, hasRemote })
       },
+      requestCommit: (terminalId) => {
+        closePalette()
+        setTimeout(() => setCommitTerminalId(terminalId), 150)
+      },
 
       // PR actions
       openMergeModal: (pr) => {
@@ -923,6 +929,14 @@ export function CommandPalette() {
           pr={rerunAllModal}
           onClose={() => setRerunAllModal(null)}
           onSuccess={closePalette}
+        />
+      )}
+
+      {commitTerminalId != null && (
+        <CommitDialog
+          open={commitTerminalId != null}
+          terminalId={commitTerminalId}
+          onClose={() => setCommitTerminalId(null)}
         />
       )}
 

@@ -43,6 +43,7 @@ export type PaletteLevel = {
     pushing?: { branch: string; force: boolean }
     rebasing?: string
     deleting?: string
+    committing?: boolean
   }
 }
 
