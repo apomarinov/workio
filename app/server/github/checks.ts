@@ -438,6 +438,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
         r.state === 'CHANGES_REQUESTED' ||
         r.state === 'COMMENTED',
     )
+    .filter((r) => !(r.state === 'COMMENTED' && !r.body))
     .map((r) => ({
       id: r.databaseId,
       author: r.author.login,
