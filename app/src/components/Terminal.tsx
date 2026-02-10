@@ -10,6 +10,7 @@ import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
+import { openInIDE } from '../lib/api'
 
 interface TerminalProps {
   terminalId: number
@@ -49,6 +50,24 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
 
   const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
   const fontSizeRef = useRef(fontSize)
+  const settingsRef = useRef(settings)
+  const terminalIdRef = useRef(terminalId)
+  const cwdRef = useRef(terminal?.cwd)
+  const sshHostRef = useRef(terminal?.ssh_host)
+
+  // Keep refs in sync so the link provider closure reads current values
+  useEffect(() => {
+    settingsRef.current = settings
+  }, [settings])
+  useEffect(() => {
+    terminalIdRef.current = terminalId
+  }, [terminalId])
+  useEffect(() => {
+    cwdRef.current = terminal?.cwd
+  }, [terminal?.cwd])
+  useEffect(() => {
+    sshHostRef.current = terminal?.ssh_host
+  }, [terminal?.ssh_host])
 
   // Keep fontSizeRef in sync for initialization
   useEffect(() => {
@@ -227,6 +246,51 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
     })
 
     terminal.open(containerRef.current)
+
+    // File path link provider — detect file paths in terminal output and open in IDE on click
+    const filePathRegex =
+      /(?:^|[\s'"`({[:])([~.]?\/[\w./@-]+(?:\/[\w./@-]+)*\.\w+(?::\d+(?::\d+)?)?|(?:[\w.@-]+\/)+[\w.@-]+\.\w+(?::\d+(?::\d+)?)?)/g
+    terminal.registerLinkProvider({
+      provideLinks(bufferLineNumber, callback) {
+        // File path links only work for local terminals
+        if (sshHostRef.current) return callback(undefined)
+
+        const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
+        if (!line) return callback(undefined)
+
+        const text = line.translateToString(true)
+        const links: import('@xterm/xterm').ILink[] = []
+
+        for (const match of text.matchAll(filePathRegex)) {
+          const filePath = match[1]
+          if (!filePath) continue
+
+          // Find position in the line — account for leading separator captured by the group boundary
+          const matchStart = match.index + (match[0].length - filePath.length)
+
+          // Skip if preceded by :// (part of a URL)
+          const before = text.slice(0, matchStart)
+          if (before.endsWith('://') || before.endsWith(':/')) continue
+
+          links.push({
+            range: {
+              start: { x: matchStart + 1, y: bufferLineNumber },
+              end: {
+                x: matchStart + filePath.length + 1,
+                y: bufferLineNumber,
+              },
+            },
+            text: filePath,
+            activate: (_event, linkText) => {
+              const ide = settingsRef.current?.preferred_ide ?? 'cursor'
+              openInIDE(linkText, ide, terminalIdRef.current).catch(() => {})
+            },
+          })
+        }
+
+        callback(links.length > 0 ? links : undefined)
+      },
+    })
 
     // Try to load WebGL addon for better performance
     try {

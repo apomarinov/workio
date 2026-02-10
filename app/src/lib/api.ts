@@ -102,11 +102,16 @@ export async function openFullDiskAccess(): Promise<void> {
 export async function openInIDE(
   path: string,
   ide: 'cursor' | 'vscode',
+  terminalId?: number,
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/open-in-ide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, ide }),
+    body: JSON.stringify({
+      path,
+      ide,
+      ...(terminalId != null && { terminal_id: terminalId }),
+    }),
   })
   if (!res.ok) throw new Error('Failed to open IDE')
 }

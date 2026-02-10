@@ -197,32 +197,64 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     })
   })
 
-  // Open directory in IDE (Cursor or VS Code) via CLI
-  fastify.post<{ Body: { path: string; ide: 'cursor' | 'vscode' } }>(
-    '/api/open-in-ide',
-    async (request, reply) => {
-      const { path: rawPath, ide } = request.body
-      if (!rawPath) {
-        return reply.status(400).send({ error: 'Path is required' })
+  // Open directory or file in IDE (Cursor or VS Code) via CLI
+  fastify.post<{
+    Body: {
+      path: string
+      ide: 'cursor' | 'vscode'
+      terminal_id?: number
+    }
+  }>('/api/open-in-ide', async (request, reply) => {
+    const { path: rawPath, ide, terminal_id } = request.body
+    if (!rawPath) {
+      return reply.status(400).send({ error: 'Path is required' })
+    }
+
+    const cmd = ide === 'vscode' ? 'code' : 'cursor'
+
+    // Strip :line:col suffix for existence check (IDE CLIs handle file:line:col)
+    const lineColMatch = rawPath.match(/^(.+?)(?::(\d+)(?::(\d+))?)?$/)
+    const pathOnly = lineColMatch ? lineColMatch[1] : rawPath
+
+    // Resolve path against terminal cwd if terminal_id is provided
+    let resolvedPath = pathOnly
+    if (terminal_id != null) {
+      const terminal = await getTerminalById(terminal_id)
+      if (terminal) {
+        // Resolve relative paths against terminal's cwd
+        if (!pathOnly.startsWith('/') && !pathOnly.startsWith('~')) {
+          resolvedPath = `${terminal.cwd}/${pathOnly}`
+        }
       }
+    }
 
-      const targetPath = expandPath(rawPath)
-      const cmd = ide === 'vscode' ? 'code' : 'cursor'
+    // Check file existence
+    try {
+      await fs.promises.access(expandPath(resolvedPath))
+    } catch {
+      return reply.status(404).send({ error: 'File not found' })
+    }
 
-      return new Promise<void>((resolve) => {
-        execFile(cmd, [targetPath], { timeout: 5000 }, (err) => {
-          if (err) {
-            reply
-              .status(500)
-              .send({ error: `Failed to open ${cmd}: ${err.message}` })
-          } else {
-            reply.status(204).send()
-          }
-          resolve()
-        })
+    // Build full target path with :line:col for the IDE CLI
+    const targetPath = expandPath(
+      lineColMatch?.[2]
+        ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
+        : resolvedPath,
+    )
+
+    return new Promise<void>((resolve) => {
+      execFile(cmd, ['--goto', targetPath], { timeout: 5000 }, (err) => {
+        if (err) {
+          reply
+            .status(500)
+            .send({ error: `Failed to open ${cmd}: ${err.message}` })
+        } else {
+          reply.status(204).send()
+        }
+        resolve()
       })
-    },
-  )
+    })
+  })
 
   // Open directory in native file explorer (Finder on macOS, xdg-open on Linux)
   fastify.post<{ Body: { path: string } }>(
