@@ -873,7 +873,7 @@ export function CommandPalette() {
             if (!open) setFilePickerTerminal(null)
           }}
           value={filePickerTerminal.cwd}
-          onSelect={() => { }}
+          onSelect={() => {}}
           mode="file"
           title="Select Files"
           onSelectPaths={(paths) => {

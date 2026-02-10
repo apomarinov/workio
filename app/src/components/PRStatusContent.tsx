@@ -5,7 +5,6 @@ import {
   ChevronRight,
   CircleX,
   Clock,
-  ExternalLink,
   File,
   Loader2,
   MessageSquare,
@@ -51,7 +50,7 @@ export const PRTabButton = memo(function PRTabButton({
   )
 
   return (
-    <div className="group/pr-btn flex items-center">
+    <div className="flex items-center">
       <button
         type="button"
         onClick={onClick}
@@ -72,15 +71,6 @@ export const PRTabButton = memo(function PRTabButton({
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1 align-middle" />
         )}
       </button>
-      <a
-        href={pr.prUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="ml-1 mb-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer hidden group-hover/pr-btn:block"
-      >
-        <ExternalLink className="w-3 h-3" />
-      </a>
     </div>
   )
 })

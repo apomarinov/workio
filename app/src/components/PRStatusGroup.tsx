@@ -118,7 +118,12 @@ export const PRStatusGroup = memo(function PRStatusGroup({
       </div>
       {!prInfo.isMerged && expanded && (
         <div className="ml-4">
-          <PRTabButton pr={pr} />
+          <PRTabButton
+            pr={pr}
+            withIcon
+            active
+            className="whitespace-nowrap mt-1"
+          />
           <PRStatusContent
             pr={pr}
             expanded
