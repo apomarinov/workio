@@ -13,12 +13,12 @@ import {
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
   Bell,
+  BellOff,
   Bot,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   Ellipsis,
-  EyeOff,
   GitBranch,
   Github,
   GitMerge,
@@ -92,6 +92,9 @@ export function Sidebar({ width }: SidebarProps) {
   )
   const [removingPR, setRemovingPR] = useState<number | null>(null)
   const [removingAuthor, setRemovingAuthor] = useState<string | null>(null)
+  const [removingSilencedAuthor, setRemovingSilencedAuthor] = useState<
+    string | null
+  >(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
@@ -918,9 +921,13 @@ export function Sidebar({ width }: SidebarProps) {
                     const hiddenAuthorsForRepo = (
                       settings?.hide_gh_authors ?? []
                     ).filter((h) => h.repo === repo)
+                    const silencedAuthorsForRepo = (
+                      settings?.silence_gh_authors ?? []
+                    ).filter((h) => h.repo === repo)
                     const hasHiddenItems =
                       hiddenPRsForRepo.length > 0 ||
-                      hiddenAuthorsForRepo.length > 0
+                      hiddenAuthorsForRepo.length > 0 ||
+                      silencedAuthorsForRepo.length > 0
                     return (
                       <div key={repo}>
                         <div className="group/repo-header flex items-center">
@@ -944,7 +951,7 @@ export function Sidebar({ width }: SidebarProps) {
                               className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
                               title="Manage hidden items"
                             >
-                              <EyeOff className="w-3 h-3" />
+                              <BellOff className="w-3 h-3" />
                             </button>
                           )}
                         </div>
@@ -1075,6 +1082,54 @@ export function Sidebar({ width }: SidebarProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-80 overflow-y-auto">
+            {(settings?.silence_gh_authors ?? []).filter(
+              (h) => h.repo === hiddenPRsModalRepo,
+            ).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Silenced Authors
+                </p>
+                {(settings?.silence_gh_authors ?? [])
+                  .filter((h) => h.repo === hiddenPRsModalRepo)
+                  .map((entry) => (
+                    <div
+                      key={entry.author}
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                    >
+                      <span className="text-sm">{entry.author}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRemovingSilencedAuthor(entry.author)
+                          try {
+                            const current = settings?.silence_gh_authors ?? []
+                            const updated = current.filter(
+                              (e) =>
+                                !(
+                                  e.repo === hiddenPRsModalRepo &&
+                                  e.author === entry.author
+                                ),
+                            )
+                            await updateSettings({
+                              silence_gh_authors: updated,
+                            })
+                          } finally {
+                            setRemovingSilencedAuthor(null)
+                          }
+                        }}
+                        disabled={removingSilencedAuthor === entry.author}
+                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                      >
+                        {removingSilencedAuthor === entry.author ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
             {(settings?.hide_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (

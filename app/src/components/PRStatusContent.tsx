@@ -327,6 +327,16 @@ export function PRStatusContent({
     return set
   }, [settings?.hide_gh_authors, pr.repo])
 
+  const silencedAuthorsSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const entry of settings?.silence_gh_authors ?? []) {
+      if (entry.repo === pr.repo) {
+        set.add(entry.author)
+      }
+    }
+    return set
+  }, [settings?.silence_gh_authors, pr.repo])
+
   const approvedReviews = useMemo(
     () => pr.reviews.filter((r) => r.state === 'APPROVED'),
     [pr.reviews],
@@ -434,17 +444,41 @@ export function PRStatusContent({
     [],
   )
 
-  const handleHideAuthor = async () => {
+  const handleAuthorConfig = async (config: {
+    hideComments: boolean
+    silenceNotifications: boolean
+  }) => {
     if (!hideAuthor) return
-    const current = settings?.hide_gh_authors ?? []
-    const alreadyHidden = current.some(
-      (e) => e.repo === pr.repo && e.author === hideAuthor,
+
+    const currentHidden = settings?.hide_gh_authors ?? []
+    const currentSilenced = settings?.silence_gh_authors ?? []
+
+    const withoutHidden = currentHidden.filter(
+      (e) => !(e.repo === pr.repo && e.author === hideAuthor),
     )
-    if (alreadyHidden) return
+    const withoutSilenced = currentSilenced.filter(
+      (e) => !(e.repo === pr.repo && e.author === hideAuthor),
+    )
+
+    const newHidden = config.hideComments
+      ? [...withoutHidden, { repo: pr.repo, author: hideAuthor }]
+      : withoutHidden
+    const newSilenced = config.silenceNotifications
+      ? [...withoutSilenced, { repo: pr.repo, author: hideAuthor }]
+      : withoutSilenced
+
     await updateSettings({
-      hide_gh_authors: [...current, { repo: pr.repo, author: hideAuthor }],
+      hide_gh_authors: newHidden,
+      silence_gh_authors: newSilenced,
     })
-    toast.success(`Comments from ${hideAuthor} hidden`)
+
+    if (config.hideComments) {
+      toast.success(`Comments from ${hideAuthor} hidden`)
+    } else if (config.silenceNotifications) {
+      toast.success(`Notifications from ${hideAuthor} silenced`)
+    } else {
+      toast.success(`Filters for ${hideAuthor} removed`)
+    }
   }
 
   const hasBody = !!pr.prBody
@@ -647,7 +681,10 @@ export function PRStatusContent({
           {hideAuthor && (
             <HideAuthorDialog
               author={hideAuthor}
-              onConfirm={handleHideAuthor}
+              repo={pr.repo}
+              isHidden={hiddenAuthorsSet.has(hideAuthor)}
+              isSilenced={silencedAuthorsSet.has(hideAuthor)}
+              onSave={handleAuthorConfig}
               onClose={() => setHideAuthor(null)}
             />
           )}

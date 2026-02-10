@@ -1448,6 +1448,15 @@ function isHiddenAuthor(
   return hiddenAuthors.some((h) => h.repo === repo && h.author === author)
 }
 
+function isSilencedAuthor(
+  silencedAuthors: HiddenGHAuthor[] | undefined,
+  repo: string,
+  author: string,
+): boolean {
+  if (!silencedAuthors) return false
+  return silencedAuthors.some((h) => h.repo === repo && h.author === author)
+}
+
 function isHiddenPR(
   hiddenPRs: HiddenPR[] | undefined,
   repo: string,
@@ -1470,6 +1479,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
 
   const settings = await getSettings()
   const hiddenAuthors = settings.hide_gh_authors
+  const silencedAuthors = settings.silence_gh_authors
   const io = getIO()
 
   for (const pr of newPRs) {
@@ -1573,7 +1583,12 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       const reviewer = pr.reviews.find(
         (r) => r.state === 'CHANGES_REQUESTED',
       )?.author
-      if (reviewer && reviewer !== ghUsername) {
+      if (
+        reviewer &&
+        reviewer !== ghUsername &&
+        !isHiddenAuthor(hiddenAuthors, pr.repo, reviewer) &&
+        !isSilencedAuthor(silencedAuthors, pr.repo, reviewer)
+      ) {
         const notification = await insertNotification(
           'changes_requested',
           pr.repo,
@@ -1594,7 +1609,12 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       pr.reviewDecision === 'APPROVED'
     ) {
       const approver = pr.reviews.find((r) => r.state === 'APPROVED')?.author
-      if (approver && approver !== ghUsername) {
+      if (
+        approver &&
+        approver !== ghUsername &&
+        !isHiddenAuthor(hiddenAuthors, pr.repo, approver) &&
+        !isSilencedAuthor(silencedAuthors, pr.repo, approver)
+      ) {
         const notification = await insertNotification(
           'pr_approved',
           pr.repo,
@@ -1616,6 +1636,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       for (const comment of pr.comments) {
         if (ghUsername && comment.author === ghUsername) continue
         if (isHiddenAuthor(hiddenAuthors, pr.repo, comment.author)) continue
+        if (isSilencedAuthor(silencedAuthors, pr.repo, comment.author)) continue
         // Skip if we've seen this comment before (by ID)
         if (comment.id && prevCommentIds.has(comment.id)) continue
         const notification = await insertNotification(
@@ -1646,6 +1667,8 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       )
       for (const review of pr.reviews) {
         if (ghUsername && review.author === ghUsername) continue
+        if (isHiddenAuthor(hiddenAuthors, pr.repo, review.author)) continue
+        if (isSilencedAuthor(silencedAuthors, pr.repo, review.author)) continue
         // Skip if we've seen this review before (by ID)
         if (review.id && prevReviewIds.has(review.id)) continue
         // Skip reviews with no body - these are just containers for code comments
