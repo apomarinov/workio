@@ -9,6 +9,7 @@ import { useSettings } from '@/hooks/useSettings'
 import {
   checkoutBranch,
   closePR,
+  createBranch,
   deleteBranch,
   getBranches,
   openInExplorer,
@@ -26,6 +27,7 @@ import type {
 } from '../../types'
 import { CommitDialog } from '../CommitDialog'
 import { ConfirmModal } from '../ConfirmModal'
+import { CreateBranchDialog } from '../CreateBranchDialog'
 import { DirectoryBrowser } from '../DirectoryBrowser'
 import { EditSessionModal } from '../EditSessionModal'
 import { EditTerminalModal } from '../EditTerminalModal'
@@ -77,6 +79,11 @@ export function CommandPalette() {
     null,
   )
   const [commitTerminalId, setCommitTerminalId] = useState<number | null>(null)
+  const [createBranchFrom, setCreateBranchFrom] = useState<{
+    terminalId: number
+    branch: string
+  } | null>(null)
+  const [createBranchLoading, setCreateBranchLoading] = useState(false)
 
   // Session search state
   const [searchText, setSearchText] = useState('')
@@ -631,6 +638,10 @@ export function CommandPalette() {
         closePalette()
         setTimeout(() => setCommitTerminalId(terminalId), 150)
       },
+      requestCreateBranch: (terminalId, branch) => {
+        closePalette()
+        setTimeout(() => setCreateBranchFrom({ terminalId, branch }), 150)
+      },
 
       // PR actions
       openMergeModal: (pr) => {
@@ -937,6 +948,33 @@ export function CommandPalette() {
           open={commitTerminalId != null}
           terminalId={commitTerminalId}
           onClose={() => setCommitTerminalId(null)}
+        />
+      )}
+
+      {createBranchFrom && (
+        <CreateBranchDialog
+          open={!!createBranchFrom}
+          fromBranch={createBranchFrom.branch}
+          loading={createBranchLoading}
+          onConfirm={async (name) => {
+            setCreateBranchLoading(true)
+            try {
+              await createBranch(
+                createBranchFrom.terminalId,
+                name,
+                createBranchFrom.branch,
+              )
+              toast.success(`Created and switched to ${name}`)
+              setCreateBranchFrom(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to create branch',
+              )
+            } finally {
+              setCreateBranchLoading(false)
+            }
+          }}
+          onCancel={() => setCreateBranchFrom(null)}
         />
       )}
 

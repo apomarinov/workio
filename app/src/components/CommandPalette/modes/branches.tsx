@@ -4,6 +4,7 @@ import {
   Check,
   CornerDownLeft,
   GitBranch,
+  GitBranchPlus,
   GitCommitHorizontal,
   GitMerge,
   Trash2,
@@ -183,7 +184,8 @@ export function createBranchActionsMode(
     !!loadingStates.checkingOut ||
     !!loadingStates.pulling ||
     !!loadingStates.pushing ||
-    !!loadingStates.committing
+    !!loadingStates.committing ||
+    !!loadingStates.creatingBranch
 
   // Build items
   const items: PaletteItem[] = []
@@ -308,6 +310,24 @@ export function createBranchActionsMode(
       onSelect: () => {
         if (canDelete) {
           actions.requestDeleteBranch(terminal.id, branch.name, hasRemote)
+        }
+      },
+    })
+  }
+
+  // Create Branch (available on all branches)
+  {
+    const canCreate = !isDirty && !isLoading
+    items.push({
+      id: 'action:create-branch',
+      label: 'Create Branch',
+      icon: <GitBranchPlus className="h-4 w-4 shrink-0 text-zinc-400" />,
+      disabled: !canCreate,
+      disabledReason: isDirty ? 'uncommitted changes' : undefined,
+      loading: loadingStates.creatingBranch === branch.name,
+      onSelect: () => {
+        if (canCreate) {
+          actions.requestCreateBranch(terminal.id, branch.name)
         }
       },
     })

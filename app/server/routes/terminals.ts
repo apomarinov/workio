@@ -121,6 +121,11 @@ interface RebaseBranchBody {
   branch: string
 }
 
+interface CreateBranchBody {
+  name: string
+  from: string
+}
+
 interface DeleteBranchBody {
   branch: string
   deleteRemote?: boolean
@@ -1513,6 +1518,86 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({
           success: false,
           branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
+  // Create a new branch from a given base branch and check it out
+  fastify.post<{ Params: TerminalParams; Body: CreateBranchBody }>(
+    '/api/terminals/:id/create-branch',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { name, from } = request.body
+      if (!name) {
+        return reply.status(400).send({ error: 'Branch name is required' })
+      }
+      if (!from) {
+        return reply.status(400).send({ error: 'Source branch is required' })
+      }
+
+      const gitCmd = `git checkout -b ${name.replace(/'/g, "'\\''")} ${from.replace(/'/g, "'\\''")}`
+
+      try {
+        const cwd = expandPath(terminal.cwd)
+
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: gitCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['checkout', '-b', name, from],
+              { cwd, timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: gitCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        // Refresh git branch detection
+        detectGitBranch(id).catch(() => {})
+
+        return { success: true, branch: name }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to create branch'
+        return reply.status(400).send({
+          success: false,
+          branch: name,
           error: errorMessage,
         })
       }

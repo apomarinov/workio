@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +37,15 @@ export function ConfirmModal({
   children,
 }: ConfirmModalProps) {
   const confirmedRef = useRef(false)
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      // Focus after AlertDialog animation completes
+      const timer = setTimeout(() => confirmButtonRef.current?.focus(), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [open])
 
   const handleConfirm = () => {
     confirmedRef.current = true
@@ -65,8 +74,8 @@ export function ConfirmModal({
             {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
+            ref={confirmButtonRef}
             onClick={handleConfirm}
-            autoFocus
             variant={variant === 'danger' ? 'destructive' : 'default'}
             disabled={loading}
           >

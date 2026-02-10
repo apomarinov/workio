@@ -464,6 +464,23 @@ export async function rebaseBranch(
   return data
 }
 
+export async function createBranch(
+  terminalId: number,
+  name: string,
+  from: string,
+): Promise<{ success: boolean; branch: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/create-branch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, from }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create branch')
+  }
+  return data
+}
+
 export async function deleteBranch(
   terminalId: number,
   branch: string,

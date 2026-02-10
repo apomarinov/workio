@@ -40,7 +40,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           onSeen?.()
         }}
         className={cn(
-          'group/pr flex items-center gap-2 pr-3 pl-2 py-1.5 transition-colors min-w-0',
+          'group/pr flex relative items-center gap-2 pr-3 pl-2 py-1.5 transition-colors min-w-0',
           isActive
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
@@ -107,7 +107,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
                 }),
               )
             }}
-            className="text-xs text-muted-foreground hidden group-hover/pr:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer"
+            className="absolute right-2 text-xs text-muted-foreground hidden group-hover/pr:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer bg-sidebar-accent/60 hover:bg-sidebar-accent py-1 rounded-sm"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -127,7 +127,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => {}}
+            onToggle={() => { }}
             hasNewActivity={hasNewActivity}
             onSeen={onSeen}
           />

@@ -44,6 +44,7 @@ export type PaletteLevel = {
     rebasing?: string
     deleting?: string
     committing?: boolean
+    creatingBranch?: string
   }
 }
 
