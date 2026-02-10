@@ -63,6 +63,7 @@ export interface PRCheckStatus {
   hasFailedChecks: boolean
   runningChecksCount: number
   failedChecksCount: number
+  headCommitSha: string
 }
 
 export interface PRChecksPayload {

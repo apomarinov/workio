@@ -143,7 +143,7 @@ io.on('connection', (socket) => {
       session?.sessionName ||
       (await getTerminalById(terminalId))?.name ||
       `terminal-${terminalId}`
-    writeToSession(terminalId, `zellij attach ${sessionName}\n`)
+    writeToSession(terminalId, `zellij attach '${sessionName}'\n`)
   })
 
   socket.on('disconnect', () => {
@@ -528,7 +528,7 @@ function stopDaemon() {
   const sockPath = path.join(projectRoot, 'daemon.sock')
   try {
     fs.unlinkSync(sockPath)
-  } catch {}
+  } catch { }
 }
 
 process.on('exit', stopDaemon)

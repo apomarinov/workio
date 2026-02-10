@@ -54,6 +54,9 @@ const WEBHOOK_THROTTLE_MS = 2000
 
 // Track last PR data for notification diffing
 const lastPRData = new Map<string, PRCheckStatus>()
+// Track commit SHAs that had check_failed notifications to suppress
+// false checks_passed notifications when a failed check is retried (same commit)
+const checkFailedOnCommit = new Map<string, string>()
 let initialFullFetchDone = false
 
 export function parseGitHubRemoteUrl(
@@ -191,6 +194,7 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
         commits(last: 1) {
           nodes {
             commit {
+              oid
               statusCheckRollup {
                 contexts(first: 30) {
                   nodes {
@@ -297,6 +301,7 @@ interface GraphQLOpenPR {
   commits: {
     nodes: {
       commit: {
+        oid: string
         statusCheckRollup: {
           contexts: { nodes: GraphQLCheckContext[] }
         } | null
@@ -388,6 +393,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
 
   // Normalize checks from commits → statusCheckRollup → contexts
   const commitNode = pr.commits.nodes[0]
+  const headCommitSha = commitNode?.commit?.oid || ''
   const contexts = commitNode?.commit?.statusCheckRollup?.contexts?.nodes || []
   const allChecks = contexts.map(normalizeCheckContext)
 
@@ -543,6 +549,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
     hasFailedChecks: failedChecksCount > 0,
     runningChecksCount,
     failedChecksCount,
+    headCommitSha,
   }
 }
 
@@ -570,6 +577,7 @@ function mapClosedPRNode(pr: GraphQLClosedPR): PRCheckStatus {
     hasFailedChecks: false,
     runningChecksCount: 0,
     failedChecksCount: 0,
+    headCommitSha: '',
   }
 }
 
@@ -1520,20 +1528,40 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       if (notification) {
         io?.emit('notifications:new', notification)
       }
+      // Track that this commit had a check failure, so we can suppress
+      // the false "checks_passed" notification when a failed check is retried
+      if (pr.headCommitSha) {
+        checkFailedOnCommit.set(key, pr.headCommitSha)
+      }
     }
 
-    // Checks passed
+    // Clear check-failed tracking when commit changes (new push)
+    if (
+      prev &&
+      pr.headCommitSha &&
+      prev.headCommitSha &&
+      prev.headCommitSha !== pr.headCommitSha
+    ) {
+      checkFailedOnCommit.delete(key)
+    }
+
+    // Checks passed — skip if this is just a retry of a previously failed check
+    // on the same commit (not a fresh push)
     if (prev && !prev.areAllChecksOk && pr.areAllChecksOk) {
-      const notification = await insertNotification(
-        'checks_passed',
-        pr.repo,
-        { prTitle: pr.prTitle, prUrl: pr.prUrl },
-        pr.updatedAt,
-        pr.prNumber,
-      )
-      if (notification) {
-        io?.emit('notifications:new', notification)
+      const failedSha = checkFailedOnCommit.get(key)
+      if (!failedSha || failedSha !== pr.headCommitSha) {
+        const notification = await insertNotification(
+          'checks_passed',
+          pr.repo,
+          { prTitle: pr.prTitle, prUrl: pr.prUrl },
+          pr.updatedAt,
+          pr.prNumber,
+        )
+        if (notification) {
+          io?.emit('notifications:new', notification)
+        }
       }
+      checkFailedOnCommit.delete(key)
     }
 
     // Changes requested
@@ -1647,11 +1675,12 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
     lastPRData.set(key, structuredClone(pr))
   }
 
-  // Clean up removed PRs from lastPRData
+  // Clean up removed PRs from lastPRData and checkFailedOnCommit
   const currentKeys = new Set(newPRs.map((pr) => `${pr.repo}#${pr.prNumber}`))
   for (const key of lastPRData.keys()) {
     if (!currentKeys.has(key)) {
       lastPRData.delete(key)
+      checkFailedOnCommit.delete(key)
     }
   }
 }
@@ -1735,6 +1764,7 @@ function patchPullRequest(repo: string, payload: WebhookPayload): boolean {
       hasFailedChecks: false,
       runningChecksCount: 0,
       failedChecksCount: 0,
+      headCommitSha: '',
     }
     lastFetchedPRs = [...lastFetchedPRs, newPR]
     return true

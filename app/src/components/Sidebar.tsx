@@ -571,7 +571,7 @@ export function Sidebar({ width }: SidebarProps) {
                     title="Notifications"
                   >
                     <Bell className="w-4 h-4" />
-                    {(hasAnyUnseenPRs || hasUnreadNotifications) && (
+                    {hasUnreadNotifications && (
                       <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
                     )}
                   </Button>
@@ -749,7 +749,7 @@ export function Sidebar({ width }: SidebarProps) {
                     title="Notifications"
                   >
                     <Bell className="w-4 h-4" />
-                    {(hasAnyUnseenPRs || hasUnreadNotifications) && (
+                    {hasUnreadNotifications && (
                       <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500" />
                     )}
                   </Button>
