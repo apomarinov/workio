@@ -15,7 +15,12 @@ import { toast } from '@/components/ui/sonner'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
-import type { PRCheckStatus, PRReview } from '../../shared/types'
+import type {
+  PRCheckStatus,
+  PRDiscussionItem,
+  PRReview,
+  PRReviewThread,
+} from '../../shared/types'
 import * as api from '../lib/api'
 import {
   ContentDialog,
@@ -116,9 +121,7 @@ const ReviewRow = memo(function ReviewRow({
     [onReply, review.author],
   )
 
-  const reviewUrl = review.id
-    ? `${prUrl}#pullrequestreview-${review.id}`
-    : prUrl
+  const reviewUrl = review.url || prUrl
 
   return (
     <div className="group/review px-2 py-1 rounded text-sidebar-foreground/70">
@@ -199,6 +202,8 @@ const CommentItem = memo(function CommentItem({
   prUrl,
   onHide,
   onReply,
+  hidePath,
+  indent,
 }: {
   comment: {
     url?: string
@@ -211,6 +216,8 @@ const CommentItem = memo(function CommentItem({
   prUrl: string
   onHide: (author: string) => void
   onReply: (author: string) => void
+  hidePath?: boolean
+  indent?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -229,7 +236,12 @@ const CommentItem = memo(function CommentItem({
 
   return (
     <>
-      <div className="group/comment px-2 py-1 rounded text-sidebar-foreground/70">
+      <div
+        className={cn(
+          'group/comment px-2 py-1 rounded text-sidebar-foreground/70',
+          indent && 'ml-4',
+        )}
+      >
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -282,7 +294,7 @@ const CommentItem = memo(function CommentItem({
             'mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded px-1 py-0.5 transition-colors',
           )}
         >
-          {comment.path && (
+          {!hidePath && comment.path && (
             <span className="text-[10px] flex items-center gap-1 text-muted-foreground/50 truncate">
               <File className="w-2 h-2 min-w-2 min-h-2" />
               {comment.path}
@@ -305,6 +317,169 @@ const CommentItem = memo(function CommentItem({
     </>
   )
 })
+
+function ReviewThreadGroup({
+  thread,
+  prUrl,
+  onHide,
+  onReply,
+}: {
+  thread: PRReviewThread
+  prUrl: string
+  onHide: (author: string) => void
+  onReply: (author: string) => void
+}) {
+  const [root, ...replies] = thread.comments
+  if (!root) return null
+
+  return (
+    <div className="ml-2 border-l border-sidebar-border pl-2">
+      {thread.path && (
+        <span className="text-[10px] flex items-center gap-1 text-muted-foreground/50 truncate px-2 pt-1">
+          <File className="w-2 h-2 min-w-2 min-h-2" />
+          {thread.path}
+        </span>
+      )}
+      <CommentItem
+        comment={root}
+        prUrl={prUrl}
+        onHide={onHide}
+        onReply={onReply}
+        hidePath
+      />
+      {replies.map((reply, i) => (
+        <CommentItem
+          key={reply.id || i}
+          comment={reply}
+          prUrl={prUrl}
+          onHide={onHide}
+          onReply={onReply}
+          hidePath
+          indent
+        />
+      ))}
+    </div>
+  )
+}
+
+function getReviewIcon(state: string): React.ReactNode {
+  switch (state) {
+    case 'APPROVED':
+      return <Check className="w-3 h-3 flex-shrink-0 text-green-500" />
+    case 'CHANGES_REQUESTED':
+      return <RefreshIcon className="w-3 h-3 flex-shrink-0 text-orange-400" />
+    case 'PENDING':
+      return <Clock className="w-3 h-3 flex-shrink-0 text-zinc-500" />
+    default:
+      return <MessageSquare className="w-3 h-3 flex-shrink-0 text-zinc-500" />
+  }
+}
+
+function DiscussionTimeline({
+  discussion,
+  pr,
+  hiddenAuthorsSet,
+  onReReview,
+  onMerge,
+  onReply,
+  onHide,
+}: {
+  discussion: PRDiscussionItem[]
+  pr: PRCheckStatus
+  hiddenAuthorsSet: Set<string>
+  onReReview: (author: string) => void
+  onMerge: () => void
+  onReply: (author: string) => void
+  onHide: (author: string) => void
+}) {
+  const [visibleCount, setVisibleCount] = useState(5)
+
+  const filteredDiscussion = useMemo(
+    () =>
+      discussion.filter((item) => {
+        if (item.type === 'comment') {
+          return !hiddenAuthorsSet.has(item.comment.author)
+        }
+        return true
+      }),
+    [discussion, hiddenAuthorsSet],
+  )
+
+  const visibleDiscussion = useMemo(
+    () => filteredDiscussion.slice(0, visibleCount),
+    [filteredDiscussion, visibleCount],
+  )
+  const hasMore = visibleCount < filteredDiscussion.length
+
+  if (filteredDiscussion.length === 0) return null
+
+  return (
+    <>
+      {visibleDiscussion.map((item, i) => {
+        switch (item.type) {
+          case 'review':
+            return (
+              <div key={`review-${item.review.id || i}`}>
+                <ReviewRow
+                  review={item.review}
+                  icon={getReviewIcon(item.review.state)}
+                  prUrl={pr.prUrl}
+                  showReReview={item.review.state === 'CHANGES_REQUESTED'}
+                  isApproved={item.review.state === 'APPROVED'}
+                  hasConflicts={pr.hasConflicts}
+                  onReReview={onReReview}
+                  onMerge={
+                    item.review.state === 'APPROVED' ? onMerge : undefined
+                  }
+                  onReply={onReply}
+                />
+                {item.threads.map((thread, ti) => (
+                  <ReviewThreadGroup
+                    key={`thread-${thread.comments[0]?.id || ti}`}
+                    thread={thread}
+                    prUrl={pr.prUrl}
+                    onHide={onHide}
+                    onReply={onReply}
+                  />
+                ))}
+              </div>
+            )
+          case 'comment':
+            return (
+              <CommentItem
+                key={`comment-${item.comment.id || i}`}
+                comment={item.comment}
+                prUrl={pr.prUrl}
+                onHide={onHide}
+                onReply={onReply}
+              />
+            )
+          case 'thread':
+            return (
+              <ReviewThreadGroup
+                key={`standalone-${item.thread.comments[0]?.id || i}`}
+                thread={item.thread}
+                prUrl={pr.prUrl}
+                onHide={onHide}
+                onReply={onReply}
+              />
+            )
+          default:
+            return null
+        }
+      })}
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setVisibleCount((v) => v + 10)}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          Show more ({filteredDiscussion.length - visibleCount} remaining)
+        </button>
+      )}
+    </>
+  )
+}
 
 export function PRStatusContent({
   pr,
@@ -337,49 +512,19 @@ export function PRStatusContent({
     return set
   }, [settings?.silence_gh_authors, pr.repo])
 
-  const approvedReviews = useMemo(
-    () => pr.reviews.filter((r) => r.state === 'APPROVED'),
-    [pr.reviews],
-  )
-  const changesRequestedReviews = useMemo(
-    () => pr.reviews.filter((r) => r.state === 'CHANGES_REQUESTED'),
-    [pr.reviews],
-  )
-  const pendingReviews = useMemo(
-    () => pr.reviews.filter((r) => r.state === 'PENDING'),
-    [pr.reviews],
-  )
-  const commentedReviews = useMemo(
-    () => pr.reviews.filter((r) => r.state === 'COMMENTED'),
-    [pr.reviews],
-  )
-  const hasReviews =
-    approvedReviews.length > 0 ||
-    changesRequestedReviews.length > 0 ||
-    pendingReviews.length > 0 ||
-    commentedReviews.length > 0
   const hasChecks = pr.checks.length > 0
-  const hasComments = useMemo(
-    () => pr.comments.some((c) => !hiddenAuthorsSet.has(c.author)),
-    [pr.comments, hiddenAuthorsSet],
+  const hasDiscussion = useMemo(
+    () =>
+      pr.discussion.some((item) => {
+        if (item.type === 'comment') {
+          return !hiddenAuthorsSet.has(item.comment.author)
+        }
+        return true
+      }),
+    [pr.discussion, hiddenAuthorsSet],
   )
-
-  const [visibleCount, setVisibleCount] = useState(5)
 
   const [owner, repo] = pr.repo.split('/')
-  const filteredComments = useMemo(
-    () => pr.comments.filter((c) => !hiddenAuthorsSet.has(c.author)),
-    [pr.comments, hiddenAuthorsSet],
-  )
-  const visibleComments = useMemo(
-    () => filteredComments.slice(0, visibleCount),
-    [filteredComments, visibleCount],
-  )
-  const hasMoreComments = visibleCount < filteredComments.length
-
-  const handleShowMore = () => {
-    setVisibleCount((v) => v + 10)
-  }
 
   const [reReviewAuthor, setReReviewAuthor] = useState<string | null>(null)
   const [mergeOpen, setMergeOpen] = useState(false)
@@ -484,7 +629,7 @@ export function PRStatusContent({
   const hasBody = !!pr.prBody
   const [bodyModalOpen, setBodyModalOpen] = useState(false)
 
-  const hasContent = hasBody || hasReviews || hasChecks || hasComments
+  const hasContent = hasBody || hasChecks || hasDiscussion
 
   // Header-only mode: if no content and no header, nothing to render
   if (!hasHeader && !hasContent) return null
@@ -520,131 +665,69 @@ export function PRStatusContent({
             />
           )}
 
-          {/* Reviews */}
-          {approvedReviews.map((review) => (
-            <ReviewRow
-              key={`approved-${review.author}`}
-              review={review}
-              icon={<Check className="w-3 h-3 flex-shrink-0 text-green-500" />}
-              prUrl={pr.prUrl}
-              isApproved
-              hasConflicts={pr.hasConflicts}
-              onReReview={handleReReview}
-              onMerge={() => setMergeOpen(true)}
-              onReply={handleReply}
-            />
-          ))}
-          {changesRequestedReviews.map((review) => (
-            <ReviewRow
-              key={`changes-${review.author}`}
-              review={review}
-              icon={
-                <RefreshIcon className="w-3 h-3 flex-shrink-0 text-orange-400" />
-              }
-              prUrl={pr.prUrl}
-              showReReview
-              onReReview={handleReReview}
-              onReply={handleReply}
-            />
-          ))}
-          {pendingReviews.map((review) => (
-            <ReviewRow
-              key={`pending-${review.author}`}
-              review={review}
-              icon={<Clock className="w-3 h-3 flex-shrink-0 text-zinc-500" />}
-              prUrl={pr.prUrl}
-              onReReview={handleReReview}
-              onReply={handleReply}
-            />
-          ))}
-          {commentedReviews.map((review) => (
-            <ReviewRow
-              key={`commented-${review.author}`}
-              review={review}
-              icon={
-                <MessageSquare className="w-3 h-3 flex-shrink-0 text-zinc-500" />
-              }
-              prUrl={pr.prUrl}
-              onReReview={handleReReview}
-              onReply={handleReply}
-            />
-          ))}
-
-          <div className="relative flex flex-col gap-0 pl-[13px]">
-            <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
-            {pr.checks.map((check) => (
-              <div
-                key={check.name}
-                className="group/check flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors"
-              >
-                <a
-                  href={check.detailsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+          {/* Checks */}
+          {hasChecks && (
+            <div className="relative flex flex-col gap-0 pl-[13px]">
+              <div className="absolute top-[5px] h-[calc(100%-12px)] border-l-[1px]" />
+              {pr.checks.map((check) => (
+                <div
+                  key={check.name}
+                  className="group/check flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors"
                 >
-                  {check.status === 'IN_PROGRESS' ||
-                  check.status === 'QUEUED' ? (
-                    <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
-                  ) : (
-                    <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
-                  )}
-                  <span className="text-xs truncate">{check.name}</span>
-                </a>
-                {check.status === 'COMPLETED' && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setRerunCheck({
-                        name: check.name,
-                        url: check.detailsUrl,
-                      })
-                    }
-                    className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
+                  <a
+                    href={check.detailsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                   >
-                    <RefreshIcon className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
+                    {check.status === 'IN_PROGRESS' ||
+                    check.status === 'QUEUED' ? (
+                      <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
+                    ) : (
+                      <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+                    )}
+                    <span className="text-xs truncate">{check.name}</span>
+                  </a>
+                  {check.status === 'COMPLETED' && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRerunCheck({
+                          name: check.name,
+                          url: check.detailsUrl,
+                        })
+                      }
+                      className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
+                    >
+                      <RefreshIcon className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
 
-            {failedCompletedChecks.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setRerunAllOpen(true)}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <RefreshIcon className="w-3 h-3" />
-                Re-run All ({failedCompletedChecks.length})
-              </button>
-            )}
+              {failedCompletedChecks.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setRerunAllOpen(true)}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <RefreshIcon className="w-3 h-3" />
+                  Re-run All ({failedCompletedChecks.length})
+                </button>
+              )}
+            </div>
+          )}
 
-            {/* Comments */}
-            {hasComments && (
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-1">
-                Comments
-              </p>
-            )}
-            {visibleComments.map((comment, i) => (
-              <CommentItem
-                key={`${comment.author}-${i}`}
-                comment={comment}
-                prUrl={pr.prUrl}
-                onHide={handleHideComment}
-                onReply={handleReply}
-              />
-            ))}
-
-            {hasComments && hasMoreComments && (
-              <button
-                type="button"
-                onClick={handleShowMore}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Show more ({filteredComments.length - visibleCount} remaining)
-              </button>
-            )}
-          </div>
+          {/* Discussion Timeline */}
+          <DiscussionTimeline
+            discussion={pr.discussion}
+            pr={pr}
+            hiddenAuthorsSet={hiddenAuthorsSet}
+            onReReview={handleReReview}
+            onMerge={() => setMergeOpen(true)}
+            onReply={handleReply}
+            onHide={handleHideComment}
+          />
 
           {reReviewAuthor && (
             <ReReviewDialog

@@ -32,11 +32,23 @@ export interface PRComment {
 
 export interface PRReview {
   id?: number
+  url?: string
   author: string
   avatarUrl: string
   state: string
   body: string
+  submittedAt?: string
 }
+
+export interface PRReviewThread {
+  path: string
+  comments: PRComment[]
+}
+
+export type PRDiscussionItem =
+  | { type: 'review'; review: PRReview; threads: PRReviewThread[] }
+  | { type: 'comment'; comment: PRComment }
+  | { type: 'thread'; thread: PRReviewThread }
 
 export interface PRCheckStatus {
   prNumber: number
@@ -50,6 +62,7 @@ export interface PRCheckStatus {
   reviews: PRReview[]
   checks: FailedPRCheck[]
   comments: PRComment[]
+  discussion: PRDiscussionItem[]
   createdAt: string
   updatedAt: string
   areAllChecksOk: boolean

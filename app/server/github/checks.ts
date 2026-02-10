@@ -6,7 +6,9 @@ import type {
   MergedPRSummary,
   PRCheckStatus,
   PRComment,
+  PRDiscussionItem,
   PRReview,
+  PRReviewThread,
 } from '../../shared/types'
 import type { HiddenGHAuthor, HiddenPR } from '../../src/types'
 import {
@@ -219,9 +221,11 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
         reviews(last: 10) {
           nodes {
             databaseId
+            url
             author { login }
             state
             body
+            submittedAt
           }
         }
         reviewRequests(first: 10) {
@@ -250,6 +254,9 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
                 body
                 createdAt
                 path
+                pullRequestReview {
+                  databaseId
+                }
               }
             }
           }
@@ -311,9 +318,11 @@ interface GraphQLOpenPR {
   reviews: {
     nodes: {
       databaseId: number
+      url: string
       author: { login: string }
       state: string
       body: string
+      submittedAt: string
     }[]
   }
   reviewRequests: {
@@ -338,6 +347,7 @@ interface GraphQLOpenPR {
           body: string
           createdAt: string
           path: string
+          pullRequestReview: { databaseId: number } | null
         }[]
       }
     }[]
@@ -388,6 +398,25 @@ function normalizeCheckContext(ctx: GraphQLCheckContext): {
   return { name, status, conclusion, detailsUrl: ctx.targetUrl || '' }
 }
 
+function getDiscussionItemTime(item: PRDiscussionItem): number {
+  switch (item.type) {
+    case 'review':
+      return item.review.submittedAt
+        ? new Date(item.review.submittedAt).getTime()
+        : 0
+    case 'comment':
+      return new Date(item.comment.createdAt).getTime()
+    case 'thread':
+      return item.thread.comments[0]
+        ? new Date(item.thread.comments[0].createdAt).getTime()
+        : 0
+  }
+}
+
+function sortDiscussion(discussion: PRDiscussionItem[]): void {
+  discussion.sort((a, b) => getDiscussionItemTime(b) - getDiscussionItemTime(a))
+}
+
 function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
   const repoKey = pr.repository.nameWithOwner
 
@@ -431,16 +460,26 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
       .filter(Boolean) as string[],
   )
 
-  const reviews: PRReview[] = (pr.reviews?.nodes || [])
-    .filter(
-      (r) =>
-        r.state === 'APPROVED' ||
-        r.state === 'CHANGES_REQUESTED' ||
-        r.state === 'COMMENTED',
-    )
-    .filter((r) => !(r.state === 'COMMENTED' && !r.body))
+  const allReviewNodes = (pr.reviews?.nodes || []).filter(
+    (r) =>
+      r.state === 'APPROVED' ||
+      r.state === 'CHANGES_REQUESTED' ||
+      r.state === 'COMMENTED',
+  )
+
+  // "Real" reviews: non-COMMENTED, or COMMENTED with body
+  const realReviewIds = new Set<number>()
+  for (const r of allReviewNodes) {
+    if (r.state !== 'COMMENTED' || r.body) {
+      realReviewIds.add(r.databaseId)
+    }
+  }
+
+  const reviews: PRReview[] = allReviewNodes
+    .filter((r) => realReviewIds.has(r.databaseId))
     .map((r) => ({
       id: r.databaseId,
+      url: r.url,
       author: r.author.login,
       avatarUrl: `https://github.com/${r.author.login}.png?size=32`,
       state:
@@ -448,6 +487,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
           ? 'PENDING'
           : r.state,
       body: r.body || '',
+      submittedAt: r.submittedAt,
     }))
 
   const reviewsByAuthor = new Map<string, PRReview>()
@@ -467,7 +507,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
       createdAt: c.createdAt,
     }))
 
-  // Code comments from reviewThreads
+  // Code comments from reviewThreads (flat, for notifications)
   const codeComments: PRComment[] = (pr.reviewThreads?.nodes || []).flatMap(
     (thread) =>
       (thread.comments?.nodes || [])
@@ -495,6 +535,66 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
   const comments = mergedComments.slice(0, 50)
+
+  // Build discussion timeline
+  // 1. Build threads from reviewThreads
+  const reviewIdToThreads = new Map<number, PRReviewThread[]>()
+  const standaloneThreads: PRReviewThread[] = []
+
+  for (const threadNode of pr.reviewThreads?.nodes || []) {
+    const threadComments: PRComment[] = (threadNode.comments?.nodes || [])
+      .filter((c) => !c.author.login.includes('[bot]'))
+      .map((c) => ({
+        id: c.databaseId,
+        url: c.url,
+        author: c.author.login,
+        avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
+        body: c.body,
+        createdAt: c.createdAt,
+        path: c.path,
+      }))
+
+    if (threadComments.length === 0) continue
+
+    const rootCommentNode = threadNode.comments?.nodes?.[0]
+    const threadPath = rootCommentNode?.path || ''
+    const thread: PRReviewThread = {
+      path: threadPath,
+      comments: threadComments,
+    }
+
+    // Check if root comment's review is a "real" review
+    const rootReviewId = rootCommentNode?.pullRequestReview?.databaseId
+    if (rootReviewId && realReviewIds.has(rootReviewId)) {
+      const existing = reviewIdToThreads.get(rootReviewId) || []
+      existing.push(thread)
+      reviewIdToThreads.set(rootReviewId, existing)
+    } else {
+      standaloneThreads.push(thread)
+    }
+  }
+
+  // 2. Build discussion items
+  const discussion: PRDiscussionItem[] = []
+
+  // Real reviews with their threads
+  for (const review of reviews) {
+    const threads = review.id ? reviewIdToThreads.get(review.id) || [] : []
+    discussion.push({ type: 'review', review, threads })
+  }
+
+  // Issue comments
+  for (const comment of issueComments) {
+    discussion.push({ type: 'comment', comment })
+  }
+
+  // Standalone threads
+  for (const thread of standaloneThreads) {
+    discussion.push({ type: 'thread', thread })
+  }
+
+  // Sort chronologically ascending
+  sortDiscussion(discussion)
 
   // Review decision
   const dedupedReviews = Array.from(reviewsByAuthor.values())
@@ -538,6 +638,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
     reviews: dedupedReviews,
     checks: failedChecks,
     comments,
+    discussion,
     createdAt: pr.createdAt || '',
     updatedAt: pr.updatedAt || '',
     areAllChecksOk,
@@ -567,6 +668,7 @@ function mapClosedPRNode(pr: GraphQLClosedPR): PRCheckStatus {
     reviews: [],
     checks: [],
     comments: [],
+    discussion: [],
     createdAt: pr.createdAt || '',
     updatedAt: pr.updatedAt || '',
     areAllChecksOk: false,
@@ -1730,6 +1832,7 @@ interface WebhookPayload {
   }
   review?: {
     id: number
+    html_url?: string
     user: { login: string }
     state: string
     body: string
@@ -1742,6 +1845,8 @@ interface WebhookPayload {
     body: string
     created_at: string
     path?: string
+    pull_request_review_id?: number
+    in_reply_to_id?: number
   }
   issue?: {
     number: number
@@ -1776,6 +1881,7 @@ function patchPullRequest(repo: string, payload: WebhookPayload): boolean {
       reviews: [],
       checks: [],
       comments: [],
+      discussion: [],
       createdAt: prData.created_at || '',
       updatedAt: prData.updated_at || '',
       areAllChecksOk: false,
@@ -1861,10 +1967,12 @@ function patchPullRequestReview(
 
   const newReview: PRReview = {
     id: review.id,
+    url: review.html_url,
     author: review.user.login,
     avatarUrl: `https://github.com/${review.user.login}.png?size=32`,
     state: mappedState,
     body: review.body || '',
+    submittedAt: review.submitted_at,
   }
 
   // Dedup by author: replace existing review from same author, or append
@@ -1873,6 +1981,33 @@ function patchPullRequestReview(
     existing.reviews[idx] = newReview
   } else {
     existing.reviews.push(newReview)
+  }
+
+  // Patch discussion: only add "real" reviews (non-COMMENTED or has body)
+  const isRealReview = mappedState !== 'COMMENTED' || review.body
+  if (isRealReview) {
+    const discIdx = existing.discussion.findIndex(
+      (d) => d.type === 'review' && d.review.id === review.id,
+    )
+    if (discIdx >= 0) {
+      const prev = existing.discussion[discIdx] as {
+        type: 'review'
+        review: PRReview
+        threads: PRReviewThread[]
+      }
+      existing.discussion[discIdx] = {
+        type: 'review',
+        review: newReview,
+        threads: prev.threads,
+      }
+    } else {
+      existing.discussion.push({
+        type: 'review',
+        review: newReview,
+        threads: [],
+      })
+    }
+    sortDiscussion(existing.discussion)
   }
 
   // Recompute review decision
@@ -1926,6 +2061,10 @@ function patchIssueComment(repo: string, payload: WebhookPayload): boolean {
     )
     .slice(0, 50)
 
+  // Patch discussion
+  existing.discussion.push({ type: 'comment', comment: newComment })
+  sortDiscussion(existing.discussion)
+
   return true
 }
 
@@ -1963,6 +2102,63 @@ function patchReviewComment(repo: string, payload: WebhookPayload): boolean {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
     .slice(0, 50)
+
+  // Patch discussion: try to find an existing thread to append to
+  const reviewId = comment.pull_request_review_id
+  const inReplyToId = comment.in_reply_to_id
+  let placed = false
+
+  // If replying to an existing comment, find the thread containing that comment
+  if (inReplyToId) {
+    for (const item of existing.discussion) {
+      if (item.type === 'review') {
+        for (const thread of item.threads) {
+          if (thread.comments.some((c) => c.id === inReplyToId)) {
+            thread.comments.push(newComment)
+            placed = true
+            break
+          }
+        }
+      } else if (item.type === 'thread') {
+        if (item.thread.comments.some((c) => c.id === inReplyToId)) {
+          item.thread.comments.push(newComment)
+          placed = true
+        }
+      }
+      if (placed) break
+    }
+  }
+
+  // If not placed as reply, try to attach to a review
+  if (!placed && reviewId) {
+    const reviewItem = existing.discussion.find(
+      (d) => d.type === 'review' && d.review.id === reviewId,
+    )
+    if (reviewItem && reviewItem.type === 'review') {
+      // Find thread with same path or create new one
+      const existingThread = reviewItem.threads.find(
+        (t) => t.path === (comment.path || ''),
+      )
+      if (existingThread) {
+        existingThread.comments.push(newComment)
+      } else {
+        reviewItem.threads.push({
+          path: comment.path || '',
+          comments: [newComment],
+        })
+      }
+      placed = true
+    }
+  }
+
+  // Otherwise create standalone thread
+  if (!placed) {
+    existing.discussion.push({
+      type: 'thread',
+      thread: { path: comment.path || '', comments: [newComment] },
+    })
+    sortDiscussion(existing.discussion)
+  }
 
   return true
 }
