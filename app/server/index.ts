@@ -27,6 +27,7 @@ import {
   initGitHubChecks,
   mergePR,
   refreshPRChecks,
+  replyToReviewComment,
   requestPRReview,
   rerunAllFailedChecks,
   rerunFailedCheck,
@@ -295,6 +296,33 @@ fastify.post<{
   await refreshPRChecks(true)
   return { ok: true }
 })
+
+// Reply to a review comment thread
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string; commentId: string }
+  Body: { body: string }
+}>(
+  '/api/github/:owner/:repo/pr/:pr/reply/:commentId',
+  async (request, reply) => {
+    const { owner, repo, pr, commentId } = request.params
+    const { body } = request.body
+    if (!body) {
+      return reply.status(400).send({ error: 'body is required' })
+    }
+    const result = await replyToReviewComment(
+      owner,
+      repo,
+      Number(pr),
+      Number(commentId),
+      body,
+    )
+    if (!result.ok) {
+      return reply.status(500).send({ error: result.error })
+    }
+    await refreshPRChecks(true)
+    return { ok: true }
+  },
+)
 
 // Re-run failed check
 fastify.post<{

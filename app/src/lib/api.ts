@@ -374,6 +374,27 @@ export async function addPRComment(
   }
 }
 
+export async function replyToReviewComment(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  commentId: number,
+  body: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/reply/${commentId}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to reply to comment')
+  }
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,

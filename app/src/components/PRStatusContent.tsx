@@ -114,7 +114,7 @@ const ReviewRow = memo(function ReviewRow({
   hasConflicts?: boolean
   onReReview: (author: string) => void
   onMerge?: () => void
-  onReply: (author: string) => void
+  onReply: (author: string, reviewCommentId?: number) => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
 
@@ -222,7 +222,7 @@ const CommentItem = memo(function CommentItem({
   }
   prUrl: string
   onHide: (author: string) => void
-  onReply: (author: string) => void
+  onReply: (author: string, reviewCommentId?: number) => void
   hidePath?: boolean
   indent?: boolean
 }) {
@@ -334,10 +334,13 @@ function ReviewThreadGroup({
   thread: PRReviewThread
   prUrl: string
   onHide: (author: string) => void
-  onReply: (author: string) => void
+  onReply: (author: string, reviewCommentId?: number) => void
 }) {
   const [root, ...replies] = thread.comments
   if (!root) return null
+
+  // Wrap onReply to include the root comment ID for review thread replies
+  const handleThreadReply = (author: string) => onReply(author, root.id)
 
   return (
     <div>
@@ -351,7 +354,7 @@ function ReviewThreadGroup({
         comment={root}
         prUrl={prUrl}
         onHide={onHide}
-        onReply={onReply}
+        onReply={handleThreadReply}
         hidePath
       />
       {replies.map((reply, i) => (
@@ -360,7 +363,7 @@ function ReviewThreadGroup({
           comment={reply}
           prUrl={prUrl}
           onHide={onHide}
-          onReply={onReply}
+          onReply={handleThreadReply}
           hidePath
           indent
         />
@@ -430,7 +433,7 @@ function CollapsedAuthorGroup({
 }: {
   group: CollapsedGroup
   prUrl: string
-  onReply: (author: string) => void
+  onReply: (author: string, reviewCommentId?: number) => void
   onHide: (author: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -491,7 +494,7 @@ function DiscussionTimeline({
   collapsedAuthorsSet: Set<string>
   onReReview: (author: string) => void
   onMerge: () => void
-  onReply: (author: string) => void
+  onReply: (author: string, reviewCommentId?: number) => void
   onHide: (author: string) => void
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
@@ -724,7 +727,10 @@ export function PRStatusContent({
     url: string
   } | null>(null)
   const [rerunAllOpen, setRerunAllOpen] = useState(false)
-  const [replyAuthor, setReplyAuthor] = useState<string | null>(null)
+  const [replyTarget, setReplyTarget] = useState<{
+    author: string
+    reviewCommentId?: number
+  } | null>(null)
 
   const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
     await api.mergePR(owner, repo, pr.prNumber, method)
@@ -742,12 +748,25 @@ export function PRStatusContent({
     [],
   )
 
-  const handleReply = useCallback((author: string) => {
-    setReplyAuthor(author)
-  }, [])
+  const handleReply = useCallback(
+    (author: string, reviewCommentId?: number) => {
+      setReplyTarget({ author, reviewCommentId })
+    },
+    [],
+  )
 
   const handleSendReply = async (body: string) => {
-    await api.addPRComment(owner, repo, pr.prNumber, body)
+    if (replyTarget?.reviewCommentId) {
+      await api.replyToReviewComment(
+        owner,
+        repo,
+        pr.prNumber,
+        replyTarget.reviewCommentId,
+        body,
+      )
+    } else {
+      await api.addPRComment(owner, repo, pr.prNumber, body)
+    }
     toast.success('Comment posted')
   }
 
@@ -976,11 +995,11 @@ export function PRStatusContent({
             />
           )}
 
-          {replyAuthor && (
+          {replyTarget && (
             <ReplyDialog
-              author={replyAuthor}
+              author={replyTarget.author}
               onConfirm={handleSendReply}
-              onClose={() => setReplyAuthor(null)}
+              onClose={() => setReplyTarget(null)}
             />
           )}
         </div>

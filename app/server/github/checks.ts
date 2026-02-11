@@ -1487,6 +1487,45 @@ export function addPRComment(
   })
 }
 
+export function replyToReviewComment(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  commentId: number,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const prId = `${owner}/${repo}#${prNumber}`
+  const cmd = `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies -f body="..."`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies`,
+        '-f',
+        `body=${body}`,
+      ],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        invalidateChecksCache()
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
 /** Send the last polled PR data to a specific socket (e.g. on connect). */
 export function emitCachedPRChecks(socket: {
   emit: (ev: string, data: unknown) => void
