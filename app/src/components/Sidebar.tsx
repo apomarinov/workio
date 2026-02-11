@@ -19,6 +19,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   Ellipsis,
+  EyeOff,
   GitBranch,
   Github,
   GitMerge,
@@ -1082,18 +1083,19 @@ export function Sidebar({ width }: SidebarProps) {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Hidden Items</DialogTitle>
+            <DialogTitle>Repo Config</DialogTitle>
             <DialogDescription>
-              Manage hidden PRs and comment authors for{' '}
+              Manage author filters and hidden PRs for{' '}
               {hiddenPRsModalRepo?.split('/')[1] || hiddenPRsModalRepo}.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-80 overflow-y-auto">
+          <div className="space-y-4 max-h-[80vh] overflow-y-auto">
             {(settings?.silence_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <BellOff className="w-3 h-3" />
                   Silenced Authors
                 </p>
                 {(settings?.silence_gh_authors ?? [])
@@ -1141,7 +1143,8 @@ export function Sidebar({ width }: SidebarProps) {
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <ChevronsDownUp className="w-3 h-3" />
                   Collapsed Authors
                 </p>
                 {(settings?.collapse_gh_authors ?? [])
@@ -1189,7 +1192,8 @@ export function Sidebar({ width }: SidebarProps) {
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <EyeOff className="w-3 h-3" />
                   Hidden Comment Authors
                 </p>
                 {(settings?.hide_gh_authors ?? [])
@@ -1235,7 +1239,8 @@ export function Sidebar({ width }: SidebarProps) {
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <EyeOff className="w-3 h-3" />
                   Hidden Pull Requests
                 </p>
                 {(settings?.hidden_prs ?? [])
