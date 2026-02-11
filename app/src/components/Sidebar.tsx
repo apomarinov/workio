@@ -95,6 +95,9 @@ export function Sidebar({ width }: SidebarProps) {
   const [removingSilencedAuthor, setRemovingSilencedAuthor] = useState<
     string | null
   >(null)
+  const [removingCollapsedAuthor, setRemovingCollapsedAuthor] = useState<
+    string | null
+  >(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [groupingOpen, setGroupingOpen] = useState(false)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
@@ -924,10 +927,14 @@ export function Sidebar({ width }: SidebarProps) {
                     const silencedAuthorsForRepo = (
                       settings?.silence_gh_authors ?? []
                     ).filter((h) => h.repo === repo)
+                    const collapsedAuthorsForRepo = (
+                      settings?.collapse_gh_authors ?? []
+                    ).filter((h) => h.repo === repo)
                     const hasHiddenItems =
                       hiddenPRsForRepo.length > 0 ||
                       hiddenAuthorsForRepo.length > 0 ||
-                      silencedAuthorsForRepo.length > 0
+                      silencedAuthorsForRepo.length > 0 ||
+                      collapsedAuthorsForRepo.length > 0
                     return (
                       <div key={repo}>
                         <div className="group/repo-header flex items-center">
@@ -1121,6 +1128,54 @@ export function Sidebar({ width }: SidebarProps) {
                         className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
                       >
                         {removingSilencedAuthor === entry.author ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+            {(settings?.collapse_gh_authors ?? []).filter(
+              (h) => h.repo === hiddenPRsModalRepo,
+            ).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Collapsed Authors
+                </p>
+                {(settings?.collapse_gh_authors ?? [])
+                  .filter((h) => h.repo === hiddenPRsModalRepo)
+                  .map((entry) => (
+                    <div
+                      key={entry.author}
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                    >
+                      <span className="text-sm">{entry.author}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRemovingCollapsedAuthor(entry.author)
+                          try {
+                            const current = settings?.collapse_gh_authors ?? []
+                            const updated = current.filter(
+                              (e) =>
+                                !(
+                                  e.repo === hiddenPRsModalRepo &&
+                                  e.author === entry.author
+                                ),
+                            )
+                            await updateSettings({
+                              collapse_gh_authors: updated,
+                            })
+                          } finally {
+                            setRemovingCollapsedAuthor(null)
+                          }
+                        }}
+                        disabled={removingCollapsedAuthor === entry.author}
+                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                      >
+                        {removingCollapsedAuthor === entry.author ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <Trash2 className="w-4 h-4" />

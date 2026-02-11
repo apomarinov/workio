@@ -16,9 +16,11 @@ interface HideAuthorDialogProps {
   repo: string
   isHidden: boolean
   isSilenced: boolean
+  isCollapsed: boolean
   onSave: (config: {
     hideComments: boolean
     silenceNotifications: boolean
+    collapseReplies: boolean
   }) => Promise<void>
   onClose: () => void
 }
@@ -28,6 +30,7 @@ export function HideAuthorDialog({
   repo,
   isHidden,
   isSilenced,
+  isCollapsed,
   onSave,
   onClose,
 }: HideAuthorDialogProps) {
@@ -35,11 +38,13 @@ export function HideAuthorDialog({
   const [loading, setLoading] = useState(false)
   const [hideComments, setHideComments] = useState(isHidden)
   const [silenceNotifications, setSilenceNotifications] = useState(isSilenced)
+  const [collapseReplies, setCollapseReplies] = useState(isCollapsed)
 
   useEffect(() => {
     setHideComments(isHidden)
     setSilenceNotifications(isSilenced)
-  }, [isHidden, isSilenced])
+    setCollapseReplies(isCollapsed)
+  }, [isHidden, isSilenced, isCollapsed])
 
   const handleClose = () => {
     setOpen(false)
@@ -55,7 +60,7 @@ export function HideAuthorDialog({
   const handleSave = async () => {
     setLoading(true)
     try {
-      await onSave({ hideComments, silenceNotifications })
+      await onSave({ hideComments, silenceNotifications, collapseReplies })
       handleClose()
     } finally {
       setLoading(false)
@@ -103,6 +108,19 @@ export function HideAuthorDialog({
                 setSilenceNotifications(checked)
                 if (checked) setHideComments(false)
               }}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <div>
+              <p className="text-sm font-medium">Collapse replies</p>
+              <p className="text-xs text-muted-foreground">
+                Group consecutive items into a collapsible row
+              </p>
+            </div>
+            <Switch
+              checked={collapseReplies && !hideComments}
+              disabled={hideComments}
+              onCheckedChange={setCollapseReplies}
             />
           </label>
         </div>

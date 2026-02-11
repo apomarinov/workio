@@ -397,6 +397,15 @@ function getLatestActivityTime(item: PRDiscussionItem): number {
   }
 }
 
+type CollapsedGroup = {
+  type: 'collapsed-group'
+  author: string
+  avatarUrl: string
+  items: Extract<PRDiscussionItem, { type: 'comment' }>[]
+}
+
+type DisplayItem = PRDiscussionItem | CollapsedGroup
+
 function flattenDiscussion(discussion: PRDiscussionItem[]): PRDiscussionItem[] {
   const items: PRDiscussionItem[] = []
   for (const item of discussion) {
@@ -413,10 +422,64 @@ function flattenDiscussion(discussion: PRDiscussionItem[]): PRDiscussionItem[] {
   return items
 }
 
+function CollapsedAuthorGroup({
+  group,
+  prUrl,
+  onReply,
+  onHide,
+}: {
+  group: CollapsedGroup
+  prUrl: string
+  onReply: (author: string) => void
+  onHide: (author: string) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
+      >
+        {expanded ? (
+          <ChevronDown className="w-3 h-3 flex-shrink-0" />
+        ) : (
+          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+        )}
+        {group.avatarUrl ? (
+          <img
+            src={group.avatarUrl}
+            alt={group.author}
+            className="w-4 h-4 rounded-full flex-shrink-0"
+          />
+        ) : (
+          <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+        )}
+        <span className="text-xs truncate">{group.author}</span>
+        <span className="text-[10px] text-muted-foreground/50">
+          ({group.items.length} comments)
+        </span>
+      </button>
+      {expanded &&
+        group.items.map((item, i) => (
+          <CommentItem
+            key={`comment-${item.comment.id || i}`}
+            comment={item.comment}
+            prUrl={prUrl}
+            onHide={onHide}
+            onReply={onReply}
+          />
+        ))}
+    </div>
+  )
+}
+
 function DiscussionTimeline({
   discussion,
   pr,
   hiddenAuthorsSet,
+  collapsedAuthorsSet,
   onReReview,
   onMerge,
   onReply,
@@ -425,6 +488,7 @@ function DiscussionTimeline({
   discussion: PRDiscussionItem[]
   pr: PRCheckStatus
   hiddenAuthorsSet: Set<string>
+  collapsedAuthorsSet: Set<string>
   onReReview: (author: string) => void
   onMerge: () => void
   onReply: (author: string) => void
@@ -452,13 +516,51 @@ function DiscussionTimeline({
     })
   }, [discussion, hiddenAuthorsSet, displayMode])
 
-  const visibleDiscussion = useMemo(
-    () => processedDiscussion.slice(0, visibleCount),
-    [processedDiscussion, visibleCount],
-  )
-  const hasMore = visibleCount < processedDiscussion.length
+  const groupedDiscussion: DisplayItem[] = useMemo(() => {
+    if (collapsedAuthorsSet.size === 0) return processedDiscussion
+    const result: DisplayItem[] = []
+    let i = 0
+    while (i < processedDiscussion.length) {
+      const item = processedDiscussion[i]
+      if (
+        item.type === 'comment' &&
+        collapsedAuthorsSet.has(item.comment.author)
+      ) {
+        const author = item.comment.author
+        const group: Extract<PRDiscussionItem, { type: 'comment' }>[] = [item]
+        let j = i + 1
+        while (j < processedDiscussion.length) {
+          const next = processedDiscussion[j]
+          if (next.type !== 'comment' || next.comment.author !== author) break
+          group.push(next)
+          j++
+        }
+        if (group.length >= 2) {
+          result.push({
+            type: 'collapsed-group',
+            author,
+            avatarUrl: item.comment.avatarUrl,
+            items: group,
+          })
+        } else {
+          result.push(item)
+        }
+        i = j
+      } else {
+        result.push(item)
+        i++
+      }
+    }
+    return result
+  }, [processedDiscussion, collapsedAuthorsSet])
 
-  if (processedDiscussion.length === 0) return null
+  const visibleDiscussion = useMemo(
+    () => groupedDiscussion.slice(0, visibleCount),
+    [groupedDiscussion, visibleCount],
+  )
+  const hasMore = visibleCount < groupedDiscussion.length
+
+  if (groupedDiscussion.length === 0) return null
 
   return (
     <>
@@ -482,6 +584,16 @@ function DiscussionTimeline({
       </div>
       {visibleDiscussion.map((item, i) => {
         switch (item.type) {
+          case 'collapsed-group':
+            return (
+              <CollapsedAuthorGroup
+                key={`collapsed-${item.author}-${i}`}
+                group={item}
+                prUrl={pr.prUrl}
+                onReply={onReply}
+                onHide={onHide}
+              />
+            )
           case 'review':
             return (
               <div key={`review-${item.review.id || i}`}>
@@ -539,7 +651,7 @@ function DiscussionTimeline({
           onClick={() => setVisibleCount((v) => v + 10)}
           className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
-          Show more ({processedDiscussion.length - visibleCount} remaining)
+          Show more ({groupedDiscussion.length - visibleCount} remaining)
         </button>
       )}
     </>
@@ -576,6 +688,16 @@ export function PRStatusContent({
     }
     return set
   }, [settings?.silence_gh_authors, pr.repo])
+
+  const collapsedAuthorsSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const entry of settings?.collapse_gh_authors ?? []) {
+      if (entry.repo === pr.repo) {
+        set.add(entry.author)
+      }
+    }
+    return set
+  }, [settings?.collapse_gh_authors, pr.repo])
 
   const hasChecks = pr.checks.length > 0
   const hasDiscussion = useMemo(
@@ -657,16 +779,21 @@ export function PRStatusContent({
   const handleAuthorConfig = async (config: {
     hideComments: boolean
     silenceNotifications: boolean
+    collapseReplies: boolean
   }) => {
     if (!hideAuthor) return
 
     const currentHidden = settings?.hide_gh_authors ?? []
     const currentSilenced = settings?.silence_gh_authors ?? []
+    const currentCollapsed = settings?.collapse_gh_authors ?? []
 
     const withoutHidden = currentHidden.filter(
       (e) => !(e.repo === pr.repo && e.author === hideAuthor),
     )
     const withoutSilenced = currentSilenced.filter(
+      (e) => !(e.repo === pr.repo && e.author === hideAuthor),
+    )
+    const withoutCollapsed = currentCollapsed.filter(
       (e) => !(e.repo === pr.repo && e.author === hideAuthor),
     )
 
@@ -676,14 +803,20 @@ export function PRStatusContent({
     const newSilenced = config.silenceNotifications
       ? [...withoutSilenced, { repo: pr.repo, author: hideAuthor }]
       : withoutSilenced
+    const newCollapsed = config.collapseReplies
+      ? [...withoutCollapsed, { repo: pr.repo, author: hideAuthor }]
+      : withoutCollapsed
 
     await updateSettings({
       hide_gh_authors: newHidden,
       silence_gh_authors: newSilenced,
+      collapse_gh_authors: newCollapsed,
     })
 
     if (config.hideComments) {
       toast.success(`Comments from ${hideAuthor} hidden`)
+    } else if (config.collapseReplies) {
+      toast.success(`Replies from ${hideAuthor} collapsed`)
     } else if (config.silenceNotifications) {
       toast.success(`Notifications from ${hideAuthor} silenced`)
     } else {
@@ -788,6 +921,7 @@ export function PRStatusContent({
             discussion={pr.discussion}
             pr={pr}
             hiddenAuthorsSet={hiddenAuthorsSet}
+            collapsedAuthorsSet={collapsedAuthorsSet}
             onReReview={handleReReview}
             onMerge={() => setMergeOpen(true)}
             onReply={handleReply}
@@ -832,6 +966,7 @@ export function PRStatusContent({
               repo={pr.repo}
               isHidden={hiddenAuthorsSet.has(hideAuthor)}
               isSilenced={silencedAuthorsSet.has(hideAuthor)}
+              isCollapsed={collapsedAuthorsSet.has(hideAuthor)}
               onSave={handleAuthorConfig}
               onClose={() => setHideAuthor(null)}
             />

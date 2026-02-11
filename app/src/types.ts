@@ -347,6 +347,7 @@ export interface Settings {
   repo_webhooks?: Record<string, RepoWebhookStatus>
   hide_gh_authors?: HiddenGHAuthor[]
   silence_gh_authors?: HiddenGHAuthor[]
+  collapse_gh_authors?: HiddenGHAuthor[]
   hidden_prs?: HiddenPR[]
   // Computed webhook warning counts
   missingWebhookCount?: number
