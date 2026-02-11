@@ -6,6 +6,8 @@ import {
   GitBranch,
   GitFork,
   GitPullRequest,
+  Heart,
+  HeartOff,
   Pencil,
   Pin,
   PinOff,
@@ -260,6 +262,19 @@ export function createActionsMode(
         ),
         onSelect: () => {
           actions.toggleSessionPin(session.session_id)
+          api.close()
+        },
+      },
+      {
+        id: 'action:favorite',
+        label: session.is_favorite ? 'Unfavorite' : 'Favorite',
+        icon: session.is_favorite ? (
+          <HeartOff className="h-4 w-4 shrink-0 text-zinc-400" />
+        ) : (
+          <Heart className="h-4 w-4 shrink-0 text-zinc-400" />
+        ),
+        onSelect: () => {
+          actions.toggleFavoriteSession(session.session_id)
           api.close()
         },
       },

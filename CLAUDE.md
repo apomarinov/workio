@@ -40,6 +40,10 @@
 - Component props interfaces (e.g., `FooProps`) are OK to keep local to their component file.
 - Utility functions go in `src/lib/`, not in type files.
 
+## React
+
+- This project uses **React Compiler** — do not use `useMemo`, `useCallback`, or `React.memo` manually. The compiler handles memoization automatically.
+
 ## UI
 
 - Always use available shadcn components from `src/components/ui/` (Dialog, Button, Input, Popover, Card, Switch, etc.).

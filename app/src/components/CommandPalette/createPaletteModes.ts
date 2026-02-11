@@ -11,6 +11,7 @@ import type {
 } from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
+import { createFavoriteSessionsMode } from './modes/favorite-sessions'
 import { createPRActionsMode } from './modes/pr-actions'
 import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
@@ -55,6 +56,7 @@ export type AppActions = {
   // Pin actions
   toggleTerminalPin: (terminalId: number) => void
   toggleSessionPin: (sessionId: string) => void
+  toggleFavoriteSession: (sessionId: string) => void
 
   // Branch actions
   loadBranches: (terminalId: number) => void
@@ -98,6 +100,7 @@ export function createPaletteModes(
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
     shell: createShellMode(data, level, actions, api),
     'session-search': createSessionSearchMode(data, level, actions, api),
+    'favorite-sessions': createFavoriteSessionsMode(data, level, actions, api),
   }
 }
 

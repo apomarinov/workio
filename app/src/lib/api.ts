@@ -224,6 +224,16 @@ export async function deleteSessions(ids: string[]): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete sessions')
 }
 
+export async function toggleFavoriteSession(
+  sessionId: string,
+): Promise<{ is_favorite: boolean }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/favorite`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to toggle favorite')
+  return res.json()
+}
+
 export async function searchSessionMessages(
   query: string,
   signal?: AbortSignal,

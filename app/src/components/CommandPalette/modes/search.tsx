@@ -6,6 +6,7 @@ import {
   GitBranch,
   GitMerge,
   Globe,
+  Heart,
   ScrollText,
   Search,
   TerminalSquare,
@@ -318,9 +319,20 @@ export function createSearchMode(
       onSelect: () =>
         api.push({ mode: 'session-search', title: 'Find Sessions' }),
     }
+    const sessionActions: PaletteItem[] = [findSessionsItem]
+    if (sessions.some((s) => s.is_favorite)) {
+      sessionActions.push({
+        id: 'action:favorite-sessions',
+        label: 'Favorite Sessions',
+        icon: <Heart className="h-4 w-4 shrink-0 text-zinc-400" />,
+        keywords: ['favorite sessions', 'favorites'],
+        onSelect: () =>
+          api.push({ mode: 'favorite-sessions', title: 'Favorite Sessions' }),
+      })
+    }
     groups.push({
       heading: 'Claude Sessions',
-      items: [findSessionsItem, ...sessionItems],
+      items: [...sessionActions, ...sessionItems],
     })
   }
   // Add actions group with logs

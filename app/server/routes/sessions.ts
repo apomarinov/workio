@@ -5,15 +5,51 @@ import {
   getAllSessions,
   getSessionById,
   getSessionMessages,
+  getSettings,
   searchSessionMessages,
   updateSession,
+  updateSettings,
 } from '../db'
 
 export default async function sessionRoutes(fastify: FastifyInstance) {
   // List all Claude sessions with project paths
   fastify.get('/api/sessions', async () => {
-    return await getAllSessions()
+    const [sessions, settings] = await Promise.all([
+      getAllSessions(),
+      getSettings(),
+    ])
+    const favorites = settings.favorite_sessions ?? []
+    const favoriteSet = new Set(favorites)
+
+    // Cleanup stale favorites
+    const sessionIds = new Set(sessions.map((s) => s.session_id))
+    const cleaned = favorites.filter((id) => sessionIds.has(id))
+    if (cleaned.length !== favorites.length) {
+      updateSettings({ favorite_sessions: cleaned })
+    }
+
+    return sessions.map((s) => ({
+      ...s,
+      is_favorite: favoriteSet.has(s.session_id),
+    }))
   })
+
+  // Toggle favorite status for a session
+  fastify.post<{ Params: { id: string } }>(
+    '/api/sessions/:id/favorite',
+    async (request) => {
+      const { id } = request.params
+      const settings = await getSettings()
+      const favorites = settings.favorite_sessions ?? []
+      const index = favorites.indexOf(id)
+      const isFavorite = index === -1
+      const updated = isFavorite
+        ? [...favorites, id]
+        : favorites.filter((fid) => fid !== id)
+      await updateSettings({ favorite_sessions: updated })
+      return { is_favorite: isFavorite }
+    },
+  )
 
   // Search session messages
   fastify.get<{ Querystring: { q?: string } }>(

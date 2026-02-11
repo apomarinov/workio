@@ -142,6 +142,7 @@ export function createSessionSearchMode(
               updated_at: '',
               latest_user_message: null,
               latest_agent_message: null,
+              is_favorite: false,
             },
           })
         },

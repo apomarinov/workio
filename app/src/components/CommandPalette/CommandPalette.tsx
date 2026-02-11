@@ -18,6 +18,7 @@ import {
   pushBranch,
   rebaseBranch,
   searchSessionMessages,
+  toggleFavoriteSession,
 } from '@/lib/api'
 import type { PRCheckStatus } from '../../../shared/types'
 import type {
@@ -109,6 +110,7 @@ export function CommandPalette() {
     clearSession,
     updateSession,
     deleteSession,
+    refetch: refetchSessions,
   } = useSessionContext()
   const { gitDirtyStatus } = useProcessContext()
   const { settings, updateSettings } = useSettings()
@@ -502,6 +504,10 @@ export function CommandPalette() {
             : [...prev, sessionId],
         )
       },
+      toggleFavoriteSession: async (sessionId) => {
+        await toggleFavoriteSession(sessionId)
+        refetchSessions()
+      },
 
       // Branch actions
       loadBranches: (terminalId) => {
@@ -710,6 +716,7 @@ export function CommandPalette() {
       preferredIDE,
       settings,
       updateSettings,
+      refetchSessions,
     ],
   )
 

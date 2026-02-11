@@ -51,6 +51,7 @@ export interface SessionWithProject extends Session {
   project_path: string
   latest_user_message: string | null
   latest_agent_message: string | null
+  is_favorite: boolean
 }
 
 export interface SessionSearchMatch {
@@ -349,6 +350,7 @@ export interface Settings {
   silence_gh_authors?: HiddenGHAuthor[]
   collapse_gh_authors?: HiddenGHAuthor[]
   hidden_prs?: HiddenPR[]
+  favorite_sessions?: string[]
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number
