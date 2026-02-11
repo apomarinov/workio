@@ -353,8 +353,15 @@ function ReviewThreadGroup({
   defaultExpanded?: boolean
   largeText?: boolean
 }) {
+  const [showAllReplies, setShowAllReplies] = useState(false)
   const [root, ...replies] = thread.comments
   if (!root) return null
+
+  const REPLY_LIMIT = 3
+  const sortedReplies = [...replies].reverse()
+  const hasMoreReplies = sortedReplies.length > REPLY_LIMIT
+  const firstReplies = sortedReplies.slice(0, REPLY_LIMIT)
+  const remainingReplies = sortedReplies.slice(REPLY_LIMIT)
 
   // Wrap onReply to include the root comment ID for review thread replies
   const handleThreadReply = (author: string) => onReply(author, root.id)
@@ -376,7 +383,7 @@ function ReviewThreadGroup({
         defaultExpanded={defaultExpanded}
         largeText={largeText}
       />
-      {replies.map((reply, i) => (
+      {firstReplies.map((reply, i) => (
         <CommentItem
           key={reply.id || i}
           comment={reply}
@@ -389,6 +396,34 @@ function ReviewThreadGroup({
           largeText={largeText}
         />
       ))}
+      {hasMoreReplies && (
+        <button
+          type="button"
+          onClick={() => setShowAllReplies((v) => !v)}
+          className="flex items-center gap-1 ml-4 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <ChevronDown
+            className={`w-3 h-3 transition-transform ${showAllReplies ? '' : '-rotate-90'}`}
+          />
+          {showAllReplies
+            ? 'Show less'
+            : `Show all (${replies.length} replies)`}
+        </button>
+      )}
+      {showAllReplies &&
+        remainingReplies.map((reply, i) => (
+          <CommentItem
+            key={reply.id || i}
+            comment={reply}
+            prUrl={prUrl}
+            onHide={onHide}
+            onReply={handleThreadReply}
+            hidePath
+            indent
+            defaultExpanded={defaultExpanded}
+            largeText={largeText}
+          />
+        ))}
     </div>
   )
 }
