@@ -6,12 +6,12 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -234,294 +234,310 @@ export function CommitDialog({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
-        className="w-[95vw] sm:max-w-[1500px] h-[95vh] max-h-[1500px] flex flex-col overflow-hidden"
+        className="w-[95vw] p-4 sm:max-w-[1500px] h-[95vh] max-h-[1500px] flex flex-col overflow-hidden"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           textareaRef.current?.focus()
         }}
+        onInteractOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader>
+        <DialogHeader className="hidden">
           <DialogTitle>Commit Changes</DialogTitle>
-          <DialogDescription>
-            Select files to stage and create a commit.
-          </DialogDescription>
         </DialogHeader>
 
         {/* Two-column layout */}
-        <div className="flex gap-4 min-h-0 flex-1 overflow-hidden">
+        <Group
+          orientation="horizontal"
+          className="min-h-0 flex-1 overflow-hidden rounded-md border border-zinc-700"
+        >
           {/* Left column: file list */}
-          <div className="w-72 flex-shrink-0 flex flex-col rounded-md border border-zinc-700">
-            {/* Toolbar */}
-            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-700">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Checkbox
-                      checked={
-                        allSelected
-                          ? true
-                          : selectedFiles.size > 0
-                            ? 'indeterminate'
-                            : false
-                      }
-                      onCheckedChange={() => toggleAll()}
-                      disabled={
-                        loading || loadingFiles || changedFiles.length === 0
-                      }
-                      className="h-4 w-4"
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {allSelected ? 'Deselect all' : 'Select all'}
-                </TooltipContent>
-              </Tooltip>
-              <span className="text-zinc-500 text-xs mr-auto">
-                {selectedFiles.size}/{changedFiles.length}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => setGroupByFolder((v) => !v)}
-                    className={cn(groupByFolder && 'bg-zinc-700')}
-                  >
-                    <Folder className="size-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Group by folder</TooltipContent>
-              </Tooltip>
-              {groupByFolder && (
-                <>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() =>
-                          setExpandedFolders(new Set(sortedFolders))
+          <Panel
+            id="commit-files"
+            defaultSize="280px"
+            minSize="180px"
+            maxSize="50%"
+          >
+            <div className="flex flex-col h-full">
+              {/* Toolbar */}
+              <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-700">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Checkbox
+                        checked={
+                          allSelected
+                            ? true
+                            : selectedFiles.size > 0
+                              ? 'indeterminate'
+                              : false
                         }
-                      >
-                        <ChevronsUpDown className="size-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Expand all</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => setExpandedFolders(new Set())}
-                      >
-                        <ChevronsDownUp className="size-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Collapse all</TooltipContent>
-                  </Tooltip>
-                </>
-              )}
-            </div>
-            <div className="flex-1 overflow-y-auto border-t border-zinc-700">
-              {loadingFiles ? (
-                <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading files...
-                </div>
-              ) : changedFiles.length === 0 ? (
-                <div className="py-4 text-center text-sm text-zinc-500">
-                  No changed files
-                </div>
-              ) : groupByFolder ? (
-                sortedFolders.map((folder) => {
-                  const files = folderGroups.get(folder) ?? []
-                  const isExpanded = expandedFolders.has(folder)
-                  const allInFolder = files.every((f) =>
-                    selectedFiles.has(f.path),
-                  )
-                  const someInFolder =
-                    !allInFolder && files.some((f) => selectedFiles.has(f.path))
-                  return (
-                    <div key={folder}>
-                      <div
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer"
-                        onClick={() => toggleFolder(folder)}
-                      >
-                        <Checkbox
-                          checked={
-                            allInFolder
-                              ? true
-                              : someInFolder
-                                ? 'indeterminate'
-                                : false
-                          }
-                          onCheckedChange={() => toggleFolderFiles(folder)}
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={loading}
-                          className="h-4 w-4"
-                        />
-                        <ChevronDown
-                          className={cn(
-                            'size-3 text-zinc-400 transition-transform duration-150',
-                            !isExpanded && '-rotate-90',
-                          )}
-                        />
-                        <Folder className="size-3 text-zinc-400" />
-                        <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
-                          {folder === '.' ? '(root)' : folder}
-                        </span>
-                        <span className="text-zinc-500 text-xs">
-                          {files.length}
-                        </span>
-                      </div>
-                      {isExpanded &&
-                        files.map((file) => {
-                          const fileName = file.path.substring(
-                            file.path.lastIndexOf('/') + 1,
-                          )
-                          return (
-                            <div
-                              key={file.path}
-                              className={cn(
-                                'flex w-full items-center gap-2 pl-6 pr-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer',
-                                selectedFile === file.path && 'bg-zinc-700/50',
-                              )}
-                              onClick={() => setSelectedFile(file.path)}
-                            >
-                              <Checkbox
-                                checked={selectedFiles.has(file.path)}
-                                onCheckedChange={(e) => {
-                                  e
-                                  toggleFile(file.path)
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                disabled={loading}
-                                className="h-4 w-4"
-                              />
-                              <FileStatusBadge status={file.status} />
-                              <span className="flex-1 text-left text-zinc-300 font-mono text-[0.7rem]">
-                                <TruncatedPath path={fileName} />
-                              </span>
-                              {(file.added > 0 || file.removed > 0) && (
-                                <span className="flex-shrink-0 font-mono text-[0.7rem]">
-                                  {file.added > 0 && (
-                                    <span className="text-green-400">
-                                      +{file.added}
-                                    </span>
-                                  )}
-                                  {file.added > 0 && file.removed > 0 && ' '}
-                                  {file.removed > 0 && (
-                                    <span className="text-red-400">
-                                      -{file.removed}
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          )
-                        })}
+                        onCheckedChange={() => toggleAll()}
+                        disabled={
+                          loading || loadingFiles || changedFiles.length === 0
+                        }
+                        className="h-4 w-4"
+                      />
                     </div>
-                  )
-                })
-              ) : (
-                changedFiles.map((file) => (
-                  <div
-                    key={file.path}
-                    className={cn(
-                      'flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer',
-                      selectedFile === file.path && 'bg-zinc-700/50',
-                    )}
-                    onClick={() => setSelectedFile(file.path)}
-                  >
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {allSelected ? 'Deselect all' : 'Select all'}
+                  </TooltipContent>
+                </Tooltip>
+                <span className="text-zinc-500 text-xs mr-auto">
+                  {selectedFiles.size}/{changedFiles.length}
+                </span>
+                {groupByFolder && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() =>
+                            setExpandedFolders(new Set(sortedFolders))
+                          }
+                        >
+                          <ChevronsUpDown className="size-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Expand all</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => setExpandedFolders(new Set())}
+                        >
+                          <ChevronsDownUp className="size-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Collapse all</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => setGroupByFolder((v) => !v)}
+                      className={cn(groupByFolder && 'bg-zinc-700')}
+                    >
+                      <Folder className="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Group by folder</TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="flex-1 overflow-y-auto border-t border-zinc-700">
+                {loadingFiles ? (
+                  <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading files...
+                  </div>
+                ) : changedFiles.length === 0 ? (
+                  <div className="py-4 text-center text-sm text-zinc-500">
+                    No changed files
+                  </div>
+                ) : groupByFolder ? (
+                  sortedFolders.map((folder) => {
+                    const files = folderGroups.get(folder) ?? []
+                    const isExpanded = expandedFolders.has(folder)
+                    const allInFolder = files.every((f) =>
+                      selectedFiles.has(f.path),
+                    )
+                    const someInFolder =
+                      !allInFolder &&
+                      files.some((f) => selectedFiles.has(f.path))
+                    return (
+                      <div key={folder}>
+                        <div
+                          className="flex w-full items-center gap-2 px-2 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer"
+                          onClick={() => toggleFolder(folder)}
+                        >
+                          <Checkbox
+                            checked={
+                              allInFolder
+                                ? true
+                                : someInFolder
+                                  ? 'indeterminate'
+                                  : false
+                            }
+                            onCheckedChange={() => toggleFolderFiles(folder)}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={loading}
+                            className="h-4 w-4"
+                          />
+                          <ChevronDown
+                            className={cn(
+                              'size-3 text-zinc-400 transition-transform duration-150',
+                              !isExpanded && '-rotate-90',
+                            )}
+                          />
+                          <Folder className="size-3 text-zinc-400" />
+                          <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
+                            {folder === '.' ? '(root)' : folder}
+                          </span>
+                          <span className="text-zinc-500 text-xs">
+                            {files.length}
+                          </span>
+                        </div>
+                        {isExpanded &&
+                          files.map((file) => {
+                            const fileName = file.path.substring(
+                              file.path.lastIndexOf('/') + 1,
+                            )
+                            return (
+                              <div
+                                key={file.path}
+                                className={cn(
+                                  'flex w-full items-center gap-2 pl-6 pr-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer',
+                                  selectedFile === file.path &&
+                                    'bg-zinc-700/50',
+                                )}
+                                onClick={() => setSelectedFile(file.path)}
+                              >
+                                <Checkbox
+                                  checked={selectedFiles.has(file.path)}
+                                  onCheckedChange={(e) => {
+                                    e
+                                    toggleFile(file.path)
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  disabled={loading}
+                                  className="h-4 w-4"
+                                />
+                                <FileStatusBadge status={file.status} />
+                                <span className="flex-1 text-left text-zinc-300 font-mono text-[0.7rem]">
+                                  <TruncatedPath path={fileName} />
+                                </span>
+                                {(file.added > 0 || file.removed > 0) && (
+                                  <span className="flex-shrink-0 font-mono text-[0.7rem]">
+                                    {file.added > 0 && (
+                                      <span className="text-green-400">
+                                        +{file.added}
+                                      </span>
+                                    )}
+                                    {file.added > 0 && file.removed > 0 && ' '}
+                                    {file.removed > 0 && (
+                                      <span className="text-red-400">
+                                        -{file.removed}
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                      </div>
+                    )
+                  })
+                ) : (
+                  changedFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className={cn(
+                        'flex w-full items-center gap-2 px-2 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer',
+                        selectedFile === file.path && 'bg-zinc-700/50',
+                      )}
+                      onClick={() => setSelectedFile(file.path)}
+                    >
+                      <Checkbox
+                        checked={selectedFiles.has(file.path)}
+                        onCheckedChange={(e) => {
+                          e // keep TS happy
+                          toggleFile(file.path)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        disabled={loading}
+                        className="h-4 w-4"
+                      />
+                      <FileStatusBadge status={file.status} />
+                      <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
+                        <TruncatedPath path={file.path} />
+                      </span>
+                      {(file.added > 0 || file.removed > 0) && (
+                        <span className="flex-shrink-0 font-mono text-xs">
+                          {file.added > 0 && (
+                            <span className="text-green-400">
+                              +{file.added}
+                            </span>
+                          )}
+                          {file.added > 0 && file.removed > 0 && ' '}
+                          {file.removed > 0 && (
+                            <span className="text-red-400">
+                              -{file.removed}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </Panel>
+          <Separator className="panel-resize-handle" />
+          {/* Right column: commit message + diff viewer */}
+          <Panel id="commit-diff">
+            <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-3 overflow-hidden h-full p-3">
+              {/* Commit message + options */}
+              <div className="flex gap-3 flex-shrink-0 p-0.5">
+                <textarea
+                  ref={textareaRef}
+                  className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
+                  rows={4}
+                  placeholder="Commit message..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  disabled={amend || loading}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      (e.metaKey || e.ctrlKey) &&
+                      canCommit
+                    ) {
+                      handleCommit()
+                    }
+                  }}
+                />
+                <div className="flex flex-col gap-2 flex-shrink-0 justify-start">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
                     <Checkbox
-                      checked={selectedFiles.has(file.path)}
-                      onCheckedChange={(e) => {
-                        e // keep TS happy
-                        toggleFile(file.path)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
+                      checked={amend}
+                      onCheckedChange={(v) => handleAmendChange(v === true)}
                       disabled={loading}
                       className="h-4 w-4"
                     />
-                    <FileStatusBadge status={file.status} />
-                    <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
-                      <TruncatedPath path={file.path} />
-                    </span>
-                    {(file.added > 0 || file.removed > 0) && (
-                      <span className="flex-shrink-0 font-mono text-xs">
-                        {file.added > 0 && (
-                          <span className="text-green-400">+{file.added}</span>
-                        )}
-                        {file.added > 0 && file.removed > 0 && ' '}
-                        {file.removed > 0 && (
-                          <span className="text-red-400">-{file.removed}</span>
-                        )}
-                      </span>
+                    Amend
+                    {fetchingMessage && (
+                      <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
                     )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                    <Checkbox
+                      checked={noVerify}
+                      onCheckedChange={(v) => setNoVerify(v === true)}
+                      disabled={loading}
+                      className="h-4 w-4"
+                    />
+                    No verify
+                  </label>
+                </div>
+              </div>
 
-          {/* Right column: commit message + diff viewer */}
-          <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-3 overflow-hidden">
-            {/* Commit message + options */}
-            <div className="flex gap-3 flex-shrink-0 p-0.5">
-              <textarea
-                ref={textareaRef}
-                className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
-                rows={4}
-                placeholder="Commit message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                disabled={amend || loading}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === 'Enter' &&
-                    (e.metaKey || e.ctrlKey) &&
-                    canCommit
-                  ) {
-                    handleCommit()
-                  }
-                }}
-              />
-              <div className="flex flex-col gap-2 flex-shrink-0 justify-start">
-                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-                  <Checkbox
-                    checked={amend}
-                    onCheckedChange={(v) => handleAmendChange(v === true)}
-                    disabled={loading}
-                    className="h-4 w-4"
-                  />
-                  Amend
-                  {fetchingMessage && (
-                    <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
-                  )}
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-                  <Checkbox
-                    checked={noVerify}
-                    onCheckedChange={(v) => setNoVerify(v === true)}
-                    disabled={loading}
-                    className="h-4 w-4"
-                  />
-                  No verify
-                </label>
+              {/* Diff viewer */}
+              <div className="flex-1 min-h-0 rounded-md border border-zinc-700 overflow-hidden flex flex-col">
+                <FileDiffViewer
+                  terminalId={terminalId}
+                  filePath={selectedFile}
+                  preferredIde={settings?.preferred_ide ?? 'cursor'}
+                />
               </div>
             </div>
-
-            {/* Diff viewer */}
-            <div className="flex-1 min-h-0 rounded-md border border-zinc-700 overflow-hidden flex flex-col">
-              <FileDiffViewer
-                terminalId={terminalId}
-                filePath={selectedFile}
-                preferredIde={settings?.preferred_ide ?? 'cursor'}
-              />
-            </div>
-          </div>
-        </div>
+          </Panel>
+        </Group>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
