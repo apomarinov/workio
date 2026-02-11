@@ -206,7 +206,7 @@ export function createSearchMode(
   // Build session items
   const sessionItems: PaletteItem[] = sessions.map((s) => ({
     id: `s:${s.session_id}`,
-    label: s.name || s.latest_user_message || s.session_id,
+    label: s.name || s.latest_user_message || `Untitled in "${s.project_path}"`,
     description: s.latest_agent_message && (
       <span className="truncate">{s.latest_agent_message}</span>
     ),
@@ -314,7 +314,7 @@ export function createSearchMode(
       id: 'action:find-sessions',
       label: 'Find Sessions',
       icon: <Search className="h-4 w-4 shrink-0 text-zinc-400" />,
-      keywords: ['find', 'search', 'sessions', 'messages'],
+      keywords: ['find sessions'],
       onSelect: () =>
         api.push({ mode: 'session-search', title: 'Find Sessions' }),
     }

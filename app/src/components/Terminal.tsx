@@ -200,7 +200,6 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
       cursorBlink: true,
       cursorStyle: 'underline',
       fastScrollSensitivity: 5,
-      scrollSensitivity: 10,
       scrollback: 50000,
       fontSize: fontSizeRef.current,
       macOptionIsMeta: true,
@@ -246,6 +245,70 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
     })
 
     terminal.open(containerRef.current)
+
+    // Accelerate scrolling in alternate screen mode (Zellij, vim, etc.)
+    // xterm.js sends one mouse event per wheel tick which feels slow.
+    // We send additional mouse/arrow events to boost scroll speed.
+    const scrollTarget = containerRef.current.querySelector(
+      '.xterm-screen',
+    ) as HTMLElement | null
+    if (scrollTarget) {
+      scrollTarget.addEventListener(
+        'wheel',
+        (e: WheelEvent) => {
+          if (!terminalRef.current) return
+          const term = terminalRef.current
+          if (term.buffer.active.type !== 'alternate') return
+          if (isBusyRef.current) return
+
+          const speed = Math.abs(e.deltaY)
+          let extraLines = 0
+          if (speed > 250) extraLines = 16
+          else if (speed > 150) extraLines = 8
+          // console.log('[scroll]', {
+          //   deltaY: e.deltaY,
+          //   speed,
+          //   extraLines,
+          //   direction: e.deltaY > 0 ? 'down' : 'up',
+          //   mouseTracking: term.modes.mouseTrackingMode,
+          // })
+
+          if (extraLines === 0) return
+
+          const down = e.deltaY > 0
+          if (term.modes.mouseTrackingMode !== 'none') {
+            const btn = down ? 65 : 64
+            const rect = scrollTarget.getBoundingClientRect()
+            const cellWidth = rect.width / term.cols
+            const cellHeight = rect.height / term.rows
+            const col = Math.max(
+              1,
+              Math.min(
+                term.cols,
+                Math.floor((e.clientX - rect.left) / cellWidth) + 1,
+              ),
+            )
+            const row = Math.max(
+              1,
+              Math.min(
+                term.rows,
+                Math.floor((e.clientY - rect.top) / cellHeight) + 1,
+              ),
+            )
+            const seq = `\x1b[<${btn};${col};${row}M`
+            for (let i = 0; i < extraLines; i++) {
+              sendInputRef.current(seq)
+            }
+          } else {
+            const arrow = down ? '\x1b[B' : '\x1b[A'
+            for (let i = 0; i < extraLines; i++) {
+              sendInputRef.current(arrow)
+            }
+          }
+        },
+        { passive: true },
+      )
+    }
 
     // File path link provider — detect file paths in terminal output and open in IDE on click
     const filePathRegex =
