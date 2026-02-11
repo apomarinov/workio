@@ -7,7 +7,7 @@ import type { SessionWithProject, Terminal } from '../../types'
 
 export type PaletteItem = {
   id: string
-  label: string
+  label: ReactNode
   description?: ReactNode // sub-line text
   icon?: ReactNode
   rightSlot?: ReactNode // badges, checkmarks
@@ -15,6 +15,7 @@ export type PaletteItem = {
   disabled?: boolean
   disabledReason?: string
   loading?: boolean
+  wrapLabel?: boolean // when true, label wraps instead of truncating
   onSelect: () => void
   onNavigate?: () => void // ArrowRight -> opens submenu
 }

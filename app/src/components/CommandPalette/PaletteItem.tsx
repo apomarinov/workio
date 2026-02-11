@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { CommandItem } from '@/components/ui/command'
+import { cn } from '@/lib/utils'
 import type { PaletteItem as PaletteItemType } from './types'
 
 type Props = {
@@ -18,9 +19,10 @@ export function PaletteItem({ item }: Props) {
       {item.icon}
       <div className="flex min-w-0 flex-1 flex-col">
         <span
-          className={
-            item.disabled ? 'truncate text-zinc-500' : 'truncate font-medium'
-          }
+          className={cn(
+            item.disabled ? 'text-zinc-500' : 'font-medium',
+            !item.wrapLabel && 'truncate',
+          )}
         >
           {item.label}
         </span>

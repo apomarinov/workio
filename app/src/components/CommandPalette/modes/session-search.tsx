@@ -1,4 +1,5 @@
 import { Bot, Check } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
@@ -30,9 +31,52 @@ function SessionSearchIcon({ status }: { status: string }) {
   )
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text
-  return `${text.slice(0, max)}...`
+function contextExcerpt(text: string, query: string, maxLen = 200): string {
+  const lowerText = text.toLowerCase()
+  const lowerQuery = query.toLowerCase()
+  const idx = lowerText.indexOf(lowerQuery)
+  if (idx === -1) {
+    // No match found, return start of text
+    if (text.length <= maxLen) return text
+    return `${text.slice(0, maxLen)}...`
+  }
+  // Center the window around the match
+  const remaining = maxLen - query.length
+  let start = Math.max(0, idx - Math.floor(remaining / 2))
+  const end = Math.min(text.length, start + maxLen)
+  // Adjust start if end hit the boundary
+  if (end - start < maxLen) {
+    start = Math.max(0, end - maxLen)
+  }
+  const excerpt = text.slice(start, end)
+  const prefix = start > 0 ? '...' : ''
+  const suffix = end < text.length ? '...' : ''
+  return `${prefix}${excerpt}${suffix}`
+}
+
+function highlightMatch(text: string, query: string): ReactNode {
+  if (!query) return text
+  const lowerText = text.toLowerCase()
+  const lowerQuery = query.toLowerCase()
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+  let i = lowerText.indexOf(lowerQuery, lastIndex)
+  while (i !== -1) {
+    if (i > lastIndex) {
+      parts.push(text.slice(lastIndex, i))
+    }
+    parts.push(
+      <span key={i} className="font-semibold text-amber-400">
+        {text.slice(i, i + query.length)}
+      </span>,
+    )
+    lastIndex = i + query.length
+    i = lowerText.indexOf(lowerQuery, lastIndex)
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return parts.length === 1 ? parts[0] : <>{parts}</>
 }
 
 export function createSessionSearchMode(
@@ -41,7 +85,8 @@ export function createSessionSearchMode(
   _actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
-  const { sessionSearchResults, sessionSearchLoading } = data
+  const { sessionSearchResults, sessionSearchLoading, sessionSearchQuery } =
+    data
 
   if (sessionSearchLoading) {
     return {
@@ -102,12 +147,23 @@ export function createSessionSearchMode(
         },
       },
       // Message preview items (disabled, skipped in keyboard nav)
-      ...match.messages.map((msg, i) => ({
-        id: `session-search:${match.session_id}:msg:${i}`,
-        label: `${msg.is_user ? 'User' : 'Claude'}: ${truncate(msg.body, 120)}`,
-        disabled: true,
-        onSelect: () => {},
-      })),
+      ...match.messages.map((msg, i) => {
+        const prefix = msg.is_user ? 'User: ' : 'Claude: '
+        const excerpt = contextExcerpt(msg.body, sessionSearchQuery)
+        return {
+          id: `session-search:${match.session_id}:msg:${i}`,
+          label: (
+            <>
+              {prefix}
+              {highlightMatch(excerpt, sessionSearchQuery)}
+            </>
+          ),
+          keywords: [msg.body.slice(0, 60)],
+          disabled: true,
+          wrapLabel: true,
+          onSelect: () => {},
+        }
+      }),
     ]
 
     return { heading, items }

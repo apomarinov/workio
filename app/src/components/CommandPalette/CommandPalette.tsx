@@ -332,20 +332,21 @@ export function CommandPalette() {
             }
           }
         })
-    }, 300)
+    }, 500)
     return () => {
       clearTimeout(timer)
       searchAbortRef.current?.abort()
     }
   }, [searchText, currentModeId])
 
-  // Reset search state when palette closes or mode changes away
+  // Reset search state when palette closes or mode changes (input remounts via key)
   useEffect(() => {
-    if (!open || currentModeId !== 'session-search') {
-      setSearchText('')
-      setSessionSearchResults(null)
-      setSessionSearchLoading(false)
-    }
+    // Reference deps so the effect re-runs on open/mode changes
+    void open
+    void currentModeId
+    setSearchText('')
+    setSessionSearchResults(null)
+    setSessionSearchLoading(false)
   }, [open, currentModeId])
 
   // Build app data
@@ -362,6 +363,7 @@ export function CommandPalette() {
       preferredIDE,
       sessionSearchResults,
       sessionSearchLoading,
+      sessionSearchQuery: searchText,
     }),
     [
       terminals,
@@ -374,6 +376,7 @@ export function CommandPalette() {
       preferredIDE,
       sessionSearchResults,
       sessionSearchLoading,
+      searchText,
     ],
   )
 

@@ -30,6 +30,7 @@ export type AppData = {
   preferredIDE: PreferredIDE
   sessionSearchResults: SessionSearchMatch[] | null
   sessionSearchLoading: boolean
+  sessionSearchQuery: string
 }
 
 // Actions that modes can trigger
