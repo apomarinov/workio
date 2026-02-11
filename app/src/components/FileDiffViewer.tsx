@@ -71,6 +71,16 @@ const DIFF_BG = {
   header: 'rgba(96, 165, 250, 0.08)',
 } as const
 
+const WORD_HIGHLIGHT_BG = {
+  added: 'rgba(34, 197, 94, 0.3)',
+  removed: 'rgba(239, 68, 68, 0.3)',
+} as const
+
+const LINE_NUM_COLOR = {
+  added: 'rgba(34, 197, 94, 0.5)',
+  removed: 'rgba(239, 68, 68, 0.5)',
+} as const
+
 const HIGHLIGHT_BORDER = {
   added: 'rgba(34, 197, 94, 0.5)',
   removed: 'rgba(239, 68, 68, 0.5)',
@@ -291,7 +301,7 @@ export function FileDiffViewer({
           className="h-7 w-7"
           onClick={(e) => {
             e.stopPropagation()
-            openInIDE(filePath, preferredIde, terminalId).catch(() => { })
+            openInIDE(filePath, preferredIde, terminalId).catch(() => {})
           }}
           title={`Open in ${preferredIde === 'cursor' ? 'Cursor' : 'VS Code'}`}
         >
@@ -347,7 +357,15 @@ export function FileDiffViewer({
                     ...borderStyle,
                   }}
                 >
-                  <td className="relative select-none text-right text-zinc-600 px-1.5 w-10 align-top">
+                  <td
+                    className="relative select-none text-right px-1.5 w-10 align-top"
+                    style={{
+                      color:
+                        LINE_NUM_COLOR[
+                          line.type as keyof typeof LINE_NUM_COLOR
+                        ] ?? 'rgb(113, 113, 122)',
+                    }}
+                  >
                     <span className="group-hover/line:invisible">
                       {line.oldLineNumber ?? ''}
                     </span>
@@ -362,33 +380,64 @@ export function FileDiffViewer({
                             `${filePath}:${lineNum}`,
                             preferredIde,
                             terminalId,
-                          ).catch(() => { })
+                          ).catch(() => {})
                         }}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </td>
-                  <td className="select-none text-right text-zinc-600 px-1.5 w-10 border-r border-zinc-700/50 align-top">
+                  <td
+                    className="select-none text-right px-1.5 w-10 border-r border-zinc-700/50 align-top"
+                    style={{
+                      color:
+                        LINE_NUM_COLOR[
+                          line.type as keyof typeof LINE_NUM_COLOR
+                        ] ?? 'rgb(113, 113, 122)',
+                    }}
+                  >
                     {line.newLineNumber ?? ''}
                   </td>
                   <td className="pl-2 whitespace-pre overflow-x-auto">
-                    <SyntaxHighlighter
-                      language={language}
-                      style={oneDark}
-                      customStyle={{
-                        margin: 0,
-                        padding: 0,
-                        background: 'transparent',
-                        fontSize: 'inherit',
-                        lineHeight: 'inherit',
-                        display: 'inline',
-                      }}
-                      PreTag="span"
-                      CodeTag="span"
-                    >
-                      {line.content || ' '}
-                    </SyntaxHighlighter>
+                    {line.type === 'removed' ? (
+                      <span className="text-zinc-400">
+                        {line.segments?.some((s) => s.highlight)
+                          ? line.segments.map((seg, si) => (
+                              <span
+                                key={`${si}-${seg.highlight}`}
+                                style={
+                                  seg.highlight
+                                    ? {
+                                        backgroundColor:
+                                          WORD_HIGHLIGHT_BG.removed,
+                                        borderRadius: '2px',
+                                      }
+                                    : undefined
+                                }
+                              >
+                                {seg.text}
+                              </span>
+                            ))
+                          : line.content || ' '}
+                      </span>
+                    ) : (
+                      <SyntaxHighlighter
+                        language={language}
+                        style={oneDark}
+                        customStyle={{
+                          margin: 0,
+                          padding: 0,
+                          background: 'transparent',
+                          fontSize: 'inherit',
+                          lineHeight: 'inherit',
+                          display: 'inline',
+                        }}
+                        PreTag="span"
+                        CodeTag="span"
+                      >
+                        {line.content || ' '}
+                      </SyntaxHighlighter>
+                    )}
                   </td>
                 </tr>
               )

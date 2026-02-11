@@ -17,13 +17,13 @@ import type { ChangedFile, FileStatus } from '../../shared/types'
 import { FileDiffViewer } from './FileDiffViewer'
 
 const STATUS_CONFIG: Record<FileStatus, { label: string; className: string }> =
-  {
-    added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
-    modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
-    deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
-    renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
-    untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
-  }
+{
+  added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
+  modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
+  deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
+  renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
+  untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
+}
 
 function FileStatusBadge({ status }: { status: FileStatus }) {
   const config = STATUS_CONFIG[status]
@@ -222,9 +222,8 @@ export function CommitDialog({
                 changedFiles.map((file) => (
                   <div
                     key={file.path}
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer ${
-                      selectedFile === file.path ? 'bg-zinc-700/50' : ''
-                    }`}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer ${selectedFile === file.path ? 'bg-zinc-700/50' : ''
+                      }`}
                     onClick={() => setSelectedFile(file.path)}
                   >
                     <Checkbox
@@ -261,7 +260,7 @@ export function CommitDialog({
           {/* Right column: commit message + diff viewer */}
           <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-3 overflow-hidden">
             {/* Commit message + options */}
-            <div className="flex gap-3 flex-shrink-0">
+            <div className="flex gap-3 flex-shrink-0 p-0.5">
               <textarea
                 ref={textareaRef}
                 className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
