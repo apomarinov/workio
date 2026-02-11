@@ -1,4 +1,4 @@
-import { AlertTriangle, Folder, Loader2 } from 'lucide-react'
+import { AlertTriangle, Folder, Loader2, MoreVertical } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSessionContext } from '../context/SessionContext'
 import { useSessionMessages } from '../hooks/useSessionMessages'
@@ -6,6 +6,7 @@ import { useSettings } from '../hooks/useSettings'
 import { groupMessages } from '../lib/messageUtils'
 import type { SessionMessage, TodoWriteTool } from '../types'
 import { MessageBubble, ThinkingGroup } from './MessageBubble'
+import { Button } from './ui/button'
 
 export function SessionChat({
   sessionId: sessionIdProp,
@@ -157,6 +158,20 @@ export function SessionChat({
                 </div>
               )}
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('open-item-actions', {
+                    detail: { terminalId: null, sessionId: resolvedSessionId },
+                  }),
+                )
+              }}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
           </div>
         )}
 

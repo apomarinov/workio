@@ -76,6 +76,7 @@ function highlightMatch(text: string, query: string): ReactNode {
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex))
   }
+  // biome-ignore lint/complexity/noUselessFragments: needed to return JSX array
   return parts.length === 1 ? parts[0] : <>{parts}</>
 }
 
