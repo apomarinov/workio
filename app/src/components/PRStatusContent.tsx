@@ -7,10 +7,18 @@ import {
   Clock,
   File,
   Loader2,
+  Maximize2,
   MessageSquare,
   Reply,
 } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -211,6 +219,8 @@ const CommentItem = memo(function CommentItem({
   onReply,
   hidePath,
   indent,
+  defaultExpanded,
+  largeText,
 }: {
   comment: {
     url?: string
@@ -225,8 +235,10 @@ const CommentItem = memo(function CommentItem({
   onReply: (author: string, reviewCommentId?: number) => void
   hidePath?: boolean
   indent?: boolean
+  defaultExpanded?: boolean
+  largeText?: boolean
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [modalOpen, setModalOpen] = useState(false)
 
   const handleHide = useCallback(
@@ -298,7 +310,8 @@ const CommentItem = memo(function CommentItem({
         <div
           onClick={() => setModalOpen(true)}
           className={cn(
-            'mt-1 text-xs cursor-pointer hover:bg-sidebar-accent/30 rounded px-1 py-0.5 transition-colors',
+            'mt-1 cursor-pointer hover:bg-sidebar-accent/30 rounded px-1 py-0.5 transition-colors',
+            largeText ? 'text-sm' : 'text-xs',
           )}
         >
           {!hidePath && comment.path && (
@@ -330,11 +343,15 @@ function ReviewThreadGroup({
   prUrl,
   onHide,
   onReply,
+  defaultExpanded,
+  largeText,
 }: {
   thread: PRReviewThread
   prUrl: string
   onHide: (author: string) => void
   onReply: (author: string, reviewCommentId?: number) => void
+  defaultExpanded?: boolean
+  largeText?: boolean
 }) {
   const [root, ...replies] = thread.comments
   if (!root) return null
@@ -356,6 +373,8 @@ function ReviewThreadGroup({
         onHide={onHide}
         onReply={handleThreadReply}
         hidePath
+        defaultExpanded={defaultExpanded}
+        largeText={largeText}
       />
       {replies.map((reply, i) => (
         <CommentItem
@@ -366,6 +385,8 @@ function ReviewThreadGroup({
           onReply={handleThreadReply}
           hidePath
           indent
+          defaultExpanded={defaultExpanded}
+          largeText={largeText}
         />
       ))}
     </div>
@@ -478,6 +499,118 @@ function CollapsedAuthorGroup({
   )
 }
 
+function FullDiscussionDialog({
+  groupedDiscussion,
+  pr,
+  onReply,
+  onHide,
+  onReReview,
+  onMerge,
+  onClose,
+}: {
+  groupedDiscussion: DisplayItem[]
+  pr: PRCheckStatus
+  onReply: (author: string, reviewCommentId?: number) => void
+  onHide: (author: string) => void
+  onReReview: (author: string) => void
+  onMerge: () => void
+  onClose: () => void
+}) {
+  const [open, setOpen] = useState(true)
+
+  const handleOpenChange = (value: boolean) => {
+    if (!value) {
+      setOpen(false)
+      setTimeout(onClose, 300)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Discussion</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-0.5">
+          {groupedDiscussion.map((item, i) => {
+            switch (item.type) {
+              case 'collapsed-group':
+                return (
+                  <CollapsedAuthorGroup
+                    key={`collapsed-${item.author}-${i}`}
+                    group={item}
+                    prUrl={pr.prUrl}
+                    onReply={onReply}
+                    onHide={onHide}
+                  />
+                )
+              case 'review':
+                return (
+                  <div key={`review-${item.review.id || i}`}>
+                    <ReviewRow
+                      review={item.review}
+                      icon={getReviewIcon(item.review.state)}
+                      prUrl={pr.prUrl}
+                      showReReview={item.review.state === 'CHANGES_REQUESTED'}
+                      isApproved={item.review.state === 'APPROVED'}
+                      hasConflicts={pr.hasConflicts}
+                      onReReview={onReReview}
+                      onMerge={
+                        item.review.state === 'APPROVED' ? onMerge : undefined
+                      }
+                      onReply={onReply}
+                    />
+                    {item.threads.map((thread, ti) => (
+                      <div
+                        key={`thread-${thread.comments[0]?.id || ti}`}
+                        className="ml-2 border-l border-sidebar-border pl-2"
+                      >
+                        <ReviewThreadGroup
+                          thread={thread}
+                          prUrl={pr.prUrl}
+                          onHide={onHide}
+                          onReply={onReply}
+                          defaultExpanded
+                          largeText
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              case 'comment':
+                return (
+                  <CommentItem
+                    key={`comment-${item.comment.id || i}`}
+                    comment={item.comment}
+                    prUrl={pr.prUrl}
+                    onHide={onHide}
+                    onReply={onReply}
+                    defaultExpanded
+                    largeText
+                  />
+                )
+              case 'thread':
+                return (
+                  <ReviewThreadGroup
+                    key={`standalone-${item.thread.comments[0]?.id || i}`}
+                    thread={item.thread}
+                    prUrl={pr.prUrl}
+                    onHide={onHide}
+                    onReply={onReply}
+                    defaultExpanded
+                    largeText
+                  />
+                )
+              default:
+                return null
+            }
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function DiscussionTimeline({
   discussion,
   pr,
@@ -498,6 +631,7 @@ function DiscussionTimeline({
   onHide: (author: string) => void
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
+  const [fullViewOpen, setFullViewOpen] = useState(false)
   const [displayMode, setDisplayMode] = useState<'threads' | 'latest'>(() => {
     const stored = localStorage.getItem('discussion-display-mode')
     return stored === 'threads' ? 'threads' : 'latest'
@@ -567,11 +701,11 @@ function DiscussionTimeline({
 
   return (
     <>
-      <div className="px-2 pb-1">
+      <div className="px-2 pb-1 flex items-center">
         <Select value={displayMode} onValueChange={handleDisplayModeChange}>
           <SelectTrigger
             size="sm"
-            className="!h-5 ml-auto text-[10px] border-none shadow-none px-1.5 gap-1"
+            className="!h-5 ml-auto !bg-transparent hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1"
           >
             <SelectValue />
           </SelectTrigger>
@@ -584,7 +718,26 @@ function DiscussionTimeline({
             </SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 p-0.5 ml-1"
+          onClick={() => setFullViewOpen(true)}
+        >
+          <Maximize2 className="max-h-3 max-w-3" />
+        </Button>
       </div>
+      {fullViewOpen && (
+        <FullDiscussionDialog
+          groupedDiscussion={groupedDiscussion}
+          pr={pr}
+          onReply={onReply}
+          onHide={onHide}
+          onReReview={onReReview}
+          onMerge={onMerge}
+          onClose={() => setFullViewOpen(false)}
+        />
+      )}
       {visibleDiscussion.map((item, i) => {
         switch (item.type) {
           case 'collapsed-group':
