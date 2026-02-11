@@ -27,15 +27,16 @@ import { commitChanges, getChangedFiles, getHeadMessage } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ChangedFile, FileStatus } from '../../shared/types'
 import { FileDiffViewer } from './FileDiffViewer'
+import { TruncatedPath } from './TruncatedPath'
 
 const STATUS_CONFIG: Record<FileStatus, { label: string; className: string }> =
-{
-  added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
-  modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
-  deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
-  renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
-  untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
-}
+  {
+    added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
+    modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
+    deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
+    renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
+    untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
+  }
 
 function FileStatusBadge({ status }: { status: FileStatus }) {
   const config = STATUS_CONFIG[status]
@@ -256,7 +257,13 @@ export function CommitDialog({
                 <TooltipTrigger asChild>
                   <div>
                     <Checkbox
-                      checked={allSelected}
+                      checked={
+                        allSelected
+                          ? true
+                          : selectedFiles.size > 0
+                            ? 'indeterminate'
+                            : false
+                      }
                       onCheckedChange={() => toggleAll()}
                       disabled={
                         loading || loadingFiles || changedFiles.length === 0
@@ -361,7 +368,7 @@ export function CommitDialog({
                           )}
                         />
                         <Folder className="size-3 text-zinc-400" />
-                        <span className="flex-1 truncate text-left text-zinc-300 font-mono text-xs">
+                        <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
                           {folder === '.' ? '(root)' : folder}
                         </span>
                         <span className="text-zinc-500 text-xs">
@@ -393,11 +400,11 @@ export function CommitDialog({
                                 className="h-4 w-4"
                               />
                               <FileStatusBadge status={file.status} />
-                              <span className="flex-1 truncate text-left text-zinc-300 font-mono text-xs">
-                                {fileName}
+                              <span className="flex-1 text-left text-zinc-300 font-mono text-[0.7rem]">
+                                <TruncatedPath path={fileName} />
                               </span>
                               {(file.added > 0 || file.removed > 0) && (
-                                <span className="flex-shrink-0 font-mono text-xs">
+                                <span className="flex-shrink-0 font-mono text-[0.7rem]">
                                   {file.added > 0 && (
                                     <span className="text-green-400">
                                       +{file.added}
@@ -438,8 +445,8 @@ export function CommitDialog({
                       className="h-4 w-4"
                     />
                     <FileStatusBadge status={file.status} />
-                    <span className="flex-1 truncate text-left text-zinc-300 font-mono text-xs">
-                      {file.path}
+                    <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
+                      <TruncatedPath path={file.path} />
                     </span>
                     {(file.added > 0 || file.removed > 0) && (
                       <span className="flex-shrink-0 font-mono text-xs">
