@@ -11,8 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { useSettings } from '@/hooks/useSettings'
 import { commitChanges, getChangedFiles, getHeadMessage } from '@/lib/api'
 import type { ChangedFile, FileStatus } from '../../shared/types'
+import { FileDiffViewer } from './FileDiffViewer'
 
 const STATUS_CONFIG: Record<FileStatus, { label: string; className: string }> =
   {
@@ -55,7 +57,9 @@ export function CommitDialog({
   const [changedFiles, setChangedFiles] = useState<ChangedFile[]>([])
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [loadingFiles, setLoadingFiles] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { settings } = useSettings()
 
   // Fetch changed files on dialog open
   useEffect(() => {
@@ -66,6 +70,7 @@ export function CommitDialog({
       setChangedFiles([])
       setSelectedFiles(new Set())
       setLoadingFiles(false)
+      setSelectedFile(null)
       return
     }
 
@@ -76,6 +81,9 @@ export function CommitDialog({
         if (!cancelled) {
           setChangedFiles(data.files)
           setSelectedFiles(new Set(data.files.map((f) => f.path)))
+          if (data.files.length > 0) {
+            setSelectedFile(data.files[0].path)
+          }
         }
       })
       .catch(() => {
@@ -164,7 +172,7 @@ export function CommitDialog({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
-        className="sm:max-w-2xl"
+        className="sm:max-w-6xl max-h-[95vh] flex flex-col overflow-hidden"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           textareaRef.current?.focus()
@@ -176,24 +184,11 @@ export function CommitDialog({
             Select files to stage and create a commit.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <textarea
-            ref={textareaRef}
-            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
-            rows={10}
-            placeholder="Commit message..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            disabled={amend || loading}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCommit) {
-                handleCommit()
-              }
-            }}
-          />
 
-          {/* File selection list */}
-          <div className="rounded-md border border-zinc-700">
+        {/* Two-column layout */}
+        <div className="flex gap-4 min-h-0 flex-1 overflow-hidden">
+          {/* Left column: file list */}
+          <div className="w-72 flex-shrink-0 flex flex-col rounded-md border border-zinc-700">
             <button
               type="button"
               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800/50"
@@ -210,10 +205,10 @@ export function CommitDialog({
                 {allSelected ? 'Deselect all' : 'Select all'}
               </span>
               <span className="text-zinc-500">
-                ({selectedFiles.size}/{changedFiles.length} files)
+                ({selectedFiles.size}/{changedFiles.length})
               </span>
             </button>
-            <div className="max-h-48 overflow-y-auto border-t border-zinc-700">
+            <div className="flex-1 overflow-y-auto border-t border-zinc-700">
               {loadingFiles ? (
                 <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -225,16 +220,20 @@ export function CommitDialog({
                 </div>
               ) : (
                 changedFiles.map((file) => (
-                  <button
-                    type="button"
+                  <div
                     key={file.path}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-800/50"
-                    onClick={() => toggleFile(file.path)}
-                    disabled={loading}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer ${
+                      selectedFile === file.path ? 'bg-zinc-700/50' : ''
+                    }`}
+                    onClick={() => setSelectedFile(file.path)}
                   >
                     <Checkbox
                       checked={selectedFiles.has(file.path)}
-                      onCheckedChange={() => toggleFile(file.path)}
+                      onCheckedChange={(e) => {
+                        e // keep TS happy
+                        toggleFile(file.path)
+                      }}
+                      onClick={(e) => e.stopPropagation()}
                       disabled={loading}
                       className="h-4 w-4"
                     />
@@ -253,37 +252,70 @@ export function CommitDialog({
                         )}
                       </span>
                     )}
-                  </button>
+                  </div>
                 ))
               )}
             </div>
           </div>
 
-          {/* Options row */}
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={amend}
-                onCheckedChange={(v) => handleAmendChange(v === true)}
-                disabled={loading}
-                className="h-5 w-5"
+          {/* Right column: commit message + diff viewer */}
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-3 overflow-hidden">
+            {/* Commit message + options */}
+            <div className="flex gap-3 flex-shrink-0">
+              <textarea
+                ref={textareaRef}
+                className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
+                rows={4}
+                placeholder="Commit message..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                disabled={amend || loading}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' &&
+                    (e.metaKey || e.ctrlKey) &&
+                    canCommit
+                  ) {
+                    handleCommit()
+                  }
+                }}
               />
-              Amend last commit
-              {fetchingMessage && (
-                <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
-              )}
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={noVerify}
-                onCheckedChange={(v) => setNoVerify(v === true)}
-                disabled={loading}
-                className="h-5 w-5"
+              <div className="flex flex-col gap-2 flex-shrink-0 justify-start">
+                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                  <Checkbox
+                    checked={amend}
+                    onCheckedChange={(v) => handleAmendChange(v === true)}
+                    disabled={loading}
+                    className="h-4 w-4"
+                  />
+                  Amend
+                  {fetchingMessage && (
+                    <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
+                  )}
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                  <Checkbox
+                    checked={noVerify}
+                    onCheckedChange={(v) => setNoVerify(v === true)}
+                    disabled={loading}
+                    className="h-4 w-4"
+                  />
+                  No verify
+                </label>
+              </div>
+            </div>
+
+            {/* Diff viewer */}
+            <div className="flex-1 min-h-0 rounded-md border border-zinc-700 overflow-hidden flex flex-col">
+              <FileDiffViewer
+                terminalId={terminalId}
+                filePath={selectedFile}
+                preferredIde={settings?.preferred_ide ?? 'cursor'}
               />
-              No verify
-            </label>
+            </div>
           </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel

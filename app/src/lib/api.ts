@@ -590,6 +590,22 @@ export async function getChangedFiles(
   return res.json()
 }
 
+export async function getFileDiff(
+  terminalId: number,
+  filePath: string,
+  fullFile?: boolean,
+): Promise<{ diff: string }> {
+  const context = fullFile ? '99999' : '5'
+  const res = await fetch(
+    `${API_BASE}/terminals/${terminalId}/file-diff?path=${encodeURIComponent(filePath)}&context=${context}`,
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to get file diff')
+  }
+  return res.json()
+}
+
 // Webhook management
 
 export async function createWebhook(

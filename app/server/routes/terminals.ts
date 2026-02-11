@@ -1332,6 +1332,98 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
+  // Get diff for a single file
+  fastify.get<{
+    Params: TerminalParams
+    Querystring: { path: string; context?: string }
+  }>('/api/terminals/:id/file-diff', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
+
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
+
+    if (!terminal.git_repo) {
+      return reply.status(400).send({ error: 'Terminal has no git repo' })
+    }
+
+    const filePath = request.query.path
+    if (!filePath) {
+      return reply.status(400).send({ error: 'Missing path query parameter' })
+    }
+
+    const context = request.query.context || '5'
+    const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+    try {
+      if (terminal.ssh_host) {
+        // SSH: try tracked file diff first, then untracked
+        const escapedPath = filePath.replace(/'/g, "'\\''")
+        let result = await execSSHCommand(
+          terminal.ssh_host,
+          `git diff -U${context} HEAD -- '${escapedPath}' 2>/dev/null || git diff -U${context} -- '${escapedPath}'`,
+          { cwd: terminal.cwd },
+        )
+        if (!result.stdout.trim()) {
+          // Try untracked file
+          result = await execSSHCommand(
+            terminal.ssh_host,
+            `git diff --no-index -- /dev/null '${escapedPath}' || true`,
+            { cwd: terminal.cwd },
+          )
+        }
+        return { diff: result.stdout }
+      }
+
+      // Local: try tracked file diff first
+      let diff = await new Promise<string>((resolve) => {
+        execFile(
+          'git',
+          ['diff', `-U${context}`, 'HEAD', '--', filePath],
+          { cwd, timeout: 10000 },
+          (err, stdout) => {
+            if (err) {
+              // Fallback without HEAD (fresh repo)
+              execFile(
+                'git',
+                ['diff', `-U${context}`, '--', filePath],
+                { cwd, timeout: 10000 },
+                (_err2, stdout2) => resolve(stdout2 || ''),
+              )
+            } else {
+              resolve(stdout)
+            }
+          },
+        )
+      })
+
+      if (!diff.trim()) {
+        // Try untracked file
+        diff = await new Promise<string>((resolve) => {
+          execFile(
+            'git',
+            ['diff', '--no-index', '--', '/dev/null', filePath],
+            { cwd, timeout: 10000 },
+            (_err, stdout) => {
+              // exit code 1 is normal for --no-index with differences
+              resolve(stdout || '')
+            },
+          )
+        })
+      }
+
+      return { diff }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to get file diff'
+      return reply.status(400).send({ error: errorMessage })
+    }
+  })
+
   // Commit changes
   fastify.post<{
     Params: TerminalParams
