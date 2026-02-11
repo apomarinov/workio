@@ -87,45 +87,50 @@ export function createFavoriteSessionsMode(
   const grouped = new Map<string, typeof favorites>()
   for (const s of favorites) {
     const terminal = s.terminal_id ? terminalMap.get(s.terminal_id) : null
-    const groupName = terminal?.name || 'All'
+    const groupName = terminal?.name || 'Not in project'
     const existing = grouped.get(groupName) || []
     existing.push(s)
     grouped.set(groupName, existing)
   }
 
-  const groups: PaletteGroup[] = [...grouped.entries()].map(
-    ([heading, sessions]) => ({
-      heading,
-      items: sessions.map((s) => ({
-        id: `fav:${s.session_id}`,
-        label:
-          s.name || s.latest_user_message || `Untitled in "${s.project_path}"`,
-        description: s.latest_agent_message && (
-          <span className="truncate">{s.latest_agent_message}</span>
-        ),
-        icon: <SessionIcon status={s.status} />,
-        keywords: [
-          s.name ?? '',
-          s.latest_user_message ?? '',
-          s.latest_agent_message ?? '',
-        ],
-        onSelect: () => {
-          api.push({
-            mode: 'actions',
-            title: s.name || s.latest_user_message || s.session_id,
-            session: s,
-          })
-        },
-        onNavigate: () => {
-          api.push({
-            mode: 'actions',
-            title: s.name || s.latest_user_message || s.session_id,
-            session: s,
-          })
-        },
-      })),
-    }),
-  )
+  // Sort so terminal groups come first, "All" last
+  const sortedEntries = [...grouped.entries()].sort(([a], [b]) => {
+    if (a === 'Not in project') return 1
+    if (b === 'Not in project') return -1
+    return 0
+  })
+
+  const groups: PaletteGroup[] = sortedEntries.map(([heading, sessions]) => ({
+    heading,
+    items: sessions.map((s) => ({
+      id: `fav:${s.session_id}`,
+      label:
+        s.name || s.latest_user_message || `Untitled in "${s.project_path}"`,
+      description: s.latest_agent_message && (
+        <span className="truncate">{s.latest_agent_message}</span>
+      ),
+      icon: <SessionIcon status={s.status} />,
+      keywords: [
+        s.name ?? '',
+        s.latest_user_message ?? '',
+        s.latest_agent_message ?? '',
+      ],
+      onSelect: () => {
+        api.push({
+          mode: 'actions',
+          title: s.name || s.latest_user_message || s.session_id,
+          session: s,
+        })
+      },
+      onNavigate: () => {
+        api.push({
+          mode: 'actions',
+          title: s.name || s.latest_user_message || s.session_id,
+          session: s,
+        })
+      },
+    })),
+  }))
 
   return {
     id: 'favorite-sessions',

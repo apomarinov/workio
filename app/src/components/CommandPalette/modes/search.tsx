@@ -330,10 +330,46 @@ export function createSearchMode(
           api.push({ mode: 'favorite-sessions', title: 'Favorite Sessions' }),
       })
     }
-    groups.push({
-      heading: 'Claude Sessions',
-      items: [...sessionActions, ...sessionItems],
-    })
+
+    // Group sessions by terminal name
+    const terminalMap = new Map(terminals.map((t) => [t.id, t]))
+    const sessionsByTerminal = new Map<string, PaletteItem[]>()
+    for (let i = 0; i < sessions.length; i++) {
+      const terminal = sessions[i].terminal_id
+        ? terminalMap.get(sessions[i].terminal_id!)
+        : null
+      const groupName = terminal?.name || 'Not in project'
+      const existing = sessionsByTerminal.get(groupName) || []
+      existing.push(sessionItems[i])
+      sessionsByTerminal.set(groupName, existing)
+    }
+
+    const needsSessionSubheadings = sessionsByTerminal.size > 1
+    if (needsSessionSubheadings) {
+      // Sort so terminal groups come first, "All" last
+      const sortedEntries = [...sessionsByTerminal.entries()].sort(
+        ([a], [b]) => {
+          if (a === 'Not in project') return 1
+          if (b === 'Not in project') return -1
+          return 0
+        },
+      )
+      let first = true
+      for (const [name, items] of sortedEntries) {
+        const heading = `Sessions — ${name}`
+        if (first) {
+          groups.push({ heading, items: [...sessionActions, ...items] })
+          first = false
+        } else {
+          groups.push({ heading, items })
+        }
+      }
+    } else {
+      groups.push({
+        heading: 'Claude Sessions',
+        items: [...sessionActions, ...sessionItems],
+      })
+    }
   }
   // Add actions group with logs
   groups.push({ heading: 'Actions', items: [logsItem] })
