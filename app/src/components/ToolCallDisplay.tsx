@@ -361,7 +361,10 @@ function CollapsibleOutput({
         className="flex cursor-pointer items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
       >
         <ChevronDown
-          className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+          className={cn(
+            'w-3 h-3 transition-transform',
+            !expanded && '-rotate-90',
+          )}
         />
         <span>{expanded ? 'Hide output' : 'Show output'}</span>
         {truncated && <span className="text-amber-500">(truncated)</span>}
@@ -454,7 +457,10 @@ function EditToolDisplay({
               className="flex cursor-pointer items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
             >
               <ChevronDown
-                className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                className={cn(
+                  'w-3 h-3 transition-transform',
+                  !expanded && '-rotate-90',
+                )}
               />
               <span>{expanded ? 'Hide diff' : 'Show diff'}</span>
             </button>

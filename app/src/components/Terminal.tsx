@@ -6,6 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { ALargeSmall, ChevronDown, ChevronUp, WholeWord, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
@@ -609,18 +610,22 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
 
   return (
     <div
-      className={`absolute inset-0 flex flex-col bg-[#1a1a1a] ${isVisible ? '' : 'invisible'}`}
+      className={cn(
+        'absolute inset-0 flex flex-col bg-[#1a1a1a]',
+        !isVisible && 'invisible',
+      )}
     >
       {showStatus && status !== 'connected' && (
         <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
           <span
-            className={`w-2 h-2 rounded-full ${
+            className={cn(
+              'w-2 h-2 rounded-full',
               status === 'connecting'
                 ? 'bg-yellow-400 animate-pulse'
                 : status === 'error'
                   ? 'bg-red-400'
-                  : 'bg-gray-400'
-            }`}
+                  : 'bg-gray-400',
+            )}
           />
           {status === 'connecting' && 'Connecting...'}
           {status === 'disconnected' && 'Disconnected - Reconnecting...'}
@@ -668,7 +673,12 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
                 setCaseSensitive((v) => !v)
                 searchInputRef.current?.focus()
               }}
-              className={`p-1 rounded ${caseSensitive ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'}`}
+              className={cn(
+                'p-1 rounded',
+                caseSensitive
+                  ? 'bg-zinc-600 text-white'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-700',
+              )}
               title="Case Sensitive (⌥C)"
             >
               <ALargeSmall className="w-4 h-4" />
@@ -679,7 +689,12 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
                 setWholeWord((v) => !v)
                 searchInputRef.current?.focus()
               }}
-              className={`p-1 rounded ${wholeWord ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'}`}
+              className={cn(
+                'p-1 rounded',
+                wholeWord
+                  ? 'bg-zinc-600 text-white'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-700',
+              )}
               title="Whole Word (⌥W)"
             >
               <WholeWord className="w-4 h-4" />

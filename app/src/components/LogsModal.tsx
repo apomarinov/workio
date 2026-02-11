@@ -376,7 +376,10 @@ export function LogsModal({
                       )}
                     >
                       <ChevronDown
-                        className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                        className={cn(
+                          'w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform',
+                          !isExpanded && '-rotate-90',
+                        )}
                       />
 
                       {/* Date */}

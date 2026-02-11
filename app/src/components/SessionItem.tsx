@@ -199,7 +199,10 @@ export const SessionItem = memo(function SessionItem({
           className="hidden cursor-pointer group-hover:block"
         >
           <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+            className={cn(
+              'w-3.5 h-3.5 transition-transform',
+              !isExpanded && '-rotate-90',
+            )}
           />
         </button>
       </div>

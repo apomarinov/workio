@@ -213,7 +213,10 @@ export const TerminalItem = memo(function TerminalItem({
               <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
             ) : (
               <TerminalIcon
-                className={`w-4 h-4 flex-shrink-0 ${hasProcesses ? 'text-green-500' : ''}`}
+                className={cn(
+                  'w-4 h-4 flex-shrink-0',
+                  hasProcesses && 'text-green-500',
+                )}
               />
             )}
             <TruncatedPath
@@ -491,7 +494,10 @@ export const TerminalItem = memo(function TerminalItem({
                   className="flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
                 >
                   <ChevronDown
-                    className={`w-3 h-3 transition-transform ${sessionsListExpanded ? '' : '-rotate-90'}`}
+                    className={cn(
+                      'w-3 h-3 transition-transform',
+                      !sessionsListExpanded && '-rotate-90',
+                    )}
                   />
                   Claude ({sessions.length})
                 </button>

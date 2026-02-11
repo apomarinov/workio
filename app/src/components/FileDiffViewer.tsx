@@ -5,6 +5,7 @@ import {
   ChevronUp,
   ExternalLink,
   Loader2,
+  WrapText,
 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -27,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { getFileDiff, openInIDE } from '@/lib/api'
 import type { DiffLine } from '@/lib/diff-parser'
 import { parseDiff } from '@/lib/diff-parser'
+import { cn } from '@/lib/utils'
 
 const EXT_TO_LANGUAGE: Record<string, string> = {
   ts: 'typescript',
@@ -123,6 +125,7 @@ export function FileDiffViewer({
   preferredIde,
 }: FileDiffViewerProps) {
   const [showFullFile, setShowFullFile] = useState(false)
+  const [wordWrap, setWordWrap] = useState(true)
   const [currentHunkIndex, setCurrentHunkIndex] = useState(0)
   const [highlightedHunkIndex, setHighlightedHunkIndex] = useState<
     number | null
@@ -248,6 +251,9 @@ export function FileDiffViewer({
     >
       {/* Toolbar */}
       <div className="flex items-center gap-1 border-b border-zinc-700 px-2 py-1 flex-shrink-0">
+        <span className="truncate text-xs text-zinc-500 mr-auto">
+          {filePath}
+        </span>
         <Button
           variant="ghost"
           size="icon"
@@ -298,6 +304,18 @@ export function FileDiffViewer({
         <Button
           variant="ghost"
           size="icon"
+          className={cn('h-7 w-7', wordWrap && 'bg-zinc-700')}
+          onClick={(e) => {
+            e.stopPropagation()
+            setWordWrap(!wordWrap)
+          }}
+          title={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+        >
+          <WrapText className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-7 w-7"
           onClick={(e) => {
             e.stopPropagation()
@@ -307,7 +325,6 @@ export function FileDiffViewer({
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </Button>
-        <span className="ml-2 truncate text-xs text-zinc-500">{filePath}</span>
       </div>
 
       {/* Diff content */}
@@ -317,8 +334,21 @@ export function FileDiffViewer({
           .diff-line-removed:hover { background-color: rgba(239, 68, 68, 0.18) !important }
           .diff-line-context:hover { background-color: rgba(255, 255, 255, 0.04) !important }
           .diff-line-header:hover { background-color: rgba(96, 165, 250, 0.12) !important }
+          .diff-wrap-content, .diff-wrap-content * { white-space: pre-wrap !important; word-break: break-all !important; overflow-wrap: break-word !important; }
         `}</style>
-        <table className="border-collapse text-xs leading-5 font-mono">
+        <table
+          className={cn(
+            'border-collapse text-xs leading-5 font-mono',
+            wordWrap && 'w-full table-fixed',
+          )}
+        >
+          {wordWrap && (
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-10" />
+              <col />
+            </colgroup>
+          )}
           <tbody>
             {parsed.lines.map((line, i) => {
               const hunkIdx = parsed.hunks.findIndex((h) => h.lineIndex === i)
@@ -351,7 +381,7 @@ export function FileDiffViewer({
                 <tr
                   key={key}
                   data-hunk-index={hunkIdx >= 0 ? hunkIdx : undefined}
-                  className={`group/line diff-line-${line.type}`}
+                  className={cn('group/line', `diff-line-${line.type}`)}
                   style={{
                     ...(bg ? { backgroundColor: bg } : {}),
                     ...borderStyle,
@@ -398,7 +428,12 @@ export function FileDiffViewer({
                   >
                     {line.newLineNumber ?? ''}
                   </td>
-                  <td className="pl-2 whitespace-pre overflow-x-auto">
+                  <td
+                    className={cn(
+                      'pl-2',
+                      wordWrap ? 'diff-wrap-content' : 'whitespace-pre',
+                    )}
+                  >
                     {line.type === 'removed' ? (
                       <span className="text-zinc-400">
                         {line.segments?.some((s) => s.highlight)

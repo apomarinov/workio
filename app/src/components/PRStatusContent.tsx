@@ -268,7 +268,10 @@ const CommentItem = memo(function CommentItem({
               className="flex items-center gap-0 min-w-0 cursor-pointer"
             >
               <ChevronDown
-                className={`w-3 h-3 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                className={cn(
+                  'w-3 h-3 flex-shrink-0 transition-transform',
+                  !expanded && '-rotate-90',
+                )}
               />
             </button>
           )}
@@ -402,7 +405,10 @@ function ReviewThreadGroup({
           className="flex items-center gap-1 ml-4 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           <ChevronDown
-            className={`w-3 h-3 transition-transform ${showAllReplies ? '' : '-rotate-90'}`}
+            className={cn(
+              'w-3 h-3 transition-transform',
+              !showAllReplies && '-rotate-90',
+            )}
           />
           {showAllReplies
             ? 'Show less'
@@ -501,7 +507,10 @@ function CollapsedAuthorGroup({
         className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
       >
         <ChevronDown
-          className={`w-3 h-3 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`}
+          className={cn(
+            'w-3 h-3 flex-shrink-0 transition-transform',
+            !expanded && '-rotate-90',
+          )}
         />
         {group.avatarUrl ? (
           <img

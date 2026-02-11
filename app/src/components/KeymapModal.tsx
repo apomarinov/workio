@@ -671,15 +671,16 @@ function ShortcutRow({
         <button
           type="button"
           onClick={onRecord}
-          className={`px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors ${
+          className={cn(
+            'px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors',
             isRecording
               ? 'border-primary bg-primary/10 text-primary animate-pulse'
               : hasConflict
                 ? 'border-amber-500/50 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
                 : isDisabled
                   ? 'border-border bg-zinc-800/50 text-muted-foreground hover:bg-zinc-700/70'
-                  : 'border-border bg-zinc-800 hover:bg-zinc-700/70'
-          }`}
+                  : 'border-border bg-zinc-800 hover:bg-zinc-700/70',
+          )}
         >
           {isRecording ? (
             recordingKeys.length > 0 ? (

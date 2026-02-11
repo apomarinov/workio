@@ -1,4 +1,5 @@
 import { CommandInput } from '@/components/ui/command'
+import { cn } from '@/lib/utils'
 
 type Props = {
   breadcrumbs: string[]
@@ -44,11 +45,12 @@ export function PaletteHeader({
             <button
               type="button"
               onClick={handleClick}
-              className={`truncate text-sm max-w-[160px] ${
+              className={cn(
+                'truncate text-sm max-w-[160px]',
                 isClickable
                   ? 'text-zinc-400 hover:text-zinc-200 cursor-pointer'
-                  : 'text-zinc-500 cursor-default'
-              }`}
+                  : 'text-zinc-500 cursor-default',
+              )}
             >
               {crumb}
             </button>

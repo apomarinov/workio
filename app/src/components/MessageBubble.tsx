@@ -31,7 +31,10 @@ export function ThinkingGroup({ messages }: ThinkingGroupProps) {
           className="flex items-center cursor-pointer gap-1 text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors"
         >
           <ChevronDown
-            className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+            className={cn(
+              'w-3 h-3 transition-transform',
+              !expanded && '-rotate-90',
+            )}
           />
           <span className="italic  group-hover:text-zinc-400">Thinking...</span>
         </button>

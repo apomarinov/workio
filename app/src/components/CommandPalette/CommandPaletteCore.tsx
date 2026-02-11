@@ -163,7 +163,9 @@ export function CommandPaletteCore({
               onSearchChange={onSearchChange}
             />
             <CommandList
-              className={totalItems >= 10 ? 'max-h-[480px]' : 'max-h-[360px]'}
+              className={cn(
+                totalItems >= 10 ? 'max-h-[480px]' : 'max-h-[360px]',
+              )}
             >
               {mode.loading ? (
                 <div className="flex items-center justify-center py-8">

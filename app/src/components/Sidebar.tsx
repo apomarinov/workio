@@ -616,9 +616,10 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('all')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'all' ? 'bg-accent' : ''
-                      }`}
+                      className={cn(
+                        'flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer',
+                        groupingMode === 'all' && 'bg-accent',
+                      )}
                     >
                       <TerminalIcon className="w-4 h-4" />
                       Projects
@@ -628,9 +629,10 @@ export function Sidebar({ width }: SidebarProps) {
                         setGroupingMode('sessions')
                         setGroupingOpen(false)
                       }}
-                      className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                        groupingMode === 'sessions' ? 'bg-accent' : ''
-                      }`}
+                      className={cn(
+                        'flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer',
+                        groupingMode === 'sessions' && 'bg-accent',
+                      )}
                     >
                       <Bot className="w-4 h-4" />
                       Claude
@@ -802,7 +804,10 @@ export function Sidebar({ width }: SidebarProps) {
                   className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 hover:text-muted-foreground transition-colors w-full"
                 >
                   <ChevronDown
-                    className={`w-3 h-3 transition-transform ${terminalsSectionCollapsed ? '-rotate-90' : ''}`}
+                    className={cn(
+                      'w-3 h-3 transition-transform',
+                      terminalsSectionCollapsed && '-rotate-90',
+                    )}
                   />
                   Projects
                 </button>
@@ -828,7 +833,10 @@ export function Sidebar({ width }: SidebarProps) {
                               className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
                             >
                               <ChevronDown
-                                className={`w-3 h-3 flex-shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                                className={cn(
+                                  'w-3 h-3 flex-shrink-0 transition-transform',
+                                  isCollapsed && '-rotate-90',
+                                )}
                               />
                               <Github className="w-3 h-3" />
                               <span className="truncate">{repoName}</span>
@@ -903,7 +911,10 @@ export function Sidebar({ width }: SidebarProps) {
                   className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
                 >
                   <ChevronDown
-                    className={`w-3 h-3 transition-transform ${githubSectionCollapsed ? '-rotate-90' : ''}`}
+                    className={cn(
+                      'w-3 h-3 transition-transform',
+                      githubSectionCollapsed && '-rotate-90',
+                    )}
                   />
                   Pull requests
                 </button>
@@ -938,7 +949,10 @@ export function Sidebar({ width }: SidebarProps) {
                             className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
                           >
                             <ChevronDown
-                              className={`w-3 h-3 flex-shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                              className={cn(
+                                'w-3 h-3 flex-shrink-0 transition-transform',
+                                isCollapsed && '-rotate-90',
+                              )}
                             />
                             <Github className="w-3 h-3" />
                             <span className="truncate">{repoName}</span>
@@ -1031,7 +1045,10 @@ export function Sidebar({ width }: SidebarProps) {
               className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
             >
               <ChevronDown
-                className={`w-3 h-3 transition-transform ${otherSessionsSectionCollapsed ? '-rotate-90' : ''}`}
+                className={cn(
+                  'w-3 h-3 transition-transform',
+                  otherSessionsSectionCollapsed && '-rotate-90',
+                )}
               />
               Claude not in project
             </button>

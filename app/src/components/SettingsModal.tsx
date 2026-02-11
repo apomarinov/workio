@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
+import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
 import type { PreferredIDE } from '../types'
@@ -270,11 +271,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             onOpenChange={setShowKeymapModal}
           />
 
-          <div className={`flex flex-col gap-3 -mx-1 px-1`}>
+          <div className="flex flex-col gap-3 -mx-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Webhook
-                  className={`w-4 h-4 ${hasWebhookWarning ? 'text-amber-500' : ''}`}
+                  className={cn(
+                    'w-4 h-4',
+                    hasWebhookWarning && 'text-amber-500',
+                  )}
                 />
                 <span className="text-sm font-medium">GitHub Webhooks</span>
                 {hasWebhookWarning && (
