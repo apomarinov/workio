@@ -61,6 +61,77 @@ function expandPath(p: string): string {
   return p
 }
 
+function parseChangedFiles(
+  numstatOut: string,
+  nameStatusOut: string,
+  untrackedOut: string,
+) {
+  type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
+  interface ChangedFile {
+    path: string
+    status: FileStatus
+    added: number
+    removed: number
+    oldPath?: string
+  }
+
+  // Parse --numstat: <added>\t<removed>\t<path>
+  const numstatMap = new Map<string, { added: number; removed: number }>()
+  for (const line of numstatOut.trim().split('\n')) {
+    if (!line) continue
+    const parts = line.split('\t')
+    const added = parts[0] === '-' ? 0 : Number(parts[0]) || 0
+    const removed = parts[1] === '-' ? 0 : Number(parts[1]) || 0
+    // For renames, numstat shows: added removed old => new
+    const filePath = parts.slice(2).join('\t')
+    numstatMap.set(filePath, { added, removed })
+  }
+
+  // Parse --name-status: <status>\t<path> (or <status>\t<old>\t<new> for renames)
+  const statusMap = new Map<string, { status: FileStatus; oldPath?: string }>()
+  for (const line of nameStatusOut.trim().split('\n')) {
+    if (!line) continue
+    const parts = line.split('\t')
+    const code = parts[0]
+    if (code.startsWith('R')) {
+      statusMap.set(parts[2], { status: 'renamed', oldPath: parts[1] })
+    } else {
+      const status: FileStatus =
+        code === 'A' ? 'added' : code === 'D' ? 'deleted' : 'modified'
+      statusMap.set(parts[1], { status })
+    }
+  }
+
+  const files: ChangedFile[] = []
+
+  // Merge status + numstat
+  for (const [filePath, { status, oldPath }] of statusMap) {
+    const numstatKey =
+      status === 'renamed' && oldPath ? `${oldPath} => ${filePath}` : filePath
+    const stats = numstatMap.get(numstatKey) ??
+      numstatMap.get(filePath) ?? { added: 0, removed: 0 }
+    files.push({
+      path: filePath,
+      status,
+      added: stats.added,
+      removed: stats.removed,
+      ...(oldPath && { oldPath }),
+    })
+  }
+
+  // Untracked files
+  for (const line of untrackedOut.trim().split('\n')) {
+    if (!line) continue
+    // Skip if already present from diff
+    if (!statusMap.has(line)) {
+      files.push({ path: line, status: 'untracked', added: 0, removed: 0 })
+    }
+  }
+
+  files.sort((a, b) => a.path.localeCompare(b.path))
+  return files
+}
+
 import {
   createTerminal,
   deleteTerminal,
@@ -1153,10 +1224,124 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
+  // Get changed files with per-file stats
+  fastify.get<{ Params: TerminalParams }>(
+    '/api/terminals/:id/changed-files',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      try {
+        const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+        if (terminal.ssh_host) {
+          const [numstatResult, nameStatusResult, untrackedResult] =
+            await Promise.all([
+              execSSHCommand(
+                terminal.ssh_host,
+                'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
+                { cwd: terminal.cwd },
+              ),
+              execSSHCommand(
+                terminal.ssh_host,
+                'git diff --name-status HEAD 2>/dev/null || git diff --name-status',
+                { cwd: terminal.cwd },
+              ),
+              execSSHCommand(
+                terminal.ssh_host,
+                'git ls-files --others --exclude-standard',
+                { cwd: terminal.cwd },
+              ),
+            ])
+
+          const files = parseChangedFiles(
+            numstatResult.stdout,
+            nameStatusResult.stdout,
+            untrackedResult.stdout,
+          )
+          return { files }
+        }
+
+        // Local: run 3 git commands in parallel
+        const [numstatOut, nameStatusOut, untrackedOut] = await Promise.all([
+          new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['diff', '--numstat', 'HEAD'],
+              { cwd, timeout: 10000 },
+              (err, stdout) => {
+                if (err) {
+                  execFile(
+                    'git',
+                    ['diff', '--numstat'],
+                    { cwd, timeout: 10000 },
+                    (_err2, stdout2) => resolve(stdout2 || ''),
+                  )
+                } else {
+                  resolve(stdout)
+                }
+              },
+            )
+          }),
+          new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['diff', '--name-status', 'HEAD'],
+              { cwd, timeout: 10000 },
+              (err, stdout) => {
+                if (err) {
+                  execFile(
+                    'git',
+                    ['diff', '--name-status'],
+                    { cwd, timeout: 10000 },
+                    (_err2, stdout2) => resolve(stdout2 || ''),
+                  )
+                } else {
+                  resolve(stdout)
+                }
+              },
+            )
+          }),
+          new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['ls-files', '--others', '--exclude-standard'],
+              { cwd, timeout: 10000 },
+              (_err, stdout) => resolve(stdout || ''),
+            )
+          }),
+        ])
+
+        const files = parseChangedFiles(numstatOut, nameStatusOut, untrackedOut)
+        return { files }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to get changed files'
+        return reply.status(400).send({ error: errorMessage })
+      }
+    },
+  )
+
   // Commit changes
   fastify.post<{
     Params: TerminalParams
-    Body: { message: string; amend?: boolean }
+    Body: {
+      message: string
+      amend?: boolean
+      noVerify?: boolean
+      files?: string[]
+    }
   }>('/api/terminals/:id/commit', async (request, reply) => {
     const id = parseInt(request.params.id, 10)
     if (Number.isNaN(id)) {
@@ -1172,46 +1357,102 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Terminal has no git repo' })
     }
 
-    const { message, amend } = request.body
+    const { message, amend, noVerify, files } = request.body
+    const cwdPath = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
 
     try {
-      // Stage all changes first (for both commit and amend)
-      const addCmd = 'git add -A'
-      if (terminal.ssh_host) {
-        const addResult = await execSSHCommand(terminal.ssh_host, addCmd, {
-          cwd: terminal.cwd,
-        })
-        logCommand({
-          terminalId: id,
-          category: 'git',
-          command: addCmd,
-          stdout: addResult.stdout,
-          stderr: addResult.stderr,
-        })
+      // Stage files
+      if (files && files.length > 0) {
+        // Selective staging: reset then add specific files
+        const resetCmd = 'git reset HEAD'
+        if (terminal.ssh_host) {
+          await execSSHCommand(terminal.ssh_host, resetCmd, {
+            cwd: terminal.cwd,
+          }).catch(() => {}) // swallow error on fresh repos
+        } else {
+          await new Promise<void>((resolve) => {
+            execFile(
+              'git',
+              ['reset', 'HEAD'],
+              { cwd: cwdPath, timeout: 30000 },
+              () => resolve(), // swallow error on fresh repos
+            )
+          })
+        }
+
+        const addCmd = `git add -- ${files.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
+        if (terminal.ssh_host) {
+          const addResult = await execSSHCommand(terminal.ssh_host, addCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: addCmd,
+            stdout: addResult.stdout,
+            stderr: addResult.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['add', '--', ...files],
+              { cwd: cwdPath, timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: addCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
       } else {
-        await new Promise<void>((resolve, reject) => {
-          execFile(
-            'git',
-            ['add', '-A'],
-            { cwd: expandPath(terminal.cwd), timeout: 30000 },
-            (err, stdout, stderr) => {
-              logCommand({
-                terminalId: id,
-                category: 'git',
-                command: addCmd,
-                stdout,
-                stderr: err ? err.message : stderr,
-              })
-              if (err) reject(err)
-              else resolve()
-            },
-          )
-        })
+        // Stage all changes (default)
+        const addCmd = 'git add -A'
+        if (terminal.ssh_host) {
+          const addResult = await execSSHCommand(terminal.ssh_host, addCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: addCmd,
+            stdout: addResult.stdout,
+            stderr: addResult.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['add', '-A'],
+              { cwd: cwdPath, timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: addCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
       }
 
       if (amend) {
         // Amend with no-edit
-        const amendCmd = 'git commit --amend --no-edit'
+        const amendArgs = ['commit', '--amend', '--no-edit']
+        if (noVerify) amendArgs.push('--no-verify')
+        const amendCmd = `git ${amendArgs.join(' ')}`
         if (terminal.ssh_host) {
           const result = await execSSHCommand(terminal.ssh_host, amendCmd, {
             cwd: terminal.cwd,
@@ -1227,8 +1468,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           await new Promise<void>((resolve, reject) => {
             execFile(
               'git',
-              ['commit', '--amend', '--no-edit'],
-              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              amendArgs,
+              { cwd: cwdPath, timeout: 30000 },
               (err, stdout, stderr) => {
                 logCommand({
                   terminalId: id,
@@ -1250,7 +1491,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
         // Commit
         const safeMessage = message.replace(/'/g, "'\\''")
-        const commitCmd = `git commit -m '${safeMessage}'`
+        const commitArgs = ['commit', '-m', message]
+        if (noVerify) commitArgs.push('--no-verify')
+        const commitCmd = `git commit${noVerify ? ' --no-verify' : ''} -m '${safeMessage}'`
         if (terminal.ssh_host) {
           const result = await execSSHCommand(terminal.ssh_host, commitCmd, {
             cwd: terminal.cwd,
@@ -1266,8 +1509,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           await new Promise<void>((resolve, reject) => {
             execFile(
               'git',
-              ['commit', '-m', message],
-              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              commitArgs,
+              { cwd: cwdPath, timeout: 30000 },
               (err, stdout, stderr) => {
                 logCommand({
                   terminalId: id,

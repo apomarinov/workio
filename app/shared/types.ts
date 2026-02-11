@@ -99,6 +99,16 @@ export interface GitDiffStat {
   untracked: number
 }
 
+export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
+
+export interface ChangedFile {
+  path: string
+  status: FileStatus
+  added: number
+  removed: number
+  oldPath?: string
+}
+
 export interface GitDirtyPayload {
   dirtyStatus: Record<number, GitDiffStat> // terminalId -> line diff stats
 }

@@ -1,4 +1,4 @@
-import type { MergedPRSummary } from '../../shared/types'
+import type { ChangedFile, MergedPRSummary } from '../../shared/types'
 import type {
   SessionMessagesResponse,
   SessionSearchMatch,
@@ -517,11 +517,13 @@ export async function commitChanges(
   terminalId: number,
   message: string,
   amend?: boolean,
+  noVerify?: boolean,
+  files?: string[],
 ): Promise<{ success: boolean; error?: string }> {
   const res = await fetch(`${API_BASE}/terminals/${terminalId}/commit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, amend }),
+    body: JSON.stringify({ message, amend, noVerify, files }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -537,6 +539,17 @@ export async function getHeadMessage(
   if (!res.ok) {
     const data = await res.json()
     throw new Error(data.error || 'Failed to get HEAD message')
+  }
+  return res.json()
+}
+
+export async function getChangedFiles(
+  terminalId: number,
+): Promise<{ files: ChangedFile[] }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/changed-files`)
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to get changed files')
   }
   return res.json()
 }
