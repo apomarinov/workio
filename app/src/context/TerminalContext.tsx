@@ -32,7 +32,6 @@ interface TerminalContextValue {
     shell?: string
     ssh_host?: string
     git_repo?: string
-    conductor?: boolean
     workspaces_root?: string
     setup_script?: string
     delete_script?: string
@@ -571,7 +570,6 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       shell?: string
       ssh_host?: string
       git_repo?: string
-      conductor?: boolean
       workspaces_root?: string
       setup_script?: string
       delete_script?: string

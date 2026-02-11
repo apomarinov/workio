@@ -163,7 +163,6 @@ interface CreateTerminalBody {
   shell?: string
   ssh_host?: string
   git_repo?: string
-  conductor?: boolean
   workspaces_root?: string
   setup_script?: string
   delete_script?: string
@@ -504,7 +503,6 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         shell,
         ssh_host,
         git_repo,
-        conductor,
         workspaces_root,
         setup_script,
         delete_script,
@@ -589,10 +587,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Build setup object
-        const hasSetup = conductor || setup_script || delete_script
+        const hasSetup = setup_script || delete_script
         const setupObj = hasSetup
           ? {
-              ...(conductor ? { conductor: true } : {}),
               ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
               ...(delete_script?.trim()
                 ? { delete: delete_script.trim() }

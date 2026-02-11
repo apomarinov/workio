@@ -209,6 +209,30 @@ fastify.get<{
   }
 })
 
+// Check if a repo has conductor.json
+fastify.get<{
+  Querystring: { repo?: string }
+}>('/api/github/conductor', async (request) => {
+  const repo = request.query.repo?.trim()
+  if (!repo || !repo.includes('/')) {
+    return { hasConductor: false }
+  }
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const exec = promisify(execFile)
+
+  try {
+    await exec(
+      'gh',
+      ['api', `repos/${repo}/contents/conductor.json`, '--jq', '.name'],
+      { timeout: 10000 },
+    )
+    return { hasConductor: true }
+  } catch {
+    return { hasConductor: false }
+  }
+})
+
 // Merged/closed PRs by @me across all repos (single GraphQL call)
 fastify.get<{
   Querystring: { repos?: string; limit?: string }

@@ -35,13 +35,25 @@ export async function getGitHubRepos(query?: string): Promise<string[]> {
   return data.repos
 }
 
+export async function checkConductor(repo: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/github/conductor?repo=${encodeURIComponent(repo)}`,
+    )
+    if (!res.ok) return false
+    const data = await res.json()
+    return data.hasConductor === true
+  } catch {
+    return false
+  }
+}
+
 export async function createTerminal(opts: {
   cwd: string
   name?: string
   shell?: string
   ssh_host?: string
   git_repo?: string
-  conductor?: boolean
   workspaces_root?: string
   setup_script?: string
   delete_script?: string

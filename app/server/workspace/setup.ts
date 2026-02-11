@@ -474,12 +474,13 @@ export async function setupTerminalWorkspace(
   const {
     terminalId,
     repo,
-    setupObj,
+    setupObj: initialSetupObj,
     workspacesRoot,
     worktreeSource,
     customName,
     sshHost = null,
   } = options
+  let setupObj = initialSetupObj
 
   const homeDir = await getHomeDir(sshHost)
 
@@ -631,6 +632,20 @@ export async function setupTerminalWorkspace(
       name: terminalName,
       git_repo: gitRepoObj,
     })
+
+    // Auto-detect conductor.json if no setup was explicitly configured
+    if (!setupObj) {
+      const conductorConfig = await readConductorJson(targetPath, sshHost)
+      if (conductorConfig) {
+        setupObj = { conductor: true }
+        const setupWithStatus = { ...setupObj, status: 'setup' as const }
+        await updateTerminal(terminalId, { setup: setupWithStatus })
+        await emitWorkspace(terminalId, {
+          name: terminalName,
+          setup: setupWithStatus,
+        })
+      }
+    }
 
     // Run setup script if configured — inject into PTY so output is visible
     if (setupObj) {

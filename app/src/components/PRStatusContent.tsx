@@ -701,31 +701,34 @@ function DiscussionTimeline({
 
   return (
     <>
-      <div className="px-2 pb-1 flex items-center">
-        <Select value={displayMode} onValueChange={handleDisplayModeChange}>
-          <SelectTrigger
-            size="sm"
-            className="!h-5 ml-auto !bg-transparent hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1"
+      <div className="px-2 pb-1 flex justify-between">
+        <div></div>
+        <div className="flex gap-1">
+          <Select value={displayMode} onValueChange={handleDisplayModeChange}>
+            <SelectTrigger
+              size="sm"
+              className="!h-5 !bg-transparent text-muted-foreground hover:text-white hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="threads" className="text-xs">
+                Threads
+              </SelectItem>
+              <SelectItem value="latest" className="text-xs">
+                Latest
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 p-0.5 text-muted-foreground hover:text-white"
+            onClick={() => setFullViewOpen(true)}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="threads" className="text-xs">
-              Threads
-            </SelectItem>
-            <SelectItem value="latest" className="text-xs">
-              Latest
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 p-0.5 ml-1"
-          onClick={() => setFullViewOpen(true)}
-        >
-          <Maximize2 className="max-h-3 max-w-3" />
-        </Button>
+            <Maximize2 className="max-h-3 max-w-3" />
+          </Button>
+        </div>
       </div>
       {fullViewOpen && (
         <FullDiscussionDialog

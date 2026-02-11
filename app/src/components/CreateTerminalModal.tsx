@@ -3,6 +3,7 @@ import {
   ChevronsUpDown,
   CircleX,
   FolderOpen,
+  Loader2,
   Plus,
   TerminalSquare,
   XCircle,
@@ -37,11 +38,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
-import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
-import { getGitHubRepos, getSSHHosts, type SSHHostEntry } from '../lib/api'
+import {
+  checkConductor,
+  getGitHubRepos,
+  getSSHHosts,
+  type SSHHostEntry,
+} from '../lib/api'
 import { DirectoryBrowser } from './DirectoryBrowser'
 
 function FolderPicker({
@@ -114,7 +119,8 @@ export function CreateTerminalModal({
   const [sshHost, setSSHHost] = useState('')
   const [gitRepo, setGitRepo] = useState('')
   const [workspacesRoot, setWorkspacesRoot] = useState('')
-  const [conductorEnabled, setConductorEnabled] = useState(false)
+  const [conductorDetected, setConductorDetected] = useState(false)
+  const [checkingConductor, setCheckingConductor] = useState(false)
   const [setupScript, setSetupScript] = useState('')
   const [deleteScript, setDeleteScript] = useState('')
   const [creating, setCreating] = useState(false)
@@ -199,7 +205,8 @@ export function CreateTerminalModal({
       setSSHHost('')
       setGitRepo('')
       setWorkspacesRoot('')
-      setConductorEnabled(false)
+      setConductorDetected(false)
+      setCheckingConductor(false)
       setSetupScript('')
       setDeleteScript('')
       setRepos([])
@@ -220,7 +227,6 @@ export function CreateTerminalModal({
         shell: !isSSH && shell.trim() ? shell.trim() : undefined,
         ssh_host: isSSH ? sshHost : undefined,
         git_repo: hasGitRepo ? gitRepo.trim() : undefined,
-        conductor: hasGitRepo && conductorEnabled ? true : undefined,
         workspaces_root:
           hasGitRepo && workspacesRoot.trim()
             ? workspacesRoot.trim()
@@ -363,6 +369,8 @@ export function CreateTerminalModal({
                             e.stopPropagation()
                             setGitRepo('')
                             setRepoPickerOpen(false)
+                            setConductorDetected(false)
+                            setCheckingConductor(false)
                           }}
                           className="w-4 h-4 opacity-50 cursor-pointer hover:opacity-100 !pointer-events-auto"
                         />
@@ -399,6 +407,11 @@ export function CreateTerminalModal({
                                 setGitRepo(manualEntry)
                                 setRepoPickerOpen(false)
                                 setRepoSearch('')
+                                setCheckingConductor(true)
+                                setConductorDetected(false)
+                                checkConductor(manualEntry)
+                                  .then(setConductorDetected)
+                                  .finally(() => setCheckingConductor(false))
                               }}
                             >
                               <Check
@@ -421,9 +434,20 @@ export function CreateTerminalModal({
                               className="cursor-pointer"
                               value={repo}
                               onSelect={() => {
-                                setGitRepo(repo === gitRepo ? '' : repo)
+                                const selected = repo === gitRepo ? '' : repo
+                                setGitRepo(selected)
                                 setRepoPickerOpen(false)
                                 setRepoSearch('')
+                                if (selected) {
+                                  setCheckingConductor(true)
+                                  setConductorDetected(false)
+                                  checkConductor(selected)
+                                    .then(setConductorDetected)
+                                    .finally(() => setCheckingConductor(false))
+                                } else {
+                                  setConductorDetected(false)
+                                  setCheckingConductor(false)
+                                }
                               }}
                             >
                               <Check
@@ -467,73 +491,61 @@ export function CreateTerminalModal({
 
           {hasGitRepo && (
             <div className="border-t-[1px] space-y-2 pt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label
-                    htmlFor="conductor"
-                    className="text-sm font-medium cursor-pointer"
-                  >
-                    Conductor
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Runs setup and archive scripts from conductor.json in repo
-                    root
-                  </p>
-                </div>
-                <Switch
-                  id="conductor"
-                  checked={conductorEnabled}
-                  onCheckedChange={(v) => {
-                    setConductorEnabled(v)
-                    setSetupScript('')
-                    setDeleteScript('')
-                  }}
-                />
-              </div>
-
-              {!conductorEnabled && (
-                <div className="space-y-2">
-                  <label htmlFor="setup-script" className="text-sm font-medium">
-                    Setup Script
-                  </label>
-                  <Input
-                    id="setup-script"
-                    type="text"
-                    value={setupScript}
-                    onChange={(e) => {
-                      setSetupScript(e.target.value)
-                      setConductorEnabled(false)
-                    }}
-                    placeholder="scripts/setup.sh"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Relative path to a setup script run after clone
-                  </p>
+              {checkingConductor && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking for conductor.json...
                 </div>
               )}
 
-              {!conductorEnabled && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="delete-script"
-                    className="text-sm font-medium"
-                  >
-                    Teardown Script
-                  </label>
-                  <Input
-                    id="delete-script"
-                    type="text"
-                    value={deleteScript}
-                    onChange={(e) => {
-                      setDeleteScript(e.target.value)
-                      setConductorEnabled(false)
-                    }}
-                    placeholder="scripts/teardown.sh"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Relative path to a script run before workspace deletion
-                  </p>
+              {!checkingConductor && conductorDetected && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="w-4 h-4 text-green-500" />
+                  conductor.json detected — setup and archive scripts will run
+                  automatically
                 </div>
+              )}
+
+              {!checkingConductor && !conductorDetected && (
+                <>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="setup-script"
+                      className="text-sm font-medium"
+                    >
+                      Setup Script
+                    </label>
+                    <Input
+                      id="setup-script"
+                      type="text"
+                      value={setupScript}
+                      onChange={(e) => setSetupScript(e.target.value)}
+                      placeholder="scripts/setup.sh"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Relative path to a setup script run after clone
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="delete-script"
+                      className="text-sm font-medium"
+                    >
+                      Teardown Script
+                    </label>
+                    <Input
+                      id="delete-script"
+                      type="text"
+                      value={deleteScript}
+                      onChange={(e) => setDeleteScript(e.target.value)}
+                      placeholder="scripts/teardown.sh"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Relative path to a script run before workspace deletion
+                    </p>
+                  </div>
+                </>
               )}
             </div>
           )}
