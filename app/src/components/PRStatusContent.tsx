@@ -2,7 +2,6 @@ import {
   BellOff,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleX,
   Clock,
   File,
@@ -262,17 +261,17 @@ const CommentItem = memo(function CommentItem({
         )}
       >
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-0 min-w-0 cursor-pointer"
-          >
-            {expanded ? (
-              <ChevronDown className="w-3 h-3 flex-shrink-0" />
-            ) : (
-              <ChevronRight className="w-3 h-3 flex-shrink-0" />
-            )}
-          </button>
+          {!defaultExpanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-0 min-w-0 cursor-pointer"
+            >
+              <ChevronDown
+                className={`w-3 h-3 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`}
+              />
+            </button>
+          )}
           <a
             href={commentUrl}
             target="_blank"
@@ -357,7 +356,7 @@ function ReviewThreadGroup({
   const [root, ...replies] = thread.comments
   if (!root) return null
 
-  const REPLY_LIMIT = 3
+  const REPLY_LIMIT = defaultExpanded ? 1000 : 3
   const sortedReplies = [...replies].reverse()
   const hasMoreReplies = sortedReplies.length > REPLY_LIMIT
   const firstReplies = sortedReplies.slice(0, REPLY_LIMIT)
@@ -501,11 +500,9 @@ function CollapsedAuthorGroup({
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer"
       >
-        {expanded ? (
-          <ChevronDown className="w-3 h-3 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="w-3 h-3 flex-shrink-0" />
-        )}
+        <ChevronDown
+          className={`w-3 h-3 flex-shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`}
+        />
         {group.avatarUrl ? (
           <img
             src={group.avatarUrl}

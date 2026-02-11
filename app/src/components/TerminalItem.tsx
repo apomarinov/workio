@@ -490,11 +490,9 @@ export const TerminalItem = memo(function TerminalItem({
                   onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
                   className="flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
                 >
-                  {sessionsListExpanded ? (
-                    <ChevronDown className="w-3 h-3" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3" />
-                  )}
+                  <ChevronDown
+                    className={`w-3 h-3 transition-transform ${sessionsListExpanded ? '' : '-rotate-90'}`}
+                  />
                   Claude ({sessions.length})
                 </button>
                 {sessionsListExpanded && (

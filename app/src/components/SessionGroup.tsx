@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, Trash2 } from 'lucide-react'
+import { ChevronDown, Folder, Trash2 } from 'lucide-react'
 import { memo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useSessionContext } from '../context/SessionContext'
@@ -42,11 +42,9 @@ export const SessionGroup = memo(function SessionGroup({
           onClick={onToggle}
           className="group flex items-start gap-2 pr-3 pl-2 py-1.5 cursor-pointer text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
         >
-          {expanded ? (
-            <ChevronDown className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          ) : (
-            <ChevronRight className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          )}
+          <ChevronDown
+            className={`w-4 h-4 flex-shrink-0 mt-0.5 transition-transform ${expanded ? '' : '-rotate-90'}`}
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <Folder className="w-4 h-4 flex-shrink-0" />

@@ -3,7 +3,6 @@ import {
   Bot,
   CheckIcon,
   ChevronDown,
-  ChevronRight,
   Folder,
   MoreVertical,
   Pin,
@@ -199,11 +198,9 @@ export const SessionItem = memo(function SessionItem({
           onClick={toggleExpanded}
           className="hidden cursor-pointer group-hover:block"
         >
-          {isExpanded ? (
-            <ChevronDown className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5" />
-          )}
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+          />
         </button>
       </div>
       <div className="flex-1 min-w-0 max-w-[100%]">

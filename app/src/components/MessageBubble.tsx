@@ -1,4 +1,4 @@
-import { Bot, ChevronDown, ChevronRight, User } from 'lucide-react'
+import { Bot, ChevronDown, User } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
@@ -30,11 +30,9 @@ export function ThinkingGroup({ messages }: ThinkingGroupProps) {
           onClick={() => setIsExpanded(!expanded)}
           className="flex items-center cursor-pointer gap-1 text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors"
         >
-          {expanded ? (
-            <ChevronDown className="w-3 h-3" />
-          ) : (
-            <ChevronRight className="w-3 h-3" />
-          )}
+          <ChevronDown
+            className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+          />
           <span className="italic  group-hover:text-zinc-400">Thinking...</span>
         </button>
         {expanded && (

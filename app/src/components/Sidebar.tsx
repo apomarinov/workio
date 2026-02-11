@@ -16,7 +16,6 @@ import {
   BellOff,
   Bot,
   ChevronDown,
-  ChevronRight,
   ChevronsDownUp,
   Ellipsis,
   EyeOff,
@@ -802,11 +801,9 @@ export function Sidebar({ width }: SidebarProps) {
                   }
                   className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 hover:text-muted-foreground transition-colors w-full"
                 >
-                  {terminalsSectionCollapsed ? (
-                    <ChevronRight className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
+                  <ChevronDown
+                    className={`w-3 h-3 transition-transform ${terminalsSectionCollapsed ? '-rotate-90' : ''}`}
+                  />
                   Projects
                 </button>
                 {!terminalsSectionCollapsed && (
@@ -830,11 +827,9 @@ export function Sidebar({ width }: SidebarProps) {
                               onClick={() => toggleProjectRepo(repo)}
                               className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
                             >
-                              {isCollapsed ? (
-                                <ChevronRight className="w-3 h-3 flex-shrink-0" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3 flex-shrink-0" />
-                              )}
+                              <ChevronDown
+                                className={`w-3 h-3 flex-shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                              />
                               <Github className="w-3 h-3" />
                               <span className="truncate">{repoName}</span>
                             </button>
@@ -907,11 +902,9 @@ export function Sidebar({ width }: SidebarProps) {
                   }
                   className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
                 >
-                  {githubSectionCollapsed ? (
-                    <ChevronRight className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
+                  <ChevronDown
+                    className={`w-3 h-3 transition-transform ${githubSectionCollapsed ? '-rotate-90' : ''}`}
+                  />
                   Pull requests
                 </button>
                 {!githubSectionCollapsed &&
@@ -944,11 +937,9 @@ export function Sidebar({ width }: SidebarProps) {
                             onClick={() => toggleGitHubRepo(repo)}
                             className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
                           >
-                            {isCollapsed ? (
-                              <ChevronRight className="w-3 h-3 flex-shrink-0" />
-                            ) : (
-                              <ChevronDown className="w-3 h-3 flex-shrink-0" />
-                            )}
+                            <ChevronDown
+                              className={`w-3 h-3 flex-shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                            />
                             <Github className="w-3 h-3" />
                             <span className="truncate">{repoName}</span>
                           </button>
@@ -1039,11 +1030,9 @@ export function Sidebar({ width }: SidebarProps) {
               }
               className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
             >
-              {otherSessionsSectionCollapsed ? (
-                <ChevronRight className="w-3 h-3" />
-              ) : (
-                <ChevronDown className="w-3 h-3" />
-              )}
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${otherSessionsSectionCollapsed ? '-rotate-90' : ''}`}
+              />
               Claude not in project
             </button>
             {!otherSessionsSectionCollapsed &&

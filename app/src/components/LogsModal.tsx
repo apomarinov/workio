@@ -2,7 +2,6 @@ import { format } from 'date-fns'
 import {
   AlertCircle,
   ChevronDown,
-  ChevronRight,
   GitBranch,
   Github,
   Loader2,
@@ -376,11 +375,9 @@ export function LogsModal({
                         isExpanded && 'bg-sidebar-accent',
                       )}
                     >
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                      )}
+                      <ChevronDown
+                        className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                      />
 
                       {/* Date */}
                       <span className="text-xs text-muted-foreground w-32 flex-shrink-0">

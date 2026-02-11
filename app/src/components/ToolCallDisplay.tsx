@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   Circle,
   CircleDot,
   FileCode,
@@ -361,11 +360,9 @@ function CollapsibleOutput({
         onClick={() => setIsExpanded(!expanded)}
         className="flex cursor-pointer items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
       >
-        {expanded ? (
-          <ChevronDown className="w-3 h-3" />
-        ) : (
-          <ChevronRight className="w-3 h-3" />
-        )}
+        <ChevronDown
+          className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+        />
         <span>{expanded ? 'Hide output' : 'Show output'}</span>
         {truncated && <span className="text-amber-500">(truncated)</span>}
       </button>
@@ -456,11 +453,9 @@ function EditToolDisplay({
               onClick={() => setIsExpanded(!expanded)}
               className="flex cursor-pointer items-center gap-1 text-xs text-zinc-500 hover:text-zinc-400 transition-colors"
             >
-              {expanded ? (
-                <ChevronDown className="w-3 h-3" />
-              ) : (
-                <ChevronRight className="w-3 h-3" />
-              )}
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+              />
               <span>{expanded ? 'Hide diff' : 'Show diff'}</span>
             </button>
             {expanded && (
