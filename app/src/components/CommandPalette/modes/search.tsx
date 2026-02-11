@@ -313,7 +313,7 @@ export function createSearchMode(
   if (sessionItems.length > 0) {
     const findSessionsItem: PaletteItem = {
       id: 'action:find-sessions',
-      label: 'Find Sessions',
+      label: 'Find',
       icon: <Search className="h-4 w-4 shrink-0 text-zinc-400" />,
       keywords: ['find sessions'],
       onSelect: () =>
@@ -323,7 +323,7 @@ export function createSearchMode(
     if (sessions.some((s) => s.is_favorite)) {
       sessionActions.push({
         id: 'action:favorite-sessions',
-        label: 'Favorite Sessions',
+        label: 'Favorite',
         icon: <Heart className="h-4 w-4 shrink-0 text-zinc-400" />,
         keywords: ['favorite sessions', 'favorites'],
         onSelect: () =>

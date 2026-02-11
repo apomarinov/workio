@@ -110,7 +110,15 @@ export function createSessionSearchMode(
     }
   }
 
-  const groups: PaletteGroup[] = sessionSearchResults.map((match) => {
+  const sorted = [...sessionSearchResults].sort((a, b) => {
+    const aName = a.terminal_name ?? ''
+    const bName = b.terminal_name ?? ''
+    if (aName && !bName) return -1
+    if (!aName && bName) return 1
+    return aName.localeCompare(bName)
+  })
+
+  const groups: PaletteGroup[] = sorted.map((match) => {
     const heading =
       match.terminal_name ?? match.name ?? match.session_id.slice(0, 12)
 
