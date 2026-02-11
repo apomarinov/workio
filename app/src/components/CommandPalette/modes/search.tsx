@@ -344,9 +344,10 @@ export function createSearchMode(
       sessionsByTerminal.set(groupName, existing)
     }
 
+    groups.push({ heading: 'Session Actions', items: sessionActions })
+
     const needsSessionSubheadings = sessionsByTerminal.size > 1
     if (needsSessionSubheadings) {
-      // Sort so terminal groups come first, "All" last
       const sortedEntries = [...sessionsByTerminal.entries()].sort(
         ([a], [b]) => {
           if (a === 'Not in project') return 1
@@ -354,21 +355,11 @@ export function createSearchMode(
           return 0
         },
       )
-      let first = true
       for (const [name, items] of sortedEntries) {
-        const heading = `Sessions — ${name}`
-        if (first) {
-          groups.push({ heading, items: [...sessionActions, ...items] })
-          first = false
-        } else {
-          groups.push({ heading, items })
-        }
+        groups.push({ heading: `Sessions — ${name}`, items })
       }
     } else {
-      groups.push({
-        heading: 'Claude Sessions',
-        items: [...sessionActions, ...sessionItems],
-      })
+      groups.push({ heading: 'Claude Sessions', items: sessionItems })
     }
   }
   // Add actions group with logs
