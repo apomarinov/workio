@@ -340,7 +340,7 @@ function ReviewThreadGroup({
   if (!root) return null
 
   return (
-    <div className="ml-2 border-l border-sidebar-border pl-2">
+    <div>
       {thread.path && (
         <span className="text-[10px] flex items-center gap-1 text-muted-foreground/50 truncate px-2 pt-1">
           <File className="w-2 h-2 min-w-2 min-h-2" />
@@ -611,13 +611,17 @@ function DiscussionTimeline({
                   onReply={onReply}
                 />
                 {item.threads.map((thread, ti) => (
-                  <ReviewThreadGroup
+                  <div
                     key={`thread-${thread.comments[0]?.id || ti}`}
-                    thread={thread}
-                    prUrl={pr.prUrl}
-                    onHide={onHide}
-                    onReply={onReply}
-                  />
+                    className="ml-2 border-l border-sidebar-border pl-2"
+                  >
+                    <ReviewThreadGroup
+                      thread={thread}
+                      prUrl={pr.prUrl}
+                      onHide={onHide}
+                      onReply={onReply}
+                    />
+                  </div>
                 ))}
               </div>
             )
