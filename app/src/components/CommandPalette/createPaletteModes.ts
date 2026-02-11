@@ -50,6 +50,7 @@ export type AppActions = {
   openDeleteModal: (terminal: Terminal) => void
 
   // Session actions
+  resumeSession: (session: SessionWithProject) => void
   openRenameModal: (session: SessionWithProject) => void
   openDeleteSessionModal: (session: SessionWithProject) => void
 

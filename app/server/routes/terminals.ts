@@ -171,6 +171,7 @@ interface CreateTerminalBody {
 
 interface UpdateTerminalBody {
   name?: string
+  settings?: { defaultClaudeCommand?: string } | null
 }
 
 interface CheckoutBranchBody {
@@ -541,6 +542,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           sourceTerminal.ssh_host,
           gitRepoData,
           setupObj,
+          sourceTerminal.settings,
         )
 
         setupTerminalWorkspace({

@@ -149,6 +149,18 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
       window.removeEventListener('terminal-paste', handler as EventListener)
   }, [terminalId])
 
+  // Listen for terminal-focus events (e.g. from resume session)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number }>) => {
+      if (e.detail.terminalId === terminalId) {
+        terminalRef.current?.focus()
+      }
+    }
+    window.addEventListener('terminal-focus', handler as EventListener)
+    return () =>
+      window.removeEventListener('terminal-focus', handler as EventListener)
+  }, [terminalId])
+
   // Track cursor position for clipboard copy button (throttled to once per frame)
   useEffect(() => {
     let rafId: number | null = null

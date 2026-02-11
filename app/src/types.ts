@@ -25,6 +25,7 @@ export interface Terminal {
   git_branch: string | null
   git_repo: GitRepoStatus | null
   setup: SetupStatus | null
+  settings: { defaultClaudeCommand?: string } | null
   orphaned?: boolean
   created_at: string
   updated_at: string

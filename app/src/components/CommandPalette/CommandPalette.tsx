@@ -6,6 +6,7 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
+import { useSocket } from '@/hooks/useSocket'
 import {
   checkoutBranch,
   closePR,
@@ -114,6 +115,7 @@ export function CommandPalette() {
   } = useSessionContext()
   const { gitDirtyStatus } = useProcessContext()
   const { settings, updateSettings } = useSettings()
+  const { emit } = useSocket()
 
   // Pin state (shared localStorage keys with sidebar)
   const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
@@ -480,6 +482,29 @@ export function CommandPalette() {
       },
 
       // Session actions
+      resumeSession: (session) => {
+        closePalette()
+        if (session.terminal_id) {
+          selectTerminal(session.terminal_id)
+          clearSession()
+          window.dispatchEvent(
+            new CustomEvent('reveal-terminal', {
+              detail: { id: session.terminal_id },
+            }),
+          )
+          emit('resume-session', {
+            terminalId: session.terminal_id,
+            sessionId: session.session_id,
+          })
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('terminal-focus', {
+                detail: { terminalId: session.terminal_id },
+              }),
+            )
+          }, 350)
+        }
+      },
       openRenameModal: (session) => {
         closePalette()
         setTimeout(() => setRenameSession(session), 150)
@@ -717,6 +742,7 @@ export function CommandPalette() {
       settings,
       updateSettings,
       refetchSessions,
+      emit,
     ],
   )
 
@@ -774,9 +800,9 @@ export function CommandPalette() {
         <EditTerminalModal
           open={!!editTerminal}
           terminal={editTerminal}
-          onSave={async (updates) => {
+          onSave={async ({ name, settings }) => {
             try {
-              await updateTerminal(editTerminal.id, updates)
+              await updateTerminal(editTerminal.id, { name, settings })
               setEditTerminal(null)
             } catch (err) {
               toast.error(

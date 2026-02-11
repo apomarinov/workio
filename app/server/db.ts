@@ -426,14 +426,15 @@ export async function createTerminal(
   ssh_host: string | null = null,
   git_repo: object | null = null,
   setup: object | null = null,
+  settings: object | null = null,
 ): Promise<Terminal> {
   // Auto-generate unique name if provided
   const uniqueName = name ? await getUniqueTerminalName(name) : null
 
   const { rows } = await pool.query(
     `
-    INSERT INTO terminals (cwd, name, shell, ssh_host, git_repo, setup)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO terminals (cwd, name, shell, ssh_host, git_repo, setup, settings)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `,
     [
@@ -443,6 +444,7 @@ export async function createTerminal(
       ssh_host,
       git_repo ? JSON.stringify(git_repo) : null,
       setup ? JSON.stringify(setup) : null,
+      settings ? JSON.stringify(settings) : null,
     ],
   )
   return rows[0]
@@ -459,6 +461,7 @@ export async function updateTerminal(
     git_branch?: string | null
     git_repo?: object | null
     setup?: object | null
+    settings?: object | null
   },
 ): Promise<Terminal | undefined> {
   // Get old terminal if name is changing (for zellij session rename)
@@ -503,6 +506,10 @@ export async function updateTerminal(
   if (updates.setup !== undefined) {
     setClauses.push(`setup = $${paramIdx++}`)
     values.push(updates.setup ? JSON.stringify(updates.setup) : null)
+  }
+  if (updates.settings !== undefined) {
+    setClauses.push(`settings = $${paramIdx++}`)
+    values.push(updates.settings ? JSON.stringify(updates.settings) : null)
   }
 
   if (setClauses.length === 0) {

@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS terminals (
     git_branch VARCHAR(255),
     git_repo JSONB,
     setup JSONB,
+    settings JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

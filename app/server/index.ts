@@ -46,6 +46,7 @@ import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import { getSession, startGitDirtyPolling, writeToSession } from './pty/manager'
+import { getActiveZellijSessionNames } from './pty/process-tree'
 import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -146,6 +147,34 @@ io.on('connection', (socket) => {
       `terminal-${terminalId}`
     writeToSession(terminalId, `zellij attach '${sessionName}'\n`)
   })
+
+  socket.on(
+    'resume-session',
+    async (data: { terminalId: number; sessionId: string }) => {
+      const { terminalId, sessionId } = data
+      const terminal = await getTerminalById(terminalId)
+      const cmd =
+        (terminal?.settings as { defaultClaudeCommand?: string } | null)
+          ?.defaultClaudeCommand || 'claude'
+      const fullCommand = `${cmd} --resume ${sessionId}`
+
+      // Check if zellij is running for this terminal
+      const ptySession = getSession(terminalId)
+      const zellijName =
+        ptySession?.sessionName || terminal?.name || `terminal-${terminalId}`
+      const zellijSessions = await getActiveZellijSessionNames()
+      const hasZellij = zellijSessions.has(zellijName)
+
+      if (hasZellij) {
+        writeToSession(terminalId, 'zellij action new-tab\n')
+        setTimeout(() => {
+          writeToSession(terminalId, `${fullCommand}\n`)
+        }, 300)
+      } else {
+        writeToSession(terminalId, `${fullCommand}\n`)
+      }
+    },
+  )
 
   socket.on('disconnect', () => {
     log.info(`Client disconnected: ${socket.id}`)

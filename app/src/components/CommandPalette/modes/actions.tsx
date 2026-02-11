@@ -11,6 +11,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Play,
   ScrollText,
   Terminal,
   Trash2,
@@ -242,6 +243,16 @@ export function createActionsMode(
         icon: <Eye className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => actions.selectSession(session.session_id),
       },
+      ...(session.terminal_id
+        ? [
+            {
+              id: 'action:resume',
+              label: 'Resume',
+              icon: <Play className="h-4 w-4 shrink-0 text-zinc-400" />,
+              onSelect: () => actions.resumeSession(session),
+            },
+          ]
+        : []),
       {
         id: 'action:copy-id',
         label: 'Copy ID',

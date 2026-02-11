@@ -13,7 +13,10 @@ import type { Terminal } from '@/types'
 interface EditTerminalModalProps {
   open: boolean
   terminal: Terminal
-  onSave: (updates: { name: string }) => void
+  onSave: (updates: {
+    name: string
+    settings?: { defaultClaudeCommand?: string } | null
+  }) => void
   onCancel: () => void
 }
 
@@ -24,16 +27,24 @@ export function EditTerminalModal({
   onCancel,
 }: EditTerminalModalProps) {
   const [name, setName] = useState(terminal.name ?? '')
+  const [defaultClaudeCommand, setDefaultClaudeCommand] = useState(
+    terminal.settings?.defaultClaudeCommand ?? '',
+  )
 
   useEffect(() => {
     if (open) {
       setName(terminal.name ?? '')
+      setDefaultClaudeCommand(terminal.settings?.defaultClaudeCommand ?? '')
     }
-  }, [open, terminal.name])
+  }, [open, terminal.name, terminal.settings?.defaultClaudeCommand])
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ name: name.trim() })
+    const trimmedCmd = defaultClaudeCommand.trim()
+    onSave({
+      name: name.trim(),
+      settings: trimmedCmd ? { defaultClaudeCommand: trimmedCmd } : null,
+    })
   }
 
   return (
@@ -52,6 +63,17 @@ export function EditTerminalModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Name"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="edit-claude-cmd" className="text-sm font-medium">
+              Default Claude Command
+            </label>
+            <Input
+              id="edit-claude-cmd"
+              value={defaultClaudeCommand}
+              onChange={(e) => setDefaultClaudeCommand(e.target.value)}
+              placeholder="claude"
             />
           </div>
           <DialogFooter>
