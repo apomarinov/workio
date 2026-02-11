@@ -246,7 +246,7 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
         }
         reviewThreads(last: 20) {
           nodes {
-            comments(last: 5) {
+            comments(first: 10) {
               nodes {
                 databaseId
                 url
