@@ -11,6 +11,13 @@ import {
   Reply,
 } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -64,9 +71,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-                dimColorClass ||
-                  'text-muted-foreground/60 hover:text-muted-foreground',
-              ),
+              dimColorClass ||
+              'text-muted-foreground/60 hover:text-muted-foreground',
+            ),
           className,
         )}
       >
@@ -375,6 +382,37 @@ function getReviewIcon(state: string): React.ReactNode {
   }
 }
 
+function getLatestActivityTime(item: PRDiscussionItem): number {
+  switch (item.type) {
+    case 'review':
+      return item.review.submittedAt
+        ? new Date(item.review.submittedAt).getTime()
+        : 0
+    case 'comment':
+      return new Date(item.comment.createdAt).getTime()
+    case 'thread': {
+      const last = item.thread.comments[item.thread.comments.length - 1]
+      return last ? new Date(last.createdAt).getTime() : 0
+    }
+  }
+}
+
+function flattenDiscussion(discussion: PRDiscussionItem[]): PRDiscussionItem[] {
+  const items: PRDiscussionItem[] = []
+  for (const item of discussion) {
+    if (item.type === 'review') {
+      items.push({ type: 'review', review: item.review, threads: [] })
+      for (const thread of item.threads) {
+        items.push({ type: 'thread', thread })
+      }
+    } else {
+      items.push(item)
+    }
+  }
+  items.sort((a, b) => getLatestActivityTime(b) - getLatestActivityTime(a))
+  return items
+}
+
 function DiscussionTimeline({
   discussion,
   pr,
@@ -393,28 +431,55 @@ function DiscussionTimeline({
   onHide: (author: string) => void
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
+  const [displayMode, setDisplayMode] = useState<'threads' | 'latest'>(() => {
+    const stored = localStorage.getItem('discussion-display-mode')
+    return stored === 'threads' ? 'threads' : 'latest'
+  })
+  const handleDisplayModeChange = useCallback((v: string) => {
+    const mode = v as 'threads' | 'latest'
+    setDisplayMode(mode)
+    localStorage.setItem('discussion-display-mode', mode)
+  }, [])
 
-  const filteredDiscussion = useMemo(
-    () =>
-      discussion.filter((item) => {
-        if (item.type === 'comment') {
-          return !hiddenAuthorsSet.has(item.comment.author)
-        }
-        return true
-      }),
-    [discussion, hiddenAuthorsSet],
-  )
+  const processedDiscussion = useMemo(() => {
+    const items =
+      displayMode === 'latest' ? flattenDiscussion(discussion) : discussion
+    return items.filter((item) => {
+      if (item.type === 'comment') {
+        return !hiddenAuthorsSet.has(item.comment.author)
+      }
+      return true
+    })
+  }, [discussion, hiddenAuthorsSet, displayMode])
 
   const visibleDiscussion = useMemo(
-    () => filteredDiscussion.slice(0, visibleCount),
-    [filteredDiscussion, visibleCount],
+    () => processedDiscussion.slice(0, visibleCount),
+    [processedDiscussion, visibleCount],
   )
-  const hasMore = visibleCount < filteredDiscussion.length
+  const hasMore = visibleCount < processedDiscussion.length
 
-  if (filteredDiscussion.length === 0) return null
+  if (processedDiscussion.length === 0) return null
 
   return (
     <>
+      <div className="px-2 pb-1">
+        <Select value={displayMode} onValueChange={handleDisplayModeChange}>
+          <SelectTrigger
+            size="sm"
+            className="!h-5 ml-auto text-[10px] border-none shadow-none px-1.5 gap-1"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="threads" className="text-xs">
+              Threads
+            </SelectItem>
+            <SelectItem value="latest" className="text-xs">
+              Latest
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       {visibleDiscussion.map((item, i) => {
         switch (item.type) {
           case 'review':
@@ -474,7 +539,7 @@ function DiscussionTimeline({
           onClick={() => setVisibleCount((v) => v + 10)}
           className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
-          Show more ({filteredDiscussion.length - visibleCount} remaining)
+          Show more ({processedDiscussion.length - visibleCount} remaining)
         </button>
       )}
     </>
@@ -681,7 +746,7 @@ export function PRStatusContent({
                     className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                   >
                     {check.status === 'IN_PROGRESS' ||
-                    check.status === 'QUEUED' ? (
+                      check.status === 'QUEUED' ? (
                       <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                     ) : (
                       <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
