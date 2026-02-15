@@ -71,18 +71,21 @@ export function createActionsMode(
     // Branches (git repos only)
     if (terminal.git_repo) {
       if (terminal.git_branch) {
-        const branchNav = () =>
+        const branchNav = () => {
+          actions.loadBranches(terminal.id)
           api.push({
             mode: 'branch-actions',
             title: terminal.git_branch!,
             terminal,
             pr,
+            branchesLoading: true,
             branch: {
               name: terminal.git_branch!,
               isRemote: false,
               isCurrent: true,
             },
           })
+        }
         items.push({
           id: 'action:current-branch',
           label: terminal.git_branch,

@@ -540,20 +540,23 @@ export function CommandPalette() {
           .then((data) => {
             setStack((prev) => {
               const current = prev[prev.length - 1]
-              if (current.mode !== 'branches') return prev
-              const firstBranch = data.local[0] ?? data.remote[0]
-              const prefix = data.local[0] ? 'local' : 'remote'
-              return [
-                ...prev.slice(0, -1),
-                {
-                  ...current,
-                  branches: data,
-                  branchesLoading: false,
-                  highlightedId: firstBranch
-                    ? `branch:${prefix}:${firstBranch.name}`
-                    : undefined,
-                },
-              ]
+              if (
+                current.mode !== 'branches' &&
+                current.mode !== 'branch-actions'
+              )
+                return prev
+              const updates: Partial<PaletteLevel> = {
+                branches: data,
+                branchesLoading: false,
+              }
+              if (current.mode === 'branches') {
+                const firstBranch = data.local[0] ?? data.remote[0]
+                const prefix = data.local[0] ? 'local' : 'remote'
+                updates.highlightedId = firstBranch
+                  ? `branch:${prefix}:${firstBranch.name}`
+                  : undefined
+              }
+              return [...prev.slice(0, -1), { ...current, ...updates }]
             })
           })
           .catch((err) => {
@@ -562,7 +565,11 @@ export function CommandPalette() {
             )
             setStack((prev) => {
               const current = prev[prev.length - 1]
-              if (current.mode !== 'branches') return prev
+              if (
+                current.mode !== 'branches' &&
+                current.mode !== 'branch-actions'
+              )
+                return prev
               return [
                 ...prev.slice(0, -1),
                 { ...current, branchesLoading: false },
