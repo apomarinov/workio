@@ -51,9 +51,21 @@ def delete_old_logs_and_hooks(conn) -> int:
     return logs_deleted + hooks_deleted
 
 
+def get_favorite_session_ids(conn) -> set[str]:
+    """Get the set of favorited session IDs from settings."""
+    cur = get_cursor(conn)
+    cur.execute("SELECT config->'favorite_sessions' AS favs FROM settings WHERE id = 1")
+    row = cur.fetchone()
+    if row and row['favs']:
+        return set(row['favs'])
+    return set()
+
+
 def delete_old_session_data(conn) -> tuple[int, list[str]]:
     """Delete messages and prompts for sessions older than a week. Returns (count deleted, deleted session IDs)."""
     cur = get_cursor(conn)
+    favorite_ids = get_favorite_session_ids(conn)
+
     # Get old session IDs
     cur.execute('''
         SELECT session_id FROM sessions
@@ -64,7 +76,10 @@ def delete_old_session_data(conn) -> tuple[int, list[str]]:
     if not old_sessions:
         return 0, []
 
-    session_ids = [s['session_id'] for s in old_sessions]
+    session_ids = [s['session_id'] for s in old_sessions if s['session_id'] not in favorite_ids]
+
+    if not session_ids:
+        return 0, []
 
     # Delete messages for old sessions' prompts
     cur.execute('''
@@ -107,6 +122,8 @@ def delete_orphan_projects(conn) -> int:
 def delete_empty_sessions(conn) -> tuple[int, list[str]]:
     """Delete sessions with no prompts, or only a single null prompt and no messages. Returns (count deleted, deleted session IDs)."""
     cur = get_cursor(conn)
+    favorite_ids = list(get_favorite_session_ids(conn))
+
     # Find sessions that have no prompts, or exactly one null prompt with no messages
     cur.execute('''
         DELETE FROM sessions WHERE session_id IN (
@@ -114,13 +131,14 @@ def delete_empty_sessions(conn) -> tuple[int, list[str]]:
             FROM sessions s
             LEFT JOIN prompts p ON p.session_id = s.session_id
             LEFT JOIN messages m ON m.prompt_id = p.id
+            WHERE s.session_id != ALL(%s)
             GROUP BY s.session_id
             HAVING COUNT(DISTINCT p.id) <= 1
                AND MAX(p.prompt) IS NULL
                AND COUNT(m.id) = 0
         )
         RETURNING session_id
-    ''')
+    ''', (favorite_ids,))
     deleted_ids = [row['session_id'] for row in cur.fetchall()]
 
     # Clean up orphaned prompts (prompts without sessions)
