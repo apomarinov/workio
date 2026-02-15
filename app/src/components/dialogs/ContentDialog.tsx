@@ -45,7 +45,7 @@ export function ContentDialog({
             {author}
           </DialogTitle>
         </DialogHeader>
-        <div className="text-sm">
+        <div className="text-sm min-w-0">
           <MarkdownContent content={content} />
         </div>
       </DialogContent>

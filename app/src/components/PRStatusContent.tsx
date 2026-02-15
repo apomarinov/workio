@@ -572,7 +572,7 @@ function FullDiscussionDialog({
         <DialogHeader>
           <DialogTitle>Discussion</DialogTitle>
         </DialogHeader>
-        <div className="space-y-0.5">
+        <div className="space-y-0.5 min-w-0">
           {groupedDiscussion.map((item, i) => {
             switch (item.type) {
               case 'collapsed-group':
