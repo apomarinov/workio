@@ -14,7 +14,15 @@ import {
   Pin,
   TerminalSquare as TerminalIcon,
 } from 'lucide-react'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  memo,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -33,6 +41,10 @@ import type { SessionWithProject, Terminal } from '../types'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
+
+const CommitDialog = lazy(() =>
+  import('./CommitDialog').then((m) => ({ default: m.CommitDialog })),
+)
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -82,6 +94,7 @@ export const TerminalItem = memo(function TerminalItem({
   const isDirty =
     !!diffStat &&
     (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
+  const [commitOpen, setCommitOpen] = useState(false)
   const remoteSyncStat = gitRemoteSyncStatus[terminal.id]
   const showRemoteSync =
     !!remoteSyncStat &&
@@ -352,11 +365,16 @@ export const TerminalItem = memo(function TerminalItem({
                     </button>
                   )}
                   {isDirty && diffStat && (
-                    <span
+                    <button
+                      type="button"
                       className={cn(
-                        'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono',
+                        'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-100 transition-opacity',
                         isActive && 'opacity-80',
                       )}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setCommitOpen(true)
+                      }}
                     >
                       {diffStat.added > 0 && (
                         <span className="text-green-500/80">
@@ -377,7 +395,7 @@ export const TerminalItem = memo(function TerminalItem({
                           ?{diffStat.untracked}
                         </span>
                       )}
-                    </span>
+                    </button>
                   )}
                   {showRemoteSync && remoteSyncStat && (
                     <span
@@ -547,6 +565,15 @@ export const TerminalItem = memo(function TerminalItem({
             )}
           </div>
         )}
+      {commitOpen && (
+        <Suspense>
+          <CommitDialog
+            open={commitOpen}
+            terminalId={terminal.id}
+            onClose={() => setCommitOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 })

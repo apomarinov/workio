@@ -1677,6 +1677,229 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     }
   })
 
+  // Discard changes for selected files
+  fastify.post<{
+    Params: TerminalParams
+    Body: { files: string[] }
+  }>('/api/terminals/:id/discard', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
+
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
+
+    if (!terminal.git_repo) {
+      return reply.status(400).send({ error: 'Terminal has no git repo' })
+    }
+
+    const { files } = request.body
+    if (!files || files.length === 0) {
+      return reply.status(400).send({ error: 'No files specified' })
+    }
+
+    const cwdPath = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+    try {
+      // Get file statuses to determine which git commands to use
+      let nameStatusOut: string
+      let untrackedOut: string
+      if (terminal.ssh_host) {
+        const [nsResult, utResult] = await Promise.all([
+          execSSHCommand(
+            terminal.ssh_host,
+            'git diff --name-status HEAD 2>/dev/null || git diff --name-status',
+            { cwd: terminal.cwd },
+          ),
+          execSSHCommand(
+            terminal.ssh_host,
+            'git ls-files --others --exclude-standard',
+            { cwd: terminal.cwd },
+          ),
+        ])
+        nameStatusOut = nsResult.stdout
+        untrackedOut = utResult.stdout
+      } else {
+        ;[nameStatusOut, untrackedOut] = await Promise.all([
+          new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['diff', '--name-status', 'HEAD'],
+              { cwd: cwdPath, timeout: 10000 },
+              (err, stdout) => {
+                if (err) {
+                  execFile(
+                    'git',
+                    ['diff', '--name-status'],
+                    { cwd: cwdPath, timeout: 10000 },
+                    (_err2, stdout2) => resolve(stdout2 || ''),
+                  )
+                } else {
+                  resolve(stdout)
+                }
+              },
+            )
+          }),
+          new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['ls-files', '--others', '--exclude-standard'],
+              { cwd: cwdPath, timeout: 10000 },
+              (_err, stdout) => resolve(stdout || ''),
+            )
+          }),
+        ])
+      }
+
+      // Parse statuses
+      const untrackedFiles = new Set(
+        untrackedOut
+          .trim()
+          .split('\n')
+          .filter((l) => l),
+      )
+      const addedFiles = new Set<string>()
+      for (const line of nameStatusOut.trim().split('\n')) {
+        if (!line) continue
+        const parts = line.split('\t')
+        if (parts[0] === 'A') addedFiles.add(parts[1])
+      }
+
+      const requestedSet = new Set(files)
+      // Tracked files (modified/deleted/renamed): git checkout HEAD --
+      const trackedToRevert = files.filter(
+        (f) => !untrackedFiles.has(f) && !addedFiles.has(f),
+      )
+      // Staged new files: git rm -f --
+      const stagedNew = files.filter(
+        (f) => addedFiles.has(f) && requestedSet.has(f),
+      )
+      // Untracked files: delete directly
+      const untracked = files.filter(
+        (f) => untrackedFiles.has(f) && requestedSet.has(f),
+      )
+
+      // Revert tracked files
+      if (trackedToRevert.length > 0) {
+        const checkoutCmd = `git checkout HEAD -- ${trackedToRevert.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, checkoutCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: checkoutCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['checkout', 'HEAD', '--', ...trackedToRevert],
+              { cwd: cwdPath, timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: checkoutCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+      }
+
+      // Remove staged new files
+      if (stagedNew.length > 0) {
+        const rmCmd = `git rm -f -- ${stagedNew.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, rmCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: rmCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['rm', '-f', '--', ...stagedNew],
+              { cwd: cwdPath, timeout: 30000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: rmCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+      }
+
+      // Delete untracked files
+      if (untracked.length > 0) {
+        if (terminal.ssh_host) {
+          const rmCmd = `rm -f -- ${untracked.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
+          await execSSHCommand(terminal.ssh_host, rmCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: rmCmd,
+            stdout: '',
+            stderr: '',
+          })
+        } else {
+          await Promise.all(
+            untracked.map((f) =>
+              fs.promises.unlink(path.join(cwdPath, f)).catch(() => {}),
+            ),
+          )
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: `rm ${untracked.join(' ')}`,
+            stdout: '',
+            stderr: '',
+          })
+        }
+      }
+
+      // Refresh dirty state
+      checkAndEmitSingleGitDirty(id).catch(() => {})
+
+      return { success: true }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to discard changes'
+      return reply.status(400).send({
+        success: false,
+        error: errorMessage,
+      })
+    }
+  })
+
   // Rebase a branch onto the current branch
   fastify.post<{ Params: TerminalParams; Body: RebaseBranchBody }>(
     '/api/terminals/:id/rebase',

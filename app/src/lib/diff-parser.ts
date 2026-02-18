@@ -158,6 +158,10 @@ export function parseDiff(raw: string): ParsedDiff {
   if (!raw.trim()) return { lines, hunks }
 
   const rawLines = raw.split('\n')
+  // Remove trailing empty line from the final newline in diff output
+  if (rawLines.length > 0 && rawLines[rawLines.length - 1] === '') {
+    rawLines.pop()
+  }
   let oldLine = 0
   let newLine = 0
 
@@ -184,13 +188,16 @@ export function parseDiff(raw: string): ParsedDiff {
     if (hunkMatch) {
       oldLine = parseInt(hunkMatch[1], 10)
       newLine = parseInt(hunkMatch[2], 10)
+      const headerContent = hunkMatch[3].trim()
       hunks.push({ lineIndex: lines.length })
-      lines.push({
-        type: 'header',
-        content: hunkMatch[3].trim() || '',
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
+      if (headerContent) {
+        lines.push({
+          type: 'header',
+          content: headerContent,
+          oldLineNumber: null,
+          newLineNumber: null,
+        })
+      }
       continue
     }
 

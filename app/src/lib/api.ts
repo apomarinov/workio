@@ -568,6 +568,22 @@ export async function commitChanges(
   return data
 }
 
+export async function discardChanges(
+  terminalId: number,
+  files: string[],
+): Promise<{ success: boolean; error?: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/discard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to discard changes')
+  }
+  return data
+}
+
 export async function getHeadMessage(
   terminalId: number,
 ): Promise<{ message: string }> {

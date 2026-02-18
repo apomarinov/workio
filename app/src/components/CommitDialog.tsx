@@ -5,9 +5,20 @@ import {
   Folder,
   Loader2,
   RefreshCw,
+  Undo2,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, type PanelSize, Separator } from 'react-resizable-panels'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -24,7 +35,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useSettings } from '@/hooks/useSettings'
-import { commitChanges, getChangedFiles, getHeadMessage } from '@/lib/api'
+import {
+  commitChanges,
+  discardChanges,
+  getChangedFiles,
+  getHeadMessage,
+} from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ChangedFile, FileStatus } from '../../shared/types'
 import { FileDiffViewer } from './FileDiffViewer'
@@ -77,6 +93,8 @@ export function CommitDialog({
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [groupByFolder, setGroupByFolder] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [discarding, setDiscarding] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { settings } = useSettings()
@@ -229,6 +247,23 @@ export function CommitDialog({
     }
   }
 
+  const handleDiscard = async () => {
+    setDiscarding(true)
+    try {
+      await discardChanges(terminalId, Array.from(selectedFiles))
+      toast.success(
+        `Discarded ${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''}`,
+      )
+      refreshFiles()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to discard changes',
+      )
+    } finally {
+      setDiscarding(false)
+    }
+  }
+
   const canCommit = (amend || !!message.trim()) && selectedFiles.size > 0
 
   return (
@@ -346,6 +381,28 @@ export function CommitDialog({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Refresh files</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => setConfirmDiscard(true)}
+                      disabled={
+                        loading ||
+                        discarding ||
+                        loadingFiles ||
+                        selectedFiles.size === 0
+                      }
+                    >
+                      {discarding ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Undo2 className="size-3" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Discard selected changes</TooltipContent>
                 </Tooltip>
               </div>
               <div className="flex-1 overflow-y-auto border-t border-zinc-700">
@@ -588,6 +645,27 @@ export function CommitDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently discard changes in {selectedFiles.size} file
+              {selectedFiles.size > 1 ? 's' : ''}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDiscard}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
