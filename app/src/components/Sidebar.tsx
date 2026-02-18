@@ -128,8 +128,6 @@ export function Sidebar({ width }: SidebarProps) {
   const {
     githubPRs,
     mergedPRs,
-    hasNewActivity,
-    markPRSeen,
     hasAnyUnseenPRs,
     hasNotifications,
     hasUnreadNotifications,
@@ -976,8 +974,7 @@ export function Sidebar({ width }: SidebarProps) {
                                 pr={pr}
                                 expanded={expandedGitHubPRsSet.has(pr.branch)}
                                 onToggle={() => toggleGitHubPR(pr)}
-                                hasNewActivity={hasNewActivity(pr)}
-                                onSeen={() => markPRSeen(pr)}
+                                hasNewActivity={pr.hasUnreadNotifications}
                                 isActive={
                                   activePR?.prNumber === pr.prNumber &&
                                   activePR?.repo === pr.repo

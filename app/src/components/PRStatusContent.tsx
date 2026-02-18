@@ -99,7 +99,7 @@ interface PRStatusContentProps {
   expanded?: boolean
   onToggle?: () => void
   hasNewActivity?: boolean
-  onSeen?: () => void
+  unreadItemIds?: Set<string>
 }
 
 const ReviewRow = memo(function ReviewRow({
@@ -151,10 +151,18 @@ const ReviewRow = memo(function ReviewRow({
             <img
               src={review.avatarUrl}
               alt={review.author}
-              className="w-4 h-4 rounded-full flex-shrink-0"
+              className={cn(
+                'w-4 h-4 rounded-full flex-shrink-0',
+                review.isUnread && 'ring-2 ring-green-500',
+              )}
             />
           ) : (
-            <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+            <div
+              className={cn(
+                'w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0',
+                review.isUnread && 'ring-2 ring-green-500',
+              )}
+            />
           )}
           <span className="text-xs truncate">{review.author}</span>
         </a>
@@ -222,12 +230,14 @@ const CommentItem = memo(function CommentItem({
   largeText,
 }: {
   comment: {
+    id?: number
     url?: string
     author: string
     avatarUrl: string
     body: string
     createdAt: string
     path?: string
+    isUnread?: boolean
   }
   prUrl: string
   onHide: (author: string) => void
@@ -285,10 +295,18 @@ const CommentItem = memo(function CommentItem({
               <img
                 src={comment.avatarUrl}
                 alt={comment.author}
-                className="w-4 h-4 rounded-full flex-shrink-0"
+                className={cn(
+                  'w-4 h-4 rounded-full flex-shrink-0',
+                  comment.isUnread && 'ring-2 ring-green-500',
+                )}
               />
             ) : (
-              <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
+              <div
+                className={cn(
+                  'w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0',
+                  comment.isUnread && 'ring-2 ring-green-500',
+                )}
+              />
             )}
             <span className="text-xs font-medium truncate">
               {comment.author}
@@ -866,7 +884,6 @@ export function PRStatusContent({
   pr,
   expanded: expandedProp,
   onToggle,
-  onSeen,
 }: PRStatusContentProps) {
   const hasHeader = onToggle !== undefined
   const expanded = hasHeader ? (expandedProp ?? false) : true
@@ -1054,7 +1071,7 @@ export function PRStatusContent({
 
   // Merged state with header: just show a merged tab
   if (hasHeader && pr.isMerged) {
-    return <PRTabButton pr={pr} active onClick={onSeen} />
+    return <PRTabButton pr={pr} active />
   }
 
   return (

@@ -150,6 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_repo ON notifications(repo);
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+CREATE INDEX IF NOT EXISTS idx_notifications_data ON notifications USING GIN (data);
 
 -- Command logs table (for terminal git operations, workspace setup, GitHub operations)
 CREATE TABLE IF NOT EXISTS command_logs (

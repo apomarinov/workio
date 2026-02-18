@@ -28,6 +28,7 @@ export interface PRComment {
   body: string
   createdAt: string
   path?: string // File path for code review comments
+  isUnread?: boolean
 }
 
 export interface PRReview {
@@ -38,6 +39,7 @@ export interface PRReview {
   state: string
   body: string
   submittedAt?: string
+  isUnread?: boolean
 }
 
 export interface PRReviewThread {
@@ -77,6 +79,7 @@ export interface PRCheckStatus {
   runningChecksCount: number
   failedChecksCount: number
   headCommitSha: string
+  hasUnreadNotifications?: boolean
 }
 
 export interface PRChecksPayload {
@@ -140,6 +143,13 @@ export interface WorkspacePayload {
     error?: string
   }
   deleted?: boolean
+}
+
+export interface UnreadPRNotification {
+  repo: string
+  prNumber: number
+  count: number
+  items: { commentId?: number; reviewId?: number }[]
 }
 
 // GitHub webhook events we subscribe to

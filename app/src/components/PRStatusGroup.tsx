@@ -16,7 +16,6 @@ interface PRStatusGroupProps {
   expanded: boolean
   onToggle: () => void
   hasNewActivity?: boolean
-  onSeen?: () => void
   isActive?: boolean
 }
 
@@ -25,7 +24,6 @@ export const PRStatusGroup = memo(function PRStatusGroup({
   expanded,
   onToggle,
   hasNewActivity,
-  onSeen,
   isActive,
 }: PRStatusGroupProps) {
   const prInfo = getPRStatusInfo(pr)
@@ -37,7 +35,6 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           if (!prInfo.isMerged) {
             onToggle()
           }
-          onSeen?.()
         }}
         className={cn(
           'group/pr flex relative items-center gap-2 pr-3 pl-2 py-1.5 transition-colors min-w-0',
@@ -129,7 +126,6 @@ export const PRStatusGroup = memo(function PRStatusGroup({
             expanded
             onToggle={() => {}}
             hasNewActivity={hasNewActivity}
-            onSeen={onSeen}
           />
         </div>
       )}

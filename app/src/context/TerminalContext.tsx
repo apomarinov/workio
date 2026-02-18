@@ -52,9 +52,6 @@ interface TerminalContextValue {
   refetch: () => void
   githubPRs: PRCheckStatus[]
   mergedPRs: MergedPRSummary[]
-  hasNewActivity: (pr: PRCheckStatus) => boolean
-  markPRSeen: (pr: PRCheckStatus) => void
-  markAllPRsSeen: () => void
   hasAnyUnseenPRs: boolean
   activePR: PRCheckStatus | null
   setActivePR: (pr: PRCheckStatus | null) => void
@@ -365,56 +362,82 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // PR seen tracking
-  const [prSeenTimes, setPRSeenTimes] = useLocalStorage<Record<string, string>>(
-    'pr-seen-times',
-    {},
-  )
+  // Unread PR notification tracking (DB-backed)
+  const [unreadPRData, setUnreadPRData] = useState<
+    Map<string, { count: number; itemIds: Set<string> }>
+  >(new Map())
 
-  const hasNewActivity = useCallback(
-    (pr: PRCheckStatus): boolean => {
-      if (!pr.updatedAt) return false
-      const seen = prSeenTimes[`${pr.repo}#${pr.prNumber}`]
-      if (!seen) return true
-      return pr.updatedAt > seen
-    },
-    [prSeenTimes],
-  )
-
-  const markPRSeen = useCallback(
-    (pr: PRCheckStatus): void => {
-      if (!pr.updatedAt) return
-      const key = `${pr.repo}#${pr.prNumber}`
-      setPRSeenTimes((prev) => {
-        if (prev[key] === pr.updatedAt) return prev
-        return { ...prev, [key]: pr.updatedAt }
-      })
-    },
-    [setPRSeenTimes],
-  )
-
-  const markAllPRsSeen = useCallback(() => {
-    setPRSeenTimes((prev) => {
-      const next = { ...prev }
-      for (const pr of githubPRs) {
-        if (pr.updatedAt) {
-          next[`${pr.repo}#${pr.prNumber}`] = pr.updatedAt
+  const refetchUnreadPRData = useCallback(async () => {
+    try {
+      const data = await api.getUnreadPRNotifications()
+      const map = new Map<string, { count: number; itemIds: Set<string> }>()
+      for (const item of data) {
+        const key = `${item.repo}#${item.prNumber}`
+        const itemIds = new Set<string>()
+        for (const i of item.items) {
+          if (i.commentId) itemIds.add(String(i.commentId))
+          if (i.reviewId) itemIds.add(String(i.reviewId))
         }
+        map.set(key, { count: item.count, itemIds })
       }
-      return next
-    })
-  }, [githubPRs, setPRSeenTimes])
+      setUnreadPRData(map)
+    } catch {
+      // silently fail
+    }
+  }, [])
 
-  const hasAnyUnseenPRs = useMemo(
-    () =>
-      githubPRs.some((pr) => {
-        if (!pr.updatedAt) return false
-        const seen = prSeenTimes[`${pr.repo}#${pr.prNumber}`]
-        if (!seen) return true
-        return pr.updatedAt > seen
-      }),
-    [githubPRs, prSeenTimes],
-  )
+  // Fetch unread PR data on mount
+  useEffect(() => {
+    refetchUnreadPRData()
+  }, [refetchUnreadPRData])
+
+  // Enrich githubPRs with unread notification status
+  const enrichedGithubPRs = useMemo(() => {
+    if (unreadPRData.size === 0) return githubPRs
+    return githubPRs.map((pr) => {
+      const key = `${pr.repo}#${pr.prNumber}`
+      const unread = unreadPRData.get(key)
+      if (!unread) return pr
+      const ids = unread.itemIds
+      const markComment = (c: (typeof pr.comments)[0]) =>
+        c.id && ids.has(String(c.id)) ? { ...c, isUnread: true } : c
+      const markReview = (r: (typeof pr.reviews)[0]) =>
+        r.id && ids.has(String(r.id)) ? { ...r, isUnread: true } : r
+      return {
+        ...pr,
+        hasUnreadNotifications: true,
+        comments: pr.comments.map(markComment),
+        reviews: pr.reviews.map(markReview),
+        discussion: pr.discussion.map((item) => {
+          if (item.type === 'comment') {
+            return { ...item, comment: markComment(item.comment) }
+          }
+          if (item.type === 'review') {
+            return {
+              ...item,
+              review: markReview(item.review),
+              threads: item.threads.map((t) => ({
+                ...t,
+                comments: t.comments.map(markComment),
+              })),
+            }
+          }
+          if (item.type === 'thread') {
+            return {
+              ...item,
+              thread: {
+                ...item.thread,
+                comments: item.thread.comments.map(markComment),
+              },
+            }
+          }
+          return item
+        }),
+      }
+    })
+  }, [githubPRs, unreadPRData])
+
+  const hasAnyUnseenPRs = unreadPRData.size > 0
 
   // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -451,8 +474,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         if (exists) return prev
         return [notification, ...prev]
       })
+      refetchUnreadPRData()
     })
-  }, [subscribe])
+  }, [subscribe, refetchUnreadPRData])
 
   const hasNotifications = notifications.length > 0
 
@@ -466,22 +490,27 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [notifications],
   )
 
-  const markNotificationRead = useCallback(async (id: number) => {
-    await api.markNotificationRead(id)
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    )
-  }, [])
+  const markNotificationRead = useCallback(
+    async (id: number) => {
+      await api.markNotificationRead(id)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      )
+      refetchUnreadPRData()
+    },
+    [refetchUnreadPRData],
+  )
 
   const markAllNotificationsRead = useCallback(async () => {
     await api.markAllNotificationsRead()
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    markAllPRsSeen()
-  }, [markAllPRsSeen])
+    setUnreadPRData(new Map())
+  }, [])
 
   const deleteAllNotifications = useCallback(async () => {
     await api.deleteAllNotifications()
     setNotifications([])
+    setUnreadPRData(new Map())
   }, [])
 
   // Update app badge based on unread notifications or unseen PRs
@@ -630,11 +659,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       deleteTerminal,
       setTerminalOrder,
       refetch,
-      githubPRs,
+      githubPRs: enrichedGithubPRs,
       mergedPRs,
-      hasNewActivity,
-      markPRSeen,
-      markAllPRsSeen,
       hasAnyUnseenPRs,
       activePR,
       setActivePR,
@@ -656,11 +682,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       deleteTerminal,
       setTerminalOrder,
       refetch,
-      githubPRs,
+      enrichedGithubPRs,
       mergedPRs,
-      hasNewActivity,
-      markPRSeen,
-      markAllPRsSeen,
       hasAnyUnseenPRs,
       activePR,
       notifications,

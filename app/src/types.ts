@@ -287,15 +287,17 @@ export interface NotificationData {
   // PR fields
   prTitle?: string
   prUrl?: string
+  prNumber?: number
   reviewer?: string
   approver?: string
   author?: string
   body?: string
   commentUrl?: string
+  commentId?: number
   checkName?: string
   checkUrl?: string
   state?: string
-  reviewId?: string
+  reviewId?: number
   // Workspace fields
   terminalId?: number
   name?: string // workspace name

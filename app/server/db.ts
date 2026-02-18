@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import type { UnreadPRNotification } from '../shared/types'
 import type {
   Project,
   SessionSearchMatch,
@@ -693,6 +694,44 @@ export async function markNotificationRead(id: number): Promise<boolean> {
 export async function deleteAllNotifications(): Promise<number> {
   const result = await pool.query('DELETE FROM notifications')
   return result.rowCount ?? 0
+}
+
+export async function getUnreadPRNotifications(): Promise<
+  UnreadPRNotification[]
+> {
+  const { rows } = await pool.query(`
+    SELECT repo, data->>'prNumber' as pr_number, type,
+           data->>'commentId' as comment_id, data->>'reviewId' as review_id
+    FROM notifications
+    WHERE read = FALSE AND data->>'prNumber' IS NOT NULL
+  `)
+
+  const grouped = new Map<
+    string,
+    {
+      repo: string
+      prNumber: number
+      items: { commentId?: number; reviewId?: number }[]
+    }
+  >()
+
+  for (const row of rows) {
+    const prNumber = Number(row.pr_number)
+    const key = `${row.repo}#${prNumber}`
+    if (!grouped.has(key)) {
+      grouped.set(key, { repo: row.repo, prNumber, items: [] })
+    }
+    const entry = grouped.get(key)!
+    entry.items.push({
+      ...(row.comment_id && { commentId: Number(row.comment_id) }),
+      ...(row.review_id && { reviewId: Number(row.review_id) }),
+    })
+  }
+
+  return Array.from(grouped.values()).map((g) => ({
+    ...g,
+    count: g.items.length,
+  }))
 }
 
 // Command logging

@@ -11,6 +11,7 @@ import {
   deleteAllNotifications,
   getNotifications,
   getTerminalById,
+  getUnreadPRNotifications,
   initDb,
   markAllNotificationsRead,
   markNotificationRead,
@@ -553,6 +554,10 @@ fastify.get<{
   const limit = Math.min(Number(request.query.limit) || 50, 100)
   const offset = Number(request.query.offset) || 0
   return getNotifications(limit, offset)
+})
+
+fastify.get('/api/notifications/pr-unread', async () => {
+  return getUnreadPRNotifications()
 })
 
 fastify.post('/api/notifications/mark-all-read', async () => {

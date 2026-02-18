@@ -1,4 +1,8 @@
-import type { ChangedFile, MergedPRSummary } from '../../shared/types'
+import type {
+  ChangedFile,
+  MergedPRSummary,
+  UnreadPRNotification,
+} from '../../shared/types'
 import type {
   SessionMessagesResponse,
   SessionSearchMatch,
@@ -708,6 +712,14 @@ export async function markNotificationRead(
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to mark notification as read')
+  return res.json()
+}
+
+export async function getUnreadPRNotifications(): Promise<
+  UnreadPRNotification[]
+> {
+  const res = await fetch(`${API_BASE}/notifications/pr-unread`)
+  if (!res.ok) throw new Error('Failed to fetch unread PR notifications')
   return res.json()
 }
 

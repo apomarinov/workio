@@ -47,13 +47,13 @@ import { FileDiffViewer } from './FileDiffViewer'
 import { TruncatedPath } from './TruncatedPath'
 
 const STATUS_CONFIG: Record<FileStatus, { label: string; className: string }> =
-  {
-    added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
-    modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
-    deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
-    renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
-    untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
-  }
+{
+  added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
+  modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
+  deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
+  renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
+  untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
+}
 
 function FileStatusBadge({ status }: { status: FileStatus }) {
   const config = STATUS_CONFIG[status]
@@ -97,7 +97,7 @@ export function CommitDialog({
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const handleCommitRef = useRef<() => void>(() => {})
+  const handleCommitRef = useRef<() => void>(() => { })
   const canCommitRef = useRef(false)
   const { settings } = useSettings()
 
@@ -515,7 +515,7 @@ export function CommitDialog({
                                 className={cn(
                                   'flex w-full items-center gap-2 pl-6 pr-3 py-1.5 text-sm hover:bg-zinc-800/50 cursor-pointer',
                                   selectedFile === file.path &&
-                                    'bg-zinc-700/50',
+                                  'bg-zinc-700/50',
                                 )}
                                 onClick={() => setSelectedFile(file.path)}
                               >

@@ -66,7 +66,7 @@ export const TerminalItem = memo(function TerminalItem({
   const { emit } = useSocket()
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
   const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
-  const { githubPRs, hasNewActivity, markPRSeen } = useTerminalContext()
+  const { githubPRs } = useTerminalContext()
   const {
     processes: allProcesses,
     terminalPorts,
@@ -329,10 +329,9 @@ export const TerminalItem = memo(function TerminalItem({
                       withIcon
                       active={activeTab === 'prs' && isActive}
                       className="whitespace-nowrap"
-                      hasNewActivity={hasNewActivity(prForBranch)}
+                      hasNewActivity={prForBranch.hasUnreadNotifications}
                       onClick={() => {
                         setActiveTab('prs')
-                        markPRSeen(prForBranch)
                       }}
                     />
                   )}
@@ -497,8 +496,7 @@ export const TerminalItem = memo(function TerminalItem({
                     <PRStatusContent
                       pr={prForBranch}
                       expanded={true}
-                      hasNewActivity={hasNewActivity(prForBranch)}
-                      onSeen={() => markPRSeen(prForBranch)}
+                      hasNewActivity={prForBranch.hasUnreadNotifications}
                     />
                   )}
                 </div>

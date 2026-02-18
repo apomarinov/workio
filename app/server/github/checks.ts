@@ -1633,7 +1633,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       const notification = await insertNotification(
         'pr_merged',
         pr.repo,
-        { prTitle: pr.prTitle, prUrl: pr.prUrl },
+        { prTitle: pr.prTitle, prUrl: pr.prUrl, prNumber: pr.prNumber },
         undefined,
         pr.prNumber,
       )
@@ -1647,7 +1647,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       const notification = await insertNotification(
         'pr_closed',
         pr.repo,
-        { prTitle: pr.prTitle, prUrl: pr.prUrl },
+        { prTitle: pr.prTitle, prUrl: pr.prUrl, prNumber: pr.prNumber },
         undefined,
         pr.prNumber,
       )
@@ -1671,6 +1671,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         {
           prTitle: pr.prTitle,
           prUrl: pr.prUrl,
+          prNumber: pr.prNumber,
           checkName: failedCheck?.name,
           checkUrl: failedCheck?.detailsUrl,
         },
@@ -1705,7 +1706,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'checks_passed',
           pr.repo,
-          { prTitle: pr.prTitle, prUrl: pr.prUrl },
+          { prTitle: pr.prTitle, prUrl: pr.prUrl, prNumber: pr.prNumber },
           pr.updatedAt,
           pr.prNumber,
         )
@@ -1722,9 +1723,10 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       prev.reviewDecision !== 'CHANGES_REQUESTED' &&
       pr.reviewDecision === 'CHANGES_REQUESTED'
     ) {
-      const reviewer = pr.reviews.find(
+      const changesReview = pr.reviews.find(
         (r) => r.state === 'CHANGES_REQUESTED',
-      )?.author
+      )
+      const reviewer = changesReview?.author
       if (
         reviewer &&
         reviewer !== ghUsername &&
@@ -1734,7 +1736,13 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'changes_requested',
           pr.repo,
-          { prTitle: pr.prTitle, prUrl: pr.prUrl, reviewer },
+          {
+            prTitle: pr.prTitle,
+            prUrl: pr.prUrl,
+            prNumber: pr.prNumber,
+            reviewer,
+            reviewId: changesReview?.id,
+          },
           `${reviewer}:${pr.updatedAt}`,
           pr.prNumber,
         )
@@ -1750,7 +1758,8 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
       prev.reviewDecision !== 'APPROVED' &&
       pr.reviewDecision === 'APPROVED'
     ) {
-      const approver = pr.reviews.find((r) => r.state === 'APPROVED')?.author
+      const approvedReview = pr.reviews.find((r) => r.state === 'APPROVED')
+      const approver = approvedReview?.author
       if (
         approver &&
         approver !== ghUsername &&
@@ -1760,7 +1769,13 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         const notification = await insertNotification(
           'pr_approved',
           pr.repo,
-          { prTitle: pr.prTitle, prUrl: pr.prUrl, approver },
+          {
+            prTitle: pr.prTitle,
+            prUrl: pr.prUrl,
+            prNumber: pr.prNumber,
+            approver,
+            reviewId: approvedReview?.id,
+          },
           `${approver}:${pr.updatedAt}`,
           pr.prNumber,
         )
@@ -1787,9 +1802,11 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           {
             prTitle: pr.prTitle,
             prUrl: pr.prUrl,
+            prNumber: pr.prNumber,
             author: comment.author,
             body: comment.body.substring(0, 200),
             commentUrl: comment.url,
+            commentId: comment.id,
           },
           comment.id
             ? String(comment.id)
@@ -1822,6 +1839,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           {
             prTitle: pr.prTitle,
             prUrl: pr.prUrl,
+            prNumber: pr.prNumber,
             author: review.author,
             state: review.state,
             body: review.body?.substring(0, 200),
