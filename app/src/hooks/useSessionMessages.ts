@@ -25,7 +25,7 @@ export function useSessionMessages(sessionId: string | null) {
   )
 
   // Reset state when session changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionId is intentionally in deps to reset state on session change
+
   useEffect(() => {
     setAllMessages([])
     setOffset(0)

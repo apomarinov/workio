@@ -201,7 +201,6 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       ? null
       : (settings?.keymap?.settings ?? DEFAULT_KEYMAP.settings)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pip.window is needed to re-attach listeners when PiP window changes
   useEffect(() => {
     let modifierBuffer: ModifierBuffer = {
       meta: false,

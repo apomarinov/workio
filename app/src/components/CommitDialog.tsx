@@ -4,9 +4,10 @@ import {
   ChevronsUpDown,
   Folder,
   Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Group, Panel, Separator } from 'react-resizable-panels'
+import { Group, Panel, type PanelSize, Separator } from 'react-resizable-panels'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -76,8 +77,27 @@ export function CommitDialog({
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [groupByFolder, setGroupByFolder] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [fileListWidth, setFileListWidth] = useState<number | undefined>()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { settings } = useSettings()
+
+  function refreshFiles() {
+    setLoadingFiles(true)
+    getChangedFiles(terminalId)
+      .then((data) => {
+        setChangedFiles(data.files)
+        setSelectedFiles(new Set(data.files.map((f) => f.path)))
+        if (data.files.length > 0) {
+          setSelectedFile(data.files[0].path)
+        }
+      })
+      .catch(() => {
+        setChangedFiles([])
+      })
+      .finally(() => {
+        setLoadingFiles(false)
+      })
+  }
 
   // Fetch changed files on dialog open
   useEffect(() => {
@@ -94,27 +114,7 @@ export function CommitDialog({
       return
     }
 
-    let cancelled = false
-    setLoadingFiles(true)
-    getChangedFiles(terminalId)
-      .then((data) => {
-        if (!cancelled) {
-          setChangedFiles(data.files)
-          setSelectedFiles(new Set(data.files.map((f) => f.path)))
-          if (data.files.length > 0) {
-            setSelectedFile(data.files[0].path)
-          }
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setChangedFiles([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingFiles(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    refreshFiles()
   }, [open, terminalId])
 
   // When amend is toggled on, fetch HEAD message
@@ -256,8 +256,12 @@ export function CommitDialog({
             defaultSize="280px"
             minSize="180px"
             maxSize="50%"
+            onResize={(size: PanelSize) => setFileListWidth(size.inPixels)}
           >
-            <div className="flex flex-col h-full">
+            <div
+              className="flex flex-col h-full overflow-hidden"
+              style={{ maxWidth: fileListWidth }}
+            >
               {/* Toolbar */}
               <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-700">
                 <Tooltip>
@@ -287,34 +291,33 @@ export function CommitDialog({
                   {selectedFiles.size}/{changedFiles.length}
                 </span>
                 {groupByFolder && (
-                  <>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() =>
-                            setExpandedFolders(new Set(sortedFolders))
-                          }
-                        >
-                          <ChevronsUpDown className="size-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Expand all</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => setExpandedFolders(new Set())}
-                        >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => {
+                          const allExpanded = sortedFolders.every((f) =>
+                            expandedFolders.has(f),
+                          )
+                          setExpandedFolders(
+                            allExpanded ? new Set() : new Set(sortedFolders),
+                          )
+                        }}
+                      >
+                        {sortedFolders.every((f) => expandedFolders.has(f)) ? (
                           <ChevronsDownUp className="size-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Collapse all</TooltipContent>
-                    </Tooltip>
-                  </>
+                        ) : (
+                          <ChevronsUpDown className="size-3" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {sortedFolders.every((f) => expandedFolders.has(f))
+                        ? 'Collapse all'
+                        : 'Expand all'}
+                    </TooltipContent>
+                  </Tooltip>
                 )}
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -328,6 +331,21 @@ export function CommitDialog({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Group by folder</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={refreshFiles}
+                      disabled={loading || loadingFiles}
+                    >
+                      <RefreshCw
+                        className={cn('size-3', loadingFiles && 'animate-spin')}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Refresh files</TooltipContent>
                 </Tooltip>
               </div>
               <div className="flex-1 overflow-y-auto border-t border-zinc-700">
@@ -376,9 +394,16 @@ export function CommitDialog({
                             )}
                           />
                           <Folder className="size-3 text-zinc-400" />
-                          <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
-                            {folder === '.' ? '(root)' : folder}
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex-1 min-w-0 text-left text-zinc-300 font-mono text-[0.7rem] truncate">
+                                {folder === '.' ? '/' : folder}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">
+                              {folder === '.' ? '/' : folder}
+                            </TooltipContent>
+                          </Tooltip>
                           <span className="text-zinc-500 text-xs">
                             {files.length}
                           </span>
@@ -409,9 +434,16 @@ export function CommitDialog({
                                   className="h-4 w-4"
                                 />
                                 <FileStatusBadge status={file.status} />
-                                <span className="flex-1 text-left text-zinc-300 font-mono text-[0.7rem]">
-                                  <TruncatedPath path={fileName} />
-                                </span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex-1 min-w-0 text-left text-zinc-300 font-mono text-[0.7rem]">
+                                      <TruncatedPath path={fileName} />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right">
+                                    {file.path}
+                                  </TooltipContent>
+                                </Tooltip>
                                 {(file.added > 0 || file.removed > 0) && (
                                   <span className="flex-shrink-0 font-mono text-[0.7rem]">
                                     {file.added > 0 && (
@@ -454,9 +486,16 @@ export function CommitDialog({
                         className="h-4 w-4"
                       />
                       <FileStatusBadge status={file.status} />
-                      <span className="flex-1 truncate text-left text-zinc-300 font-mono text-[0.7rem]">
-                        <TruncatedPath path={file.path} />
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex-1 min-w-0 text-left text-zinc-300 font-mono text-[0.7rem]">
+                            <TruncatedPath path={file.path} />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          {file.path}
+                        </TooltipContent>
+                      </Tooltip>
                       {(file.added > 0 || file.removed > 0) && (
                         <span className="flex-shrink-0 font-mono text-xs">
                           {file.added > 0 && (

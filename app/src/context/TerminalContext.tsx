@@ -485,7 +485,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Update app badge based on unread notifications or unseen PRs
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when unseen PRs change to clear badge
+
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return
 

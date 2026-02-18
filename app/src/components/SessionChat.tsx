@@ -99,7 +99,7 @@ export function SessionChat({
   }, [handleIntersection])
 
   // Reset initial load flag when session changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on session change
+
   useEffect(() => {
     isInitialLoadRef.current = true
     isNearBottomRef.current = true

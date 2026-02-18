@@ -138,6 +138,7 @@ export function FileDiffViewer({
   const {
     data: parsed,
     isLoading,
+    isValidating,
     error,
   } = useSWR(
     swrKey,
@@ -258,6 +259,7 @@ export function FileDiffViewer({
           variant="ghost"
           size="icon"
           className="h-7 w-7"
+          disabled={isValidating}
           onClick={(e) => {
             e.stopPropagation()
             setShowFullFile(!showFullFile)
@@ -266,7 +268,9 @@ export function FileDiffViewer({
           }}
           title={showFullFile ? 'Compact view' : 'Full file'}
         >
-          {showFullFile ? (
+          {isValidating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : showFullFile ? (
             <ChevronsDownUp className="h-3.5 w-3.5" />
           ) : (
             <ChevronsUpDown className="h-3.5 w-3.5" />

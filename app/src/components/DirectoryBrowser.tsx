@@ -50,7 +50,7 @@ export function DirectoryBrowser({
   const defaultRoot = '~'
 
   // Initialize columns when dialog opens
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when dialog opens
+
   useEffect(() => {
     if (!open) return
     if (value) {
@@ -61,7 +61,6 @@ export function DirectoryBrowser({
     }
   }, [open])
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally triggers on showHidden change
   useEffect(() => {
     setHiddenVersion((v) => v + 1)
   }, [showHidden])
@@ -301,7 +300,7 @@ function ColumnView({
   }, [columns.length])
 
   // Auto-scroll rightmost column into view
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when column count changes
+
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollLeft = containerRef.current.scrollWidth
@@ -380,7 +379,7 @@ function BrowserColumn({
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Fetch on mount only if no initial data was provided
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only fetch when path/hidden/ssh changes and no initial data
+
   useEffect(() => {
     if (initialEntries) return
 
