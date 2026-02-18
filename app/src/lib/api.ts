@@ -106,6 +106,16 @@ export async function deleteTerminal(
   return res.status === 202
 }
 
+export async function cancelWorkspace(terminalId: number): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/terminals/${terminalId}/cancel-workspace`,
+    {
+      method: 'POST',
+    },
+  )
+  if (!res.ok) throw new Error('Failed to cancel')
+}
+
 export async function browseFolder(): Promise<string | null> {
   const res = await fetch(`${API_BASE}/browse-folder`)
   if (res.status === 204) return null

@@ -34,7 +34,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const MAX_BUFFER_LINES = 5000
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
-const LONG_TIMEOUT = 300_000 // 5 min for setup/teardown operations
+const LONG_TIMEOUT = 900_000 // 15 min for setup/teardown operations
 
 const COMMAND_IGNORE_LIST: string[] = []
 
@@ -1188,5 +1188,14 @@ export function interruptSession(terminalId: number): void {
   const session = sessions.get(terminalId)
   if (session) {
     session.pty.write('\x03')
+  }
+}
+
+export function cancelWaitForMarker(terminalId: number): void {
+  const session = sessions.get(terminalId)
+  if (session?.onDoneMarker) {
+    const cb = session.onDoneMarker
+    session.onDoneMarker = null
+    cb(0)
   }
 }

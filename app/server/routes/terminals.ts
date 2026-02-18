@@ -168,6 +168,7 @@ import {
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import {
+  cancelWorkspaceOperation,
   deleteTerminalWorkspace,
   emitWorkspace,
   rmrf,
@@ -816,6 +817,24 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     refreshPRChecks(true)
     return reply.status(204).send()
   })
+
+  // Cancel a running workspace operation (clone, setup, or teardown)
+  fastify.post<{ Params: TerminalParams }>(
+    '/api/terminals/:id/cancel-workspace',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const cancelled = cancelWorkspaceOperation(id)
+      if (!cancelled) {
+        return reply.status(409).send({ error: 'No cancellable operation' })
+      }
+
+      return { cancelled: true }
+    },
+  )
 
   // Get branches for a terminal
   fastify.get<{ Params: TerminalParams }>(

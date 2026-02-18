@@ -24,6 +24,7 @@ import {
   useState,
 } from 'react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/sonner'
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +34,7 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSocket } from '@/hooks/useSocket'
+import { cancelWorkspace } from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import { useProcessContext } from '../context/ProcessContext'
@@ -248,20 +250,56 @@ export const TerminalItem = memo(function TerminalItem({
             )
           )}
           {terminal.git_repo?.status === 'setup' && (
-            <div className="text-[10px] text-blue-400">
+            <div className="flex items-center gap-1 text-[10px] text-blue-400">
               Preparing workspace...
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  cancelWorkspace(terminal.id).catch(() =>
+                    toast.error('Failed to cancel'),
+                  )
+                }}
+                className="flex items-center gap-1 text-red-400/60 hover:text-red-400 hover:bg-zinc-400/30 rounded-sm px-1 py-0.5 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
             </div>
           )}
           {terminal.git_repo?.status === 'done' && (
             <>
               {terminal.setup?.status === 'setup' && (
-                <div className="text-[10px] text-blue-400">
+                <div className="flex items-center gap-1 text-[10px] text-blue-400">
                   Running setup...
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      cancelWorkspace(terminal.id).catch(() =>
+                        toast.error('Failed to cancel'),
+                      )
+                    }}
+                    className="flex items-center gap-1 text-red-400/60 hover:text-red-400 hover:bg-zinc-400/30 rounded-sm px-1 py-0.5 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
               {terminal.setup?.status === 'delete' && (
-                <div className="text-[10px] text-blue-400">
+                <div className="flex items-center gap-1 text-[10px] text-blue-400">
                   Running teardown...
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      cancelWorkspace(terminal.id).catch(() =>
+                        toast.error('Failed to cancel'),
+                      )
+                    }}
+                    className="flex items-center gap-1 text-red-400/60 hover:text-red-400 hover:bg-zinc-400/30 rounded-sm px-1 py-0.5 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
             </>

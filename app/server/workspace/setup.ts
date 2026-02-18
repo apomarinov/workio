@@ -14,6 +14,7 @@ import {
 import { getIO } from '../io'
 import { log } from '../logger'
 import {
+  cancelWaitForMarker,
   destroySession,
   getSession,
   interruptSession,
@@ -25,6 +26,8 @@ import { execSSHCommand } from '../ssh/exec'
 
 const execFile = promisify(execFileCb)
 const LONG_TIMEOUT = 300_000 // 5 min for clone/setup operations
+
+const activeOperations = new Map<number, AbortController>()
 
 // ---------------------------------------------------------------------------
 // Word lists for slug generation (~100 each, no external packages)
@@ -377,10 +380,12 @@ async function runCmd(
   cwd: string,
   sshHost: string | null,
   timeout?: number,
+  signal?: AbortSignal,
 ): Promise<{ stdout: string; stderr: string }> {
   if (!sshHost) {
-    return execFile(cmd, args, { cwd, timeout })
+    return execFile(cmd, args, { cwd, timeout, signal })
   }
+  if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
   const quoted = [cmd, ...args].map(shellQuote).join(' ')
   return execSSHCommand(sshHost, quoted, { cwd, timeout })
 }
@@ -482,6 +487,10 @@ export async function setupTerminalWorkspace(
   } = options
   let setupObj = initialSetupObj
 
+  const controller = new AbortController()
+  const { signal } = controller
+  activeOperations.set(terminalId, controller)
+
   const homeDir = await getHomeDir(sshHost)
 
   // Generate a slug whose target directory doesn't already exist
@@ -519,9 +528,9 @@ export async function setupTerminalWorkspace(
         }
       : { repo, status: 'failed' as const, error }
 
-  try {
-    let targetPath: string
+  let targetPath: string | null = null
 
+  try {
     if (worktreeSource) {
       // --- Worktree mode ---
       // First prune any orphaned worktrees from previous deletions
@@ -545,6 +554,8 @@ export async function setupTerminalWorkspace(
         // Ignore prune errors
       }
 
+      if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
+
       targetPath = joinPath(sshHost, parentDir, slug)
       const worktreeCmd = `git worktree add ${targetPath} -b feature/${slug}`
       const worktreeResult = await runCmd(
@@ -553,6 +564,7 @@ export async function setupTerminalWorkspace(
         worktreeSource,
         sshHost,
         LONG_TIMEOUT,
+        signal,
       )
       logCommand({
         terminalId,
@@ -579,6 +591,7 @@ export async function setupTerminalWorkspace(
         sshHost ? '/' : process.cwd(),
         sshHost,
         LONG_TIMEOUT,
+        signal,
       )
       logCommand({
         terminalId,
@@ -588,6 +601,8 @@ export async function setupTerminalWorkspace(
         stderr: cloneResult.stderr,
       })
     }
+
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
 
     // Update terminal cwd (and name if not user-provided)
     if (customName) {
@@ -626,6 +641,8 @@ export async function setupTerminalWorkspace(
       )
     }
 
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
+
     // Mark git_repo as done
     await updateTerminal(terminalId, { git_repo: gitRepoObj })
     await emitWorkspace(terminalId, {
@@ -647,6 +664,8 @@ export async function setupTerminalWorkspace(
       }
     }
 
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
+
     // Run setup script if configured — inject into PTY so output is visible
     if (setupObj) {
       const { setupScript } = await resolveScripts(
@@ -657,12 +676,14 @@ export async function setupTerminalWorkspace(
       if (setupScript) {
         const setupCmd = `bash "${setupScript}"`
         const hasSession = await waitForSession(terminalId, 30_000)
+        if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
         if (hasSession) {
           writeToSession(
             terminalId,
             `cd "${targetPath}" && bash "${setupScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
           )
           const exitCode = await waitForMarker(terminalId)
+          if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
           logCommand({
             terminalId,
             category: 'workspace',
@@ -680,6 +701,36 @@ export async function setupTerminalWorkspace(
       await emitWorkspace(terminalId, { name: terminalName, setup: doneSetup })
     }
   } catch (err) {
+    if (signal.aborted) {
+      // Cancelled — phase-specific cleanup
+      log.info(`[workspace] Setup cancelled for terminal ${terminalId}`)
+      const terminal = await getTerminalById(terminalId)
+      if (terminal?.git_repo?.status === 'setup') {
+        // Clone phase: destroy session, rm partial dir, delete terminal
+        destroySession(terminalId)
+        if (targetPath) {
+          try {
+            await rmrf(targetPath, sshHost)
+          } catch {
+            // Directory may not exist yet
+          }
+        }
+        await deleteTerminal(terminalId)
+        await emitWorkspace(terminalId, { name: terminalName, deleted: true })
+      } else {
+        // Setup script phase: mark setup as done
+        if (setupObj) {
+          const doneSetup = { ...setupObj, status: 'done' as const }
+          await updateTerminal(terminalId, { setup: doneSetup })
+          await emitWorkspace(terminalId, {
+            name: terminalName,
+            setup: doneSetup,
+          })
+        }
+      }
+      return
+    }
+
     const errorMsg = err instanceof Error ? err.message : String(err)
     log.error(
       `[workspace] Setup failed for terminal ${terminalId}: ${errorMsg}`,
@@ -702,6 +753,8 @@ export async function setupTerminalWorkspace(
         setup: failedSetup,
       })
     }
+  } finally {
+    activeOperations.delete(terminalId)
   }
 }
 
@@ -717,6 +770,10 @@ export async function deleteTerminalWorkspace(
 
   const sshHost = terminal.ssh_host ?? null
 
+  const controller = new AbortController()
+  const { signal } = controller
+  activeOperations.set(terminalId, controller)
+
   try {
     // Run delete script if configured — inject into PTY so output is visible
     const { deleteScript } = await resolveScripts(
@@ -730,11 +787,13 @@ export async function deleteTerminalWorkspace(
       if (session) {
         interruptSession(terminalId)
         await new Promise((r) => setTimeout(r, 300))
+        if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
         writeToSession(
           terminalId,
           `cd "${terminal.cwd}" && bash "${deleteScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
         )
         const exitCode = await waitForMarker(terminalId)
+        if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
         logCommand({
           terminalId,
           category: 'workspace',
@@ -762,6 +821,21 @@ export async function deleteTerminalWorkspace(
     // Notify clients
     await emitWorkspace(terminalId, { name: terminal.name, deleted: true })
   } catch (err) {
+    if (signal.aborted) {
+      // Cancelled — restore pre-delete state
+      log.info(`[workspace] Teardown cancelled for terminal ${terminalId}`)
+      const doneSetup = {
+        ...(terminal.setup as SetupObj | null),
+        status: 'done' as const,
+      }
+      await updateTerminal(terminalId, { setup: doneSetup })
+      await emitWorkspace(terminalId, {
+        name: terminal.name,
+        setup: doneSetup,
+      })
+      return
+    }
+
     const errorMsg = err instanceof Error ? err.message : String(err)
     log.error(
       `[workspace] Delete failed for terminal ${terminalId}: ${errorMsg}`,
@@ -774,5 +848,18 @@ export async function deleteTerminalWorkspace(
     }
     await updateTerminal(terminalId, { setup: failedSetup })
     await emitWorkspace(terminalId, { name: terminal.name, setup: failedSetup })
+  } finally {
+    activeOperations.delete(terminalId)
   }
+}
+
+export function cancelWorkspaceOperation(terminalId: number): boolean {
+  const controller = activeOperations.get(terminalId)
+  if (!controller) return false
+
+  interruptSession(terminalId)
+  cancelWaitForMarker(terminalId)
+  controller.abort()
+
+  return true
 }
