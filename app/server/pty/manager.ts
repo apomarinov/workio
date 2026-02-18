@@ -271,32 +271,50 @@ async function checkGitDirty(
   const zero = { added: 0, removed: 0, untracked: 0 }
   try {
     if (sshHost) {
-      const [diffResult, untrackedResult] = await Promise.all([
-        execSSHCommand(
-          sshHost,
-          'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
-          cwd,
-        ),
-        execSSHCommand(
-          sshHost,
-          'git ls-files --others --exclude-standard',
-          cwd,
-        ),
-      ])
+      const [diffResult, untrackedResult, untrackedLinesResult] =
+        await Promise.all([
+          execSSHCommand(
+            sshHost,
+            'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
+            cwd,
+          ),
+          execSSHCommand(
+            sshHost,
+            'git ls-files --others --exclude-standard',
+            cwd,
+          ),
+          execSSHCommand(
+            sshHost,
+            'git ls-files -z --others --exclude-standard | xargs -0 cat 2>/dev/null | wc -l',
+            cwd,
+          ),
+        ])
       const diff = parseDiffNumstat(diffResult.stdout)
-      return { ...diff, untracked: countUntracked(untrackedResult.stdout) }
+      const untrackedLines =
+        Number.parseInt(untrackedLinesResult.stdout.trim(), 10) || 0
+      return {
+        added: diff.added + untrackedLines,
+        removed: diff.removed,
+        untracked: countUntracked(untrackedResult.stdout),
+      }
     }
     return await new Promise<{
       added: number
       removed: number
       untracked: number
     }>((resolve) => {
-      // Run diff and untracked count in parallel
+      // Run diff, untracked count, and untracked lines in parallel
       let diff = { added: 0, removed: 0 }
       let untracked = 0
+      let untrackedLines = 0
       let completed = 0
       const checkDone = () => {
-        if (++completed === 2) resolve({ ...diff, untracked })
+        if (++completed === 3)
+          resolve({
+            added: diff.added + untrackedLines,
+            removed: diff.removed,
+            untracked,
+          })
       }
 
       // Get diff stats
@@ -323,13 +341,27 @@ async function checkGitDirty(
         },
       )
 
-      // Get untracked count
+      // Get untracked file count
       execFile(
         'git',
         ['ls-files', '--others', '--exclude-standard'],
         { cwd, timeout: 5000 },
         (err, stdout) => {
           if (!err) untracked = countUntracked(stdout)
+          checkDone()
+        },
+      )
+
+      // Get untracked file line count
+      execFile(
+        'sh',
+        [
+          '-c',
+          'git ls-files -z --others --exclude-standard | xargs -0 cat 2>/dev/null | wc -l',
+        ],
+        { cwd, timeout: 5000 },
+        (err, stdout) => {
+          if (!err) untrackedLines = Number.parseInt(stdout.trim(), 10) || 0
           checkDone()
         },
       )

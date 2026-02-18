@@ -61,10 +61,23 @@ function expandPath(p: string): string {
   return p
 }
 
+function parseUntrackedWc(wcOut: string): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const line of wcOut.trim().split('\n')) {
+    if (!line) continue
+    const match = line.match(/^\s*(\d+)\s+(.+)$/)
+    if (match && match[2] !== 'total') {
+      map.set(match[2], Number(match[1]) || 0)
+    }
+  }
+  return map
+}
+
 function parseChangedFiles(
   numstatOut: string,
   nameStatusOut: string,
   untrackedOut: string,
+  untrackedWcOut?: string,
 ) {
   type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
   interface ChangedFile {
@@ -120,11 +133,15 @@ function parseChangedFiles(
   }
 
   // Untracked files
+  const untrackedWcMap = untrackedWcOut
+    ? parseUntrackedWc(untrackedWcOut)
+    : undefined
   for (const line of untrackedOut.trim().split('\n')) {
     if (!line) continue
     // Skip if already present from diff
     if (!statusMap.has(line)) {
-      files.push({ path: line, status: 'untracked', added: 0, removed: 0 })
+      const added = untrackedWcMap?.get(line) ?? 0
+      files.push({ path: line, status: 'untracked', added, removed: 0 })
     }
   }
 
@@ -1245,84 +1262,111 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
 
         if (terminal.ssh_host) {
-          const [numstatResult, nameStatusResult, untrackedResult] =
-            await Promise.all([
-              execSSHCommand(
-                terminal.ssh_host,
-                'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
-                { cwd: terminal.cwd },
-              ),
-              execSSHCommand(
-                terminal.ssh_host,
-                'git diff --name-status HEAD 2>/dev/null || git diff --name-status',
-                { cwd: terminal.cwd },
-              ),
-              execSSHCommand(
-                terminal.ssh_host,
-                'git ls-files --others --exclude-standard',
-                { cwd: terminal.cwd },
-              ),
-            ])
+          const [
+            numstatResult,
+            nameStatusResult,
+            untrackedResult,
+            untrackedWcResult,
+          ] = await Promise.all([
+            execSSHCommand(
+              terminal.ssh_host,
+              'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
+              { cwd: terminal.cwd },
+            ),
+            execSSHCommand(
+              terminal.ssh_host,
+              'git diff --name-status HEAD 2>/dev/null || git diff --name-status',
+              { cwd: terminal.cwd },
+            ),
+            execSSHCommand(
+              terminal.ssh_host,
+              'git ls-files --others --exclude-standard',
+              { cwd: terminal.cwd },
+            ),
+            execSSHCommand(
+              terminal.ssh_host,
+              'git ls-files -z --others --exclude-standard | xargs -0 wc -l 2>/dev/null',
+              { cwd: terminal.cwd },
+            ),
+          ])
 
           const files = parseChangedFiles(
             numstatResult.stdout,
             nameStatusResult.stdout,
             untrackedResult.stdout,
+            untrackedWcResult.stdout,
           )
           return { files }
         }
 
-        // Local: run 3 git commands in parallel
-        const [numstatOut, nameStatusOut, untrackedOut] = await Promise.all([
-          new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['diff', '--numstat', 'HEAD'],
-              { cwd, timeout: 10000 },
-              (err, stdout) => {
-                if (err) {
-                  execFile(
-                    'git',
-                    ['diff', '--numstat'],
-                    { cwd, timeout: 10000 },
-                    (_err2, stdout2) => resolve(stdout2 || ''),
-                  )
-                } else {
-                  resolve(stdout)
-                }
-              },
-            )
-          }),
-          new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['diff', '--name-status', 'HEAD'],
-              { cwd, timeout: 10000 },
-              (err, stdout) => {
-                if (err) {
-                  execFile(
-                    'git',
-                    ['diff', '--name-status'],
-                    { cwd, timeout: 10000 },
-                    (_err2, stdout2) => resolve(stdout2 || ''),
-                  )
-                } else {
-                  resolve(stdout)
-                }
-              },
-            )
-          }),
-          new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['ls-files', '--others', '--exclude-standard'],
-              { cwd, timeout: 10000 },
-              (_err, stdout) => resolve(stdout || ''),
-            )
-          }),
-        ])
+        // Local: run 4 git commands in parallel
+        const [numstatOut, nameStatusOut, untrackedOut, untrackedWcOut] =
+          await Promise.all([
+            new Promise<string>((resolve) => {
+              execFile(
+                'git',
+                ['diff', '--numstat', 'HEAD'],
+                { cwd, timeout: 10000 },
+                (err, stdout) => {
+                  if (err) {
+                    execFile(
+                      'git',
+                      ['diff', '--numstat'],
+                      { cwd, timeout: 10000 },
+                      (_err2, stdout2) => resolve(stdout2 || ''),
+                    )
+                  } else {
+                    resolve(stdout)
+                  }
+                },
+              )
+            }),
+            new Promise<string>((resolve) => {
+              execFile(
+                'git',
+                ['diff', '--name-status', 'HEAD'],
+                { cwd, timeout: 10000 },
+                (err, stdout) => {
+                  if (err) {
+                    execFile(
+                      'git',
+                      ['diff', '--name-status'],
+                      { cwd, timeout: 10000 },
+                      (_err2, stdout2) => resolve(stdout2 || ''),
+                    )
+                  } else {
+                    resolve(stdout)
+                  }
+                },
+              )
+            }),
+            new Promise<string>((resolve) => {
+              execFile(
+                'git',
+                ['ls-files', '--others', '--exclude-standard'],
+                { cwd, timeout: 10000 },
+                (_err, stdout) => resolve(stdout || ''),
+              )
+            }),
+            new Promise<string>((resolve) => {
+              execFile(
+                'sh',
+                [
+                  '-c',
+                  'git ls-files -z --others --exclude-standard | xargs -0 wc -l 2>/dev/null',
+                ],
+                { cwd, timeout: 10000 },
+                (_err, stdout) => resolve(stdout || ''),
+              )
+            }),
+          ])
 
-        const files = parseChangedFiles(numstatOut, nameStatusOut, untrackedOut)
+        const files = parseChangedFiles(
+          numstatOut,
+          nameStatusOut,
+          untrackedOut,
+          untrackedWcOut,
+        )
         return { files }
       } catch (err) {
         const errorMessage =

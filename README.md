@@ -15,18 +15,19 @@ A developer dashboard that brings together your projects, temrinals, Claude AI s
   - add more workspaces from a project using Git worktrees
   - view all processes started from your terminal
   - view all ports running in your terminal
-  - open your project in Cursor
+  - open your project in Cursor/VSCode
 - **GitHub PRs**
-  - webhook integration for updates
+  - PR updates via `gh cli` polling or over repo webhooks
   - view PR status of the current branch in your project
   - view PR list of all the repos you have projects in
   - view reviews, comments, running/failed checks
   - re request reviews from change requests
   - re run failed checks
-  - merge PRs
+  - merge/close PRs
 - **Git**
-  - changes badge
-  - pull/push branches
+  - changes at a glance
+  - pull/push/checkout/merge/rabase branches
+  - commit modal with file and diff viewer
 - **Claude**
   - view all running Claude sessions on your system
   - view sessions started in your projects
