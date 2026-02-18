@@ -49,3 +49,4 @@
 - Always use available shadcn components from `src/components/ui/` (Dialog, Button, Input, Popover, Card, Switch, etc.).
 - Icons come from `lucide-react`.
 - Toast notifications use `sonner` via `import { toast } from '@/components/ui/sonner'`.
+- For confirmation dialogs (discard, delete, destructive actions), use `ConfirmModal` from `src/components/ConfirmModal.tsx` instead of raw `AlertDialog` primitives.

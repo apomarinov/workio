@@ -12,16 +12,6 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -34,6 +24,7 @@ import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import { DEFAULT_KEYMAP, type ShortcutBinding } from '../types'
+import { ConfirmModal } from './ConfirmModal'
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
 const MOD_MAP: Record<string, 'meta' | 'ctrl' | 'alt' | 'shift'> = {
@@ -668,25 +659,15 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showConfirmClose} onOpenChange={setShowConfirmClose}>
-        <AlertDialogContent className="bg-sidebar">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes. Are you sure you want to discard them?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleDiscardChanges}
-            >
-              Discard
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmModal
+        open={showConfirmClose}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Are you sure you want to discard them?"
+        confirmLabel="Discard"
+        variant="danger"
+        onConfirm={handleDiscardChanges}
+        onCancel={() => setShowConfirmClose(false)}
+      />
     </>
   )
 }
