@@ -1,3 +1,4 @@
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   ChevronDown,
   ChevronsDownUp,
@@ -7,7 +8,7 @@ import {
   Loader2,
   WrapText,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark as oneDarkBase } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
@@ -138,7 +139,6 @@ export function FileDiffViewer({
   const {
     data: parsed,
     isLoading,
-    isValidating,
     error,
   } = useSWR(
     swrKey,
@@ -153,6 +153,26 @@ export function FileDiffViewer({
     { revalidateOnFocus: false, keepPreviousData: true },
   )
 
+  // Precompute hunk line index map: lineIndex -> hunkIndex
+  const hunkIndexMap = new Map<number, number>()
+  if (parsed) {
+    for (let hi = 0; hi < parsed.hunks.length; hi++) {
+      hunkIndexMap.set(parsed.hunks[hi].lineIndex, hi)
+    }
+  }
+
+  const virtualizer = useVirtualizer({
+    count: parsed?.lines.length ?? 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 20,
+    overscan: 20,
+  })
+
+  // Re-measure all rows when word wrap changes
+  useEffect(() => {
+    virtualizer.measure()
+  }, [wordWrap, virtualizer])
+
   const navigateHunk = (direction: 'prev' | 'next') => {
     if (!parsed || parsed.hunks.length === 0) return
     const nextIndex =
@@ -161,10 +181,11 @@ export function FileDiffViewer({
         : Math.min(parsed.hunks.length - 1, currentHunkIndex + 1)
     setCurrentHunkIndex(nextIndex)
     setHighlightedHunkIndex(nextIndex)
-    const el = scrollRef.current?.querySelector(
-      `[data-hunk-index="${nextIndex}"]`,
-    )
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const hunkLineIndex = parsed.hunks[nextIndex].lineIndex
+    virtualizer.scrollToIndex(hunkLineIndex, {
+      align: 'start',
+      behavior: 'smooth',
+    })
   }
 
   if (!filePath) {
@@ -245,6 +266,8 @@ export function FileDiffViewer({
     }
   }
 
+  const virtualItems = virtualizer.getVirtualItems()
+
   return (
     <div
       className="flex flex-1 flex-col min-h-0 overflow-hidden"
@@ -259,7 +282,6 @@ export function FileDiffViewer({
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          disabled={isValidating}
           onClick={(e) => {
             e.stopPropagation()
             setShowFullFile(!showFullFile)
@@ -268,9 +290,7 @@ export function FileDiffViewer({
           }}
           title={showFullFile ? 'Compact view' : 'Full file'}
         >
-          {isValidating ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : showFullFile ? (
+          {showFullFile ? (
             <ChevronsDownUp className="h-3.5 w-3.5" />
           ) : (
             <ChevronsUpDown className="h-3.5 w-3.5" />
@@ -340,149 +360,148 @@ export function FileDiffViewer({
           .diff-line-header:hover { background-color: rgba(96, 165, 250, 0.12) !important }
           .diff-wrap-content, .diff-wrap-content * { white-space: pre-wrap !important; word-break: break-all !important; overflow-wrap: break-word !important; }
         `}</style>
-        <table
+        <div
           className={cn(
-            'border-collapse text-xs leading-5 font-mono',
-            wordWrap && 'w-full table-fixed',
+            'text-xs leading-5 font-mono relative',
+            wordWrap ? 'w-full' : 'w-max min-w-full',
           )}
+          style={{ height: `${virtualizer.getTotalSize()}px` }}
         >
-          {wordWrap && (
-            <colgroup>
-              <col className="w-10" />
-              <col className="w-10" />
-              <col />
-            </colgroup>
-          )}
-          <tbody>
-            {parsed.lines.map((line, i) => {
-              const hunkIdx = parsed.hunks.findIndex((h) => h.lineIndex === i)
-              const bg = DIFF_BG[line.type as keyof typeof DIFF_BG]
-              const key = `${line.type}-${line.oldLineNumber ?? 'x'}-${line.newLineNumber ?? 'x'}-${i}`
+          {virtualItems.map((virtualRow) => {
+            const i = virtualRow.index
+            const line = parsed.lines[i]
+            const hunkIdx = hunkIndexMap.get(i)
+            const bg = DIFF_BG[line.type as keyof typeof DIFF_BG]
 
-              // Highlight borders
-              const isFirst = highlightRange?.first === i
-              const isLast = highlightRange?.last === i
-              const isInRange =
-                highlightRange != null &&
-                i >= highlightRange.first &&
-                i <= highlightRange.last
+            // Highlight borders
+            const isFirst = highlightRange?.first === i
+            const isLast = highlightRange?.last === i
+            const isInRange =
+              highlightRange != null &&
+              i >= highlightRange.first &&
+              i <= highlightRange.last
 
-              const borderStyle: React.CSSProperties = {}
-              if (isFirst && highlightRange) {
-                borderStyle.borderTop = `1px solid ${highlightRange.borderColor}`
-              }
-              if (isLast && highlightRange) {
-                borderStyle.borderBottom = `1px solid ${highlightRange.borderColor}`
-              }
-              if (isInRange && highlightRange) {
-                borderStyle.borderLeft = `2px solid ${highlightRange.borderColor}`
-                borderStyle.borderRight = `1px solid ${highlightRange.borderColor}`
-              }
+            const borderStyle: React.CSSProperties = {}
+            if (isFirst && highlightRange) {
+              borderStyle.borderTop = `1px solid ${highlightRange.borderColor}`
+            }
+            if (isLast && highlightRange) {
+              borderStyle.borderBottom = `1px solid ${highlightRange.borderColor}`
+            }
+            if (isInRange && highlightRange) {
+              borderStyle.borderLeft = `2px solid ${highlightRange.borderColor}`
+              borderStyle.borderRight = `1px solid ${highlightRange.borderColor}`
+            }
 
-              const lineNum = getLineNumber(line)
+            const lineNum = getLineNumber(line)
 
-              return (
-                <tr
-                  key={key}
-                  data-hunk-index={hunkIdx >= 0 ? hunkIdx : undefined}
-                  className={cn('group/line', `diff-line-${line.type}`)}
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={i}
+                data-hunk-index={hunkIdx != null ? hunkIdx : undefined}
+                ref={virtualizer.measureElement}
+                className={cn(
+                  'group/line flex absolute top-0 left-0 w-full',
+                  `diff-line-${line.type}`,
+                )}
+                style={{
+                  transform: `translateY(${virtualRow.start}px)`,
+                  ...(bg ? { backgroundColor: bg } : {}),
+                  ...borderStyle,
+                }}
+              >
+                <div
+                  className="relative select-none text-right px-1.5 w-10 shrink-0 align-top"
                   style={{
-                    ...(bg ? { backgroundColor: bg } : {}),
-                    ...borderStyle,
+                    color:
+                      LINE_NUM_COLOR[
+                        line.type as keyof typeof LINE_NUM_COLOR
+                      ] ?? 'rgb(113, 113, 122)',
                   }}
                 >
-                  <td
-                    className="relative select-none text-right px-1.5 w-10 align-top"
-                    style={{
-                      color:
-                        LINE_NUM_COLOR[
-                          line.type as keyof typeof LINE_NUM_COLOR
-                        ] ?? 'rgb(113, 113, 122)',
-                    }}
-                  >
-                    <span className="group-hover/line:invisible">
-                      {line.oldLineNumber ?? ''}
+                  <span className="group-hover/line:invisible">
+                    {line.oldLineNumber ?? ''}
+                  </span>
+                  {lineNum != null && (
+                    <button
+                      type="button"
+                      className="absolute cursor-pointer inset-0 hidden group-hover/line:inline-flex items-center justify-center text-zinc-500 hover:text-zinc-300"
+                      title={`Open at line ${lineNum}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openInIDE(
+                          `${filePath}:${lineNum}`,
+                          preferredIde,
+                          terminalId,
+                        ).catch(() => {})
+                      }}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div
+                  className="select-none text-right px-1.5 w-10 shrink-0 border-r border-zinc-700/50 align-top"
+                  style={{
+                    color:
+                      LINE_NUM_COLOR[
+                        line.type as keyof typeof LINE_NUM_COLOR
+                      ] ?? 'rgb(113, 113, 122)',
+                  }}
+                >
+                  {line.newLineNumber ?? ''}
+                </div>
+                <div
+                  className={cn(
+                    'pl-2 min-w-0 flex-1',
+                    wordWrap ? 'diff-wrap-content' : 'whitespace-pre',
+                  )}
+                >
+                  {line.type === 'removed' ? (
+                    <span className="text-zinc-400">
+                      {line.segments?.some((s) => s.highlight)
+                        ? line.segments.map((seg, si) => (
+                            <span
+                              key={`${si}-${seg.highlight}`}
+                              style={
+                                seg.highlight
+                                  ? {
+                                      backgroundColor:
+                                        WORD_HIGHLIGHT_BG.removed,
+                                      borderRadius: '2px',
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {seg.text}
+                            </span>
+                          ))
+                        : line.content || ' '}
                     </span>
-                    {lineNum != null && (
-                      <button
-                        type="button"
-                        className="absolute cursor-pointer inset-0 hidden group-hover/line:inline-flex items-center justify-center text-zinc-500 hover:text-zinc-300"
-                        title={`Open at line ${lineNum}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openInIDE(
-                            `${filePath}:${lineNum}`,
-                            preferredIde,
-                            terminalId,
-                          ).catch(() => {})
-                        }}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </td>
-                  <td
-                    className="select-none text-right px-1.5 w-10 border-r border-zinc-700/50 align-top"
-                    style={{
-                      color:
-                        LINE_NUM_COLOR[
-                          line.type as keyof typeof LINE_NUM_COLOR
-                        ] ?? 'rgb(113, 113, 122)',
-                    }}
-                  >
-                    {line.newLineNumber ?? ''}
-                  </td>
-                  <td
-                    className={cn(
-                      'pl-2',
-                      wordWrap ? 'diff-wrap-content' : 'whitespace-pre',
-                    )}
-                  >
-                    {line.type === 'removed' ? (
-                      <span className="text-zinc-400">
-                        {line.segments?.some((s) => s.highlight)
-                          ? line.segments.map((seg, si) => (
-                              <span
-                                key={`${si}-${seg.highlight}`}
-                                style={
-                                  seg.highlight
-                                    ? {
-                                        backgroundColor:
-                                          WORD_HIGHLIGHT_BG.removed,
-                                        borderRadius: '2px',
-                                      }
-                                    : undefined
-                                }
-                              >
-                                {seg.text}
-                              </span>
-                            ))
-                          : line.content || ' '}
-                      </span>
-                    ) : (
-                      <SyntaxHighlighter
-                        language={language}
-                        style={oneDark}
-                        customStyle={{
-                          margin: 0,
-                          padding: 0,
-                          background: 'transparent',
-                          fontSize: 'inherit',
-                          lineHeight: 'inherit',
-                          display: 'inline',
-                        }}
-                        PreTag="span"
-                        CodeTag="span"
-                      >
-                        {line.content || ' '}
-                      </SyntaxHighlighter>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                  ) : (
+                    <SyntaxHighlighter
+                      language={language}
+                      style={oneDark}
+                      customStyle={{
+                        margin: 0,
+                        padding: 0,
+                        background: 'transparent',
+                        fontSize: 'inherit',
+                        lineHeight: 'inherit',
+                        display: 'inline',
+                      }}
+                      PreTag="span"
+                      CodeTag="span"
+                    >
+                      {line.content || ' '}
+                    </SyntaxHighlighter>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

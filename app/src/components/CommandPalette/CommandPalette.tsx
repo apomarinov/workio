@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
 import { useProcessContext } from '@/context/ProcessContext'
@@ -27,7 +27,11 @@ import type {
   SessionWithProject,
   Terminal,
 } from '../../types'
-import { CommitDialog } from '../CommitDialog'
+
+const CommitDialog = lazy(() =>
+  import('../CommitDialog').then((m) => ({ default: m.CommitDialog })),
+)
+
 import { ConfirmModal } from '../ConfirmModal'
 import { CreateBranchDialog } from '../CreateBranchDialog'
 import { DirectoryBrowser } from '../DirectoryBrowser'
