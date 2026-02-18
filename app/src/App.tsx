@@ -90,6 +90,12 @@ function AppContent() {
     settings: () => {
       window.dispatchEvent(new Event('open-settings'))
     },
+    commitAmend: () => {
+      window.dispatchEvent(new Event('commit-toggle-amend'))
+    },
+    commitNoVerify: () => {
+      window.dispatchEvent(new Event('commit-toggle-no-verify'))
+    },
   })
 
   // Example: Change favicon based on session status

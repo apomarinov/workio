@@ -97,7 +97,26 @@ export function CommitDialog({
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const handleCommitRef = useRef<() => void>(() => {})
+  const canCommitRef = useRef(false)
   const { settings } = useSettings()
+
+  // Listen for custom events from global keyboard shortcuts
+  useEffect(() => {
+    if (!open) return
+    const onToggleAmend = () =>
+      setAmend((v) => {
+        if (v) setMessage('')
+        return !v
+      })
+    const onToggleNoVerify = () => setNoVerify((v) => !v)
+    window.addEventListener('commit-toggle-amend', onToggleAmend)
+    window.addEventListener('commit-toggle-no-verify', onToggleNoVerify)
+    return () => {
+      window.removeEventListener('commit-toggle-amend', onToggleAmend)
+      window.removeEventListener('commit-toggle-no-verify', onToggleNoVerify)
+    }
+  }, [open])
 
   function refreshFiles() {
     setLoadingFiles(true)
@@ -161,6 +180,24 @@ export function CommitDialog({
       cancelled = true
     }
   }, [amend, terminalId])
+
+  // Cmd/Ctrl+Enter to commit from anywhere in the dialog
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'Enter' &&
+        (e.metaKey || e.ctrlKey) &&
+        canCommitRef.current
+      ) {
+        e.preventDefault()
+        e.stopPropagation()
+        handleCommitRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [open])
 
   const handleAmendChange = (checked: boolean) => {
     setAmend(checked)
@@ -265,6 +302,8 @@ export function CommitDialog({
   }
 
   const canCommit = (amend || !!message.trim()) && selectedFiles.size > 0
+  handleCommitRef.current = handleCommit
+  canCommitRef.current = canCommit
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -588,15 +627,6 @@ export function CommitDialog({
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   disabled={amend || loading}
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === 'Enter' &&
-                      (e.metaKey || e.ctrlKey) &&
-                      canCommit
-                    ) {
-                      handleCommit()
-                    }
-                  }}
                 />
                 <div className="flex flex-col gap-2 flex-shrink-0 justify-start">
                   <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">

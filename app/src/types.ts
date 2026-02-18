@@ -251,6 +251,8 @@ export interface Keymap {
   itemActions: ShortcutBinding | null
   collapseAll: ShortcutBinding | null
   settings: ShortcutBinding | null
+  commitAmend: ShortcutBinding | null
+  commitNoVerify: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -261,6 +263,8 @@ export const DEFAULT_KEYMAP: Keymap = {
   itemActions: { metaKey: true, key: 'i' },
   collapseAll: { metaKey: true, key: 'arrowup' },
   settings: { metaKey: true, key: ',' },
+  commitAmend: { altKey: true, key: 'a' },
+  commitNoVerify: { altKey: true, key: 'n' },
 }
 
 export interface RepoWebhookStatus {

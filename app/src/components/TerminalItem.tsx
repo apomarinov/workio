@@ -383,7 +383,7 @@ export const TerminalItem = memo(function TerminalItem({
                       )}
                       {diffStat.added > 0 && diffStat.removed > 0 && '/'}
                       {diffStat.removed > 0 && (
-                        <span className="text-red-500/80">
+                        <span className="text-red-400/80">
                           -{diffStat.removed}
                         </span>
                       )}

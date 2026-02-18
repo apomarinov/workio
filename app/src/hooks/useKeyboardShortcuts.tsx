@@ -153,6 +153,8 @@ interface KeymapHandlers {
   itemActions?: () => void
   collapseAll?: () => void
   settings?: () => void
+  commitAmend?: () => void
+  commitNoVerify?: () => void
 }
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
@@ -200,6 +202,14 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     settings?.keymap?.settings === null
       ? null
       : (settings?.keymap?.settings ?? DEFAULT_KEYMAP.settings)
+  const commitAmendBinding =
+    settings?.keymap?.commitAmend === null
+      ? null
+      : (settings?.keymap?.commitAmend ?? DEFAULT_KEYMAP.commitAmend)
+  const commitNoVerifyBinding =
+    settings?.keymap?.commitNoVerify === null
+      ? null
+      : (settings?.keymap?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
 
   useEffect(() => {
     let modifierBuffer: ModifierBuffer = {
@@ -241,7 +251,12 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
         heldNonModKeys.add(e.code)
 
         const h = handlersRef.current
-        const key = e.key.toLowerCase()
+        // On macOS, Alt+key produces special characters (e.g. Alt+A → å).
+        // Use e.code to get the physical key when Alt is held.
+        const key =
+          modifierBuffer.alt && e.code.startsWith('Key')
+            ? e.code[3].toLowerCase()
+            : e.key.toLowerCase()
         keyBuffer.push(key)
 
         // Check palette: modifiers + accumulated keys match binding
@@ -319,6 +334,38 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           e.preventDefault()
           e.stopPropagation()
           h.settings()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check commitAmend
+        if (
+          h.commitAmend &&
+          commitAmendBinding &&
+          commitAmendBinding.key &&
+          modifiersMatchBinding(modifierBuffer, commitAmendBinding) &&
+          keyBuffer.join('') === commitAmendBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.commitAmend()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check commitNoVerify
+        if (
+          h.commitNoVerify &&
+          commitNoVerifyBinding &&
+          commitNoVerifyBinding.key &&
+          modifiersMatchBinding(modifierBuffer, commitNoVerifyBinding) &&
+          keyBuffer.join('') === commitNoVerifyBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.commitNoVerify()
           consumed = true
           suppressModifiers()
           return
@@ -434,6 +481,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     itemActionsBinding,
     collapseAllBinding,
     settingsBinding,
+    commitAmendBinding,
+    commitNoVerifyBinding,
     pip.window,
   ])
 }

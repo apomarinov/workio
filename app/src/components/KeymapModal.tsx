@@ -120,6 +120,8 @@ type ShortcutName =
   | 'itemActions'
   | 'collapseAll'
   | 'settings'
+  | 'commitAmend'
+  | 'commitNoVerify'
 
 function findDuplicates(
   bindings: Record<ShortcutName, ShortcutBinding | null>,
@@ -183,16 +185,13 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   )
   const [settingsShortcut, setSettingsShortcut] =
     useState<ShortcutBinding | null>(DEFAULT_KEYMAP.settings)
-  const [recording, setRecording] = useState<
-    | 'palette'
-    | 'goToTab'
-    | 'goToLastTab'
-    | 'togglePip'
-    | 'itemActions'
-    | 'collapseAll'
-    | 'settings'
-    | null
-  >(null)
+  const [commitAmend, setCommitAmend] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.commitAmend,
+  )
+  const [commitNoVerify, setCommitNoVerify] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.commitNoVerify,
+  )
+  const [recording, setRecording] = useState<ShortcutName | null>(null)
   const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [showConfirmClose, setShowConfirmClose] = useState(false)
@@ -207,6 +206,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     const savedItemActions = saved?.itemActions ?? DEFAULT_KEYMAP.itemActions
     const savedCollapseAll = saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll
     const savedSettings = saved?.settings ?? DEFAULT_KEYMAP.settings
+    const savedCommitAmend = saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend
+    const savedCommitNoVerify =
+      saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify
 
     return (
       !bindingsEqual(palette, savedPalette) ||
@@ -215,7 +217,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       !bindingsEqual(togglePip, savedTogglePip) ||
       !bindingsEqual(itemActions, savedItemActions) ||
       !bindingsEqual(collapseAll, savedCollapseAll) ||
-      !bindingsEqual(settingsShortcut, savedSettings)
+      !bindingsEqual(settingsShortcut, savedSettings) ||
+      !bindingsEqual(commitAmend, savedCommitAmend) ||
+      !bindingsEqual(commitNoVerify, savedCommitNoVerify)
     )
   }, [
     settings?.keymap,
@@ -226,6 +230,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     itemActions,
     collapseAll,
     settingsShortcut,
+    commitAmend,
+    commitNoVerify,
   ])
 
   const handleClose = (newOpen: boolean) => {
@@ -247,6 +253,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setItemActions(saved?.itemActions ?? DEFAULT_KEYMAP.itemActions)
     setCollapseAll(saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
     setSettingsShortcut(saved?.settings ?? DEFAULT_KEYMAP.settings)
+    setCommitAmend(saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend)
+    setCommitNoVerify(saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
     onOpenChange(false)
   }
 
@@ -268,6 +276,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       }
       if (settings.keymap.settings !== undefined) {
         setSettingsShortcut(settings.keymap.settings)
+      }
+      if (settings.keymap.commitAmend !== undefined) {
+        setCommitAmend(settings.keymap.commitAmend)
+      }
+      if (settings.keymap.commitNoVerify !== undefined) {
+        setCommitNoVerify(settings.keymap.commitNoVerify)
       }
     }
   }, [settings?.keymap])
@@ -318,6 +332,16 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           binding.key = keyBuffer.join('')
         }
         setSettingsShortcut(binding)
+      } else if (recording === 'commitAmend') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setCommitAmend(binding)
+      } else if (recording === 'commitNoVerify') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setCommitNoVerify(binding)
       }
 
       setRecording(null)
@@ -363,6 +387,10 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           setCollapseAll({ key: e.key.toLowerCase() })
         } else if (recording === 'settings') {
           setSettingsShortcut({ key: e.key.toLowerCase() })
+        } else if (recording === 'commitAmend') {
+          setCommitAmend({ key: e.key.toLowerCase() })
+        } else if (recording === 'commitNoVerify') {
+          setCommitNoVerify({ key: e.key.toLowerCase() })
         }
         setRecording(null)
         return
@@ -421,6 +449,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           itemActions,
           collapseAll,
           settings: settingsShortcut,
+          commitAmend,
+          commitNoVerify,
         },
       })
       toast.success('Keyboard shortcuts saved')
@@ -442,6 +472,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setItemActions(DEFAULT_KEYMAP.itemActions)
     setCollapseAll(DEFAULT_KEYMAP.collapseAll)
     setSettingsShortcut(DEFAULT_KEYMAP.settings)
+    setCommitAmend(DEFAULT_KEYMAP.commitAmend)
+    setCommitNoVerify(DEFAULT_KEYMAP.commitNoVerify)
     setRecording(null)
   }
 
@@ -456,6 +488,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         itemActions,
         collapseAll,
         settings: settingsShortcut,
+        commitAmend,
+        commitNoVerify,
       }),
     [
       palette,
@@ -465,6 +499,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       itemActions,
       collapseAll,
       settingsShortcut,
+      commitAmend,
+      commitNoVerify,
     ],
   )
 
@@ -574,6 +610,44 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               hasConflict={duplicates.has('settings')}
               defaultBinding={DEFAULT_KEYMAP.settings}
               display={formatBinding(settingsShortcut)}
+            />
+
+            <div className="pt-2 border-t border-zinc-700">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Commit
+              </span>
+            </div>
+            <ShortcutRow
+              label="Toggle Amend"
+              binding={commitAmend}
+              isRecording={recording === 'commitAmend'}
+              recordingKeys={recording === 'commitAmend' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'commitAmend' ? null : 'commitAmend')
+              }
+              onReset={() => setCommitAmend(DEFAULT_KEYMAP.commitAmend)}
+              onUnset={() => setCommitAmend(null)}
+              hasConflict={duplicates.has('commitAmend')}
+              defaultBinding={DEFAULT_KEYMAP.commitAmend}
+              display={formatBinding(commitAmend)}
+            />
+            <ShortcutRow
+              label="Toggle No Verify"
+              binding={commitNoVerify}
+              isRecording={recording === 'commitNoVerify'}
+              recordingKeys={
+                recording === 'commitNoVerify' ? recordingKeys : []
+              }
+              onRecord={() =>
+                setRecording(
+                  recording === 'commitNoVerify' ? null : 'commitNoVerify',
+                )
+              }
+              onReset={() => setCommitNoVerify(DEFAULT_KEYMAP.commitNoVerify)}
+              onUnset={() => setCommitNoVerify(null)}
+              hasConflict={duplicates.has('commitNoVerify')}
+              defaultBinding={DEFAULT_KEYMAP.commitNoVerify}
+              display={formatBinding(commitNoVerify)}
             />
           </div>
 
