@@ -1,4 +1,11 @@
-import { ChevronRight, File, Folder, Loader2, ShieldAlert } from 'lucide-react'
+import {
+  ChevronRight,
+  File,
+  Folder,
+  FolderPlus,
+  Loader2,
+  ShieldAlert,
+} from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,7 +18,12 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { type DirEntry, listDirectories, openFullDiskAccess } from '../lib/api'
+import {
+  createDirectory,
+  type DirEntry,
+  listDirectories,
+  openFullDiskAccess,
+} from '../lib/api'
 
 interface Column {
   path: string
@@ -46,6 +58,8 @@ export function DirectoryBrowser({
   const [showHidden, setShowHidden] = useState(false)
   const [hiddenVersion, setHiddenVersion] = useState(0)
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
+  const [newFolderName, setNewFolderName] = useState<string | null>(null)
+  const [creatingFolder, setCreatingFolder] = useState(false)
 
   const defaultRoot = '~'
 
@@ -127,6 +141,15 @@ export function DirectoryBrowser({
     [mode],
   )
 
+  const handleColumnBackground = useCallback((colIndex: number) => {
+    setColumns((prev) => {
+      const updated = prev.slice(0, colIndex + 1)
+      updated[colIndex] = { ...updated[colIndex], selectedDir: null }
+      setInputPath(updated[colIndex].path)
+      return updated
+    })
+  }, [])
+
   const handleSelectEntry = useCallback(
     (fullPath: string, metaKey: boolean) => {
       setSelectedPaths((prev) => {
@@ -165,6 +188,26 @@ export function DirectoryBrowser({
 
   const handleCancel = () => {
     onOpenChange(false)
+  }
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName?.trim()) return
+    const name = newFolderName.trim()
+    setCreatingFolder(true)
+    try {
+      const result = await createDirectory(
+        inputPath || defaultRoot,
+        name,
+        sshHost,
+      )
+      setNewFolderName(null)
+      setHiddenVersion((v) => v + 1)
+      navigateToPath(result.path)
+    } catch {
+      // stay in input so user can retry
+    } finally {
+      setCreatingFolder(false)
+    }
   }
 
   return (
@@ -208,12 +251,62 @@ export function DirectoryBrowser({
           hiddenVersion={hiddenVersion}
           sshHost={sshHost}
           onSelect={handleColumnSelect}
+          onSelectColumn={handleColumnBackground}
           fileMode={mode === 'file'}
           selectedPaths={selectedPaths}
           onSelectEntry={mode === 'file' ? handleSelectEntry : undefined}
         />
 
         <DialogFooter className="px-6 py-4 border-t">
+          {newFolderName != null ? (
+            <div className="flex items-center gap-2 mr-auto">
+              <Input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleCreateFolder()
+                  } else if (e.key === 'Escape') {
+                    setNewFolderName(null)
+                  }
+                }}
+                placeholder="Folder name"
+                className="w-48 font-mono text-sm h-9"
+                disabled={creatingFolder}
+              />
+              <Button
+                size="sm"
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim() || creatingFolder}
+              >
+                {creatingFolder ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  'Create'
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setNewFolderName(null)}
+                disabled={creatingFolder}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              type="button"
+              className="mr-auto"
+              onClick={() => setNewFolderName('')}
+            >
+              <FolderPlus className="w-4 h-4 mr-1.5" />
+              New Folder
+            </Button>
+          )}
           <Button variant="outline" type="button" onClick={handleCancel}>
             Cancel
           </Button>
@@ -274,6 +367,7 @@ function ColumnView({
   hiddenVersion,
   sshHost,
   onSelect,
+  onSelectColumn,
   fileMode,
   selectedPaths,
   onSelectEntry,
@@ -283,6 +377,7 @@ function ColumnView({
   hiddenVersion: number
   sshHost?: string
   onSelect: (colIndex: number, dirName: string) => void
+  onSelectColumn: (colIndex: number) => void
   fileMode?: boolean
   selectedPaths?: Set<string>
   onSelectEntry?: (fullPath: string, metaKey: boolean) => void
@@ -334,6 +429,7 @@ function ColumnView({
               initialEntries={col.initialEntries}
               initialHasMore={col.initialHasMore}
               onSelectDir={(dirName) => onSelect(i, dirName)}
+              onClickBackground={() => onSelectColumn(i)}
               fileMode={fileMode}
               selectedPaths={selectedPaths}
               onSelectEntry={onSelectEntry}
@@ -354,6 +450,7 @@ function BrowserColumn({
   initialEntries,
   initialHasMore,
   onSelectDir,
+  onClickBackground,
   fileMode,
   selectedPaths,
   onSelectEntry,
@@ -365,6 +462,7 @@ function BrowserColumn({
   initialEntries?: DirEntry[]
   initialHasMore?: boolean
   onSelectDir: (dirName: string) => void
+  onClickBackground: () => void
   fileMode?: boolean
   selectedPaths?: Set<string>
   onSelectEntry?: (fullPath: string, metaKey: boolean) => void
@@ -485,14 +583,25 @@ function BrowserColumn({
 
   if (entries.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Empty</p>
+      <div
+        className="h-full flex items-center justify-center cursor-pointer"
+        onClick={onClickBackground}
+      >
+        <p className="text-sm text-muted-foreground pointer-events-none">
+          Empty
+        </p>
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto">
+    <div
+      ref={containerRef}
+      className="h-full overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClickBackground()
+      }}
+    >
       {entries.map((entry) => {
         const fullPath =
           path === '/' ? `/${entry.name}` : `${path}/${entry.name}`

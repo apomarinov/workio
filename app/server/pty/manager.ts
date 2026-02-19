@@ -12,6 +12,7 @@ import {
   updateTerminal,
 } from '../db'
 import {
+  getGhUsername,
   refreshPRChecks,
   startChecksPolling,
   trackTerminal,
@@ -22,6 +23,7 @@ import { log } from '../logger'
 import { validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
+import { emitWorkspace } from '../workspace/setup'
 import { type CommandEvent, createOscParser } from './osc-parser'
 import {
   getActiveZellijSessionNames,
@@ -531,7 +533,7 @@ async function scanAndEmitGitDirty() {
             if (terminal.ssh_host) {
               const result = await execSSHCommand(
                 terminal.ssh_host,
-                'git rev-parse --abbrev-ref HEAD',
+                'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null',
                 terminal.cwd,
               )
               branch = result.stdout.trim() || null
@@ -542,8 +544,16 @@ async function scanAndEmitGitDirty() {
                   ['rev-parse', '--abbrev-ref', 'HEAD'],
                   { cwd: terminal.cwd },
                   (err, stdout) => {
-                    if (err || !stdout) return resolve(null)
-                    resolve(stdout.trim() || null)
+                    if (!err && stdout?.trim()) return resolve(stdout.trim())
+                    execFile(
+                      'git',
+                      ['symbolic-ref', '--short', 'HEAD'],
+                      { cwd: terminal.cwd },
+                      (err2, stdout2) => {
+                        if (err2 || !stdout2) return resolve(null)
+                        resolve(stdout2.trim() || null)
+                      },
+                    )
                   },
                 )
               })
@@ -646,6 +656,49 @@ export function startGitDirtyPolling() {
   gitDirtyPollingId = setInterval(scanAndEmitGitDirty, 10000)
 }
 
+async function detectRepoSlug(
+  cwd: string,
+  sshHost: string | null,
+): Promise<string | null> {
+  // Try to get owner/repo from remote origin URL
+  let remoteUrl: string | null = null
+  if (sshHost) {
+    const result = await execSSHCommand(
+      sshHost,
+      'git remote get-url origin',
+      cwd,
+    )
+    remoteUrl = result.stdout.trim() || null
+  } else {
+    remoteUrl = await new Promise<string | null>((resolve) => {
+      execFile(
+        'git',
+        ['remote', 'get-url', 'origin'],
+        { cwd },
+        (err, stdout) => {
+          if (err || !stdout) return resolve(null)
+          resolve(stdout.trim() || null)
+        },
+      )
+    })
+  }
+
+  if (remoteUrl) {
+    // Parse owner/repo from SSH or HTTPS URLs
+    const match = remoteUrl.match(
+      /(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/,
+    )
+    if (match) return match[1]
+  }
+
+  // Fallback: gh-username/folder-name
+  const ghUser = getGhUsername()
+  const folderName = cwd.split('/').filter(Boolean).pop()
+  if (ghUser && folderName) return `${ghUser}/${folderName}`
+
+  return null
+}
+
 export async function detectGitBranch(
   terminalId: number,
   options?: { skipPRRefresh?: boolean },
@@ -659,7 +712,7 @@ export async function detectGitBranch(
     if (terminal.ssh_host) {
       const result = await execSSHCommand(
         terminal.ssh_host,
-        'git rev-parse --abbrev-ref HEAD',
+        'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null',
         terminal.cwd,
       )
       branch = result.stdout.trim() || null
@@ -670,8 +723,17 @@ export async function detectGitBranch(
           ['rev-parse', '--abbrev-ref', 'HEAD'],
           { cwd: terminal.cwd },
           (err, stdout) => {
-            if (err || !stdout) return resolve(null)
-            resolve(stdout.trim() || null)
+            if (!err && stdout?.trim()) return resolve(stdout.trim())
+            // Fallback for repos with no commits (git init)
+            execFile(
+              'git',
+              ['symbolic-ref', '--short', 'HEAD'],
+              { cwd: terminal.cwd },
+              (err2, stdout2) => {
+                if (err2 || !stdout2) return resolve(null)
+                resolve(stdout2.trim() || null)
+              },
+            )
           },
         )
       })
@@ -685,6 +747,20 @@ export async function detectGitBranch(
       })
       if (!options?.skipPRRefresh) {
         refreshPRChecks()
+      }
+
+      // Auto-set git_repo when a branch is detected on a local terminal
+      if (!terminal.git_repo) {
+        try {
+          const repo = await detectRepoSlug(terminal.cwd, terminal.ssh_host)
+          if (repo) {
+            const gitRepo = { repo, status: 'done' as const }
+            await updateTerminal(terminalId, { git_repo: gitRepo })
+            await emitWorkspace(terminalId, { git_repo: gitRepo })
+          }
+        } catch {
+          // non-critical, ignore
+        }
       }
     }
   } catch (err) {

@@ -190,6 +190,25 @@ export async function listDirectories(
   return res.json()
 }
 
+export async function createDirectory(
+  parentPath: string,
+  name: string,
+  sshHost?: string,
+): Promise<{ path: string }> {
+  const body: Record<string, unknown> = { path: parentPath, name }
+  if (sshHost) body.ssh_host = sshHost
+  const res = await fetch(`${API_BASE}/create-directory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to create folder')
+  }
+  return res.json()
+}
+
 export async function getSettings(): Promise<Settings> {
   const res = await fetch(`${API_BASE}/settings`)
   if (!res.ok) throw new Error('Failed to fetch settings')

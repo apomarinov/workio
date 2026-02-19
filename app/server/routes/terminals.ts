@@ -489,6 +489,48 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
+  // Create a directory
+  fastify.post<{ Body: { path: string; name: string; ssh_host?: string } }>(
+    '/api/create-directory',
+    async (request, reply) => {
+      const { path: parentPath, name, ssh_host } = request.body
+      if (!parentPath || !name) {
+        return reply.status(400).send({ error: 'path and name are required' })
+      }
+      if (name.includes('/') || name.includes('\\')) {
+        return reply
+          .status(400)
+          .send({ error: 'Folder name cannot contain path separators' })
+      }
+
+      try {
+        if (ssh_host) {
+          const validation = validateSSHHost(ssh_host)
+          if (!validation.valid) {
+            return reply.status(400).send({ error: validation.error })
+          }
+          const fullPath = `${parentPath}/${name}`
+          await execSSHCommand(
+            ssh_host,
+            `mkdir ${fullPath.replace(/'/g, "'\\''")}`,
+          )
+          return { path: fullPath }
+        }
+
+        const dirPath = expandPath(parentPath)
+        const fullPath = path.join(dirPath, name)
+        await fs.promises.mkdir(fullPath)
+        const resultPath =
+          parentPath === '/' ? `/${name}` : `${parentPath}/${name}`
+        return { path: resultPath }
+      } catch (err) {
+        return reply.status(500).send({
+          error: err instanceof Error ? err.message : 'Failed to create folder',
+        })
+      }
+    },
+  )
+
   // List available SSH hosts from ~/.ssh/config
   fastify.get('/api/ssh/hosts', async () => {
     return listSSHHosts()
