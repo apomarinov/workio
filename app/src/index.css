@@ -5,6 +5,22 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "MesloLGS NF";
+  src: url("/fonts/MesloLGS NF Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MesloLGS NF";
+  src: url("/fonts/MesloLGS NF Bold.ttf") format("truetype");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
