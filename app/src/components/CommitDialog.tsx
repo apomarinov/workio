@@ -282,6 +282,7 @@ export function CommitDialog({
       toast.success(
         `Discarded ${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''}`,
       )
+      setConfirmDiscard(false)
       refreshFiles()
     } catch (err) {
       toast.error(

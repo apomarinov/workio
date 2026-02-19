@@ -667,7 +667,7 @@ export async function getNotifications(
     `
     SELECT * FROM notifications
     ${whereClause}
-    ORDER BY created_at DESC
+    ORDER BY read ASC, created_at DESC
     LIMIT $1 OFFSET $2
     `,
     [limit, offset],
@@ -689,6 +689,40 @@ export async function markNotificationRead(id: number): Promise<boolean> {
     [id],
   )
   return (result.rowCount ?? 0) > 0
+}
+
+export async function markNotificationReadByItem(
+  repo: string,
+  prNumber: number,
+  commentId?: number,
+  reviewId?: number,
+): Promise<boolean> {
+  const conditions = ['read = FALSE', `repo = $1`, `data->>'prNumber' = $2`]
+  const params: (string | number)[] = [repo, String(prNumber)]
+  if (commentId) {
+    params.push(String(commentId))
+    conditions.push(`data->>'commentId' = $${params.length}`)
+  }
+  if (reviewId) {
+    params.push(String(reviewId))
+    conditions.push(`data->>'reviewId' = $${params.length}`)
+  }
+  const result = await pool.query(
+    `UPDATE notifications SET read = TRUE WHERE ${conditions.join(' AND ')}`,
+    params,
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+export async function markPRNotificationsRead(
+  repo: string,
+  prNumber: number,
+): Promise<number> {
+  const result = await pool.query(
+    `UPDATE notifications SET read = TRUE WHERE read = FALSE AND repo = $1 AND data->>'prNumber' = $2`,
+    [repo, String(prNumber)],
+  )
+  return result.rowCount ?? 0
 }
 
 export async function deleteAllNotifications(): Promise<number> {

@@ -6,6 +6,7 @@ import {
   Clock,
   File,
   Loader2,
+  MailCheck,
   Maximize2,
   MessageSquare,
   Reply,
@@ -26,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import { useTerminalContext } from '@/context/TerminalContext'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
@@ -47,6 +49,16 @@ import {
 } from './dialogs'
 import { RefreshIcon } from './icons'
 import { MarkdownContent } from './MarkdownContent'
+
+function formatTimeAgo(dateString: string): string {
+  const diffMs = Date.now() - new Date(dateString).getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  return `${Math.floor(diffHr / 24)}d ago`
+}
 
 export const PRTabButton = memo(function PRTabButton({
   pr,
@@ -112,6 +124,7 @@ const ReviewRow = memo(function ReviewRow({
   onReReview,
   onMerge,
   onReply,
+  onMarkRead,
 }: {
   review: PRReview
   icon: React.ReactNode
@@ -122,6 +135,7 @@ const ReviewRow = memo(function ReviewRow({
   onReReview: (author: string) => void
   onMerge?: () => void
   onReply: (author: string, reviewCommentId?: number) => void
+  onMarkRead?: () => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
 
@@ -135,6 +149,10 @@ const ReviewRow = memo(function ReviewRow({
     [onReply, review.author],
   )
 
+  const handleMarkRead = () => {
+    if (review.isUnread && onMarkRead) onMarkRead()
+  }
+
   const reviewUrl = review.url || prUrl
 
   return (
@@ -145,24 +163,20 @@ const ReviewRow = memo(function ReviewRow({
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 min-w-0 py-1 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
+          onClick={handleMarkRead}
         >
           {icon}
+          {review.isUnread && (
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+          )}
           {review.avatarUrl ? (
             <img
               src={review.avatarUrl}
               alt={review.author}
-              className={cn(
-                'w-4 h-4 rounded-full flex-shrink-0',
-                review.isUnread && 'ring-2 ring-green-500',
-              )}
+              className="w-4 h-4 rounded-full flex-shrink-0"
             />
           ) : (
-            <div
-              className={cn(
-                'w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0',
-                review.isUnread && 'ring-2 ring-green-500',
-              )}
-            />
+            <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
           )}
           <span className="text-xs truncate">{review.author}</span>
         </a>
@@ -201,7 +215,10 @@ const ReviewRow = memo(function ReviewRow({
       </div>
       {review.body && (
         <div
-          onClick={() => setBodyOpen(true)}
+          onClick={() => {
+            setBodyOpen(true)
+            handleMarkRead()
+          }}
           className="mt-1 text-xs line-clamp-3 cursor-pointer hover:bg-sidebar-accent/30 rounded p-1 transition-colors"
         >
           <MarkdownContent content={review.body} />
@@ -224,6 +241,7 @@ const CommentItem = memo(function CommentItem({
   prUrl,
   onHide,
   onReply,
+  onMarkRead,
   hidePath,
   indent,
   defaultExpanded,
@@ -242,6 +260,7 @@ const CommentItem = memo(function CommentItem({
   prUrl: string
   onHide: (author: string) => void
   onReply: (author: string, reviewCommentId?: number) => void
+  onMarkRead?: () => void
   hidePath?: boolean
   indent?: boolean
   defaultExpanded?: boolean
@@ -260,6 +279,10 @@ const CommentItem = memo(function CommentItem({
     [onReply, comment.author],
   )
 
+  const handleMarkRead = () => {
+    if (comment.isUnread && onMarkRead) onMarkRead()
+  }
+
   const commentUrl = comment.url || prUrl
 
   return (
@@ -274,7 +297,10 @@ const CommentItem = memo(function CommentItem({
           {!defaultExpanded && (
             <button
               type="button"
-              onClick={() => setExpanded(!expanded)}
+              onClick={() => {
+                setExpanded(!expanded)
+                handleMarkRead()
+              }}
               className="flex items-center gap-0 min-w-0 cursor-pointer"
             >
               <ChevronDown
@@ -285,28 +311,24 @@ const CommentItem = memo(function CommentItem({
               />
             </button>
           )}
+          {comment.isUnread && (
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+          )}
           <a
             href={commentUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 min-w-0 flex-1 hover:bg-sidebar-accent/30 rounded transition-colors cursor-pointer"
+            onClick={handleMarkRead}
           >
             {comment.avatarUrl ? (
               <img
                 src={comment.avatarUrl}
                 alt={comment.author}
-                className={cn(
-                  'w-4 h-4 rounded-full flex-shrink-0',
-                  comment.isUnread && 'ring-2 ring-green-500',
-                )}
+                className="w-4 h-4 rounded-full flex-shrink-0"
               />
             ) : (
-              <div
-                className={cn(
-                  'w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0',
-                  comment.isUnread && 'ring-2 ring-green-500',
-                )}
-              />
+              <div className="w-4 h-4 rounded-full bg-zinc-600 flex-shrink-0" />
             )}
             <span className="text-xs font-medium truncate">
               {comment.author}
@@ -328,7 +350,10 @@ const CommentItem = memo(function CommentItem({
           </button>
         </div>
         <div
-          onClick={() => setModalOpen(true)}
+          onClick={() => {
+            setModalOpen(true)
+            handleMarkRead()
+          }}
           className={cn(
             'mt-1 cursor-pointer hover:bg-sidebar-accent/30 rounded px-1 py-0.5 transition-colors',
             largeText ? 'text-sm' : 'text-xs',
@@ -361,6 +386,7 @@ const CommentItem = memo(function CommentItem({
 function ReviewThreadGroup({
   thread,
   prUrl,
+  pr,
   onHide,
   onReply,
   defaultExpanded,
@@ -368,12 +394,14 @@ function ReviewThreadGroup({
 }: {
   thread: PRReviewThread
   prUrl: string
+  pr?: PRCheckStatus
   onHide: (author: string) => void
   onReply: (author: string, reviewCommentId?: number) => void
   defaultExpanded?: boolean
   largeText?: boolean
 }) {
   const [showAllReplies, setShowAllReplies] = useState(false)
+  const { markNotificationReadByItem } = useTerminalContext()
   const [root, ...replies] = thread.comments
   if (!root) return null
 
@@ -399,6 +427,11 @@ function ReviewThreadGroup({
         prUrl={prUrl}
         onHide={onHide}
         onReply={handleThreadReply}
+        onMarkRead={
+          pr && root.isUnread && root.id
+            ? () => markNotificationReadByItem(pr.repo, pr.prNumber, root.id)
+            : undefined
+        }
         hidePath
         defaultExpanded={defaultExpanded}
         largeText={largeText}
@@ -410,6 +443,11 @@ function ReviewThreadGroup({
           prUrl={prUrl}
           onHide={onHide}
           onReply={handleThreadReply}
+          onMarkRead={
+            pr && reply.isUnread && reply.id
+              ? () => markNotificationReadByItem(pr.repo, pr.prNumber, reply.id)
+              : undefined
+          }
           hidePath
           indent
           defaultExpanded={defaultExpanded}
@@ -441,6 +479,12 @@ function ReviewThreadGroup({
             prUrl={prUrl}
             onHide={onHide}
             onReply={handleThreadReply}
+            onMarkRead={
+              pr && reply.isUnread && reply.id
+                ? () =>
+                    markNotificationReadByItem(pr.repo, pr.prNumber, reply.id)
+                : undefined
+            }
             hidePath
             indent
             defaultExpanded={defaultExpanded}
@@ -576,6 +620,7 @@ function FullDiscussionDialog({
   onClose: () => void
 }) {
   const [open, setOpen] = useState(true)
+  const { markNotificationReadByItem } = useTerminalContext()
 
   const handleOpenChange = (value: boolean) => {
     if (!value) {
@@ -618,6 +663,17 @@ function FullDiscussionDialog({
                         item.review.state === 'APPROVED' ? onMerge : undefined
                       }
                       onReply={onReply}
+                      onMarkRead={
+                        item.review.isUnread && item.review.id
+                          ? () =>
+                              markNotificationReadByItem(
+                                pr.repo,
+                                pr.prNumber,
+                                undefined,
+                                item.review.id,
+                              )
+                          : undefined
+                      }
                     />
                     {item.threads.map((thread, ti) => (
                       <div
@@ -627,6 +683,7 @@ function FullDiscussionDialog({
                         <ReviewThreadGroup
                           thread={thread}
                           prUrl={pr.prUrl}
+                          pr={pr}
                           onHide={onHide}
                           onReply={onReply}
                           defaultExpanded
@@ -644,6 +701,16 @@ function FullDiscussionDialog({
                     prUrl={pr.prUrl}
                     onHide={onHide}
                     onReply={onReply}
+                    onMarkRead={
+                      item.comment.isUnread && item.comment.id
+                        ? () =>
+                            markNotificationReadByItem(
+                              pr.repo,
+                              pr.prNumber,
+                              item.comment.id,
+                            )
+                        : undefined
+                    }
                     defaultExpanded
                     largeText
                   />
@@ -654,6 +721,7 @@ function FullDiscussionDialog({
                     key={`standalone-${item.thread.comments[0]?.id || i}`}
                     thread={item.thread}
                     prUrl={pr.prUrl}
+                    pr={pr}
                     onHide={onHide}
                     onReply={onReply}
                     defaultExpanded
@@ -691,6 +759,9 @@ function DiscussionTimeline({
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
   const [fullViewOpen, setFullViewOpen] = useState(false)
+  const [discussionOpen, setDiscussionOpen] = useState(true)
+  const { markPRNotificationsRead, markNotificationReadByItem } =
+    useTerminalContext()
   const [displayMode, setDisplayMode] = useState<'threads' | 'latest'>(() => {
     const stored = localStorage.getItem('discussion-display-mode')
     return stored === 'threads' ? 'threads' : 'latest'
@@ -760,8 +831,32 @@ function DiscussionTimeline({
 
   return (
     <>
-      <div className="px-2 pb-1 flex justify-between">
-        <div></div>
+      <div className="px-2 pb-1 flex justify-between items-center">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setDiscussionOpen((v) => !v)}
+            className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-white transition-colors cursor-pointer"
+          >
+            <ChevronDown
+              className={cn(
+                'h-3 w-3 transition-transform',
+                !discussionOpen && '-rotate-90',
+              )}
+            />
+            Discussion
+          </button>
+          {pr.hasUnreadNotifications && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 p-0.5 text-muted-foreground hover:text-white"
+              onClick={() => markPRNotificationsRead(pr.repo, pr.prNumber)}
+            >
+              <MailCheck className="max-h-3 max-w-3" />
+            </Button>
+          )}
+        </div>
         <div className="flex gap-1">
           <Select value={displayMode} onValueChange={handleDisplayModeChange}>
             <SelectTrigger
@@ -800,81 +895,108 @@ function DiscussionTimeline({
           onClose={() => setFullViewOpen(false)}
         />
       )}
-      {visibleDiscussion.map((item, i) => {
-        switch (item.type) {
-          case 'collapsed-group':
-            return (
-              <CollapsedAuthorGroup
-                key={`collapsed-${item.author}-${i}`}
-                group={item}
-                prUrl={pr.prUrl}
-                onReply={onReply}
-                onHide={onHide}
-              />
-            )
-          case 'review':
-            return (
-              <div key={`review-${item.review.id || i}`}>
-                <ReviewRow
-                  review={item.review}
-                  icon={getReviewIcon(item.review.state)}
-                  prUrl={pr.prUrl}
-                  showReReview={item.review.state === 'CHANGES_REQUESTED'}
-                  isApproved={item.review.state === 'APPROVED'}
-                  hasConflicts={pr.hasConflicts}
-                  onReReview={onReReview}
-                  onMerge={
-                    item.review.state === 'APPROVED' ? onMerge : undefined
-                  }
-                  onReply={onReply}
-                />
-                {item.threads.map((thread, ti) => (
-                  <div
-                    key={`thread-${thread.comments[0]?.id || ti}`}
-                    className="ml-2 border-l border-sidebar-border pl-2"
-                  >
-                    <ReviewThreadGroup
-                      thread={thread}
+      {discussionOpen && (
+        <>
+          {visibleDiscussion.map((item, i) => {
+            switch (item.type) {
+              case 'collapsed-group':
+                return (
+                  <CollapsedAuthorGroup
+                    key={`collapsed-${item.author}-${i}`}
+                    group={item}
+                    prUrl={pr.prUrl}
+                    onReply={onReply}
+                    onHide={onHide}
+                  />
+                )
+              case 'review':
+                return (
+                  <div key={`review-${item.review.id || i}`}>
+                    <ReviewRow
+                      review={item.review}
+                      icon={getReviewIcon(item.review.state)}
                       prUrl={pr.prUrl}
-                      onHide={onHide}
+                      showReReview={item.review.state === 'CHANGES_REQUESTED'}
+                      isApproved={item.review.state === 'APPROVED'}
+                      hasConflicts={pr.hasConflicts}
+                      onReReview={onReReview}
+                      onMerge={
+                        item.review.state === 'APPROVED' ? onMerge : undefined
+                      }
                       onReply={onReply}
+                      onMarkRead={
+                        item.review.isUnread && item.review.id
+                          ? () =>
+                              markNotificationReadByItem(
+                                pr.repo,
+                                pr.prNumber,
+                                undefined,
+                                item.review.id,
+                              )
+                          : undefined
+                      }
                     />
+                    {item.threads.map((thread, ti) => (
+                      <div
+                        key={`thread-${thread.comments[0]?.id || ti}`}
+                        className="ml-2 border-l border-sidebar-border pl-2"
+                      >
+                        <ReviewThreadGroup
+                          thread={thread}
+                          prUrl={pr.prUrl}
+                          pr={pr}
+                          onHide={onHide}
+                          onReply={onReply}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )
-          case 'comment':
-            return (
-              <CommentItem
-                key={`comment-${item.comment.id || i}`}
-                comment={item.comment}
-                prUrl={pr.prUrl}
-                onHide={onHide}
-                onReply={onReply}
-              />
-            )
-          case 'thread':
-            return (
-              <ReviewThreadGroup
-                key={`standalone-${item.thread.comments[0]?.id || i}`}
-                thread={item.thread}
-                prUrl={pr.prUrl}
-                onHide={onHide}
-                onReply={onReply}
-              />
-            )
-          default:
-            return null
-        }
-      })}
-      {hasMore && (
-        <button
-          type="button"
-          onClick={() => setVisibleCount((v) => v + 10)}
-          className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          Show more ({groupedDiscussion.length - visibleCount} remaining)
-        </button>
+                )
+              case 'comment':
+                return (
+                  <CommentItem
+                    key={`comment-${item.comment.id || i}`}
+                    comment={item.comment}
+                    prUrl={pr.prUrl}
+                    onHide={onHide}
+                    onReply={onReply}
+                    onMarkRead={
+                      item.comment.isUnread && item.comment.id
+                        ? () =>
+                            markNotificationReadByItem(
+                              pr.repo,
+                              pr.prNumber,
+                              item.comment.id,
+                            )
+                        : undefined
+                    }
+                  />
+                )
+              case 'thread':
+                return (
+                  <ReviewThreadGroup
+                    key={`standalone-${item.thread.comments[0]?.id || i}`}
+                    thread={item.thread}
+                    prUrl={pr.prUrl}
+                    pr={pr}
+                    onHide={onHide}
+                    onReply={onReply}
+                  />
+                )
+              default:
+                return null
+            }
+          })}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((v) => v + 10)}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              Show more ({groupedDiscussion.length - visibleCount} remaining)
+            </button>
+          )}
+        </>
       )}
     </>
   )
@@ -1122,6 +1244,11 @@ export function PRStatusContent({
                       <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
                     )}
                     <span className="text-xs truncate">{check.name}</span>
+                    {check.startedAt && (
+                      <span className="text-[10px] text-muted-foreground/40 flex-shrink-0 ml-auto">
+                        {formatTimeAgo(check.startedAt)}
+                      </span>
+                    )}
                   </a>
                   {check.status === 'COMPLETED' && (
                     <button

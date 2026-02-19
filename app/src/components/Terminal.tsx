@@ -382,11 +382,14 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
     // OSC 52 clipboard handler — intercept copy sequences from programs like zellij
     // Skip during buffer replay (before 'ready' message) to avoid stale clipboard popups
     terminal.parser.registerOscHandler(52, (data: string) => {
+      return true
+      // biome-ignore lint/correctness/noUnreachable: temporarily disabled
       if (!sessionLiveRef.current) return true
       const idx = data.indexOf(';')
       if (idx === -1) return false
       const payload = data.slice(idx + 1)
       if (!payload || payload === '?') return true
+      // biome-ignore lint/correctness/noUnreachable: temporarily disabled
       try {
         const decoded = atob(payload)
         const text = new TextDecoder().decode(
@@ -401,6 +404,7 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
       } catch {
         // invalid base64
       }
+      // biome-ignore lint/correctness/noUnreachable: temporarily disabled
       return true
     })
 

@@ -15,6 +15,8 @@ import {
   initDb,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationReadByItem,
+  markPRNotificationsRead,
 } from './db'
 import { env } from './env'
 import {
@@ -563,6 +565,33 @@ fastify.get('/api/notifications/pr-unread', async () => {
 fastify.post('/api/notifications/mark-all-read', async () => {
   const count = await markAllNotificationsRead()
   return { count }
+})
+
+fastify.post<{ Body: { repo: string; prNumber: number } }>(
+  '/api/notifications/pr-read',
+  async (request) => {
+    const { repo, prNumber } = request.body
+    const count = await markPRNotificationsRead(repo, prNumber)
+    return { count }
+  },
+)
+
+fastify.post<{
+  Body: {
+    repo: string
+    prNumber: number
+    commentId?: number
+    reviewId?: number
+  }
+}>('/api/notifications/item-read', async (request) => {
+  const { repo, prNumber, commentId, reviewId } = request.body
+  const success = await markNotificationReadByItem(
+    repo,
+    prNumber,
+    commentId,
+    reviewId,
+  )
+  return { success }
 })
 
 fastify.post<{ Params: { id: string } }>(

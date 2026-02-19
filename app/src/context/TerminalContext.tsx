@@ -60,7 +60,14 @@ interface TerminalContextValue {
   hasNotifications: boolean
   hasUnreadNotifications: boolean
   markNotificationRead: (id: number) => Promise<void>
+  markNotificationReadByItem: (
+    repo: string,
+    prNumber: number,
+    commentId?: number,
+    reviewId?: number,
+  ) => Promise<void>
   markAllNotificationsRead: () => Promise<void>
+  markPRNotificationsRead: (repo: string, prNumber: number) => Promise<void>
   deleteAllNotifications: () => Promise<void>
 }
 
@@ -501,11 +508,54 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [refetchUnreadPRData],
   )
 
+  const markNotificationReadByItem = useCallback(
+    async (
+      repo: string,
+      prNumber: number,
+      commentId?: number,
+      reviewId?: number,
+    ) => {
+      await api.markNotificationReadByItem(repo, prNumber, commentId, reviewId)
+      setNotifications((prev) =>
+        prev.map((n) => {
+          if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
+            return n
+          if (commentId && n.data.commentId === commentId)
+            return { ...n, read: true }
+          if (reviewId && n.data.reviewId === reviewId)
+            return { ...n, read: true }
+          return n
+        }),
+      )
+      refetchUnreadPRData()
+    },
+    [refetchUnreadPRData],
+  )
+
   const markAllNotificationsRead = useCallback(async () => {
     await api.markAllNotificationsRead()
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     setUnreadPRData(new Map())
   }, [])
+
+  const markPRNotificationsRead = useCallback(
+    async (repo: string, prNumber: number) => {
+      await api.markPRNotificationsRead(repo, prNumber)
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.repo === repo && n.data.prNumber === prNumber
+            ? { ...n, read: true }
+            : n,
+        ),
+      )
+      setUnreadPRData((prev) => {
+        const next = new Map(prev)
+        next.delete(`${repo}#${prNumber}`)
+        return next
+      })
+    },
+    [],
+  )
 
   const deleteAllNotifications = useCallback(async () => {
     await api.deleteAllNotifications()
@@ -668,7 +718,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasNotifications,
       hasUnreadNotifications,
       markNotificationRead,
+      markNotificationReadByItem,
       markAllNotificationsRead,
+      markPRNotificationsRead,
       deleteAllNotifications,
     }),
     [
@@ -690,7 +742,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasNotifications,
       hasUnreadNotifications,
       markNotificationRead,
+      markNotificationReadByItem,
       markAllNotificationsRead,
+      markPRNotificationsRead,
       deleteAllNotifications,
     ],
   )

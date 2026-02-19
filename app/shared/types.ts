@@ -18,6 +18,7 @@ export interface FailedPRCheck {
   status: string
   conclusion: string
   detailsUrl: string
+  startedAt: string
 }
 
 export interface PRComment {

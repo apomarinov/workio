@@ -715,6 +715,34 @@ export async function markAllNotificationsRead(): Promise<{ count: number }> {
   return res.json()
 }
 
+export async function markNotificationReadByItem(
+  repo: string,
+  prNumber: number,
+  commentId?: number,
+  reviewId?: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/notifications/item-read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repo, prNumber, commentId, reviewId }),
+  })
+  if (!res.ok) throw new Error('Failed to mark notification item as read')
+  return res.json()
+}
+
+export async function markPRNotificationsRead(
+  repo: string,
+  prNumber: number,
+): Promise<{ count: number }> {
+  const res = await fetch(`${API_BASE}/notifications/pr-read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repo, prNumber }),
+  })
+  if (!res.ok) throw new Error('Failed to mark PR notifications as read')
+  return res.json()
+}
+
 export async function markNotificationRead(
   id: number,
 ): Promise<{ success: boolean }> {

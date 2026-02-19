@@ -206,6 +206,7 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
                       status
                       conclusion
                       detailsUrl
+                      startedAt
                     }
                     ... on StatusContext {
                       context
@@ -287,6 +288,7 @@ interface GraphQLCheckContext {
   status?: string
   conclusion?: string | null
   detailsUrl?: string
+  startedAt?: string | null
   // StatusContext fields
   context?: string
   state?: string
@@ -370,6 +372,7 @@ function normalizeCheckContext(ctx: GraphQLCheckContext): {
   status: string
   conclusion: string
   detailsUrl: string
+  startedAt: string
 } {
   if (ctx.__typename === 'CheckRun') {
     return {
@@ -377,6 +380,7 @@ function normalizeCheckContext(ctx: GraphQLCheckContext): {
       status: ctx.status || '',
       conclusion: ctx.conclusion || '',
       detailsUrl: ctx.detailsUrl || '',
+      startedAt: ctx.startedAt || '',
     }
   }
   // StatusContext
@@ -395,7 +399,13 @@ function normalizeCheckContext(ctx: GraphQLCheckContext): {
     status = 'COMPLETED'
     conclusion = 'FAILURE'
   }
-  return { name, status, conclusion, detailsUrl: ctx.targetUrl || '' }
+  return {
+    name,
+    status,
+    conclusion,
+    detailsUrl: ctx.targetUrl || '',
+    startedAt: '',
+  }
 }
 
 function getDiscussionItemTime(item: PRDiscussionItem): number {
@@ -451,6 +461,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
       status: c.status,
       conclusion: c.conclusion,
       detailsUrl: c.detailsUrl,
+      startedAt: c.startedAt,
     }))
 
   // Reviews

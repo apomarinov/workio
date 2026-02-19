@@ -5,6 +5,7 @@ import {
   Eye,
   GitMerge,
   GitPullRequestArrow,
+  MailCheck,
   MessageSquare,
   Terminal,
   Trash2,
@@ -243,12 +244,12 @@ export function NotificationList() {
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
+            size="icon"
+            className="h-7 w-7"
             onClick={markAllNotificationsRead}
             disabled={!hasUnreadNotifications && !hasAnyUnseenPRs}
           >
-            Read all
+            <MailCheck className="w-3.5 h-3.5" />
           </Button>
           {notifications.length > 0 && (
             <Button
