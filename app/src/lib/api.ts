@@ -361,6 +361,43 @@ export async function closePR(
   }
 }
 
+export async function renamePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  title: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rename`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to rename PR')
+  }
+}
+
+export async function renameBranch(
+  terminalId: number,
+  branch: string,
+  newName: string,
+): Promise<{ success: boolean; branch: string; newName: string }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/rename-branch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch, newName }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to rename branch')
+  }
+  return data
+}
+
 export async function rerunFailedCheck(
   owner: string,
   repo: string,

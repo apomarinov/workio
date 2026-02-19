@@ -5,6 +5,7 @@ import {
   EyeOff,
   GitBranch,
   GitMerge,
+  Pencil,
   ScrollText,
 } from 'lucide-react'
 import { RefreshIcon } from '@/components/icons'
@@ -120,6 +121,18 @@ export function createPRActionsMode(
         if (canMerge) {
           actions.openMergeModal(pr)
         }
+      },
+    })
+  }
+
+  // Rename PR (only for open PRs)
+  if (isOpen) {
+    items.push({
+      id: 'action:rename',
+      label: 'Rename',
+      icon: <Pencil className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => {
+        actions.openRenamePRModal(pr)
       },
     })
   }

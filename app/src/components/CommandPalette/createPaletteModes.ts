@@ -73,6 +73,7 @@ export type AppActions = {
   ) => void
   requestCommit: (terminalId: number) => void
   requestCreateBranch: (terminalId: number, fromBranch: string) => void
+  requestRenameBranch: (terminalId: number, branch: string) => void
 
   // Shell actions
   openFilePicker: (terminal: Terminal) => void
@@ -80,6 +81,7 @@ export type AppActions = {
   // PR actions
   openMergeModal: (pr: PRCheckStatus) => void
   openCloseModal: (pr: PRCheckStatus) => void
+  openRenamePRModal: (pr: PRCheckStatus) => void
   openRerunAllModal: (pr: PRCheckStatus) => void
   checkoutPRBranch: (terminalId: number, branch: string) => Promise<void>
   hidePR: (pr: PRCheckStatus) => Promise<void>

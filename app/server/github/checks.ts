@@ -1417,6 +1417,53 @@ export function closePR(
   })
 }
 
+export function renamePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  title: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const prId = `${owner}/${repo}#${prNumber}`
+  const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=...`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        '--method',
+        'PATCH',
+        `repos/${owner}/${repo}/pulls/${prNumber}`,
+        '-f',
+        `title=${title}`,
+      ],
+      { timeout: 30000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        // Directly mutate cache and push to clients
+        const existing = lastFetchedPRs.find(
+          (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
+        )
+        if (existing) {
+          existing.prTitle = title
+        }
+        emitPRChecks(lastFetchedPRs)
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
 export function rerunFailedCheck(
   owner: string,
   repo: string,

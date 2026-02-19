@@ -7,6 +7,7 @@ import {
   GitBranchPlus,
   GitCommitHorizontal,
   GitMerge,
+  Pencil,
   Trash2,
 } from 'lucide-react'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -185,7 +186,8 @@ export function createBranchActionsMode(
     !!loadingStates.pulling ||
     !!loadingStates.pushing ||
     !!loadingStates.committing ||
-    !!loadingStates.creatingBranch
+    !!loadingStates.creatingBranch ||
+    !!loadingStates.renaming
 
   // Build items
   const items: PaletteItem[] = []
@@ -292,6 +294,23 @@ export function createBranchActionsMode(
       onSelect: () => {
         if (canRebase) {
           actions.rebaseBranch(branch.name)
+        }
+      },
+    })
+  }
+
+  // Rename (for local branches)
+  if (!branch.isRemote) {
+    const canRename = !isLoading
+    items.push({
+      id: 'action:rename',
+      label: 'Rename',
+      icon: <Pencil className="h-4 w-4 shrink-0 text-zinc-400" />,
+      disabled: !canRename,
+      loading: loadingStates.renaming === branch.name,
+      onSelect: () => {
+        if (canRename) {
+          actions.requestRenameBranch(terminal.id, branch.name)
         }
       },
     })

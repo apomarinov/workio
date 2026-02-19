@@ -2186,6 +2186,117 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
+  // Rename a local branch
+  interface RenameBranchBody {
+    branch: string
+    newName: string
+  }
+
+  fastify.post<{ Params: TerminalParams; Body: RenameBranchBody }>(
+    '/api/terminals/:id/rename-branch',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { branch, newName } = request.body
+      if (!branch) {
+        return reply.status(400).send({ error: 'Branch is required' })
+      }
+      if (!newName) {
+        return reply.status(400).send({ error: 'New name is required' })
+      }
+
+      try {
+        // Pre-check: ensure target name doesn't already exist
+        if (terminal.ssh_host) {
+          const listResult = await execSSHCommand(
+            terminal.ssh_host,
+            `git branch --list '${newName.replace(/'/g, "'\\''")}'`,
+            { cwd: terminal.cwd },
+          )
+          if (listResult.stdout.trim()) {
+            return reply
+              .status(400)
+              .send({ error: `Branch '${newName}' already exists` })
+          }
+        } else {
+          const exists = await new Promise<boolean>((resolve) => {
+            execFile(
+              'git',
+              ['branch', '--list', newName],
+              { cwd: expandPath(terminal.cwd), timeout: 5000 },
+              (_err, stdout) => {
+                resolve(!!stdout.trim())
+              },
+            )
+          })
+          if (exists) {
+            return reply
+              .status(400)
+              .send({ error: `Branch '${newName}' already exists` })
+          }
+        }
+
+        // Rename the branch
+        const renameCmd = `git branch -m ${branch.replace(/'/g, "'\\''").replace(/ /g, '\\ ')} ${newName.replace(/'/g, "'\\''").replace(/ /g, '\\ ')}`
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, renameCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: renameCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['branch', '-m', branch, newName],
+              { cwd: expandPath(terminal.cwd), timeout: 10000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: renameCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        detectGitBranch(id).catch(() => {})
+        return { success: true, branch, newName }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to rename branch'
+        return reply.status(400).send({
+          success: false,
+          branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
   // Create a new branch from a given base branch and check it out
   fastify.post<{ Params: TerminalParams; Body: CreateBranchBody }>(
     '/api/terminals/:id/create-branch',

@@ -18,6 +18,8 @@ import {
   pullBranch,
   pushBranch,
   rebaseBranch,
+  renameBranch,
+  renamePR,
   searchSessionMessages,
   toggleFavoriteSession,
 } from '@/lib/api'
@@ -35,7 +37,7 @@ const CommitDialog = lazy(() =>
 import { ConfirmModal } from '../ConfirmModal'
 import { CreateBranchDialog } from '../CreateBranchDialog'
 import { DirectoryBrowser } from '../DirectoryBrowser'
-import { EditSessionModal } from '../EditSessionModal'
+import { RenameModal } from '../EditSessionModal'
 import { EditTerminalModal } from '../EditTerminalModal'
 import { MergePRModal } from '../MergePRModal'
 import { RerunChecksModal } from '../RerunChecksModal'
@@ -85,6 +87,13 @@ export function CommandPalette() {
     null,
   )
   const [commitTerminalId, setCommitTerminalId] = useState<number | null>(null)
+  const [renamePRTarget, setRenamePRTarget] = useState<PRCheckStatus | null>(
+    null,
+  )
+  const [renameBranchTarget, setRenameBranchTarget] = useState<{
+    terminalId: number
+    branch: string
+  } | null>(null)
   const [createBranchFrom, setCreateBranchFrom] = useState<{
     terminalId: number
     branch: string
@@ -613,7 +622,6 @@ export function CommandPalette() {
         try {
           await pullBranch(terminal.id, name)
           toast.success(`Pulled ${name}`)
-          closePalette()
         } catch (err) {
           toast.error(
             err instanceof Error ? err.message : 'Failed to pull branch',
@@ -638,7 +646,6 @@ export function CommandPalette() {
         try {
           await pushBranch(terminal.id, name, force)
           toast.success(force ? `Force pushed ${name}` : `Pushed ${name}`)
-          closePalette()
         } catch (err) {
           toast.error(
             err instanceof Error ? err.message : 'Failed to push branch',
@@ -687,6 +694,10 @@ export function CommandPalette() {
         closePalette()
         setTimeout(() => setCreateBranchFrom({ terminalId, branch }), 150)
       },
+      requestRenameBranch: (terminalId, branch) => {
+        closePalette()
+        setTimeout(() => setRenameBranchTarget({ terminalId, branch }), 150)
+      },
 
       // PR actions
       openMergeModal: (pr) => {
@@ -695,6 +706,10 @@ export function CommandPalette() {
       openCloseModal: (pr) => {
         closePalette()
         setTimeout(() => setCloseModal(pr), 150)
+      },
+      openRenamePRModal: (pr) => {
+        closePalette()
+        setTimeout(() => setRenamePRTarget(pr), 150)
       },
       openRerunAllModal: (pr) => {
         setRerunAllModal(pr)
@@ -856,7 +871,7 @@ export function CommandPalette() {
       )}
 
       {renameSession && (
-        <EditSessionModal
+        <RenameModal
           open={!!renameSession}
           currentName={renameSession.name ?? ''}
           onSave={async (name) => {
@@ -978,6 +993,55 @@ export function CommandPalette() {
             }
           }}
           onCancel={() => setCloseModal(null)}
+        />
+      )}
+
+      {renamePRTarget && (
+        <RenameModal
+          open={!!renamePRTarget}
+          title="Rename PR"
+          placeholder="PR title"
+          currentName={renamePRTarget.prTitle}
+          onSave={async (newTitle) => {
+            const [owner, repo] = renamePRTarget.repo.split('/')
+            try {
+              await renamePR(owner, repo, renamePRTarget.prNumber, newTitle)
+              toast.success(`Renamed PR #${renamePRTarget.prNumber}`)
+              setRenamePRTarget(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to rename PR',
+              )
+            }
+          }}
+          onCancel={() => setRenamePRTarget(null)}
+        />
+      )}
+
+      {renameBranchTarget && (
+        <RenameModal
+          open={!!renameBranchTarget}
+          title="Rename Branch"
+          placeholder="Branch name"
+          currentName={renameBranchTarget.branch}
+          onSave={async (newName) => {
+            try {
+              await renameBranch(
+                renameBranchTarget.terminalId,
+                renameBranchTarget.branch,
+                newName,
+              )
+              toast.success(
+                `Renamed branch ${renameBranchTarget.branch} to ${newName}`,
+              )
+              setRenameBranchTarget(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to rename branch',
+              )
+            }
+          }}
+          onCancel={() => setRenameBranchTarget(null)}
         />
       )}
 

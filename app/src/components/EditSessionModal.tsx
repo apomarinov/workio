@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -9,46 +10,68 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
-interface EditSessionModalProps {
+interface RenameModalProps {
   open: boolean
   currentName: string
-  onSave: (name: string) => void
+  onSave: (name: string) => Promise<void> | void
   onCancel: () => void
+  title?: string
+  placeholder?: string
 }
 
-export function EditSessionModal({
+export function RenameModal({
   open,
   currentName,
   onSave,
   onCancel,
-}: EditSessionModalProps) {
+  title = 'Rename Session',
+  placeholder = 'Session name',
+}: RenameModalProps) {
   const [name, setName] = useState(currentName)
+  const [saving, setSaving] = useState(false)
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(name.trim())
+    setSaving(true)
+    try {
+      await onSave(name.trim())
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
       <DialogContent className="bg-sidebar">
         <DialogHeader>
-          <DialogTitle>Rename Session</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSave}>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Session name"
+            placeholder={placeholder}
+            disabled={saving}
           />
           <DialogFooter className="mt-4">
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onCancel}
+              disabled={saving}
+            >
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   )
 }
+
+/** @deprecated Use RenameModal instead */
+export const EditSessionModal = RenameModal

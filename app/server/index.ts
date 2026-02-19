@@ -32,6 +32,7 @@ import {
   mergePR,
   refreshPRChecks,
   removeReaction,
+  renamePR,
   replyToReviewComment,
   requestPRReview,
   rerunAllFailedChecks,
@@ -334,6 +335,23 @@ fastify.post<{
     prNumber: Number(pr),
     until: (pr) => !pr || pr.state === 'CLOSED',
   })
+  return { ok: true }
+})
+
+// Rename PR
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { title: string }
+}>('/api/github/:owner/:repo/pr/:pr/rename', async (request, reply) => {
+  const { owner, repo, pr } = request.params
+  const { title } = request.body
+  if (!title) {
+    return reply.status(400).send({ error: 'title is required' })
+  }
+  const result = await renamePR(owner, repo, Number(pr), title)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
   return { ok: true }
 })
 

@@ -46,6 +46,7 @@ export type PaletteLevel = {
     deleting?: string
     committing?: boolean
     creatingBranch?: string
+    renaming?: string
   }
 }
 
