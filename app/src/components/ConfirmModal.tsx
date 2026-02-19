@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { toast } from '@/components/ui/sonner'
 
 interface ConfirmModalProps {
   open: boolean
@@ -19,7 +20,7 @@ interface ConfirmModalProps {
   cancelLabel?: string
   variant?: 'danger' | 'default'
   loading?: boolean
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   onCancel: () => void
   children?: React.ReactNode
 }
@@ -31,13 +32,15 @@ export function ConfirmModal({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'default',
-  loading = false,
+  loading: externalLoading = false,
   onConfirm,
   onCancel,
   children,
 }: ConfirmModalProps) {
   const confirmedRef = useRef(false)
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
+  const [internalLoading, setInternalLoading] = useState(false)
+  const loading = externalLoading || internalLoading
 
   useEffect(() => {
     if (open) {
@@ -47,13 +50,25 @@ export function ConfirmModal({
     }
   }, [open])
 
-  const handleConfirm = () => {
+  const handleConfirm = async (e: React.MouseEvent) => {
+    e.preventDefault()
     confirmedRef.current = true
-    onConfirm()
+    const result = onConfirm()
+    if (result instanceof Promise) {
+      setInternalLoading(true)
+      try {
+        await result
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Something went wrong')
+      } finally {
+        setInternalLoading(false)
+        confirmedRef.current = false
+      }
+    }
   }
 
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
+    if (!isOpen && !loading) {
       if (!confirmedRef.current) {
         onCancel()
       }

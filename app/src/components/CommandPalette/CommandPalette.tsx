@@ -81,7 +81,6 @@ export function CommandPalette() {
   // PR action modals
   const [mergeModal, setMergeModal] = useState<PRCheckStatus | null>(null)
   const [closeModal, setCloseModal] = useState<PRCheckStatus | null>(null)
-  const [closeLoading, setCloseLoading] = useState(false)
   const [rerunAllModal, setRerunAllModal] = useState<PRCheckStatus | null>(null)
   const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
     null,
@@ -346,6 +345,7 @@ export function CommandPalette() {
           if (!controller.signal.aborted) {
             if (err instanceof Error && err.name !== 'AbortError') {
               setSessionSearchLoading(false)
+              toast.error(err.message || 'Failed to search sessions')
             }
           }
         })
@@ -543,8 +543,14 @@ export function CommandPalette() {
         )
       },
       toggleFavoriteSession: async (sessionId) => {
-        await toggleFavoriteSession(sessionId)
-        refetchSessions()
+        try {
+          await toggleFavoriteSession(sessionId)
+          refetchSessions()
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to toggle favorite',
+          )
+        }
       },
 
       // Branch actions
@@ -738,14 +744,18 @@ export function CommandPalette() {
         }
       },
       hidePR: async (pr) => {
-        const current = settings?.hidden_prs ?? []
-        const updated = [
-          ...current,
-          { repo: pr.repo, prNumber: pr.prNumber, title: pr.prTitle },
-        ]
-        await updateSettings({ hidden_prs: updated })
-        toast.success(`Hidden PR #${pr.prNumber}`)
-        closePalette()
+        try {
+          const current = settings?.hidden_prs ?? []
+          const updated = [
+            ...current,
+            { repo: pr.repo, prNumber: pr.prNumber, title: pr.prTitle },
+          ]
+          await updateSettings({ hidden_prs: updated })
+          toast.success(`Hidden PR #${pr.prNumber}`)
+          closePalette()
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Failed to hide PR')
+        }
       },
 
       // Shell actions
@@ -849,8 +859,8 @@ export function CommandPalette() {
           message={`Are you sure you want to delete "${deleteTerminalTarget.name || deleteTerminalTarget.cwd}"?`}
           confirmLabel="Delete"
           variant="danger"
-          onConfirm={() => {
-            deleteTerminal(deleteTerminalTarget.id, { deleteDirectory })
+          onConfirm={async () => {
+            await deleteTerminal(deleteTerminalTarget.id, { deleteDirectory })
             setDeleteTerminalTarget(null)
           }}
           onCancel={() => {
@@ -895,8 +905,8 @@ export function CommandPalette() {
           message="Are you sure you want to delete this session?"
           confirmLabel="Delete"
           variant="danger"
-          onConfirm={() => {
-            deleteSession(deleteSessionTarget.session_id)
+          onConfirm={async () => {
+            await deleteSession(deleteSessionTarget.session_id)
             setDeleteSessionTarget(null)
           }}
           onCancel={() => setDeleteSessionTarget(null)}
@@ -926,24 +936,17 @@ export function CommandPalette() {
           confirmLabel="Delete"
           variant="danger"
           onConfirm={async () => {
-            try {
-              const result = await deleteBranch(
-                deleteBranchConfirm.terminalId,
-                deleteBranchConfirm.branch,
-                deleteRemoteBranch,
-              )
-              const msg = result.deletedRemote
-                ? `Deleted branch ${deleteBranchConfirm.branch} (local and remote)`
-                : `Deleted branch ${deleteBranchConfirm.branch}`
-              toast.success(msg)
-              setDeleteBranchConfirm(null)
-              closePalette()
-            } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to delete branch',
-              )
-              setDeleteBranchConfirm(null)
-            }
+            const result = await deleteBranch(
+              deleteBranchConfirm.terminalId,
+              deleteBranchConfirm.branch,
+              deleteRemoteBranch,
+            )
+            const msg = result.deletedRemote
+              ? `Deleted branch ${deleteBranchConfirm.branch} (local and remote)`
+              : `Deleted branch ${deleteBranchConfirm.branch}`
+            toast.success(msg)
+            setDeleteBranchConfirm(null)
+            closePalette()
           }}
           onCancel={() => setDeleteBranchConfirm(null)}
         >
@@ -976,21 +979,11 @@ export function CommandPalette() {
           message={`Are you sure you want to close "${closeModal.prTitle}"? This will not delete the branch.`}
           confirmLabel="Close PR"
           variant="danger"
-          loading={closeLoading}
           onConfirm={async () => {
             const [owner, repo] = closeModal.repo.split('/')
-            setCloseLoading(true)
-            try {
-              await closePR(owner, repo, closeModal.prNumber)
-              toast.success(`Closed PR #${closeModal.prNumber}`)
-              setCloseModal(null)
-            } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to close PR',
-              )
-            } finally {
-              setCloseLoading(false)
-            }
+            await closePR(owner, repo, closeModal.prNumber)
+            toast.success(`Closed PR #${closeModal.prNumber}`)
+            setCloseModal(null)
           }}
           onCancel={() => setCloseModal(null)}
         />

@@ -32,8 +32,13 @@ export function createActionsMode(
   actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
-  const { terminal, session, pr } = level
+  const { terminal, pr } = level
   const { pinnedTerminalSessions, pinnedSessions } = data
+  // Look up fresh session from data to reflect latest state (e.g. after favorite toggle)
+  const session = level.session
+    ? (data.sessions.find((s) => s.session_id === level.session!.session_id) ??
+      level.session)
+    : undefined
 
   // If no target, return empty mode
   if (!terminal && !session) {
@@ -276,7 +281,6 @@ export function createActionsMode(
         ),
         onSelect: () => {
           actions.toggleSessionPin(session.session_id)
-          api.close()
         },
       },
       {
@@ -289,7 +293,6 @@ export function createActionsMode(
         ),
         onSelect: () => {
           actions.toggleFavoriteSession(session.session_id)
-          api.close()
         },
       },
       {

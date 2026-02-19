@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
+import { toast } from '@/components/ui/sonner'
 import * as api from '../lib/api'
 import type { SessionMessage, SessionMessagesResponse } from '../types'
 import { useSocket } from './useSocket'
@@ -98,6 +99,10 @@ export function useSessionMessages(sessionId: string | null) {
       })
       setOffset((prev) => prev + result.messages.length)
       setHasMore(result.hasMore)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to load messages',
+      )
     } finally {
       setIsLoadingMore(false)
     }

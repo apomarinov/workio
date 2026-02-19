@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 import useSWR from 'swr'
+import { toast } from '@/components/ui/sonner'
 import type {
   MergedPRSummary,
   PRCheckStatus,
@@ -511,11 +512,17 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   const markNotificationRead = useCallback(
     async (id: number) => {
-      await api.markNotificationRead(id)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      )
-      refetchUnreadPRData()
+      try {
+        await api.markNotificationRead(id)
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        )
+        refetchUnreadPRData()
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to mark as read',
+        )
+      }
     },
     [refetchUnreadPRData],
   )
@@ -527,52 +534,83 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       commentId?: number,
       reviewId?: number,
     ) => {
-      await api.markNotificationReadByItem(repo, prNumber, commentId, reviewId)
-      setNotifications((prev) =>
-        prev.map((n) => {
-          if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
+      try {
+        await api.markNotificationReadByItem(
+          repo,
+          prNumber,
+          commentId,
+          reviewId,
+        )
+        setNotifications((prev) =>
+          prev.map((n) => {
+            if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
+              return n
+            if (commentId && n.data.commentId === commentId)
+              return { ...n, read: true }
+            if (reviewId && n.data.reviewId === reviewId)
+              return { ...n, read: true }
             return n
-          if (commentId && n.data.commentId === commentId)
-            return { ...n, read: true }
-          if (reviewId && n.data.reviewId === reviewId)
-            return { ...n, read: true }
-          return n
-        }),
-      )
-      refetchUnreadPRData()
+          }),
+        )
+        refetchUnreadPRData()
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to mark as read',
+        )
+      }
     },
     [refetchUnreadPRData],
   )
 
   const markAllNotificationsRead = useCallback(async () => {
-    await api.markAllNotificationsRead()
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    setUnreadPRData(new Map())
+    try {
+      await api.markAllNotificationsRead()
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      setUnreadPRData(new Map())
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to mark notifications as read',
+      )
+    }
   }, [])
 
   const markPRNotificationsRead = useCallback(
     async (repo: string, prNumber: number) => {
-      await api.markPRNotificationsRead(repo, prNumber)
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.repo === repo && n.data.prNumber === prNumber
-            ? { ...n, read: true }
-            : n,
-        ),
-      )
-      setUnreadPRData((prev) => {
-        const next = new Map(prev)
-        next.delete(`${repo}#${prNumber}`)
-        return next
-      })
+      try {
+        await api.markPRNotificationsRead(repo, prNumber)
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.repo === repo && n.data.prNumber === prNumber
+              ? { ...n, read: true }
+              : n,
+          ),
+        )
+        setUnreadPRData((prev) => {
+          const next = new Map(prev)
+          next.delete(`${repo}#${prNumber}`)
+          return next
+        })
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to mark as read',
+        )
+      }
     },
     [],
   )
 
   const deleteAllNotifications = useCallback(async () => {
-    await api.deleteAllNotifications()
-    setNotifications([])
-    setUnreadPRData(new Map())
+    try {
+      await api.deleteAllNotifications()
+      setNotifications([])
+      setUnreadPRData(new Map())
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to delete notifications',
+      )
+    }
   }, [])
 
   const updatePRReaction = useCallback(

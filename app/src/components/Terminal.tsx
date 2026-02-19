@@ -6,6 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { ALargeSmall, ChevronDown, ChevronUp, WholeWord, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -359,7 +360,11 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
             text: filePath,
             activate: (_event, linkText) => {
               const ide = settingsRef.current?.preferred_ide ?? 'cursor'
-              openInIDE(linkText, ide, terminalIdRef.current).catch(() => {})
+              openInIDE(linkText, ide, terminalIdRef.current).catch((err) => {
+                toast.error(
+                  err instanceof Error ? err.message : 'Failed to open in IDE',
+                )
+              })
             },
           })
         }

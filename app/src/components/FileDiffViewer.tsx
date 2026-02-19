@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/sonner'
 import { getFileDiff, openInIDE } from '@/lib/api'
 import type { DiffLine, ParsedDiff } from '@/lib/diff-parser'
 import { parseDiff } from '@/lib/diff-parser'
@@ -353,7 +354,11 @@ export function FileDiffViewer({
             className="h-7 w-7"
             onClick={(e) => {
               e.stopPropagation()
-              openInIDE(filePath, preferredIde, terminalId).catch(() => {})
+              openInIDE(filePath, preferredIde, terminalId).catch((err) =>
+                toast.error(
+                  err instanceof Error ? err.message : 'Failed to open in IDE',
+                ),
+              )
             }}
             title={`Open in ${preferredIde === 'cursor' ? 'Cursor' : 'VS Code'}`}
           >
@@ -456,7 +461,13 @@ export function FileDiffViewer({
                             `${filePath}:${lineNum}`,
                             preferredIde,
                             terminalId,
-                          ).catch(() => {})
+                          ).catch((err) =>
+                            toast.error(
+                              err instanceof Error
+                                ? err.message
+                                : 'Failed to open in IDE',
+                            ),
+                          )
                         }}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -691,7 +702,11 @@ function MaximizedDiffContent({
           className="h-7 w-7"
           onClick={(e) => {
             e.stopPropagation()
-            openInIDE(filePath, preferredIde, terminalId).catch(() => {})
+            openInIDE(filePath, preferredIde, terminalId).catch((err) =>
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to open in IDE',
+              ),
+            )
           }}
           title={`Open in ${preferredIde === 'cursor' ? 'Cursor' : 'VS Code'}`}
         >
@@ -792,7 +807,13 @@ function MaximizedDiffContent({
                           `${filePath}:${lineNum}`,
                           preferredIde,
                           terminalId,
-                        ).catch(() => {})
+                        ).catch((err) =>
+                          toast.error(
+                            err instanceof Error
+                              ? err.message
+                              : 'Failed to open in IDE',
+                          ),
+                        )
                       }}
                     >
                       <ExternalLink className="h-3.5 w-3.5" />

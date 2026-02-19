@@ -506,8 +506,11 @@ export function CommitDialog({
           setSelectedFile(data.files[0].path)
         }
       })
-      .catch(() => {
+      .catch((err) => {
         setChangedFiles([])
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to load changed files',
+        )
       })
       .finally(() => {
         setLoadingFiles(false)

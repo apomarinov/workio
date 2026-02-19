@@ -1332,14 +1332,26 @@ export function PRStatusContent({
   } | null>(null)
 
   const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
-    await api.mergePR(owner, repo, pr.prNumber, method)
-    toast.success('PR merged successfully')
+    try {
+      await api.mergePR(owner, repo, pr.prNumber, method)
+      toast.success('PR merged successfully')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to merge PR')
+      throw err
+    }
   }
 
   const handleReRequestReview = async () => {
     if (!reReviewAuthor) return
-    await api.requestPRReview(owner, repo, pr.prNumber, reReviewAuthor)
-    toast.success(`Review requested from ${reReviewAuthor}`)
+    try {
+      await api.requestPRReview(owner, repo, pr.prNumber, reReviewAuthor)
+      toast.success(`Review requested from ${reReviewAuthor}`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to request review',
+      )
+      throw err
+    }
   }
 
   const handleReReview = useCallback(
@@ -1379,24 +1391,34 @@ export function PRStatusContent({
   }
 
   const handleSendReply = async (body: string) => {
-    if (replyTarget?.reviewCommentId) {
-      await api.replyToReviewComment(
-        owner,
-        repo,
-        pr.prNumber,
-        replyTarget.reviewCommentId,
-        body,
-      )
-    } else {
-      await api.addPRComment(owner, repo, pr.prNumber, body)
+    try {
+      if (replyTarget?.reviewCommentId) {
+        await api.replyToReviewComment(
+          owner,
+          repo,
+          pr.prNumber,
+          replyTarget.reviewCommentId,
+          body,
+        )
+      } else {
+        await api.addPRComment(owner, repo, pr.prNumber, body)
+      }
+      toast.success('Comment posted')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to post comment')
+      throw err
     }
-    toast.success('Comment posted')
   }
 
   const handleRerunCheck = async () => {
     if (!rerunCheck) return
-    await api.rerunFailedCheck(owner, repo, pr.prNumber, rerunCheck.url)
-    toast.success('Re-running failed jobs')
+    try {
+      await api.rerunFailedCheck(owner, repo, pr.prNumber, rerunCheck.url)
+      toast.success('Re-running failed jobs')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rerun check')
+      throw err
+    }
   }
 
   // Filter for completed failed checks (not in-progress or queued)
@@ -1408,13 +1430,18 @@ export function PRStatusContent({
   const handleRerunAllChecks = async () => {
     if (failedCompletedChecks.length === 0) return
     const checkUrls = failedCompletedChecks.map((c) => c.detailsUrl)
-    const result = await api.rerunAllFailedChecks(
-      owner,
-      repo,
-      pr.prNumber,
-      checkUrls,
-    )
-    toast.success(`Re-running ${result.rerunCount} failed workflow(s)`)
+    try {
+      const result = await api.rerunAllFailedChecks(
+        owner,
+        repo,
+        pr.prNumber,
+        checkUrls,
+      )
+      toast.success(`Re-running ${result.rerunCount} failed workflow(s)`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rerun checks')
+      throw err
+    }
   }
 
   const handleHideComment = useCallback(
@@ -1453,20 +1480,27 @@ export function PRStatusContent({
       ? [...withoutCollapsed, { repo: pr.repo, author: hideAuthor }]
       : withoutCollapsed
 
-    await updateSettings({
-      hide_gh_authors: newHidden,
-      silence_gh_authors: newSilenced,
-      collapse_gh_authors: newCollapsed,
-    })
+    try {
+      await updateSettings({
+        hide_gh_authors: newHidden,
+        silence_gh_authors: newSilenced,
+        collapse_gh_authors: newCollapsed,
+      })
 
-    if (config.hideComments) {
-      toast.success(`Comments from ${hideAuthor} hidden`)
-    } else if (config.collapseReplies) {
-      toast.success(`Replies from ${hideAuthor} collapsed`)
-    } else if (config.silenceNotifications) {
-      toast.success(`Notifications from ${hideAuthor} silenced`)
-    } else {
-      toast.success(`Filters for ${hideAuthor} removed`)
+      if (config.hideComments) {
+        toast.success(`Comments from ${hideAuthor} hidden`)
+      } else if (config.collapseReplies) {
+        toast.success(`Replies from ${hideAuthor} collapsed`)
+      } else if (config.silenceNotifications) {
+        toast.success(`Notifications from ${hideAuthor} silenced`)
+      } else {
+        toast.success(`Filters for ${hideAuthor} removed`)
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to update settings',
+      )
+      throw err
     }
   }
 

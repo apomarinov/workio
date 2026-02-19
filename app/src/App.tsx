@@ -165,7 +165,8 @@ function AppContent() {
         'Claude'
 
       if (data.status === 'permission_needed') {
-        const title = session?.name || 'Permission Required'
+        const title =
+          session?.latest_user_message || session?.name || 'Permission Required'
 
         sendNotification(`⚠️ ${title}`, {
           body: `"${terminalName}" needs permissions`,

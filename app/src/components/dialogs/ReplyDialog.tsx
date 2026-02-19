@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/sonner'
 
 interface ReplyDialogProps {
   author: string
@@ -38,6 +39,8 @@ export function ReplyDialog({ author, onConfirm, onClose }: ReplyDialogProps) {
     try {
       await onConfirm(body)
       handleClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }

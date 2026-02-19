@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from '@/components/ui/sonner'
 
 interface MergeDialogProps {
   prNumber: number
@@ -48,6 +49,8 @@ export function MergeDialog({
     try {
       await onConfirm(method)
       handleClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }

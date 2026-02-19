@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 
 interface HideAuthorDialogProps {
@@ -62,6 +63,8 @@ export function HideAuthorDialog({
     try {
       await onSave({ hideComments, silenceNotifications, collapseReplies })
       handleClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }

@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/sonner'
 
 interface RerunAllChecksDialogProps {
   checkCount: number
@@ -40,6 +41,8 @@ export function RerunAllChecksDialog({
     try {
       await onConfirm()
       handleClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }

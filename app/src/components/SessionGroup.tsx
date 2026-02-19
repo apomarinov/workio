@@ -1,6 +1,7 @@
 import { ChevronDown, Folder, Trash2 } from 'lucide-react'
 import { memo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import type { SessionWithProject } from '../types'
@@ -31,9 +32,15 @@ export const SessionGroup = memo(function SessionGroup({
     setShowDeleteModal(true)
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     setShowDeleteModal(false)
-    deleteSessions(sessions.map((s) => s.session_id))
+    try {
+      await deleteSessions(sessions.map((s) => s.session_id))
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to delete sessions',
+      )
+    }
   }
 
   return (
