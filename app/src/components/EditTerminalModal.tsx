@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -8,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { toast } from '@/components/ui/sonner'
 import type { Terminal } from '@/types'
 
 interface EditTerminalModalProps {
@@ -16,7 +18,7 @@ interface EditTerminalModalProps {
   onSave: (updates: {
     name: string
     settings?: { defaultClaudeCommand?: string } | null
-  }) => void
+  }) => Promise<void> | void
   onCancel: () => void
 }
 
@@ -30,6 +32,7 @@ export function EditTerminalModal({
   const [defaultClaudeCommand, setDefaultClaudeCommand] = useState(
     terminal.settings?.defaultClaudeCommand ?? '',
   )
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -38,17 +41,29 @@ export function EditTerminalModal({
     }
   }, [open, terminal.name, terminal.settings?.defaultClaudeCommand])
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     const trimmedCmd = defaultClaudeCommand.trim()
-    onSave({
-      name: name.trim(),
-      settings: trimmedCmd ? { defaultClaudeCommand: trimmedCmd } : null,
-    })
+    setSaving(true)
+    try {
+      await onSave({
+        name: name.trim(),
+        settings: trimmedCmd ? { defaultClaudeCommand: trimmedCmd } : null,
+      })
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to update project',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && !saving && onCancel()}
+    >
       <DialogContent className="bg-sidebar">
         <DialogHeader>
           <DialogTitle>Edit Project</DialogTitle>
@@ -63,6 +78,7 @@ export function EditTerminalModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Name"
+              disabled={saving}
             />
           </div>
           <div className="space-y-2">
@@ -74,13 +90,22 @@ export function EditTerminalModal({
               value={defaultClaudeCommand}
               onChange={(e) => setDefaultClaudeCommand(e.target.value)}
               placeholder="claude"
+              disabled={saving}
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onCancel}
+              disabled={saving}
+            >
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

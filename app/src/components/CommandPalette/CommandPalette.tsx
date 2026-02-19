@@ -837,16 +837,8 @@ export function CommandPalette() {
           open={!!editTerminal}
           terminal={editTerminal}
           onSave={async ({ name, settings }) => {
-            try {
-              await updateTerminal(editTerminal.id, { name, settings })
-              setEditTerminal(null)
-            } catch (err) {
-              toast.error(
-                err instanceof Error
-                  ? err.message
-                  : 'Failed to update terminal',
-              )
-            }
+            await updateTerminal(editTerminal.id, { name, settings })
+            setEditTerminal(null)
           }}
           onCancel={() => setEditTerminal(null)}
         />
@@ -885,14 +877,8 @@ export function CommandPalette() {
           open={!!renameSession}
           currentName={renameSession.name ?? ''}
           onSave={async (name) => {
-            try {
-              await updateSession(renameSession.session_id, { name })
-              setRenameSession(null)
-            } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to rename session',
-              )
-            }
+            await updateSession(renameSession.session_id, { name })
+            setRenameSession(null)
           }}
           onCancel={() => setRenameSession(null)}
         />
@@ -997,15 +983,9 @@ export function CommandPalette() {
           currentName={renamePRTarget.prTitle}
           onSave={async (newTitle) => {
             const [owner, repo] = renamePRTarget.repo.split('/')
-            try {
-              await renamePR(owner, repo, renamePRTarget.prNumber, newTitle)
-              toast.success(`Renamed PR #${renamePRTarget.prNumber}`)
-              setRenamePRTarget(null)
-            } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to rename PR',
-              )
-            }
+            await renamePR(owner, repo, renamePRTarget.prNumber, newTitle)
+            toast.success(`Renamed PR #${renamePRTarget.prNumber}`)
+            setRenamePRTarget(null)
           }}
           onCancel={() => setRenamePRTarget(null)}
         />
@@ -1018,21 +998,15 @@ export function CommandPalette() {
           placeholder="Branch name"
           currentName={renameBranchTarget.branch}
           onSave={async (newName) => {
-            try {
-              await renameBranch(
-                renameBranchTarget.terminalId,
-                renameBranchTarget.branch,
-                newName,
-              )
-              toast.success(
-                `Renamed branch ${renameBranchTarget.branch} to ${newName}`,
-              )
-              setRenameBranchTarget(null)
-            } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to rename branch',
-              )
-            }
+            await renameBranch(
+              renameBranchTarget.terminalId,
+              renameBranchTarget.branch,
+              newName,
+            )
+            toast.success(
+              `Renamed branch ${renameBranchTarget.branch} to ${newName}`,
+            )
+            setRenameBranchTarget(null)
           }}
           onCancel={() => setRenameBranchTarget(null)}
         />
