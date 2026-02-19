@@ -205,6 +205,21 @@ export function Sidebar({ width }: SidebarProps) {
     return { repoGroups, ungrouped }
   }, [terminals])
 
+  // Compute render-order shortcut indices: repo-grouped first, then ungrouped
+  const terminalShortcutMap = useMemo(() => {
+    const map = new Map<number, number>()
+    let idx = 1
+    for (const group of repoGroupedTerminals.repoGroups.values()) {
+      for (const t of group) {
+        map.set(t.id, idx++)
+      }
+    }
+    for (const t of repoGroupedTerminals.ungrouped) {
+      map.set(t.id, idx++)
+    }
+    return map
+  }, [repoGroupedTerminals])
+
   const collapsedProjectReposSet = useMemo(
     () => new Set(collapsedProjectRepos),
     [collapsedProjectRepos],
@@ -857,6 +872,9 @@ export function Sidebar({ width }: SidebarProps) {
                                     onToggleTerminalSessions={
                                       toggleTerminalSessions
                                     }
+                                    shortcutIndex={terminalShortcutMap.get(
+                                      terminal.id,
+                                    )}
                                   />
                                 ))}
                               </SortableContext>
@@ -881,6 +899,7 @@ export function Sidebar({ width }: SidebarProps) {
                               terminal.id,
                             )}
                             onToggleTerminalSessions={toggleTerminalSessions}
+                            shortcutIndex={terminalShortcutMap.get(terminal.id)}
                           />
                         ))}
                       </SortableContext>

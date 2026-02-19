@@ -57,7 +57,16 @@ function AppContent() {
 
   useKeyboardShortcuts({
     goToTab: (index) => {
-      const terminal = terminalsRef.current[index - 1]
+      // Use render order: repo-grouped terminals first, then ungrouped
+      const all = terminalsRef.current
+      const grouped: typeof all = []
+      const ungrouped: typeof all = []
+      for (const t of all) {
+        if (t.git_repo?.repo) grouped.push(t)
+        else ungrouped.push(t)
+      }
+      const ordered = [...grouped, ...ungrouped]
+      const terminal = ordered[index - 1]
       if (terminal) {
         selectTerminal(terminal.id)
         clearSession()

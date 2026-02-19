@@ -54,6 +54,7 @@ interface TerminalItemProps {
   sessions?: SessionWithProject[]
   sessionsExpanded?: boolean
   onToggleTerminalSessions?: (terminalId: number) => void
+  shortcutIndex?: number
 }
 
 export const TerminalItem = memo(function TerminalItem({
@@ -62,12 +63,14 @@ export const TerminalItem = memo(function TerminalItem({
   sessions = [],
   sessionsExpanded = true,
   onToggleTerminalSessions,
+  shortcutIndex: shortcutIndexProp,
 }: TerminalItemProps) {
   const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
   const { clearSession } = useSessionContext()
   const { emit } = useSocket()
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
-  const shortcutIndex = terminals.findIndex((t) => t.id === terminal.id) + 1
+  const shortcutIndex =
+    shortcutIndexProp ?? terminals.findIndex((t) => t.id === terminal.id) + 1
   const { githubPRs } = useTerminalContext()
   const {
     processes: allProcesses,

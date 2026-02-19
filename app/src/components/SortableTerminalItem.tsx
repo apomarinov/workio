@@ -9,6 +9,7 @@ interface SortableTerminalItemProps {
   sessions: SessionWithProject[]
   sessionsExpanded: boolean
   onToggleTerminalSessions: (terminalId: number) => void
+  shortcutIndex?: number
 }
 
 export const SortableTerminalItem = memo(function SortableTerminalItem({
@@ -16,6 +17,7 @@ export const SortableTerminalItem = memo(function SortableTerminalItem({
   sessions,
   sessionsExpanded,
   onToggleTerminalSessions,
+  shortcutIndex,
 }: SortableTerminalItemProps) {
   const {
     attributes,
@@ -39,6 +41,7 @@ export const SortableTerminalItem = memo(function SortableTerminalItem({
         sessions={sessions}
         sessionsExpanded={sessionsExpanded}
         onToggleTerminalSessions={onToggleTerminalSessions}
+        shortcutIndex={shortcutIndex}
       />
     </div>
   )
