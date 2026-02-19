@@ -443,6 +443,44 @@ export async function replyToReviewComment(
   }
 }
 
+export async function addReaction(
+  owner: string,
+  repo: string,
+  subjectId: number,
+  subjectType: 'issue_comment' | 'review_comment' | 'review',
+  content: string,
+  prNumber?: number,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subjectId, subjectType, content, prNumber }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to add reaction')
+  }
+}
+
+export async function removeReaction(
+  owner: string,
+  repo: string,
+  subjectId: number,
+  subjectType: 'issue_comment' | 'review_comment' | 'review',
+  content: string,
+  prNumber?: number,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subjectId, subjectType, content, prNumber }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to remove reaction')
+  }
+}
+
 export async function getSessionMessages(
   sessionId: string,
   limit: number,

@@ -178,7 +178,7 @@ function decodeNodeId(nodeId: string): number | null {
 // GitHub GraphQL rate limit cost = sum of (first/last values multiplied across nesting levels).
 // Keep limits low: we rarely have >10 open PRs, >20 checks, >10 reviews, etc.
 const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int!, $closedFirst: Int!) {
-  rateLimit { cost remaining }
+  rateLimit { cost remaining resetAt }
   openPRs: search(query: $openQ, type: ISSUE, first: $openFirst) {
     nodes {
       ... on PullRequest {
@@ -198,7 +198,7 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
             commit {
               oid
               statusCheckRollup {
-                contexts(first: 30) {
+                contexts(first: 15) {
                   nodes {
                     __typename
                     ... on CheckRun {
@@ -227,6 +227,13 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
             state
             body
             submittedAt
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 3) {
+                nodes { ... on User { login } }
+              }
+            }
           }
         }
         reviewRequests(first: 10) {
@@ -236,18 +243,25 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
             }
           }
         }
-        comments(last: 20) {
+        comments(last: 10) {
           nodes {
             databaseId
             url
             author { login }
             body
             createdAt
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 3) {
+                nodes { ... on User { login } }
+              }
+            }
           }
         }
-        reviewThreads(last: 20) {
+        reviewThreads(last: 10) {
           nodes {
-            comments(first: 20) {
+            comments(first: 10) {
               nodes {
                 databaseId
                 url
@@ -257,6 +271,13 @@ const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int
                 path
                 pullRequestReview {
                   databaseId
+                }
+                reactionGroups {
+                  content
+                  viewerHasReacted
+                  reactors(first: 3) {
+                    nodes { ... on User { login } }
+                  }
                 }
               }
             }
@@ -325,6 +346,11 @@ interface GraphQLOpenPR {
       state: string
       body: string
       submittedAt: string
+      reactionGroups?: {
+        content: string
+        viewerHasReacted: boolean
+        reactors: { nodes: { login?: string }[] }
+      }[]
     }[]
   }
   reviewRequests: {
@@ -337,6 +363,11 @@ interface GraphQLOpenPR {
       author: { login: string }
       body: string
       createdAt: string
+      reactionGroups?: {
+        content: string
+        viewerHasReacted: boolean
+        reactors: { nodes: { login?: string }[] }
+      }[]
     }[]
   }
   reviewThreads: {
@@ -350,6 +381,11 @@ interface GraphQLOpenPR {
           createdAt: string
           path: string
           pullRequestReview: { databaseId: number } | null
+          reactionGroups?: {
+            content: string
+            viewerHasReacted: boolean
+            reactors: { nodes: { login?: string }[] }
+          }[]
         }[]
       }
     }[]
@@ -427,6 +463,38 @@ function sortDiscussion(discussion: PRDiscussionItem[]): void {
   discussion.sort((a, b) => getDiscussionItemTime(b) - getDiscussionItemTime(a))
 }
 
+const GRAPHQL_REACTION_MAP: Record<string, string> = {
+  THUMBS_UP: '+1',
+  THUMBS_DOWN: '-1',
+  LAUGH: 'laugh',
+  HOORAY: 'hooray',
+  CONFUSED: 'confused',
+  HEART: 'heart',
+  ROCKET: 'rocket',
+  EYES: 'eyes',
+}
+
+function mapReactionGroups(
+  groups?: {
+    content: string
+    viewerHasReacted: boolean
+    reactors: { nodes: { login?: string }[] }
+  }[],
+) {
+  if (!groups) return undefined
+  const reactions = groups
+    .filter((r) => r.reactors.nodes.length > 0)
+    .map((r) => ({
+      content: GRAPHQL_REACTION_MAP[r.content] || r.content.toLowerCase(),
+      count: r.reactors.nodes.length,
+      viewerHasReacted: r.viewerHasReacted,
+      users: r.reactors.nodes
+        .map((n) => n.login)
+        .filter((l): l is string => !!l),
+    }))
+  return reactions.length > 0 ? reactions : undefined
+}
+
 function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
   const repoKey = pr.repository.nameWithOwner
 
@@ -499,6 +567,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
           : r.state,
       body: r.body || '',
       submittedAt: r.submittedAt,
+      reactions: mapReactionGroups(r.reactionGroups),
     }))
 
   const reviewsByAuthor = new Map<string, PRReview>()
@@ -516,6 +585,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
       avatarUrl: `https://github.com/${c.author.login}.png?size=32`,
       body: c.body,
       createdAt: c.createdAt,
+      reactions: mapReactionGroups(c.reactionGroups),
     }))
 
   // Code comments from reviewThreads (flat, for notifications)
@@ -531,6 +601,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
           body: c.body,
           createdAt: c.createdAt,
           path: c.path,
+          reactions: mapReactionGroups(c.reactionGroups),
         })),
   )
 
@@ -563,6 +634,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
         body: c.body,
         createdAt: c.createdAt,
         path: c.path,
+        reactions: mapReactionGroups(c.reactionGroups),
       }))
 
     if (threadComments.length === 0) continue
@@ -736,9 +808,9 @@ function fetchAllPRsViaGraphQL(
         '-f',
         `closedQ=${closedQ}`,
         '-F',
-        'openFirst=20',
+        'openFirst=15',
         '-F',
-        'closedFirst=20',
+        'closedFirst=10',
       ],
       { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout) => {
@@ -756,8 +828,11 @@ function fetchAllPRsViaGraphQL(
           // Log rate limit from the response itself
           const rl = resp.data?.rateLimit
           if (rl) {
+            const resetMin = rl.resetAt
+              ? Math.ceil((new Date(rl.resetAt).getTime() - Date.now()) / 60000)
+              : '?'
             log.info(
-              `[github] GraphQL rate limit: cost=${rl.cost} remaining=${rl.remaining}`,
+              `[github] GraphQL rate limit: cost=${rl.cost} remaining=${rl.remaining} resets_in=${resetMin}m`,
             )
           }
 
@@ -1516,6 +1591,136 @@ export function replyToReviewComment(
         '-f',
         `body=${body}`,
       ],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        invalidateChecksCache()
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
+export function addReaction(
+  owner: string,
+  repo: string,
+  subjectId: number,
+  subjectType: 'issue_comment' | 'review_comment' | 'review',
+  content: string,
+  prNumber?: number,
+): Promise<{ ok: boolean; error?: string }> {
+  let endpoint: string
+  switch (subjectType) {
+    case 'issue_comment':
+      endpoint = `repos/${owner}/${repo}/issues/comments/${subjectId}/reactions`
+      break
+    case 'review_comment':
+      endpoint = `repos/${owner}/${repo}/pulls/comments/${subjectId}/reactions`
+      break
+    case 'review':
+      if (!prNumber) {
+        return Promise.resolve({
+          ok: false,
+          error: 'prNumber is required for review reactions',
+        })
+      }
+      endpoint = `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${subjectId}/reactions`
+      break
+  }
+
+  const cmd = `gh api --method POST ${endpoint} -f content=${content}`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      ['api', '--method', 'POST', endpoint, '-f', `content=${content}`],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId: `${owner}/${repo}`,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        invalidateChecksCache()
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
+export async function removeReaction(
+  owner: string,
+  repo: string,
+  subjectId: number,
+  subjectType: 'issue_comment' | 'review_comment' | 'review',
+  content: string,
+  prNumber?: number,
+): Promise<{ ok: boolean; error?: string }> {
+  let listEndpoint: string
+  switch (subjectType) {
+    case 'issue_comment':
+      listEndpoint = `repos/${owner}/${repo}/issues/comments/${subjectId}/reactions`
+      break
+    case 'review_comment':
+      listEndpoint = `repos/${owner}/${repo}/pulls/comments/${subjectId}/reactions`
+      break
+    case 'review':
+      if (!prNumber) {
+        return { ok: false, error: 'prNumber is required for review reactions' }
+      }
+      listEndpoint = `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${subjectId}/reactions`
+      break
+  }
+
+  // List reactions and find ours
+  const listStdout = await execFileAsync(
+    'gh',
+    ['api', `${listEndpoint}?content=${content}&per_page=100`],
+    { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+  )
+  if (!listStdout) {
+    return { ok: false, error: 'Failed to list reactions' }
+  }
+
+  let reactions: { id: number; user: { login: string }; content: string }[]
+  try {
+    reactions = JSON.parse(listStdout)
+  } catch {
+    return { ok: false, error: 'Failed to parse reactions' }
+  }
+
+  const myReaction = reactions.find(
+    (r) => r.user.login === ghUsername && r.content === content,
+  )
+  if (!myReaction) {
+    return { ok: false, error: 'Reaction not found' }
+  }
+
+  // Delete the reaction
+  const deleteEndpoint = `${listEndpoint}/${myReaction.id}`
+  const prId = `${owner}/${repo}`
+  const cmd = `gh api --method DELETE ${deleteEndpoint}`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      ['api', '--method', 'DELETE', deleteEndpoint],
       { timeout: 15000 },
       (err, stdout, stderr) => {
         logCommand({

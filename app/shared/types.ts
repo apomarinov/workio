@@ -21,6 +21,13 @@ export interface FailedPRCheck {
   startedAt: string
 }
 
+export interface PRReaction {
+  content: string
+  count: number
+  viewerHasReacted: boolean
+  users: string[]
+}
+
 export interface PRComment {
   id?: number
   url?: string
@@ -30,6 +37,7 @@ export interface PRComment {
   createdAt: string
   path?: string // File path for code review comments
   isUnread?: boolean
+  reactions?: PRReaction[]
 }
 
 export interface PRReview {
@@ -41,6 +49,7 @@ export interface PRReview {
   body: string
   submittedAt?: string
   isUnread?: boolean
+  reactions?: PRReaction[]
 }
 
 export interface PRReviewThread {

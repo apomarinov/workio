@@ -21,6 +21,7 @@ import {
 import { env } from './env'
 import {
   addPRComment,
+  addReaction,
   applyWebhookAndRefresh,
   closePR,
   detectAllTerminalBranches,
@@ -30,6 +31,7 @@ import {
   initGitHubChecks,
   mergePR,
   refreshPRChecks,
+  removeReaction,
   replyToReviewComment,
   requestPRReview,
   rerunAllFailedChecks,
@@ -379,6 +381,70 @@ fastify.post<{
     return { ok: true }
   },
 )
+
+// Add reaction to a comment or review
+fastify.post<{
+  Params: { owner: string; repo: string }
+  Body: {
+    subjectId: number
+    subjectType: 'issue_comment' | 'review_comment' | 'review'
+    content: string
+    prNumber?: number
+  }
+}>('/api/github/:owner/:repo/reaction', async (request, reply) => {
+  const { owner, repo } = request.params
+  const { subjectId, subjectType, content, prNumber } = request.body
+  if (!subjectId || !subjectType || !content) {
+    return reply
+      .status(400)
+      .send({ error: 'subjectId, subjectType, and content are required' })
+  }
+  const result = await addReaction(
+    owner,
+    repo,
+    subjectId,
+    subjectType,
+    content,
+    prNumber,
+  )
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  refreshPRChecks(true)
+  return { ok: true }
+})
+
+// Remove reaction from a comment or review
+fastify.delete<{
+  Params: { owner: string; repo: string }
+  Body: {
+    subjectId: number
+    subjectType: 'issue_comment' | 'review_comment' | 'review'
+    content: string
+    prNumber?: number
+  }
+}>('/api/github/:owner/:repo/reaction', async (request, reply) => {
+  const { owner, repo } = request.params
+  const { subjectId, subjectType, content, prNumber } = request.body
+  if (!subjectId || !subjectType || !content) {
+    return reply
+      .status(400)
+      .send({ error: 'subjectId, subjectType, and content are required' })
+  }
+  const result = await removeReaction(
+    owner,
+    repo,
+    subjectId,
+    subjectType,
+    content,
+    prNumber,
+  )
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  refreshPRChecks(true)
+  return { ok: true }
+})
 
 // Re-run failed check
 fastify.post<{

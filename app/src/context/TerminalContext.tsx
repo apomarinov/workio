@@ -12,6 +12,7 @@ import type {
   MergedPRSummary,
   PRCheckStatus,
   PRChecksPayload,
+  PRReaction,
   WorkspacePayload,
 } from '../../shared/types'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -50,6 +51,7 @@ interface TerminalContextValue {
   ) => Promise<void>
   setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
   refetch: () => void
+  ghUsername: string | null
   githubPRs: PRCheckStatus[]
   mergedPRs: MergedPRSummary[]
   hasAnyUnseenPRs: boolean
@@ -69,6 +71,14 @@ interface TerminalContextValue {
   markAllNotificationsRead: () => Promise<void>
   markPRNotificationsRead: (repo: string, prNumber: number) => Promise<void>
   deleteAllNotifications: () => Promise<void>
+  reactToPR: (
+    repo: string,
+    prNumber: number,
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove: boolean,
+  ) => Promise<void>
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -171,6 +181,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [subscribe, mutate])
 
   // GitHub PR checks
+  const [ghUsername, setGhUsername] = useState<string | null>(null)
   const [githubPRs, setGithubPRs] = useState<PRCheckStatus[]>([])
   const { sendNotification } = useNotifications()
   const sendNotificationRef = useRef(sendNotification)
@@ -214,6 +225,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return subscribe<PRChecksPayload>('github:pr-checks', (data) => {
       setGithubPRs(data.prs)
+      if (data.username) setGhUsername(data.username)
       setPrPoll(true)
     })
   }, [subscribe])
@@ -563,6 +575,169 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     setUnreadPRData(new Map())
   }, [])
 
+  const updatePRReaction = useCallback(
+    (
+      repo: string,
+      prNumber: number,
+      subjectId: number,
+      subjectType: 'issue_comment' | 'review_comment' | 'review',
+      content: string,
+      remove: boolean,
+    ) => {
+      setGithubPRs((prev) =>
+        prev.map((pr) => {
+          if (pr.repo !== repo || pr.prNumber !== prNumber) return pr
+
+          const patchReactions = (
+            reactions: PRReaction[] | undefined,
+          ): PRReaction[] | undefined => {
+            const result = (reactions || []).map((r) => ({
+              ...r,
+              users: [...r.users],
+            }))
+            const idx = result.findIndex((r) => r.content === content)
+            if (remove) {
+              if (idx >= 0 && result[idx].viewerHasReacted) {
+                result[idx].count--
+                result[idx].viewerHasReacted = false
+                result[idx].users = result[idx].users.filter(
+                  (u) => u !== ghUsername,
+                )
+                if (result[idx].count <= 0) result.splice(idx, 1)
+              }
+            } else {
+              if (idx >= 0) {
+                if (!result[idx].viewerHasReacted) {
+                  result[idx].count++
+                  result[idx].viewerHasReacted = true
+                  if (ghUsername) result[idx].users.push(ghUsername)
+                }
+              } else {
+                result.push({
+                  content,
+                  count: 1,
+                  viewerHasReacted: true,
+                  users: ghUsername ? [ghUsername] : [],
+                })
+              }
+            }
+            return result.length > 0 ? result : undefined
+          }
+
+          const patchComment = <
+            T extends { id?: number; reactions?: PRReaction[] },
+          >(
+            c: T,
+          ): T =>
+            c.id === subjectId
+              ? { ...c, reactions: patchReactions(c.reactions) }
+              : c
+
+          if (subjectType === 'review') {
+            return {
+              ...pr,
+              reviews: pr.reviews.map((r) =>
+                r.id === subjectId
+                  ? { ...r, reactions: patchReactions(r.reactions) }
+                  : r,
+              ),
+              discussion: pr.discussion.map((item) => {
+                if (item.type === 'review' && item.review.id === subjectId) {
+                  return {
+                    ...item,
+                    review: {
+                      ...item.review,
+                      reactions: patchReactions(item.review.reactions),
+                    },
+                  }
+                }
+                return item
+              }),
+            }
+          }
+
+          return {
+            ...pr,
+            comments: pr.comments.map(patchComment),
+            discussion: pr.discussion.map((item) => {
+              if (item.type === 'comment' && item.comment.id === subjectId) {
+                return { ...item, comment: patchComment(item.comment) }
+              }
+              if (item.type === 'review') {
+                return {
+                  ...item,
+                  threads: item.threads.map((thread) => ({
+                    ...thread,
+                    comments: thread.comments.map(patchComment),
+                  })),
+                }
+              }
+              if (item.type === 'thread') {
+                return {
+                  ...item,
+                  thread: {
+                    ...item.thread,
+                    comments: item.thread.comments.map(patchComment),
+                  },
+                }
+              }
+              return item
+            }),
+          }
+        }),
+      )
+    },
+    [ghUsername],
+  )
+
+  const reactToPR = useCallback(
+    async (
+      repo: string,
+      prNumber: number,
+      subjectId: number,
+      subjectType: 'issue_comment' | 'review_comment' | 'review',
+      content: string,
+      remove: boolean,
+    ) => {
+      updatePRReaction(repo, prNumber, subjectId, subjectType, content, remove)
+
+      const [owner, repoName] = repo.split('/')
+      const prNum = subjectType === 'review' ? prNumber : undefined
+      try {
+        if (remove) {
+          await api.removeReaction(
+            owner,
+            repoName,
+            subjectId,
+            subjectType,
+            content,
+            prNum,
+          )
+        } else {
+          await api.addReaction(
+            owner,
+            repoName,
+            subjectId,
+            subjectType,
+            content,
+            prNum,
+          )
+        }
+      } catch (err) {
+        updatePRReaction(
+          repo,
+          prNumber,
+          subjectId,
+          subjectType,
+          content,
+          !remove,
+        )
+        throw err
+      }
+    },
+    [updatePRReaction],
+  )
+
   // Update app badge based on unread notifications or unseen PRs
 
   useEffect(() => {
@@ -709,6 +884,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       deleteTerminal,
       setTerminalOrder,
       refetch,
+      ghUsername,
       githubPRs: enrichedGithubPRs,
       mergedPRs,
       hasAnyUnseenPRs,
@@ -722,6 +898,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markAllNotificationsRead,
       markPRNotificationsRead,
       deleteAllNotifications,
+      reactToPR,
     }),
     [
       terminals,
@@ -734,6 +911,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       deleteTerminal,
       setTerminalOrder,
       refetch,
+      ghUsername,
       enrichedGithubPRs,
       mergedPRs,
       hasAnyUnseenPRs,
@@ -746,6 +924,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markAllNotificationsRead,
       markPRNotificationsRead,
       deleteAllNotifications,
+      reactToPR,
     ],
   )
 

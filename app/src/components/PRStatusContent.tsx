@@ -10,6 +10,7 @@ import {
   Maximize2,
   MessageSquare,
   Reply,
+  Smile,
 } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +34,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -34,6 +46,7 @@ import { cn } from '@/lib/utils'
 import type {
   PRCheckStatus,
   PRDiscussionItem,
+  PRReaction,
   PRReview,
   PRReviewThread,
 } from '../../shared/types'
@@ -58,6 +71,61 @@ function formatTimeAgo(dateString: string): string {
   const diffHr = Math.floor(diffMin / 60)
   if (diffHr < 24) return `${diffHr}h ago`
   return `${Math.floor(diffHr / 24)}d ago`
+}
+
+const REACTIONS = [
+  { content: '+1', emoji: '👍' },
+  { content: '-1', emoji: '👎' },
+  { content: 'laugh', emoji: '😄' },
+  { content: 'hooray', emoji: '🎉' },
+  { content: 'confused', emoji: '😐' },
+  { content: 'heart', emoji: '❤️' },
+  { content: 'rocket', emoji: '🚀' },
+  { content: 'eyes', emoji: '👀' },
+]
+
+function ReactionBadges({
+  reactions,
+  onReact,
+}: {
+  reactions: PRReaction[]
+  onReact?: (content: string, remove: boolean) => void
+}) {
+  const { ghUsername } = useTerminalContext()
+  if (reactions.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-0.5 px-2 py-0.5">
+      {reactions.map((r) => {
+        const emoji =
+          REACTIONS.find((re) => re.content === r.content)?.emoji || r.content
+        const tooltipUsers = r.users.map((u) =>
+          ghUsername && u === ghUsername ? 'you' : u,
+        )
+        return (
+          <Tooltip key={r.content}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => onReact?.(r.content, r.viewerHasReacted)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-1.5 py-0 text-[10px] transition-colors cursor-pointer border',
+                  r.viewerHasReacted
+                    ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                    : 'bg-sidebar-accent/40 text-muted-foreground border-transparent hover:bg-sidebar-accent/70',
+                )}
+              >
+                <span className="text-xs leading-none">{emoji}</span>
+                <span>{r.count}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {tooltipUsers.join(', ')}
+            </TooltipContent>
+          </Tooltip>
+        )
+      })}
+    </div>
+  )
 }
 
 export const PRTabButton = memo(function PRTabButton({
@@ -124,6 +192,7 @@ const ReviewRow = memo(function ReviewRow({
   onReReview,
   onMerge,
   onReply,
+  onReact,
   onMarkRead,
 }: {
   review: PRReview
@@ -135,6 +204,12 @@ const ReviewRow = memo(function ReviewRow({
   onReReview: (author: string) => void
   onMerge?: () => void
   onReply: (author: string, reviewCommentId?: number) => void
+  onReact?: (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => void
   onMarkRead?: () => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
@@ -180,6 +255,61 @@ const ReviewRow = memo(function ReviewRow({
           )}
           <span className="text-xs truncate">{review.author}</span>
         </a>
+        {onReact && review.body && review.id && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+              >
+                {review.reactions?.find((r) => r.viewerHasReacted) ? (
+                  <span className="text-xs leading-none">
+                    {REACTIONS.find(
+                      (re) =>
+                        re.content ===
+                        review.reactions!.find((r) => r.viewerHasReacted)!
+                          .content,
+                    )?.emoji || '😀'}
+                  </span>
+                ) : (
+                  <Smile className="w-3 h-3" />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-1" side="top" align="center">
+              <div className="flex gap-0.5">
+                {REACTIONS.map((r) => {
+                  const existing = review.reactions?.find(
+                    (re) => re.content === r.content,
+                  )
+                  return (
+                    <PopoverClose key={r.content} asChild>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onReact(
+                            review.id!,
+                            'review',
+                            r.content,
+                            existing?.viewerHasReacted,
+                          )
+                        }
+                        className={cn(
+                          'rounded p-1 text-sm cursor-pointer transition-colors',
+                          existing?.viewerHasReacted
+                            ? 'bg-blue-500/15'
+                            : 'hover:bg-sidebar-accent',
+                        )}
+                      >
+                        {r.emoji}
+                      </button>
+                    </PopoverClose>
+                  )
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
         <button
           type="button"
           onClick={handleReply}
@@ -224,6 +354,17 @@ const ReviewRow = memo(function ReviewRow({
           <MarkdownContent content={review.body} />
         </div>
       )}
+      {review.reactions && review.reactions.length > 0 && (
+        <ReactionBadges
+          reactions={review.reactions}
+          onReact={
+            onReact && review.id
+              ? (content, remove) =>
+                  onReact(review.id!, 'review', content, remove)
+              : undefined
+          }
+        />
+      )}
       {review.body && bodyOpen && (
         <ContentDialog
           author={review.author}
@@ -241,6 +382,7 @@ const CommentItem = memo(function CommentItem({
   prUrl,
   onHide,
   onReply,
+  onReact,
   onMarkRead,
   hidePath,
   indent,
@@ -256,10 +398,17 @@ const CommentItem = memo(function CommentItem({
     createdAt: string
     path?: string
     isUnread?: boolean
+    reactions?: PRReaction[]
   }
   prUrl: string
   onHide: (author: string) => void
   onReply: (author: string, reviewCommentId?: number) => void
+  onReact?: (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => void
   onMarkRead?: () => void
   hidePath?: boolean
   indent?: boolean
@@ -334,6 +483,61 @@ const CommentItem = memo(function CommentItem({
               {comment.author}
             </span>
           </a>
+          {onReact && comment.id && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+                >
+                  {comment.reactions?.find((r) => r.viewerHasReacted) ? (
+                    <span className="text-xs leading-none">
+                      {REACTIONS.find(
+                        (re) =>
+                          re.content ===
+                          comment.reactions!.find((r) => r.viewerHasReacted)!
+                            .content,
+                      )?.emoji || '😀'}
+                    </span>
+                  ) : (
+                    <Smile className="w-3 h-3" />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-1" side="top" align="center">
+                <div className="flex gap-0.5">
+                  {REACTIONS.map((r) => {
+                    const existing = comment.reactions?.find(
+                      (re) => re.content === r.content,
+                    )
+                    return (
+                      <PopoverClose key={r.content} asChild>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onReact(
+                              comment.id!,
+                              comment.path ? 'review_comment' : 'issue_comment',
+                              r.content,
+                              existing?.viewerHasReacted,
+                            )
+                          }
+                          className={cn(
+                            'rounded p-1 text-sm cursor-pointer transition-colors',
+                            existing?.viewerHasReacted
+                              ? 'bg-blue-500/15'
+                              : 'hover:bg-sidebar-accent',
+                          )}
+                        >
+                          {r.emoji}
+                        </button>
+                      </PopoverClose>
+                    )
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <button
             type="button"
             onClick={handleReply}
@@ -344,7 +548,7 @@ const CommentItem = memo(function CommentItem({
           <button
             type="button"
             onClick={handleHide}
-            className="text-muted-foreground/30 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+            className="text-muted-foreground/30 mt- hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
           >
             <BellOff className="w-3 h-3" />
           </button>
@@ -369,6 +573,22 @@ const CommentItem = memo(function CommentItem({
             <MarkdownContent content={comment.body} />
           </div>
         </div>
+        {comment.reactions && comment.reactions.length > 0 && (
+          <ReactionBadges
+            reactions={comment.reactions}
+            onReact={
+              onReact && comment.id
+                ? (content, remove) =>
+                    onReact(
+                      comment.id!,
+                      comment.path ? 'review_comment' : 'issue_comment',
+                      content,
+                      remove,
+                    )
+                : undefined
+            }
+          />
+        )}
       </div>
 
       {modalOpen && (
@@ -389,6 +609,7 @@ function ReviewThreadGroup({
   pr,
   onHide,
   onReply,
+  onReact,
   defaultExpanded,
   largeText,
 }: {
@@ -397,6 +618,12 @@ function ReviewThreadGroup({
   pr?: PRCheckStatus
   onHide: (author: string) => void
   onReply: (author: string, reviewCommentId?: number) => void
+  onReact?: (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => void
   defaultExpanded?: boolean
   largeText?: boolean
 }) {
@@ -427,6 +654,7 @@ function ReviewThreadGroup({
         prUrl={prUrl}
         onHide={onHide}
         onReply={handleThreadReply}
+        onReact={onReact}
         onMarkRead={
           pr && root.isUnread && root.id
             ? () => markNotificationReadByItem(pr.repo, pr.prNumber, root.id)
@@ -443,6 +671,7 @@ function ReviewThreadGroup({
           prUrl={prUrl}
           onHide={onHide}
           onReply={handleThreadReply}
+          onReact={onReact}
           onMarkRead={
             pr && reply.isUnread && reply.id
               ? () => markNotificationReadByItem(pr.repo, pr.prNumber, reply.id)
@@ -479,6 +708,7 @@ function ReviewThreadGroup({
             prUrl={prUrl}
             onHide={onHide}
             onReply={handleThreadReply}
+            onReact={onReact}
             onMarkRead={
               pr && reply.isUnread && reply.id
                 ? () =>
@@ -553,11 +783,18 @@ function CollapsedAuthorGroup({
   prUrl,
   onReply,
   onHide,
+  onReact,
 }: {
   group: CollapsedGroup
   prUrl: string
   onReply: (author: string, reviewCommentId?: number) => void
   onHide: (author: string) => void
+  onReact?: (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -596,6 +833,7 @@ function CollapsedAuthorGroup({
             prUrl={prUrl}
             onHide={onHide}
             onReply={onReply}
+            onReact={onReact}
           />
         ))}
     </div>
@@ -607,6 +845,7 @@ function FullDiscussionDialog({
   pr,
   onReply,
   onHide,
+  onReact,
   onReReview,
   onMerge,
   onClose,
@@ -615,6 +854,12 @@ function FullDiscussionDialog({
   pr: PRCheckStatus
   onReply: (author: string, reviewCommentId?: number) => void
   onHide: (author: string) => void
+  onReact?: (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => void
   onReReview: (author: string) => void
   onMerge: () => void
   onClose: () => void
@@ -646,6 +891,7 @@ function FullDiscussionDialog({
                     prUrl={pr.prUrl}
                     onReply={onReply}
                     onHide={onHide}
+                    onReact={onReact}
                   />
                 )
               case 'review':
@@ -663,6 +909,7 @@ function FullDiscussionDialog({
                         item.review.state === 'APPROVED' ? onMerge : undefined
                       }
                       onReply={onReply}
+                      onReact={onReact}
                       onMarkRead={
                         item.review.isUnread && item.review.id
                           ? () =>
@@ -686,6 +933,7 @@ function FullDiscussionDialog({
                           pr={pr}
                           onHide={onHide}
                           onReply={onReply}
+                          onReact={onReact}
                           defaultExpanded
                           largeText
                         />
@@ -701,6 +949,7 @@ function FullDiscussionDialog({
                     prUrl={pr.prUrl}
                     onHide={onHide}
                     onReply={onReply}
+                    onReact={onReact}
                     onMarkRead={
                       item.comment.isUnread && item.comment.id
                         ? () =>
@@ -724,6 +973,7 @@ function FullDiscussionDialog({
                     pr={pr}
                     onHide={onHide}
                     onReply={onReply}
+                    onReact={onReact}
                     defaultExpanded
                     largeText
                   />
@@ -747,6 +997,7 @@ function DiscussionTimeline({
   onMerge,
   onReply,
   onHide,
+  onReact,
 }: {
   discussion: PRDiscussionItem[]
   pr: PRCheckStatus
@@ -756,6 +1007,12 @@ function DiscussionTimeline({
   onMerge: () => void
   onReply: (author: string, reviewCommentId?: number) => void
   onHide: (author: string) => void
+  onReact?: (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => void
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
   const [fullViewOpen, setFullViewOpen] = useState(false)
@@ -890,6 +1147,7 @@ function DiscussionTimeline({
           pr={pr}
           onReply={onReply}
           onHide={onHide}
+          onReact={onReact}
           onReReview={onReReview}
           onMerge={onMerge}
           onClose={() => setFullViewOpen(false)}
@@ -907,6 +1165,7 @@ function DiscussionTimeline({
                     prUrl={pr.prUrl}
                     onReply={onReply}
                     onHide={onHide}
+                    onReact={onReact}
                   />
                 )
               case 'review':
@@ -924,6 +1183,7 @@ function DiscussionTimeline({
                         item.review.state === 'APPROVED' ? onMerge : undefined
                       }
                       onReply={onReply}
+                      onReact={onReact}
                       onMarkRead={
                         item.review.isUnread && item.review.id
                           ? () =>
@@ -947,6 +1207,7 @@ function DiscussionTimeline({
                           pr={pr}
                           onHide={onHide}
                           onReply={onReply}
+                          onReact={onReact}
                         />
                       </div>
                     ))}
@@ -960,6 +1221,7 @@ function DiscussionTimeline({
                     prUrl={pr.prUrl}
                     onHide={onHide}
                     onReply={onReply}
+                    onReact={onReact}
                     onMarkRead={
                       item.comment.isUnread && item.comment.id
                         ? () =>
@@ -981,6 +1243,7 @@ function DiscussionTimeline({
                     pr={pr}
                     onHide={onHide}
                     onReply={onReply}
+                    onReact={onReact}
                   />
                 )
               default:
@@ -1090,6 +1353,30 @@ export function PRStatusContent({
     },
     [],
   )
+
+  const { reactToPR } = useTerminalContext()
+
+  const handleReact = async (
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove?: boolean,
+  ) => {
+    try {
+      await reactToPR(
+        pr.repo,
+        pr.prNumber,
+        subjectId,
+        subjectType,
+        content,
+        !!remove,
+      )
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to update reaction',
+      )
+    }
+  }
 
   const handleSendReply = async (body: string) => {
     if (replyTarget?.reviewCommentId) {
@@ -1290,6 +1577,7 @@ export function PRStatusContent({
             onMerge={() => setMergeOpen(true)}
             onReply={handleReply}
             onHide={handleHideComment}
+            onReact={handleReact}
           />
 
           {reReviewAuthor && (
