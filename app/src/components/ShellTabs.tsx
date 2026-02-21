@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronDown, PencilIcon, Plus, TrashIcon, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
@@ -263,20 +263,6 @@ export function ShellTabs({
   const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Listen for shell-close events (from keyboard shortcut) to go through activity check
-  useEffect(() => {
-    const handler = (
-      e: CustomEvent<{ terminalId: number; shellId: number }>,
-    ) => {
-      if (e.detail.terminalId === terminal.id) {
-        handleDeleteShell(e.detail.shellId)
-      }
-    }
-    window.addEventListener('shell-close', handler as EventListener)
-    return () =>
-      window.removeEventListener('shell-close', handler as EventListener)
-  }, [terminal.id])
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -321,6 +307,22 @@ export function ShellTabs({
       onDeleteShell(shellId)
     }
   }
+
+  // Listen for shell-close events (from keyboard shortcut) to go through activity check
+  const handleDeleteShellRef = useRef(handleDeleteShell)
+  handleDeleteShellRef.current = handleDeleteShell
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number; shellId: number }>,
+    ) => {
+      if (e.detail.terminalId === terminal.id) {
+        handleDeleteShellRef.current(e.detail.shellId)
+      }
+    }
+    window.addEventListener('shell-close', handler as EventListener)
+    return () =>
+      window.removeEventListener('shell-close', handler as EventListener)
+  }, [terminal.id])
 
   const deleteShellName = deleteShellId
     ? terminal.shells.find((s) => s.id === deleteShellId)?.name
