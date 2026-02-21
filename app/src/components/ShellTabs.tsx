@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronDown, PencilIcon, Plus, TrashIcon, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
@@ -57,6 +57,7 @@ function SortableShellPill({
   isActive,
   hasActivity,
   isMain,
+  displayName,
   onSelect,
   onDelete,
   shortcutHint,
@@ -67,6 +68,7 @@ function SortableShellPill({
   isActive: boolean
   hasActivity: boolean
   isMain: boolean
+  displayName: string
   onSelect: () => void
   onDelete: () => void
   shortcutHint?: React.ReactNode
@@ -131,7 +133,7 @@ function SortableShellPill({
       )}
       <span className="truncate max-w-[80px] relative">
         <span className={shortcutHint ? 'invisible' : undefined}>
-          {shell.name}
+          {displayName}
         </span>
         {shortcutHint && (
           <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
@@ -148,6 +150,7 @@ function SortableShellTab({
   isActive,
   hasActivity,
   isMain,
+  displayName,
   onSelect,
   onDelete,
   shortcutHint,
@@ -158,6 +161,7 @@ function SortableShellTab({
   isActive: boolean
   hasActivity: boolean
   isMain: boolean
+  displayName: string
   onSelect: () => void
   onDelete: () => void
   shortcutHint?: React.ReactNode
@@ -197,7 +201,7 @@ function SortableShellTab({
       type="button"
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 max-w-[150px] border-b-2',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 max-w-[150px] border-t-2',
         hasActivity
           ? isActive
             ? 'border-green-500'
@@ -212,7 +216,7 @@ function SortableShellTab({
     >
       <span className="truncate relative">
         <span className={shortcutHint ? 'invisible' : undefined}>
-          {shell.name}
+          {displayName}
         </span>
         {shortcutHint && (
           <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
@@ -258,6 +262,20 @@ export function ShellTabs({
   const [deleteShellId, setDeleteShellId] = useState<number | null>(null)
   const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // Listen for shell-close events (from keyboard shortcut) to go through activity check
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number; shellId: number }>,
+    ) => {
+      if (e.detail.terminalId === terminal.id) {
+        handleDeleteShell(e.detail.shellId)
+      }
+    }
+    window.addEventListener('shell-close', handler as EventListener)
+    return () =>
+      window.removeEventListener('shell-close', handler as EventListener)
+  }, [terminal.id])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -355,7 +373,7 @@ export function ShellTabs({
           className,
         )}
       >
-        {tabBar && (
+        {tabBar && false && (
           <div className="absolute bottom-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
         )}
         {/* Shell items — responsive */}
@@ -388,6 +406,9 @@ export function ShellTabs({
                           isActive={shell.id === activeShellId}
                           hasActivity={shellHasActivity(shell.id)}
                           isMain={isMain}
+                          displayName={
+                            isMain ? (terminal.name ?? shell.name) : shell.name
+                          }
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
                           shortcutHint={
@@ -463,6 +484,9 @@ export function ShellTabs({
                           isActive={shell.id === activeShellId}
                           hasActivity={shellHasActivity(shell.id)}
                           isMain={isMain}
+                          displayName={
+                            isMain ? (terminal.name ?? shell.name) : shell.name
+                          }
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
                           shortcutHint={

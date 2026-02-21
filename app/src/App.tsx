@@ -106,7 +106,14 @@ function AppContent() {
       await refetch()
       const terminal = terminalsRef.current.find((t) => t.id === terminalId)
       const main = terminal?.shells.find((s) => s.name === 'main')
-      if (main) setActiveShells((prev) => ({ ...prev, [terminalId]: main.id }))
+      if (main) {
+        setActiveShells((prev) => ({ ...prev, [terminalId]: main.id }))
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId, shellId: main.id },
+          }),
+        )
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete shell')
     }
@@ -261,6 +268,23 @@ function AppContent() {
     },
     settings: () => {
       window.dispatchEvent(new Event('open-settings'))
+    },
+    newShell: () => {
+      const t = activeTerminalRef.current
+      if (t) handleCreateShellRef.current(t.id)
+    },
+    closeShell: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      const activeShellId = activeShellsRef.current[t.id]
+      if (!activeShellId) return
+      const shell = t.shells.find((s) => s.id === activeShellId)
+      if (!shell || shell.name === 'main') return
+      window.dispatchEvent(
+        new CustomEvent('shell-close', {
+          detail: { terminalId: t.id, shellId: activeShellId },
+        }),
+      )
     },
     commitAmend: () => {
       window.dispatchEvent(new Event('commit-toggle-amend'))
@@ -454,7 +478,7 @@ function AppContent() {
                         handleDeleteShell(t.id, shellId)
                       }
                       onRenameShell={handleRenameShell}
-                      className="px-2 py-0.5 bg-[#1a1a1a] border-b border-zinc-800"
+                      className="pr-2 pl-1 bg-[#1a1a1a] border-b border-zinc-800"
                     />
                   )}
                   <div className="relative flex-1 min-h-0">

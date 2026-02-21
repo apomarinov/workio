@@ -1062,7 +1062,7 @@ export async function createSession(
         case 'prompt':
           session.isIdle = true
           session.currentCommand = null
-          updateTerminal(terminalId, { active_cmd: null }).catch(() => { })
+          updateTerminal(terminalId, { active_cmd: null }).catch(() => {})
           // log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
           break
         case 'done_marker':
@@ -1077,7 +1077,7 @@ export async function createSession(
           session.currentCommand = event.command || null
           updateTerminal(terminalId, {
             active_cmd: event.command || null,
-          }).catch(() => { })
+          }).catch(() => {})
           // log.info(`[pty:${terminalId}] Command started: ${event.command}`)
           session.processPollTimeoutId = setTimeout(() => {
             session.processPollTimeoutId = null
@@ -1119,7 +1119,7 @@ export async function createSession(
       pid: null,
       status: 'stopped',
       active_cmd: null,
-    }).catch(() => { })
+    }).catch(() => {})
     session.onExit?.(exitCode)
   })
 
@@ -1135,8 +1135,8 @@ export async function createSession(
   startGlobalProcessPolling()
 
   // Write terminal/shell name files for dynamic zellij session naming (fire-and-forget)
-  writeTerminalNameFile(terminalId, terminalName).catch(() => { })
-  writeShellNameFile(shellId, shellRecord.name).catch(() => { })
+  writeTerminalNameFile(terminalId, terminalName).catch(() => {})
+  writeShellNameFile(shellId, shellRecord.name).catch(() => {})
 
   // wioname function to read current terminal name (for zellij session naming)
   const wionameFunc = `wioname() { cat "${WORKIO_TERMINALS_DIR}/${terminalId}" 2>/dev/null || echo "terminal-${terminalId}"; }`
@@ -1190,9 +1190,9 @@ export async function createSession(
     // Check if integration script exists before the timeout
     const scriptExists = integrationScript
       ? await fs.promises
-        .access(integrationScript)
-        .then(() => true)
-        .catch(() => false)
+          .access(integrationScript)
+          .then(() => true)
+          .catch(() => false)
       : false
 
     setTimeout(() => {
@@ -1331,7 +1331,7 @@ export function destroySession(shellId: number): boolean {
     pid: null,
     status: 'stopped',
     active_cmd: null,
-  }).catch(() => { })
+  }).catch(() => {})
 
   lastDirtyStatus.delete(session.terminalId)
   lastRemoteSyncStatus.delete(session.terminalId)
@@ -1353,7 +1353,7 @@ export function destroySessionsForTerminal(terminalId: number): boolean {
     pid: null,
     status: 'stopped',
     active_cmd: null,
-  }).catch(() => { })
+  }).catch(() => {})
 
   lastDirtyStatus.delete(terminalId)
   lastRemoteSyncStatus.delete(terminalId)

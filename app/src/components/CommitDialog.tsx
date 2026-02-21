@@ -479,6 +479,18 @@ export function CommitDialog({
   const fileListRef = useRef<FileListHandle>(null)
   const { settings } = useSettings()
 
+  // Notify keyboard shortcuts hook about commit dialog state
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('commit-dialog-open', { detail: open }),
+    )
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent('commit-dialog-open', { detail: false }),
+      )
+    }
+  }, [open])
+
   // Listen for custom events from global keyboard shortcuts
   useEffect(() => {
     if (!open) return

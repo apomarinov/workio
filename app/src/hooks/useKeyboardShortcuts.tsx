@@ -171,6 +171,8 @@ interface KeymapHandlers {
   itemActions?: () => void
   collapseAll?: () => void
   settings?: () => void
+  newShell?: () => void
+  closeShell?: () => void
   commitAmend?: () => void
   commitNoVerify?: () => void
 }
@@ -183,13 +185,21 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
   const disabledRef = useRef(false)
+  const commitDialogOpenRef = useRef(false)
 
   useEffect(() => {
     const onDisable = (e: Event) => {
       disabledRef.current = (e as CustomEvent).detail
     }
+    const onCommitDialog = (e: Event) => {
+      commitDialogOpenRef.current = (e as CustomEvent).detail
+    }
     window.addEventListener('shortcuts-disabled', onDisable)
-    return () => window.removeEventListener('shortcuts-disabled', onDisable)
+    window.addEventListener('commit-dialog-open', onCommitDialog)
+    return () => {
+      window.removeEventListener('shortcuts-disabled', onDisable)
+      window.removeEventListener('commit-dialog-open', onCommitDialog)
+    }
   }, [])
 
   const paletteBinding =
@@ -232,6 +242,14 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     settings?.keymap?.settings === null
       ? null
       : (settings?.keymap?.settings ?? DEFAULT_KEYMAP.settings)
+  const newShellBinding =
+    settings?.keymap?.newShell === null
+      ? null
+      : (settings?.keymap?.newShell ?? DEFAULT_KEYMAP.newShell)
+  const closeShellBinding =
+    settings?.keymap?.closeShell === null
+      ? null
+      : (settings?.keymap?.closeShell ?? DEFAULT_KEYMAP.closeShell)
   const commitAmendBinding =
     settings?.keymap?.commitAmend === null
       ? null
@@ -380,6 +398,39 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           e.preventDefault()
           e.stopPropagation()
           h.commitAmend()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check newShell (only when commit dialog is not open)
+        if (
+          h.newShell &&
+          newShellBinding &&
+          newShellBinding.key &&
+          modifiersMatchBinding(modifierBuffer, newShellBinding) &&
+          keyBuffer.join('') === newShellBinding.key &&
+          !commitDialogOpenRef.current
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.newShell()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check closeShell
+        if (
+          h.closeShell &&
+          closeShellBinding &&
+          closeShellBinding.key &&
+          modifiersMatchBinding(modifierBuffer, closeShellBinding) &&
+          keyBuffer.join('') === closeShellBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.closeShell()
           consumed = true
           suppressModifiers()
           return
@@ -558,6 +609,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     itemActionsBinding,
     collapseAllBinding,
     settingsBinding,
+    newShellBinding,
+    closeShellBinding,
     commitAmendBinding,
     commitNoVerifyBinding,
     pip.window,

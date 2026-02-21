@@ -114,8 +114,16 @@ type ShortcutName =
   | 'itemActions'
   | 'collapseAll'
   | 'settings'
+  | 'newShell'
+  | 'closeShell'
   | 'commitAmend'
   | 'commitNoVerify'
+
+// Pairs that intentionally share a binding (context-dependent shortcuts)
+const ALLOWED_DUPLICATE_PAIRS = new Set([
+  'commitNoVerify:newShell',
+  'newShell:commitNoVerify',
+])
 
 function findDuplicates(
   bindings: Record<ShortcutName, ShortcutBinding | null>,
@@ -129,6 +137,8 @@ function findDuplicates(
       const b = bindings[keys[j]]
       // Skip if either is null or modifier-only (no key)
       if (!a || !b || !a.key || !b.key) continue
+      // Skip allowed duplicate pairs (context-dependent)
+      if (ALLOWED_DUPLICATE_PAIRS.has(`${keys[i]}:${keys[j]}`)) continue
       if (bindingsEqual(a, b)) {
         duplicates.add(keys[i])
         duplicates.add(keys[j])
@@ -188,6 +198,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   )
   const [settingsShortcut, setSettingsShortcut] =
     useState<ShortcutBinding | null>(DEFAULT_KEYMAP.settings)
+  const [newShell, setNewShell] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.newShell,
+  )
+  const [closeShell, setCloseShell] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.closeShell,
+  )
   const [commitAmend, setCommitAmend] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.commitAmend,
   )
@@ -212,6 +228,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     const savedItemActions = saved?.itemActions ?? DEFAULT_KEYMAP.itemActions
     const savedCollapseAll = saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll
     const savedSettings = saved?.settings ?? DEFAULT_KEYMAP.settings
+    const savedNewShell = saved?.newShell ?? DEFAULT_KEYMAP.newShell
+    const savedCloseShell = saved?.closeShell ?? DEFAULT_KEYMAP.closeShell
     const savedCommitAmend = saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend
     const savedCommitNoVerify =
       saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify
@@ -227,6 +245,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       !bindingsEqual(itemActions, savedItemActions) ||
       !bindingsEqual(collapseAll, savedCollapseAll) ||
       !bindingsEqual(settingsShortcut, savedSettings) ||
+      !bindingsEqual(newShell, savedNewShell) ||
+      !bindingsEqual(closeShell, savedCloseShell) ||
       !bindingsEqual(commitAmend, savedCommitAmend) ||
       !bindingsEqual(commitNoVerify, savedCommitNoVerify)
     )
@@ -242,6 +262,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     itemActions,
     collapseAll,
     settingsShortcut,
+    newShell,
+    closeShell,
     commitAmend,
     commitNoVerify,
   ])
@@ -268,6 +290,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setItemActions(saved?.itemActions ?? DEFAULT_KEYMAP.itemActions)
     setCollapseAll(saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
     setSettingsShortcut(saved?.settings ?? DEFAULT_KEYMAP.settings)
+    setNewShell(saved?.newShell ?? DEFAULT_KEYMAP.newShell)
+    setCloseShell(saved?.closeShell ?? DEFAULT_KEYMAP.closeShell)
     setCommitAmend(saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend)
     setCommitNoVerify(saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
     onOpenChange(false)
@@ -300,6 +324,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       }
       if (settings.keymap.settings !== undefined) {
         setSettingsShortcut(settings.keymap.settings)
+      }
+      if (settings.keymap.newShell !== undefined) {
+        setNewShell(settings.keymap.newShell)
+      }
+      if (settings.keymap.closeShell !== undefined) {
+        setCloseShell(settings.keymap.closeShell)
       }
       if (settings.keymap.commitAmend !== undefined) {
         setCommitAmend(settings.keymap.commitAmend)
@@ -368,6 +398,16 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           binding.key = keyBuffer.join('')
         }
         setSettingsShortcut(binding)
+      } else if (recording === 'newShell') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setNewShell(binding)
+      } else if (recording === 'closeShell') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setCloseShell(binding)
       } else if (recording === 'commitAmend') {
         if (keyBuffer.length > 0) {
           binding.key = keyBuffer.join('')
@@ -423,6 +463,10 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           setCollapseAll({ key: e.key.toLowerCase() })
         } else if (recording === 'settings') {
           setSettingsShortcut({ key: e.key.toLowerCase() })
+        } else if (recording === 'newShell') {
+          setNewShell({ key: e.key.toLowerCase() })
+        } else if (recording === 'closeShell') {
+          setCloseShell({ key: e.key.toLowerCase() })
         } else if (recording === 'commitAmend') {
           setCommitAmend({ key: e.key.toLowerCase() })
         } else if (recording === 'commitNoVerify') {
@@ -488,6 +532,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           itemActions,
           collapseAll,
           settings: settingsShortcut,
+          newShell,
+          closeShell,
           commitAmend,
           commitNoVerify,
         },
@@ -514,6 +560,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setItemActions(DEFAULT_KEYMAP.itemActions)
     setCollapseAll(DEFAULT_KEYMAP.collapseAll)
     setSettingsShortcut(DEFAULT_KEYMAP.settings)
+    setNewShell(DEFAULT_KEYMAP.newShell)
+    setCloseShell(DEFAULT_KEYMAP.closeShell)
     setCommitAmend(DEFAULT_KEYMAP.commitAmend)
     setCommitNoVerify(DEFAULT_KEYMAP.commitNoVerify)
     setRecording(null)
@@ -533,6 +581,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         itemActions,
         collapseAll,
         settings: settingsShortcut,
+        newShell,
+        closeShell,
         commitAmend,
         commitNoVerify,
       }),
@@ -547,6 +597,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       itemActions,
       collapseAll,
       settingsShortcut,
+      newShell,
+      closeShell,
       commitAmend,
       commitNoVerify,
     ],
@@ -608,6 +660,34 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
                 Shells
               </span>
             </div>
+            <ShortcutRow
+              label="New Shell"
+              binding={newShell}
+              isRecording={recording === 'newShell'}
+              recordingKeys={recording === 'newShell' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'newShell' ? null : 'newShell')
+              }
+              onReset={() => setNewShell(DEFAULT_KEYMAP.newShell)}
+              onUnset={() => setNewShell(null)}
+              hasConflict={duplicates.has('newShell')}
+              defaultBinding={DEFAULT_KEYMAP.newShell}
+              display={formatBinding(newShell)}
+            />
+            <ShortcutRow
+              label="Close Shell"
+              binding={closeShell}
+              isRecording={recording === 'closeShell'}
+              recordingKeys={recording === 'closeShell' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'closeShell' ? null : 'closeShell')
+              }
+              onReset={() => setCloseShell(DEFAULT_KEYMAP.closeShell)}
+              onUnset={() => setCloseShell(null)}
+              hasConflict={duplicates.has('closeShell')}
+              defaultBinding={DEFAULT_KEYMAP.closeShell}
+              display={formatBinding(closeShell)}
+            />
             <ShortcutRow
               label="Go to shell"
               binding={goToShell}
