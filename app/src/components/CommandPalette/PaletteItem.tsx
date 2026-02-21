@@ -32,7 +32,7 @@ export function PaletteItem({ item }: Props) {
           </div>
         )}
       </div>
-      {item.disabledReason && (
+      {item.disabled && item.disabledReason && (
         <span className="text-xs text-yellow-500/80">
           ({item.disabledReason})
         </span>

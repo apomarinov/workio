@@ -895,3 +895,37 @@ export async function deleteAllNotifications(): Promise<{ count: number }> {
   if (!res.ok) throw new Error('Failed to delete notifications')
   return res.json()
 }
+
+// Session move
+
+import type { MoveTarget } from '../types'
+
+export async function getMoveTargets(
+  sessionId: string,
+): Promise<{ targets: MoveTarget[] }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/move-targets`)
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to fetch move targets')
+  }
+  return res.json()
+}
+
+export async function moveSession(
+  sessionId: string,
+  targetProjectPath: string,
+  targetTerminalId: number,
+): Promise<{ snapshotDir?: string }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetProjectPath, targetTerminalId }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    const err = new Error(data.error || 'Failed to move session')
+    ;(err as Error & { snapshotDir?: string }).snapshotDir = data.snapshotDir
+    throw err
+  }
+  return { snapshotDir: data.snapshotDir }
+}

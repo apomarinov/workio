@@ -1,3 +1,4 @@
+import { Info, TriangleAlert } from 'lucide-react'
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
@@ -14,6 +15,8 @@ import {
   deleteBranch,
   editPR,
   getBranches,
+  getMoveTargets,
+  moveSession,
   openInExplorer,
   openInIDE,
   pullBranch,
@@ -25,6 +28,7 @@ import {
 } from '@/lib/api'
 import type { PRCheckStatus } from '../../../shared/types'
 import type {
+  MoveTarget,
   SessionSearchMatch,
   SessionWithProject,
   Terminal,
@@ -99,6 +103,10 @@ export function CommandPalette() {
   } | null>(null)
   const [createBranchLoading, setCreateBranchLoading] = useState(false)
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false)
+  const [moveSessionTarget, setMoveSessionTarget] = useState<{
+    session: SessionWithProject
+    target: MoveTarget
+  } | null>(null)
 
   // Session search state
   const [searchText, setSearchText] = useState('')
@@ -527,6 +535,42 @@ export function CommandPalette() {
         closePalette()
         setTimeout(() => setDeleteSessionTarget(session), 150)
       },
+      loadMoveTargets: (sessionId) => {
+        getMoveTargets(sessionId)
+          .then((data) => {
+            setStack((prev) => {
+              const current = prev[prev.length - 1]
+              if (current.mode !== 'move-to-project') return prev
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...current,
+                  moveTargets: data.targets,
+                  moveTargetsLoading: false,
+                },
+              ]
+            })
+          })
+          .catch((err) => {
+            toast.error(
+              err instanceof Error
+                ? err.message
+                : 'Failed to fetch move targets',
+            )
+            setStack((prev) => {
+              const current = prev[prev.length - 1]
+              if (current.mode !== 'move-to-project') return prev
+              return [
+                ...prev.slice(0, -1),
+                { ...current, moveTargetsLoading: false },
+              ]
+            })
+          })
+      },
+      openMoveSessionModal: (session, target) => {
+        closePalette()
+        setTimeout(() => setMoveSessionTarget({ session, target }), 150)
+      },
 
       // Pin actions
       toggleTerminalPin: (terminalId) => {
@@ -866,16 +910,14 @@ export function CommandPalette() {
             setDeleteTerminalTarget(null)
           }}
         >
-          {deleteTerminalTarget.git_repo && (
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={deleteDirectory}
-                onCheckedChange={(v) => setDeleteDirectory(v === true)}
-                className="w-5 h-5"
-              />
-              Also delete workspace directory
-            </label>
-          )}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={deleteDirectory}
+              onCheckedChange={(v) => setDeleteDirectory(v === true)}
+              className="w-5 h-5"
+            />
+            Also delete directory
+          </label>
         </ConfirmModal>
       )}
 
@@ -904,6 +946,82 @@ export function CommandPalette() {
           }}
           onCancel={() => setDeleteSessionTarget(null)}
         />
+      )}
+
+      {moveSessionTarget && (
+        <ConfirmModal
+          open={!!moveSessionTarget}
+          title="Move Session"
+          message={`Move this session to a different project?`}
+          confirmLabel="Move"
+          onConfirm={async () => {
+            const { session: s, target } = moveSessionTarget
+            try {
+              const { snapshotDir } = await moveSession(
+                s.session_id,
+                target.projectPath,
+                target.terminalId,
+              )
+              toast.success('Session moved successfully', {
+                description: snapshotDir
+                  ? `Snapshot: ${snapshotDir}`
+                  : undefined,
+              })
+            } catch (err) {
+              const snapshotDir = (err as Error & { snapshotDir?: string })
+                .snapshotDir
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to move session',
+                {
+                  description: snapshotDir
+                    ? `Snapshot: ${snapshotDir}`
+                    : undefined,
+                },
+              )
+            }
+            refetchSessions()
+            setMoveSessionTarget(null)
+          }}
+          onCancel={() => setMoveSessionTarget(null)}
+        >
+          <div className="space-y-2 text-sm text-zinc-400">
+            <div>
+              <span className="text-zinc-500">Session:</span>{' '}
+              {moveSessionTarget.session.name ??
+                moveSessionTarget.session.session_id}
+            </div>
+            <div>
+              <span className="text-zinc-500">From:</span>{' '}
+              {moveSessionTarget.session.project_path}
+            </div>
+            <div>
+              <span className="text-zinc-500">To:</span>{' '}
+              {moveSessionTarget.target.projectPath}
+            </div>
+            {moveSessionTarget.target.sshHost && (
+              <div className="mt-2 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300">
+                Operations will run on SSH host:{' '}
+                <span className="font-mono text-zinc-200">
+                  {moveSessionTarget.target.sshHost}
+                </span>
+              </div>
+            )}
+            {!moveSessionTarget.target.claudeDirExists && (
+              <div className="text-xs text-yellow-500">
+                Target Claude project directory will be created.
+              </div>
+            )}
+            <div className="mt-2 flex items-center gap-1.5 rounded bg-yellow-500/10 px-2 py-1.5 text-xs text-yellow-400">
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+              Make sure you have exited this session in Claude before moving.
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5 rounded bg-blue-500/10 px-2 py-1.5 text-xs text-blue-400">
+              <Info className="h-3.5 w-3.5 shrink-0" />A snapshot of all
+              affected files will be taken before moving. If anything fails,
+              everything will be restored automatically.
+            </div>
+          </div>
+        </ConfirmModal>
       )}
 
       {forcePushConfirm && (

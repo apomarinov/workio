@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BranchInfo } from '@/lib/api'
 import type { PRCheckStatus } from '../../../shared/types'
-import type { SessionWithProject, Terminal } from '../../types'
+import type { MoveTarget, SessionWithProject, Terminal } from '../../types'
 
 // Generic types - the palette core knows nothing about terminals, sessions, etc.
 
@@ -38,6 +38,8 @@ export type PaletteLevel = {
   branch?: { name: string; isRemote: boolean; isCurrent: boolean }
   branches?: { local: BranchInfo[]; remote: BranchInfo[] }
   branchesLoading?: boolean
+  moveTargets?: MoveTarget[]
+  moveTargetsLoading?: boolean
   loadingStates?: {
     checkingOut?: string
     pulling?: string

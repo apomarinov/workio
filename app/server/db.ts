@@ -73,6 +73,52 @@ export async function getProjectById(id: number): Promise<Project | undefined> {
   return rows[0]
 }
 
+export async function upsertProject(
+  projectPath: string,
+  client?: pg.PoolClient,
+): Promise<number> {
+  const db = client ?? pool
+  const { rows } = await db.query(
+    `INSERT INTO projects (path) VALUES ($1)
+     ON CONFLICT (path) DO UPDATE SET path = EXCLUDED.path
+     RETURNING id`,
+    [projectPath],
+  )
+  return rows[0].id
+}
+
+export async function updateSessionMove(
+  sessionId: string,
+  projectId: number,
+  terminalId: number,
+  transcriptPath: string,
+  client?: pg.PoolClient,
+): Promise<boolean> {
+  const db = client ?? pool
+  const result = await db.query(
+    `UPDATE sessions SET project_id = $1, terminal_id = $2, transcript_path = $3, updated_at = NOW() WHERE session_id = $4`,
+    [projectId, terminalId, transcriptPath, sessionId],
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+export async function withTransaction<T>(
+  fn: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await fn(client)
+    await client.query('COMMIT')
+    return result
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 // Session queries
 
 const SESSION_SELECT = `

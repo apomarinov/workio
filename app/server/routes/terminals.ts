@@ -844,7 +844,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     // Delete workspace directory if requested
-    if (deleteDirectory && terminal.git_repo) {
+    if (deleteDirectory) {
       try {
         await rmrf(
           terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd),

@@ -3,6 +3,7 @@ import {
   Copy,
   CornerDownLeft,
   Eye,
+  FolderOutput,
   GitBranch,
   GitFork,
   GitPullRequest,
@@ -300,6 +301,31 @@ export function createActionsMode(
         label: 'Rename',
         icon: <Pencil className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => actions.openRenameModal(session),
+      },
+      {
+        id: 'action:move-to-project',
+        label: 'Move To Project',
+        icon: <FolderOutput className="h-4 w-4 shrink-0 text-zinc-400" />,
+        disabled: session.status !== 'ended',
+        disabledReason: 'Exit the session in Claude before moving',
+        onSelect: () => {
+          actions.loadMoveTargets(session.session_id)
+          api.push({
+            mode: 'move-to-project',
+            title: 'Move To Project',
+            session,
+            moveTargetsLoading: true,
+          })
+        },
+        onNavigate: () => {
+          actions.loadMoveTargets(session.session_id)
+          api.push({
+            mode: 'move-to-project',
+            title: 'Move To Project',
+            session,
+            moveTargetsLoading: true,
+          })
+        },
       },
       {
         id: 'action:delete',

@@ -4,6 +4,7 @@ import type {
   PRCheckStatus,
 } from '../../../shared/types'
 import type {
+  MoveTarget,
   PreferredIDE,
   SessionSearchMatch,
   SessionWithProject,
@@ -13,6 +14,7 @@ import { createActionsMode } from './modes/actions'
 import { createBranchClaudeSessionsMode } from './modes/branch-claude-sessions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createFavoriteSessionsMode } from './modes/favorite-sessions'
+import { createMoveToProjectMode } from './modes/move-to-project'
 import { createPRActionsMode } from './modes/pr-actions'
 import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
@@ -54,6 +56,11 @@ export type AppActions = {
   resumeSession: (session: SessionWithProject) => void
   openRenameModal: (session: SessionWithProject) => void
   openDeleteSessionModal: (session: SessionWithProject) => void
+  loadMoveTargets: (sessionId: string) => void
+  openMoveSessionModal: (
+    session: SessionWithProject,
+    target: MoveTarget,
+  ) => void
 
   // Pin actions
   toggleTerminalPin: (terminalId: number) => void
@@ -111,6 +118,7 @@ export function createPaletteModes(
     ),
     'pr-actions': createPRActionsMode(data, level, actions, api),
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
+    'move-to-project': createMoveToProjectMode(data, level, actions, api),
     shell: createShellMode(data, level, actions, api),
     'session-search': createSessionSearchMode(data, level, actions, api),
     'favorite-sessions': createFavoriteSessionsMode(data, level, actions, api),

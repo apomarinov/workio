@@ -56,6 +56,15 @@ export interface SessionWithProject extends Session {
   is_favorite: boolean
 }
 
+export interface MoveTarget {
+  projectPath: string
+  encodedPath: string
+  terminalId: number
+  terminalName: string | null
+  sshHost: string | null
+  claudeDirExists: boolean
+}
+
 export interface SessionSearchMatch {
   session_id: string
   name: string | null
