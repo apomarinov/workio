@@ -169,9 +169,12 @@ import {
   destroySession,
   destroySessionsForTerminal,
   detectGitBranch,
+  interruptSession,
   renameZellijSession,
   updateSessionName,
+  waitForSession,
   writeShellNameFile,
+  writeToSession,
 } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
@@ -2485,6 +2488,59 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       writeShellNameFile(id, trimmedName).catch(() => {})
 
       return reply.send(updated)
+    },
+  )
+
+  // Write data to a shell's PTY session
+  fastify.post<{ Params: { id: string }; Body: { data: string } }>(
+    '/api/shells/:id/write',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid shell id' })
+      }
+
+      const shell = await getShellById(id)
+      if (!shell) {
+        return reply.status(404).send({ error: 'Shell not found' })
+      }
+
+      const { data } = request.body
+      if (typeof data !== 'string') {
+        return reply.status(400).send({ error: 'data is required' })
+      }
+
+      // Wait for PTY session to be ready (up to 10s)
+      const ready = await waitForSession(id, 10000)
+      if (!ready) {
+        return reply.status(503).send({ error: 'Shell session not ready' })
+      }
+
+      const written = writeToSession(id, data)
+      if (!written) {
+        return reply.status(500).send({ error: 'Failed to write to shell' })
+      }
+
+      return { success: true }
+    },
+  )
+
+  // Send interrupt (Ctrl+C) to a shell's PTY session
+  fastify.post<{ Params: { id: string } }>(
+    '/api/shells/:id/interrupt',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid shell id' })
+      }
+
+      const shell = await getShellById(id)
+      if (!shell) {
+        return reply.status(404).send({ error: 'Shell not found' })
+      }
+
+      interruptSession(id)
+      return { success: true }
     },
   )
 }

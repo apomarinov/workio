@@ -7,8 +7,10 @@ import {
   GitMerge,
   Globe,
   Heart,
+  LayoutTemplate,
   ScrollText,
   Search,
+  Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
 import { TerminalIcon2 } from '@/components/icons'
@@ -290,6 +292,8 @@ export function createSearchMode(
 
   // Build groups
   const groups = []
+
+  // Projects
   if (needsRepoSubheadings) {
     for (const repo of allRepos) {
       const repoName = repo.split('/')[1] || repo
@@ -304,24 +308,62 @@ export function createSearchMode(
     if (terminalsNoRepo.length > 0) {
       groups.push({ heading: 'Projects', items: terminalsNoRepo })
     }
-    for (const repo of allRepos) {
-      const repoName = repo.split('/')[1] || repo
-      const repoPRs = prsByRepo.get(repo)
-      if (repoPRs && repoPRs.length > 0) {
-        groups.push({
-          heading: `Pull Requests — ${repoName}`,
-          items: repoPRs,
-        })
-      }
-    }
   } else {
     if (terminalItems.length > 0) {
       groups.push({ heading: 'Projects', items: terminalItems })
     }
-    if (allPRItems.length > 0) {
-      groups.push({ heading: 'Pull Requests', items: allPRItems })
+  }
+
+  // Actions (after projects, before PRs)
+  const totalShells = terminals.reduce((n, t) => n + t.shells.length, 0)
+  const actionItems: PaletteItem[] = [
+    {
+      id: 'action:shells',
+      label: 'Shells',
+      description: `${totalShells} shell${totalShells !== 1 ? 's' : ''} across ${terminals.length} project${terminals.length !== 1 ? 's' : ''}`,
+      icon: <TerminalIcon className="h-4 w-4 shrink-0 text-zinc-400" />,
+      keywords: ['shells', 'terminal'],
+      onSelect: () => api.push({ mode: 'shells', title: 'Shells' }),
+    },
+  ]
+  if (data.shellTemplates.length > 0) {
+    actionItems.push({
+      id: 'action:shell-templates',
+      label: 'Shell Templates',
+      description: 'Run a saved shell template',
+      icon: <LayoutTemplate className="h-4 w-4 shrink-0 text-zinc-400" />,
+      keywords: ['templates', 'shell', 'layout'],
+      onSelect: () =>
+        api.push({ mode: 'shell-templates', title: 'Shell Templates' }),
+    })
+  }
+  actionItems.push(logsItem)
+  groups.push({ heading: 'Actions', items: actionItems })
+
+  // Pull Requests helper (reused in two paths)
+  let prsAdded = false
+  const addPRGroups = () => {
+    if (prsAdded) return
+    prsAdded = true
+    if (needsRepoSubheadings) {
+      for (const repo of allRepos) {
+        const repoName = repo.split('/')[1] || repo
+        const repoPRs = prsByRepo.get(repo)
+        if (repoPRs && repoPRs.length > 0) {
+          groups.push({
+            heading: `Pull Requests — ${repoName}`,
+            items: repoPRs,
+          })
+        }
+      }
+    } else {
+      if (allPRItems.length > 0) {
+        groups.push({ heading: 'Pull Requests', items: allPRItems })
+      }
     }
   }
+
+  // Session Actions → PRs → Sessions
   if (sessionItems.length > 0) {
     const findSessionsItem: PaletteItem = {
       id: 'action:find-sessions',
@@ -364,6 +406,7 @@ export function createSearchMode(
     }
 
     groups.push({ heading: 'Session Actions', items: sessionActions })
+    addPRGroups()
 
     const needsSessionSubheadings = sessionsByTerminal.size > 1
     if (needsSessionSubheadings) {
@@ -381,8 +424,9 @@ export function createSearchMode(
       groups.push({ heading: 'Claude Sessions', items: sessionItems })
     }
   }
-  // Add actions group with logs
-  groups.push({ heading: 'Actions', items: [logsItem] })
+
+  // If no sessions, PRs haven't been added yet
+  addPRGroups()
 
   return {
     id: 'search',

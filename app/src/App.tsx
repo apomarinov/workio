@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
+import { ConfirmModal } from './components/ConfirmModal'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
 import { ShellTabs } from './components/ShellTabs'
@@ -28,9 +29,15 @@ import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSocket } from './hooks/useSocket'
-import { createShellForTerminal, deleteShell, renameShell } from './lib/api'
+import {
+  createShellForTerminal,
+  deleteShell,
+  interruptShell,
+  renameShell,
+  writeToShell,
+} from './lib/api'
 import { cn } from './lib/utils'
-import type { HookEvent } from './types'
+import type { HookEvent, ShellTemplate } from './types'
 
 function setFavicon(href: string) {
   let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
@@ -131,6 +138,85 @@ function AppContent() {
   handleDeleteShellRef.current = handleDeleteShell
   const handleRenameShellRef = useRef(handleRenameShell)
   handleRenameShellRef.current = handleRenameShell
+
+  // Shell template execution
+  const [runTemplateTarget, setRunTemplateTarget] = useState<{
+    terminalId: number
+    template: ShellTemplate
+  } | null>(null)
+
+  const handleRunTemplate = async (
+    terminalId: number,
+    template: ShellTemplate,
+  ) => {
+    try {
+      const terminal = terminalsRef.current.find((t) => t.id === terminalId)
+      if (!terminal) return
+
+      // 1. Delete all non-main shells
+      const nonMainShells = terminal.shells.filter((s) => s.name !== 'main')
+      for (const shell of nonMainShells) {
+        await deleteShell(shell.id)
+      }
+
+      // 2. Interrupt main shell
+      const mainShell = terminal.shells.find((s) => s.name === 'main')
+      if (mainShell) {
+        await interruptShell(mainShell.id).catch(() => {})
+      }
+
+      // 3. Wait for things to settle
+      await new Promise((r) => setTimeout(r, 300))
+
+      // 4. Create custom shells from template entries (skip first, that's main)
+      const customEntries = template.entries.slice(1)
+      const createdShellIds: number[] = []
+      for (const entry of customEntries) {
+        const shell = await createShellForTerminal(terminalId, entry.name)
+        createdShellIds.push(shell.id)
+      }
+
+      // 5. Refetch to get updated terminal state
+      await refetch()
+
+      // 6. Send commands to main shell
+      if (mainShell && template.entries[0]?.command) {
+        await writeToShell(mainShell.id, `${template.entries[0].command}\n`)
+      }
+
+      // 7. Send commands to custom shells
+      for (let i = 0; i < customEntries.length; i++) {
+        if (customEntries[i].command) {
+          await writeToShell(
+            createdShellIds[i],
+            `${customEntries[i].command}\n`,
+          )
+        }
+      }
+
+      // 8. Set active shell to main
+      if (mainShell) {
+        setActiveShells((prev) => ({ ...prev, [terminalId]: mainShell.id }))
+      }
+
+      toast.success(`Template "${template.name}" started`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to run template')
+    }
+    setRunTemplateTarget(null)
+  }
+
+  // Listen for shell-template-run events
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number; template: ShellTemplate }>,
+    ) => {
+      setRunTemplateTarget(e.detail)
+    }
+    window.addEventListener('shell-template-run', handler as EventListener)
+    return () =>
+      window.removeEventListener('shell-template-run', handler as EventListener)
+  }, [])
 
   // Shell event listeners (dispatched from TerminalItem sidebar)
   useEffect(() => {
@@ -478,7 +564,7 @@ function AppContent() {
                         handleDeleteShell(t.id, shellId)
                       }
                       onRenameShell={handleRenameShell}
-                      className="pr-2 pl-1 bg-[#1a1a1a] border-b border-zinc-800"
+                      className="pr-2 pl-1 bg-[#1a1a1a]"
                     />
                   )}
                   <div className="relative flex-1 min-h-0">
@@ -499,7 +585,22 @@ function AppContent() {
       </Group>
       <Toaster />
       <CommandPalette />
-      <PinnedSessionsPip />,
+      <PinnedSessionsPip />
+      <ConfirmModal
+        open={runTemplateTarget !== null}
+        title={`Run "${runTemplateTarget?.template.name}"?`}
+        message="This will close all custom shells, interrupt the main shell, then recreate shells and run all template commands."
+        confirmLabel="Run"
+        onConfirm={() => {
+          if (runTemplateTarget) {
+            handleRunTemplate(
+              runTemplateTarget.terminalId,
+              runTemplateTarget.template,
+            )
+          }
+        }}
+        onCancel={() => setRunTemplateTarget(null)}
+      />
     </>
   )
 }

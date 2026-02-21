@@ -1,4 +1,5 @@
 import type {
+  ActiveProcess,
   GitDiffStat,
   MergedPRSummary,
   PRCheckStatus,
@@ -8,6 +9,7 @@ import type {
   PreferredIDE,
   SessionSearchMatch,
   SessionWithProject,
+  ShellTemplate,
   Terminal,
 } from '../../types'
 import { createActionsMode } from './modes/actions'
@@ -19,7 +21,8 @@ import { createPRActionsMode } from './modes/pr-actions'
 import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
 import { createSessionSearchMode } from './modes/session-search'
-import { createShellMode } from './modes/shell'
+import { createShellTemplatesMode } from './modes/shell-templates'
+import { createShellsMode } from './modes/shells'
 import type { PaletteAPI, PaletteLevel, PaletteMode } from './types'
 
 // App-specific data that modes need
@@ -35,6 +38,9 @@ export type AppData = {
   sessionSearchResults: SessionSearchMatch[] | null
   sessionSearchLoading: boolean
   sessionSearchQuery: string
+  processes: ActiveProcess[]
+  shellPorts: Record<number, number[]>
+  shellTemplates: ShellTemplate[]
 }
 
 // Actions that modes can trigger
@@ -83,11 +89,12 @@ export type AppActions = {
   requestCreateBranch: (terminalId: number, fromBranch: string) => void
   requestRenameBranch: (terminalId: number, branch: string) => void
 
+  // Shell actions
+  selectShell: (terminalId: number, shellId: number) => void
+  runTemplate: (template: ShellTemplate) => void
+
   // Cleanup actions
   openCleanupModal: () => void
-
-  // Shell actions
-  openFilePicker: (terminal: Terminal) => void
 
   // PR actions
   openMergeModal: (pr: PRCheckStatus) => void
@@ -119,9 +126,10 @@ export function createPaletteModes(
     'pr-actions': createPRActionsMode(data, level, actions, api),
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
     'move-to-project': createMoveToProjectMode(data, level, actions, api),
-    shell: createShellMode(data, level, actions, api),
+    shells: createShellsMode(data, level, actions, api),
     'session-search': createSessionSearchMode(data, level, actions, api),
     'favorite-sessions': createFavoriteSessionsMode(data, level, actions, api),
+    'shell-templates': createShellTemplatesMode(data, level, actions, api),
   }
 }
 

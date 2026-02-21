@@ -16,7 +16,15 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, PencilIcon, Plus, TrashIcon, X } from 'lucide-react'
+import {
+  ChevronDown,
+  FolderOpen,
+  PencilIcon,
+  Play,
+  Plus,
+  TrashIcon,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,10 +44,12 @@ import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
-import type { Shell, Terminal } from '../types'
+import type { Shell, ShellTemplate, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { RenameModal } from './EditSessionModal'
+import { ShellTemplateModal } from './ShellTemplateModal'
 
 interface ShellTabsProps {
   terminal: Terminal
@@ -262,6 +272,13 @@ export function ShellTabs({
   const [deleteShellId, setDeleteShellId] = useState<number | null>(null)
   const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [templateModalOpen, setTemplateModalOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<
+    ShellTemplate | undefined
+  >()
+  const [deleteTemplateTarget, setDeleteTemplateTarget] =
+    useState<ShellTemplate | null>(null)
+  const { settings, updateSettings } = useSettings()
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -328,6 +345,31 @@ export function ShellTabs({
     ? terminal.shells.find((s) => s.id === deleteShellId)?.name
     : null
 
+  const templates = settings?.shell_templates ?? []
+
+  const handleSaveTemplate = async (template: ShellTemplate) => {
+    const existing = templates.filter((t) => t.id !== template.id)
+    await updateSettings({ shell_templates: [...existing, template] })
+    setTemplateModalOpen(false)
+    setEditingTemplate(undefined)
+  }
+
+  const handleDeleteTemplate = async (template: ShellTemplate) => {
+    await updateSettings({
+      shell_templates: templates.filter((t) => t.id !== template.id),
+    })
+    setDeleteTemplateTarget(null)
+  }
+
+  const handleRunTemplate = (template: ShellTemplate) => {
+    setMenuOpen(false)
+    window.dispatchEvent(
+      new CustomEvent('shell-template-run', {
+        detail: { terminalId: terminal.id, template },
+      }),
+    )
+  }
+
   const menuButton = (
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
       <PopoverTrigger asChild>
@@ -351,6 +393,73 @@ export function ShellTabs({
           <Plus className="w-3.5 h-3.5" />
           New Shell
         </button>
+        <div className="my-1 h-px bg-border" />
+        <div className="flex items-center justify-between px-2 py-1">
+          <span className="text-xs text-muted-foreground font-medium">
+            Templates
+          </span>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground cursor-pointer"
+            onClick={() => {
+              setEditingTemplate(undefined)
+              setTemplateModalOpen(true)
+              setMenuOpen(false)
+            }}
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
+        {templates.length === 0 ? (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground/60">
+            No templates yet
+          </div>
+        ) : (
+          templates.map((tmpl) => (
+            <ContextMenu key={tmpl.id}>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                  onClick={() => handleRunTemplate(tmpl)}
+                >
+                  <Play className="w-3 h-3" />
+                  <span className="truncate">{tmpl.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {tmpl.entries.length}
+                  </span>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onClick={() => handleRunTemplate(tmpl)}>
+                  <Play />
+                  Run
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => {
+                    setEditingTemplate(tmpl)
+                    setTemplateModalOpen(true)
+                    setMenuOpen(false)
+                  }}
+                >
+                  <PencilIcon />
+                  Edit
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    setDeleteTemplateTarget(tmpl)
+                    setMenuOpen(false)
+                  }}
+                >
+                  <TrashIcon />
+                  Delete
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          ))
+        )}
         <div className="my-1 h-px bg-border" />
         <label className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
           Wrap
@@ -423,28 +532,45 @@ export function ShellTabs({
                           }
                         />
                       </ContextMenuTrigger>
-                      {!isMain && (
-                        <ContextMenuContent>
-                          <ContextMenuGroup>
-                            <ContextMenuItem
-                              onClick={() => setRenameShellTarget(shell)}
-                            >
-                              <PencilIcon />
-                              Rename
-                            </ContextMenuItem>
-                          </ContextMenuGroup>
-                          <ContextMenuSeparator />
-                          <ContextMenuGroup>
-                            <ContextMenuItem
-                              variant="destructive"
-                              onClick={() => handleDeleteShell(shell.id)}
-                            >
-                              <TrashIcon />
-                              Close
-                            </ContextMenuItem>
-                          </ContextMenuGroup>
-                        </ContextMenuContent>
-                      )}
+                      <ContextMenuContent>
+                        <ContextMenuGroup>
+                          <ContextMenuItem
+                            onClick={() =>
+                              window.dispatchEvent(
+                                new CustomEvent('open-file-picker', {
+                                  detail: { terminal },
+                                }),
+                              )
+                            }
+                          >
+                            <FolderOpen />
+                            Select Files
+                          </ContextMenuItem>
+                        </ContextMenuGroup>
+                        {!isMain && (
+                          <>
+                            <ContextMenuSeparator />
+                            <ContextMenuGroup>
+                              <ContextMenuItem
+                                onClick={() => setRenameShellTarget(shell)}
+                              >
+                                <PencilIcon />
+                                Rename
+                              </ContextMenuItem>
+                            </ContextMenuGroup>
+                            <ContextMenuSeparator />
+                            <ContextMenuGroup>
+                              <ContextMenuItem
+                                variant="destructive"
+                                onClick={() => handleDeleteShell(shell.id)}
+                              >
+                                <TrashIcon />
+                                Close
+                              </ContextMenuItem>
+                            </ContextMenuGroup>
+                          </>
+                        )}
+                      </ContextMenuContent>
                     </ContextMenu>
                   )
                 })}
@@ -501,28 +627,45 @@ export function ShellTabs({
                           }
                         />
                       </ContextMenuTrigger>
-                      {!isMain && (
-                        <ContextMenuContent>
-                          <ContextMenuGroup>
-                            <ContextMenuItem
-                              onClick={() => setRenameShellTarget(shell)}
-                            >
-                              <PencilIcon />
-                              Rename
-                            </ContextMenuItem>
-                          </ContextMenuGroup>
-                          <ContextMenuSeparator />
-                          <ContextMenuGroup>
-                            <ContextMenuItem
-                              variant="destructive"
-                              onClick={() => handleDeleteShell(shell.id)}
-                            >
-                              <TrashIcon />
-                              Close
-                            </ContextMenuItem>
-                          </ContextMenuGroup>
-                        </ContextMenuContent>
-                      )}
+                      <ContextMenuContent>
+                        <ContextMenuGroup>
+                          <ContextMenuItem
+                            onClick={() =>
+                              window.dispatchEvent(
+                                new CustomEvent('open-file-picker', {
+                                  detail: { terminal },
+                                }),
+                              )
+                            }
+                          >
+                            <FolderOpen />
+                            Select Files
+                          </ContextMenuItem>
+                        </ContextMenuGroup>
+                        {!isMain && (
+                          <>
+                            <ContextMenuSeparator />
+                            <ContextMenuGroup>
+                              <ContextMenuItem
+                                onClick={() => setRenameShellTarget(shell)}
+                              >
+                                <PencilIcon />
+                                Rename
+                              </ContextMenuItem>
+                            </ContextMenuGroup>
+                            <ContextMenuSeparator />
+                            <ContextMenuGroup>
+                              <ContextMenuItem
+                                variant="destructive"
+                                onClick={() => handleDeleteShell(shell.id)}
+                              >
+                                <TrashIcon />
+                                Close
+                              </ContextMenuItem>
+                            </ContextMenuGroup>
+                          </>
+                        )}
+                      </ContextMenuContent>
                     </ContextMenu>
                   )
                 })}
@@ -566,6 +709,26 @@ export function ShellTabs({
           }
         }}
         onCancel={() => setRenameShellTarget(null)}
+      />
+      <ShellTemplateModal
+        open={templateModalOpen}
+        template={editingTemplate}
+        onSave={handleSaveTemplate}
+        onCancel={() => {
+          setTemplateModalOpen(false)
+          setEditingTemplate(undefined)
+        }}
+      />
+      <ConfirmModal
+        open={deleteTemplateTarget !== null}
+        title="Delete Template"
+        message={`Are you sure you want to delete "${deleteTemplateTarget?.name}"?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteTemplateTarget) handleDeleteTemplate(deleteTemplateTarget)
+        }}
+        onCancel={() => setDeleteTemplateTarget(null)}
       />
     </>
   )

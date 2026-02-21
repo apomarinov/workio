@@ -134,7 +134,7 @@ export function CommandPalette() {
     deleteSession,
     refetch: refetchSessions,
   } = useSessionContext()
-  const { gitDirtyStatus } = useProcessContext()
+  const { gitDirtyStatus, processes, shellPorts } = useProcessContext()
   const { settings, updateSettings } = useSettings()
   const { emit } = useSocket()
 
@@ -178,6 +178,16 @@ export function CommandPalette() {
     }
     window.addEventListener('open-palette', handler)
     return () => window.removeEventListener('open-palette', handler)
+  }, [])
+
+  // Listen for open-file-picker event (dispatched from shell tab context menu)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminal: Terminal }>) => {
+      setFilePickerTerminal(e.detail.terminal)
+    }
+    window.addEventListener('open-file-picker', handler as EventListener)
+    return () =>
+      window.removeEventListener('open-file-picker', handler as EventListener)
   }, [])
 
   // Build branchToPR map for event handlers
@@ -390,6 +400,9 @@ export function CommandPalette() {
       sessionSearchResults,
       sessionSearchLoading,
       sessionSearchQuery: searchText,
+      processes,
+      shellPorts,
+      shellTemplates: settings?.shell_templates ?? [],
     }),
     [
       terminals,
@@ -403,6 +416,9 @@ export function CommandPalette() {
       sessionSearchResults,
       sessionSearchLoading,
       searchText,
+      processes,
+      shellPorts,
+      settings?.shell_templates,
     ],
   )
 
@@ -803,16 +819,38 @@ export function CommandPalette() {
         }
       },
 
+      // Shell actions
+      selectShell: (terminalId, shellId) => {
+        selectTerminal(terminalId)
+        clearSession()
+        closePalette()
+        window.dispatchEvent(
+          new CustomEvent('reveal-terminal', { detail: { id: terminalId } }),
+        )
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId, shellId },
+          }),
+        )
+      },
+      runTemplate: (template) => {
+        // Find the active terminal from current palette context or first terminal
+        const terminalId = currentLevel.terminal?.id ?? terminals[0]?.id
+        if (terminalId == null) return
+        closePalette()
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('shell-template-run', {
+              detail: { terminalId, template },
+            }),
+          )
+        }, 150)
+      },
+
       // Cleanup actions
       openCleanupModal: () => {
         closePalette()
         setTimeout(() => setCleanupModalOpen(true), 150)
-      },
-
-      // Shell actions
-      openFilePicker: (terminal) => {
-        closePalette()
-        setTimeout(() => setFilePickerTerminal(terminal), 150)
       },
     }),
     [

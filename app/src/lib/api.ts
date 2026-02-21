@@ -925,6 +925,31 @@ export async function deleteShell(shellId: number): Promise<void> {
   }
 }
 
+export async function writeToShell(
+  shellId: number,
+  data: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/shells/${shellId}/write`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data }),
+  })
+  if (!res.ok) {
+    const result = await res.json()
+    throw new Error(result.error || 'Failed to write to shell')
+  }
+}
+
+export async function interruptShell(shellId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/shells/${shellId}/interrupt`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const result = await res.json()
+    throw new Error(result.error || 'Failed to interrupt shell')
+  }
+}
+
 export async function renameShell(
   shellId: number,
   name: string,

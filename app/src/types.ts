@@ -367,6 +367,17 @@ export interface LogTerminal {
   deleted: boolean
 }
 
+export interface ShellTemplateEntry {
+  name: string
+  command: string
+}
+
+export interface ShellTemplate {
+  id: string
+  name: string
+  entries: ShellTemplateEntry[]
+}
+
 export type PreferredIDE = 'cursor' | 'vscode'
 
 export interface Settings {
@@ -387,6 +398,7 @@ export interface Settings {
   collapse_gh_authors?: HiddenGHAuthor[]
   hidden_prs?: HiddenPR[]
   favorite_sessions?: string[]
+  shell_templates?: ShellTemplate[]
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number
