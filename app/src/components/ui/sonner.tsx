@@ -11,7 +11,7 @@ function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         classNames: {
           toast:
-            'group toast group-[.toaster]:bg-zinc-900 group-[.toaster]:text-zinc-50 group-[.toaster]:border-zinc-800 group-[.toaster]:shadow-lg',
+            'group toast group-[.toaster]:bg-zinc-900 group-[.toaster]:text-zinc-50 group-[.toaster]:border-zinc-800 group-[.toaster]:shadow-lg data-[type=error]:group-[.toaster]:!bg-red-950 data-[type=error]:group-[.toaster]:!border-red-900 data-[type=error]:group-[.toaster]:!text-red-50',
           description: 'group-[.toast]:text-zinc-400',
           actionButton:
             'group-[.toast]:bg-zinc-50 group-[.toast]:text-zinc-900',
