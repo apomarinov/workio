@@ -240,6 +240,17 @@ export async function updateSession(
   return (result.rowCount ?? 0) > 0
 }
 
+export async function updateSessionData(
+  sessionId: string,
+  data: Record<string, unknown>,
+): Promise<boolean> {
+  const result = await pool.query(
+    `UPDATE sessions SET data = COALESCE(data, '{}'::jsonb) || $1::jsonb WHERE session_id = $2`,
+    [JSON.stringify(data), sessionId],
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
 export async function deleteSession(sessionId: string): Promise<boolean> {
   // Delete in order: messages (via prompts), prompts, hooks, then session
   const promptResult = await pool.query(
@@ -293,9 +304,19 @@ export async function searchSessionMessages(
     [`%${query}%`, limit],
   )
 
-  if (matchRows.length === 0) return []
+  // Step 1b: Find sessions matching by name or branch
+  const { rows: nameMatchRows } = await pool.query(
+    `
+    SELECT session_id
+    FROM sessions
+    WHERE name ILIKE $1
+       OR data->>'branch' ILIKE $1
+    LIMIT $2
+    `,
+    [`%${query}%`, limit],
+  )
 
-  // Step 2: Group by session_id in JS, cap messages per session
+  // Step 2: Group message matches by session_id, cap messages per session
   const sessionMessages = new Map<
     string,
     { body: string; is_user: boolean }[]
@@ -308,6 +329,15 @@ export async function searchSessionMessages(
     sessionMessages.set(row.session_id, msgs)
   }
 
+  // Include name/branch-matched sessions (with empty messages if not already present)
+  for (const row of nameMatchRows) {
+    if (!sessionMessages.has(row.session_id)) {
+      sessionMessages.set(row.session_id, [])
+    }
+  }
+
+  if (sessionMessages.size === 0) return []
+
   // Step 3: Fetch session + terminal info for matching session_ids
   const sessionIds = [...sessionMessages.keys()]
   const { rows: sessionRows } = await pool.query(
@@ -318,6 +348,7 @@ export async function searchSessionMessages(
       s.status,
       s.terminal_id,
       s.updated_at,
+      s.data,
       p.path as project_path,
       t.name as terminal_name
     FROM sessions s
@@ -345,6 +376,7 @@ export async function searchSessionMessages(
       terminal_name: info.terminal_name as string | null,
       project_path: info.project_path as string,
       status: info.status as string,
+      data: (info.data as Record<string, unknown> | null) ?? null,
       messages,
     })
   }

@@ -44,6 +44,7 @@ export interface Session {
   message_count: number | null
   status: 'started' | 'active' | 'done' | 'ended' | 'permission_needed' | 'idle'
   transcript_path: string | null
+  data: { branch?: string } | null
   created_at: string
   updated_at: string
 }
@@ -61,6 +62,7 @@ export interface SessionSearchMatch {
   terminal_name: string | null
   project_path: string
   status: string
+  data: { branch?: string } | null
   messages: { body: string; is_user: boolean }[]
 }
 

@@ -1,7 +1,71 @@
+import { execFile } from 'node:child_process'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
-import { getMessagesByIds } from './db'
+import { getMessagesByIds, getTerminalById, updateSessionData } from './db'
 import { log } from './logger'
+import { execSSHCommand } from './ssh/exec'
+
+function detectLocalBranch(cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'git',
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd, timeout: 5000 },
+      (err, stdout) => {
+        if (!err && stdout.trim()) return resolve(stdout.trim())
+        // Fallback to symbolic-ref (for detached HEAD with a ref)
+        execFile(
+          'git',
+          ['symbolic-ref', '--short', 'HEAD'],
+          { cwd, timeout: 5000 },
+          (err2, stdout2) => {
+            if (err2) return reject(err2)
+            resolve(stdout2.trim())
+          },
+        )
+      },
+    )
+  })
+}
+
+async function detectSessionBranch(
+  io: SocketIOServer,
+  sessionId: string,
+  terminalId: number | null,
+  projectPath: string,
+) {
+  try {
+    let branch: string
+
+    if (terminalId) {
+      const terminal = await getTerminalById(terminalId)
+      if (terminal?.ssh_host) {
+        const cmd =
+          'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null'
+        const { stdout } = await execSSHCommand(terminal.ssh_host, cmd, {
+          cwd: terminal.cwd,
+        })
+        branch = stdout.trim()
+      } else {
+        const cwd = terminal?.cwd || projectPath
+        branch = await detectLocalBranch(cwd)
+      }
+    } else {
+      branch = await detectLocalBranch(projectPath)
+    }
+
+    if (!branch) return
+
+    await updateSessionData(sessionId, { branch })
+    io.emit('session:updated', { sessionId, data: { branch } })
+    log.info(`[listen] Detected branch="${branch}" for session=${sessionId}`)
+  } catch (err) {
+    log.error(
+      { err, sessionId },
+      '[listen] Failed to detect branch for session',
+    )
+  }
+}
 
 let listenerClient: pg.Client | null = null
 
@@ -25,6 +89,16 @@ export async function initPgListener(
       if (msg.channel === 'hook') {
         io.emit('hook', payload)
         log.info(`LISTEN: hook event session=${payload.session_id}`)
+
+        if (payload.hook_type === 'SessionStart') {
+          // Fire-and-forget branch detection
+          detectSessionBranch(
+            io,
+            payload.session_id,
+            payload.terminal_id ?? null,
+            payload.project_path,
+          )
+        }
       }
 
       if (msg.channel === 'session_update') {

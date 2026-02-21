@@ -17,6 +17,11 @@ interface SessionUpdateEvent {
   messages: unknown[]
 }
 
+interface SessionUpdatedEvent {
+  sessionId: string
+  data: Record<string, unknown>
+}
+
 interface SessionsDeletedEvent {
   session_ids: string[]
 }
@@ -113,6 +118,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       debouncedMerge(data.session_id)
     })
   }, [subscribe, debouncedMerge])
+
+  useEffect(() => {
+    return subscribe<SessionUpdatedEvent>('session:updated', (event) => {
+      mutate(
+        (prev) => {
+          if (!prev) return prev
+          const idx = prev.findIndex((s) => s.session_id === event.sessionId)
+          if (idx < 0) return prev
+          const next = [...prev]
+          next[idx] = {
+            ...next[idx],
+            data: { ...next[idx].data, ...event.data },
+          }
+          return next
+        },
+        { revalidate: false },
+      )
+    })
+  }, [subscribe, mutate])
 
   useEffect(() => {
     return subscribe<SessionsDeletedEvent>('sessions_deleted', (data) => {

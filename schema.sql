@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     message_count INTEGER,
     status VARCHAR(20),
     transcript_path TEXT,
+    data JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

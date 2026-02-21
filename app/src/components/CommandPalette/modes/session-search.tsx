@@ -1,4 +1,4 @@
-import { Bot, Check } from 'lucide-react'
+import { Bot, Check, GitBranch } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -129,9 +129,17 @@ export function createSessionSearchMode(
         id: `session-search:${match.session_id}`,
         label: match.name || match.session_id.slice(0, 12),
         description: (
-          <span className="truncate text-zinc-500">
-            {match.project_path.split('/').pop()}
-          </span>
+          <>
+            <span className="truncate">
+              {match.project_path.split('/').pop()}
+            </span>
+            {match.data?.branch && (
+              <span className="flex items-center gap-1 truncate">
+                <GitBranch className="max-h-3 max-w-3 shrink-0 text-zinc-400" />
+                {match.data.branch}
+              </span>
+            )}
+          </>
         ),
         icon: <SessionSearchIcon status={match.status} />,
         onSelect: () => {
@@ -147,6 +155,7 @@ export function createSessionSearchMode(
               terminal_id: null,
               message_count: null,
               transcript_path: null,
+              data: null,
               created_at: '',
               updated_at: '',
               latest_user_message: null,

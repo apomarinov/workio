@@ -208,14 +208,25 @@ export function createSearchMode(
   const sessionItems: PaletteItem[] = sessions.map((s) => ({
     id: `s:${s.session_id}`,
     label: s.name || s.latest_user_message || `Untitled in "${s.project_path}"`,
-    description: s.latest_agent_message && (
-      <span className="truncate">{s.latest_agent_message}</span>
+    description: (s.data?.branch || s.latest_agent_message) && (
+      <>
+        {s.latest_agent_message && (
+          <span className="truncate">{s.latest_agent_message}</span>
+        )}
+        {s.data?.branch && (
+          <span className="flex items-center gap-1 truncate">
+            <GitBranch className="max-h-3 max-w-3 shrink-0 text-zinc-400" />
+            {s.data.branch}
+          </span>
+        )}
+      </>
     ),
     icon: <SessionIcon status={s.status} />,
     keywords: [
       s.name ?? '',
       s.latest_user_message ?? '',
       s.latest_agent_message ?? '',
+      s.data?.branch ?? '',
     ],
     onSelect: () => {
       api.push({
