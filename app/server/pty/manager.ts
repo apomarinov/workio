@@ -172,8 +172,13 @@ async function getProcessesForTerminal(
         try {
           const childPids = await getChildPids(shellPid)
           const cmdName = session.currentCommand.split(' ')[0] || ''
-          for (const cpid of childPids) {
-            const comm = await getProcessComm(cpid)
+          const comms = await Promise.all(
+            childPids.map(async (cpid) => ({
+              cpid,
+              comm: await getProcessComm(cpid),
+            })),
+          )
+          for (const { cpid, comm } of comms) {
             if (comm) {
               const basename = comm.split('/').pop() || comm
               if (basename === cmdName || comm === cmdName) {
@@ -258,15 +263,19 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const allPorts: number[] = []
   const shellPorts: Record<number, number[]> = {}
 
-  for (const session of terminalSessions) {
-    const procs = await getProcessesForTerminal(terminalId, session)
-    allProcesses.push(...procs)
-    const ports = await getPortsForTerminal(session, systemPorts)
-    allPorts.push(...ports)
-    if (ports.length > 0) {
-      shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
-    }
-  }
+  await Promise.all(
+    terminalSessions.map(async (session) => {
+      const [procs, ports] = await Promise.all([
+        getProcessesForTerminal(terminalId, session),
+        getPortsForTerminal(session, systemPorts),
+      ])
+      allProcesses.push(...procs)
+      allPorts.push(...ports)
+      if (ports.length > 0) {
+        shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+      }
+    }),
+  )
 
   const terminalPorts: Record<number, number[]> = {}
   if (allPorts.length > 0) {
@@ -286,19 +295,23 @@ async function scanAndEmitAllProcesses() {
   const terminalPorts: Record<number, number[]> = {}
   const shellPorts: Record<number, number[]> = {}
 
-  for (const [_shellId, session] of sessions) {
-    const procs = await getProcessesForTerminal(session.terminalId, session)
-    allProcesses.push(...procs)
+  await Promise.all(
+    [...sessions.values()].map(async (session) => {
+      const [procs, ports] = await Promise.all([
+        getProcessesForTerminal(session.terminalId, session),
+        getPortsForTerminal(session, systemPorts),
+      ])
+      allProcesses.push(...procs)
 
-    const ports = await getPortsForTerminal(session, systemPorts)
-    if (ports.length > 0) {
-      const existing = terminalPorts[session.terminalId] || []
-      terminalPorts[session.terminalId] = [
-        ...new Set([...existing, ...ports]),
-      ].sort((a, b) => a - b)
-      shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
-    }
-  }
+      if (ports.length > 0) {
+        const existing = terminalPorts[session.terminalId] || []
+        terminalPorts[session.terminalId] = [
+          ...new Set([...existing, ...ports]),
+        ].sort((a, b) => a - b)
+        shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+      }
+    }),
+  )
 
   // Check for active zellij sessions matching each shell's session name
   try {

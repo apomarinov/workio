@@ -198,24 +198,26 @@ async function findZellijServerForSession(
 
     const serverPids = output.split('\n').map(Number)
 
-    for (const serverPid of serverPids) {
-      try {
-        // Check socket path to get session name
-        const { stdout: lsofOutput } = await execFileAsync(
-          'lsof',
-          ['-p', String(serverPid)],
-          { encoding: 'utf8', timeout: 2000 },
-        )
-
-        // Look for unix socket with session name in path
-        const match = lsofOutput.match(/unix.*zellij-\d+[^\s]*\/([^\s]+)/)
-        if (match && match[1] === sessionName) {
-          return serverPid
+    const results = await Promise.all(
+      serverPids.map(async (serverPid) => {
+        try {
+          const { stdout: lsofOutput } = await execFileAsync(
+            'lsof',
+            ['-p', String(serverPid)],
+            { encoding: 'utf8', timeout: 2000 },
+          )
+          const match = lsofOutput.match(/unix.*zellij-\d+[^\s]*\/([^\s]+)/)
+          if (match && match[1] === sessionName) {
+            return serverPid
+          }
+        } catch {
+          // Skip this server
         }
-      } catch {
-        // Skip this server
-      }
-    }
+        return null
+      }),
+    )
+    const matched = results.find((pid) => pid !== null)
+    if (matched != null) return matched
   } catch {
     // Failed to find servers
   }
@@ -236,42 +238,54 @@ export async function getZellijSessionProcesses(
     // Get all pane shells (direct children of server)
     const paneShells = await getChildPids(serverPid)
 
-    for (const shellPid of paneShells) {
-      const shellComm = await getProcessComm(shellPid)
-      const shellArgs = await getProcessArgs(shellPid)
+    const shellResults = await Promise.all(
+      paneShells.map(async (shellPid) => {
+        const [shellComm, shellArgs, cmdPids] = await Promise.all([
+          getProcessComm(shellPid),
+          getProcessArgs(shellPid),
+          getChildPids(shellPid),
+        ])
 
-      // Get first child of the shell (the running command)
-      const cmdPids = await getChildPids(shellPid)
-
-      if (cmdPids.length > 0) {
-        for (const cmdPid of cmdPids) {
-          try {
-            const cmdArgs = await getProcessArgs(cmdPid)
-            if (cmdArgs && !shouldIgnoreProcess(cmdArgs)) {
-              results.push({
-                pid: cmdPid,
-                command: cmdArgs,
-                isIdle: false,
-                terminalId,
-              })
-            }
-          } catch {
-            // Process may have exited
-          }
+        if (cmdPids.length > 0) {
+          const cmdArgsList = await Promise.all(
+            cmdPids.map(async (cmdPid) => {
+              try {
+                return { cmdPid, cmdArgs: await getProcessArgs(cmdPid) }
+              } catch {
+                return { cmdPid, cmdArgs: null }
+              }
+            }),
+          )
+          return cmdArgsList
+            .filter(
+              (r): r is { cmdPid: number; cmdArgs: string } =>
+                r.cmdArgs != null && !shouldIgnoreProcess(r.cmdArgs),
+            )
+            .map((r) => ({
+              pid: r.cmdPid,
+              command: r.cmdArgs,
+              isIdle: false,
+              terminalId,
+            }))
         }
-      } else {
         // No children - auto-started command via zellij layout `command` directive
         // runs directly as a child of the server, not wrapped in a shell
         const isIgnored = shellComm ? shouldIgnoreProcess(shellComm) : true
         if (!isIgnored && shellArgs) {
-          results.push({
-            pid: shellPid,
-            command: shellArgs,
-            isIdle: false,
-            terminalId,
-          })
+          return [
+            {
+              pid: shellPid,
+              command: shellArgs,
+              isIdle: false,
+              terminalId,
+            },
+          ]
         }
-      }
+        return []
+      }),
+    )
+    for (const procs of shellResults) {
+      results.push(...procs)
     }
 
     return results
@@ -287,13 +301,11 @@ export async function getDescendantPids(pid: number): Promise<Set<number>> {
   const visit = async (p: number) => {
     if (descendants.has(p)) return
     descendants.add(p)
-    for (const child of await getChildPids(p)) {
-      await visit(child)
-    }
+    const children = await getChildPids(p)
+    await Promise.all(children.map((child) => visit(child)))
   }
-  for (const child of await getChildPids(pid)) {
-    await visit(child)
-  }
+  const children = await getChildPids(pid)
+  await Promise.all(children.map((child) => visit(child)))
   return descendants
 }
 
@@ -412,15 +424,18 @@ export async function getChildProcesses(
     ): Promise<void> => {
       if (visited.has(pid)) return
       visited.add(pid)
-      for (const childPid of await getChildPids(pid)) {
-        try {
-          const name = await getProcessComm(childPid)
-          if (name) pidToName.set(childPid, name)
-          await collectDescendants(childPid, visited)
-        } catch {
-          // Skip
-        }
-      }
+      const childPids = await getChildPids(pid)
+      await Promise.all(
+        childPids.map(async (childPid) => {
+          try {
+            const name = await getProcessComm(childPid)
+            if (name) pidToName.set(childPid, name)
+            await collectDescendants(childPid, visited)
+          } catch {
+            // Skip
+          }
+        }),
+      )
     }
     await collectDescendants(shellPid)
 
@@ -439,14 +454,19 @@ export async function getChildProcesses(
     const results: ActiveProcess[] = []
     const seen = new Set<string>()
 
-    for (const [pid, name] of pidToName) {
-      // Skip our shell and ignored processes
-      if (pid === shellPid) continue
-      if (shouldIgnoreProcess(name)) continue
-
-      const command = (await getProcessArgs(pid)) || name
+    // Filter out shell and ignored processes, then fetch args in parallel
+    const candidates = [...pidToName].filter(
+      ([pid, name]) => pid !== shellPid && !shouldIgnoreProcess(name),
+    )
+    const argsResults = await Promise.all(
+      candidates.map(async ([pid, name]) => ({
+        pid,
+        name,
+        command: (await getProcessArgs(pid)) || name,
+      })),
+    )
+    for (const { pid, name, command } of argsResults) {
       if (shouldIgnoreProcess(command)) continue
-
       if (!seen.has(command)) {
         seen.add(command)
         results.push({ pid, name, command, terminalId, source: 'direct' })
