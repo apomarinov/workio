@@ -12,6 +12,7 @@ import {
   closePR,
   createBranch,
   deleteBranch,
+  editPR,
   getBranches,
   openInExplorer,
   openInIDE,
@@ -19,7 +20,6 @@ import {
   pushBranch,
   rebaseBranch,
   renameBranch,
-  renamePR,
   searchSessionMessages,
   toggleFavoriteSession,
 } from '@/lib/api'
@@ -37,6 +37,7 @@ const CommitDialog = lazy(() =>
 import { ConfirmModal } from '../ConfirmModal'
 import { CreateBranchDialog } from '../CreateBranchDialog'
 import { DirectoryBrowser } from '../DirectoryBrowser'
+import { EditPRDialog } from '../dialogs/EditPRDialog'
 import { RenameModal } from '../EditSessionModal'
 import { EditTerminalModal } from '../EditTerminalModal'
 import { MergePRModal } from '../MergePRModal'
@@ -86,9 +87,7 @@ export function CommandPalette() {
     null,
   )
   const [commitTerminalId, setCommitTerminalId] = useState<number | null>(null)
-  const [renamePRTarget, setRenamePRTarget] = useState<PRCheckStatus | null>(
-    null,
-  )
+  const [editPRTarget, setEditPRTarget] = useState<PRCheckStatus | null>(null)
   const [renameBranchTarget, setRenameBranchTarget] = useState<{
     terminalId: number
     branch: string
@@ -713,9 +712,9 @@ export function CommandPalette() {
         closePalette()
         setTimeout(() => setCloseModal(pr), 150)
       },
-      openRenamePRModal: (pr) => {
+      openEditPRModal: (pr) => {
         closePalette()
-        setTimeout(() => setRenamePRTarget(pr), 150)
+        setTimeout(() => setEditPRTarget(pr), 150)
       },
       openRerunAllModal: (pr) => {
         setRerunAllModal(pr)
@@ -975,19 +974,18 @@ export function CommandPalette() {
         />
       )}
 
-      {renamePRTarget && (
-        <RenameModal
-          open={!!renamePRTarget}
-          title="Rename PR"
-          placeholder="PR title"
-          currentName={renamePRTarget.prTitle}
-          onSave={async (newTitle) => {
-            const [owner, repo] = renamePRTarget.repo.split('/')
-            await renamePR(owner, repo, renamePRTarget.prNumber, newTitle)
-            toast.success(`Renamed PR #${renamePRTarget.prNumber}`)
-            setRenamePRTarget(null)
+      {editPRTarget && (
+        <EditPRDialog
+          open={!!editPRTarget}
+          currentTitle={editPRTarget.prTitle}
+          currentBody={editPRTarget.prBody}
+          onSave={async (newTitle, newBody) => {
+            const [owner, repo] = editPRTarget.repo.split('/')
+            await editPR(owner, repo, editPRTarget.prNumber, newTitle, newBody)
+            toast.success(`Updated PR #${editPRTarget.prNumber}`)
+            setEditPRTarget(null)
           }}
-          onCancel={() => setRenamePRTarget(null)}
+          onCancel={() => setEditPRTarget(null)}
         />
       )}
 

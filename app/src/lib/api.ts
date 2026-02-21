@@ -381,6 +381,27 @@ export async function renamePR(
   }
 }
 
+export async function editPR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  title: string,
+  body: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/edit`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to edit PR')
+  }
+}
+
 export async function renameBranch(
   terminalId: number,
   branch: string,

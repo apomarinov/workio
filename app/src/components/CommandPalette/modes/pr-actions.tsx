@@ -125,14 +125,14 @@ export function createPRActionsMode(
     })
   }
 
-  // Rename PR (only for open PRs)
+  // Edit PR (only for open PRs)
   if (isOpen) {
     items.push({
-      id: 'action:rename',
-      label: 'Rename',
+      id: 'action:edit',
+      label: 'Edit',
       icon: <Pencil className="h-4 w-4 shrink-0 text-zinc-400" />,
       onSelect: () => {
-        actions.openRenamePRModal(pr)
+        actions.openEditPRModal(pr)
       },
     })
   }

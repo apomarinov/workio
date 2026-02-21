@@ -25,6 +25,7 @@ import {
   applyWebhookAndRefresh,
   closePR,
   detectAllTerminalBranches,
+  editPR,
   emitCachedPRChecks,
   fetchAllClosedPRs,
   getGhUsername,
@@ -349,6 +350,23 @@ fastify.post<{
     return reply.status(400).send({ error: 'title is required' })
   }
   const result = await renamePR(owner, repo, Number(pr), title)
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  return { ok: true }
+})
+
+// Edit PR (title + body)
+fastify.post<{
+  Params: { owner: string; repo: string; pr: string }
+  Body: { title: string; body: string }
+}>('/api/github/:owner/:repo/pr/:pr/edit', async (request, reply) => {
+  const { owner, repo, pr } = request.params
+  const { title, body } = request.body
+  if (!title) {
+    return reply.status(400).send({ error: 'title is required' })
+  }
+  const result = await editPR(owner, repo, Number(pr), title, body ?? '')
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }
