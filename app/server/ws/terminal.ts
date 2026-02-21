@@ -16,7 +16,7 @@ import {
 // Message types
 interface InitMessage {
   type: 'init'
-  terminalId: number
+  shellId: number
   cols: number
   rows: number
 }
@@ -55,8 +55,8 @@ interface ReadyMessage {
 
 type ServerMessage = OutputMessage | ExitMessage | ErrorMessage | ReadyMessage
 
-// Track which terminal each WebSocket is connected to
-const wsTerminalMap = new WeakMap<WebSocket, number>()
+// Track which shell each WebSocket is connected to
+const wsShellMap = new WeakMap<WebSocket, number>()
 
 // Debounce resize events to prevent shell redraw spam during drag
 const resizeTimers = new Map<number, ReturnType<typeof setTimeout>>()
@@ -94,7 +94,7 @@ function createOutputBatcher(ws: WebSocket): (data: string) => void {
 }
 
 wss.on('connection', (ws: WebSocket) => {
-  let terminalId: number | null = null
+  let shellId: number | null = null
 
   ws.on('message', async (rawData) => {
     let message: ClientMessage
@@ -107,23 +107,23 @@ wss.on('connection', (ws: WebSocket) => {
 
     switch (message.type) {
       case 'init': {
-        terminalId = message.terminalId
-        wsTerminalMap.set(ws, terminalId)
+        shellId = message.shellId
+        wsShellMap.set(ws, shellId)
 
         // Check if session already exists (reconnection)
-        const existingSession = getSession(terminalId)
+        const existingSession = getSession(shellId)
         if (existingSession) {
           // Clear timeout since client reconnected
-          clearSessionTimeout(terminalId)
+          clearSessionTimeout(shellId)
 
           // Update callbacks to use the new WebSocket
           const batchOutput = createOutputBatcher(ws)
-          attachSession(terminalId, batchOutput, (code) => {
+          attachSession(shellId, batchOutput, (code) => {
             sendMessage(ws, { type: 'exit', code })
           })
 
           // Replay buffer
-          const buffer = getSessionBuffer(terminalId)
+          const buffer = getSessionBuffer(shellId)
           for (const data of buffer) {
             sendMessage(ws, { type: 'output', data })
           }
@@ -135,14 +135,14 @@ wss.on('connection', (ws: WebSocket) => {
           // foreground processes (e.g. Zellij), triggering a full redraw.
           // Without this, TUI apps show stale buffer content and don't
           // respond to mouse/scroll after reconnection.
-          resizeSession(terminalId, message.cols, message.rows)
+          resizeSession(shellId, message.cols, message.rows)
           return
         }
 
         // Create new session
         const batchOutput = createOutputBatcher(ws)
         const session = await createSession(
-          terminalId,
+          shellId,
           message.cols,
           message.rows,
           batchOutput,
@@ -165,31 +165,31 @@ wss.on('connection', (ws: WebSocket) => {
       }
 
       case 'input': {
-        if (terminalId === null) {
+        if (shellId === null) {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
         }
-        writeToSession(terminalId, message.data)
+        writeToSession(shellId, message.data)
         break
       }
 
       case 'resize': {
-        if (terminalId === null) {
+        if (shellId === null) {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
         }
         // Debounce resize to prevent shell redraw spam during drag
-        const tid = terminalId
-        const existingTimer = resizeTimers.get(tid)
+        const sid = shellId
+        const existingTimer = resizeTimers.get(sid)
         if (existingTimer) {
           clearTimeout(existingTimer)
         }
         const { cols, rows } = message
         resizeTimers.set(
-          tid,
+          sid,
           setTimeout(() => {
-            resizeTimers.delete(tid)
-            resizeSession(tid, cols, rows)
+            resizeTimers.delete(sid)
+            resizeSession(sid, cols, rows)
           }, RESIZE_DEBOUNCE_MS),
         )
         break
@@ -198,9 +198,9 @@ wss.on('connection', (ws: WebSocket) => {
   })
 
   ws.on('close', () => {
-    if (terminalId !== null) {
+    if (shellId !== null) {
       // Start timeout - session will be killed after 30 minutes
-      startSessionTimeout(terminalId)
+      startSessionTimeout(shellId)
     }
   })
 

@@ -162,7 +162,7 @@ import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
-  destroySession,
+  destroySessionsForTerminal,
   detectGitBranch,
 } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
@@ -837,10 +837,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(202).send()
     }
 
-    // Kill PTY session for non-delete-flow paths
-    const killed = destroySession(id)
+    // Kill all PTY sessions for non-delete-flow paths
+    const killed = destroySessionsForTerminal(id)
     if (killed) {
-      log.info(`[terminals] Killed PTY session for terminal ${id}`)
+      log.info(`[terminals] Killed PTY sessions for terminal ${id}`)
     }
 
     // Delete workspace directory if requested

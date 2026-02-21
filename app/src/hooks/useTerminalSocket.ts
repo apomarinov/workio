@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 interface UseTerminalSocketOptions {
-  terminalId: number | null
+  shellId: number | null
   cols: number
   rows: number
   onData: (data: string) => void
@@ -22,7 +22,7 @@ const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000] // Exponential backoff
 const MAX_RECONNECT_ATTEMPTS = 10
 
 export function useTerminalSocket({
-  terminalId,
+  shellId,
   cols,
   rows,
   onData,
@@ -38,7 +38,7 @@ export function useTerminalSocket({
   const mountedRef = useRef(true)
 
   // Store current values in refs
-  const terminalIdRef = useRef<number | null>(terminalId)
+  const shellIdRef = useRef<number | null>(shellId)
   const colsRef = useRef(cols)
   const rowsRef = useRef(rows)
   const onDataRef = useRef(onData)
@@ -47,8 +47,8 @@ export function useTerminalSocket({
 
   // Keep refs in sync
   useEffect(() => {
-    terminalIdRef.current = terminalId
-  }, [terminalId])
+    shellIdRef.current = shellId
+  }, [shellId])
 
   useEffect(() => {
     colsRef.current = cols
@@ -97,7 +97,7 @@ export function useTerminalSocket({
   const connect = useCallback(() => {
     if (!mountedRef.current) return
     if (isConnectingRef.current) return
-    if (terminalIdRef.current === null) return
+    if (shellIdRef.current === null) return
 
     // Check max retries
     if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
@@ -109,7 +109,7 @@ export function useTerminalSocket({
     isConnectingRef.current = true
     setStatus('connecting')
 
-    const currentTerminalId = terminalIdRef.current
+    const currentShellId = shellIdRef.current
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/ws/terminal`
 
@@ -123,7 +123,7 @@ export function useTerminalSocket({
         ws.send(
           JSON.stringify({
             type: 'init',
-            terminalId: currentTerminalId,
+            shellId: currentShellId,
             cols: colsRef.current,
             rows: rowsRef.current,
           }),
@@ -194,9 +194,9 @@ export function useTerminalSocket({
     }
   }, [cleanup])
 
-  // Connect when terminalId changes
+  // Connect when shellId changes
   useEffect(() => {
-    if (terminalId !== null) {
+    if (shellId !== null) {
       reconnectAttemptRef.current = 0
       connect()
     } else {
@@ -205,7 +205,7 @@ export function useTerminalSocket({
     }
 
     return cleanup
-  }, [terminalId, connect, cleanup])
+  }, [shellId, connect, cleanup])
 
   const sendInput = useCallback((data: string) => {
     if (

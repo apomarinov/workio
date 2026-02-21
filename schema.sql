@@ -86,6 +86,14 @@ CREATE TABLE IF NOT EXISTS terminals (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Shells table (multiple shells per terminal)
+CREATE TABLE IF NOT EXISTS shells (
+    id SERIAL PRIMARY KEY,
+    terminal_id INTEGER NOT NULL REFERENCES terminals(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL DEFAULT 'main',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Settings table (singleton with JSONB config)
 CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),

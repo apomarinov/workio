@@ -5,9 +5,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as pty from 'node-pty'
 import type { ActiveProcess } from '../../shared/types'
+import type { Shell } from '../../src/types'
 import {
   getAllTerminals,
   getSettings,
+  getShellById,
   getTerminalById,
   updateTerminal,
 } from '../db'
@@ -46,6 +48,7 @@ export interface PtySession {
   pty: TerminalBackend
   buffer: string[]
   timeoutId: NodeJS.Timeout | null
+  shell: Shell
   terminalId: number
   sessionName: string // Zellij session name for process detection
   cols: number
@@ -60,8 +63,31 @@ export interface PtySession {
   processPollTimeoutId: NodeJS.Timeout | null
 }
 
-// In-memory map of active PTY sessions
+// In-memory map of active PTY sessions, keyed by shellId
 const sessions = new Map<number, PtySession>()
+
+// Helper to find session(s) by terminalId (for terminal-level operations)
+function getSessionsForTerminal(terminalId: number): PtySession[] {
+  const result: PtySession[] = []
+  for (const session of sessions.values()) {
+    if (session.terminalId === terminalId) result.push(session)
+  }
+  return result
+}
+
+// Returns the "main" shell session for a terminal
+function getMainSessionForTerminal(terminalId: number): PtySession | undefined {
+  for (const session of sessions.values()) {
+    if (session.terminalId === terminalId && session.shell.name === 'main') {
+      return session
+    }
+  }
+  // Fallback: return any session for this terminal
+  for (const session of sessions.values()) {
+    if (session.terminalId === terminalId) return session
+  }
+  return undefined
+}
 
 // Global process polling
 let globalProcessPollingId: NodeJS.Timeout | null = null
@@ -149,6 +175,7 @@ async function getProcessesForTerminal(
         name: session.currentCommand.split(' ')[0] || '',
         command: session.currentCommand,
         terminalId: terminalId,
+        shellId: session.shell.id,
         source: 'direct',
       })
     }
@@ -177,6 +204,7 @@ async function getProcessesForTerminal(
         name: p.command.split(' ')[0] || '',
         command: p.command,
         terminalId: p.terminalId,
+        shellId: session.shell.id,
         source: 'zellij',
       })
     }
@@ -200,17 +228,29 @@ async function getPortsForTerminal(
 }
 
 async function scanAndEmitProcessesForTerminal(terminalId: number) {
-  const session = sessions.get(terminalId)
-  if (!session) return
+  const terminalSessions = getSessionsForTerminal(terminalId)
+  if (terminalSessions.length === 0) return
 
-  const processes = await getProcessesForTerminal(terminalId, session)
+  const allProcesses: ActiveProcess[] = []
   const systemPorts = await getSystemListeningPorts()
-  const ports = await getPortsForTerminal(session, systemPorts)
-  const terminalPorts: Record<number, number[]> = {}
-  if (ports.length > 0) {
-    terminalPorts[terminalId] = ports
+  const allPorts: number[] = []
+
+  for (const session of terminalSessions) {
+    const procs = await getProcessesForTerminal(terminalId, session)
+    allProcesses.push(...procs)
+    const ports = await getPortsForTerminal(session, systemPorts)
+    allPorts.push(...ports)
   }
-  getIO()?.emit('processes', { terminalId, processes, ports: terminalPorts })
+
+  const terminalPorts: Record<number, number[]> = {}
+  if (allPorts.length > 0) {
+    terminalPorts[terminalId] = [...new Set(allPorts)].sort((a, b) => a - b)
+  }
+  getIO()?.emit('processes', {
+    terminalId,
+    processes: allProcesses,
+    ports: terminalPorts,
+  })
 }
 
 async function scanAndEmitAllProcesses() {
@@ -218,13 +258,16 @@ async function scanAndEmitAllProcesses() {
   const systemPorts = await getSystemListeningPorts()
   const terminalPorts: Record<number, number[]> = {}
 
-  for (const [terminalId, session] of sessions) {
-    const procs = await getProcessesForTerminal(terminalId, session)
+  for (const [_shellId, session] of sessions) {
+    const procs = await getProcessesForTerminal(session.terminalId, session)
     allProcesses.push(...procs)
 
     const ports = await getPortsForTerminal(session, systemPorts)
     if (ports.length > 0) {
-      terminalPorts[terminalId] = ports
+      const existing = terminalPorts[session.terminalId] || []
+      terminalPorts[session.terminalId] = [
+        ...new Set([...existing, ...ports]),
+      ].sort((a, b) => a - b)
     }
   }
 
@@ -235,7 +278,7 @@ async function scanAndEmitAllProcesses() {
       const terminals = await getAllTerminals()
       for (const terminal of terminals) {
         // Try the PTY session name first (set at creation, may differ from current name)
-        const ptySession = sessions.get(terminal.id)
+        const ptySession = getMainSessionForTerminal(terminal.id)
         const sessionName = ptySession?.sessionName
         const terminalName = terminal.name || `terminal-${terminal.id}`
         if (
@@ -540,7 +583,8 @@ async function scanAndEmitGitDirty() {
       // Skip terminals that aren't in a git repo
       if (!terminal.git_branch) continue
       // Skip SSH terminals that don't have an active session
-      if (terminal.ssh_host && !sessions.has(terminal.id)) continue
+      if (terminal.ssh_host && getSessionsForTerminal(terminal.id).length === 0)
+        continue
       checks.push(
         (async () => {
           try {
@@ -794,12 +838,18 @@ export async function detectGitBranch(
   }
 }
 
-export function getSession(terminalId: number): PtySession | undefined {
-  return sessions.get(terminalId)
+export function getSession(shellId: number): PtySession | undefined {
+  return sessions.get(shellId)
+}
+
+export function getSessionByTerminalId(
+  terminalId: number,
+): PtySession | undefined {
+  return getMainSessionForTerminal(terminalId)
 }
 
 export async function createSession(
-  terminalId: number,
+  shellId: number,
   cols: number,
   rows: number,
   onData: (data: string) => void,
@@ -807,7 +857,7 @@ export async function createSession(
   onCommandEvent?: (event: CommandEvent) => void,
 ): Promise<PtySession | null> {
   // Check if session already exists
-  const existing = sessions.get(terminalId)
+  const existing = sessions.get(shellId)
   if (existing) {
     // Clear any pending timeout
     if (existing.timeoutId) {
@@ -816,6 +866,15 @@ export async function createSession(
     }
     return existing
   }
+
+  // Get shell from database to find terminal
+  const shellRecord = await getShellById(shellId)
+  if (!shellRecord) {
+    log.error(`[pty] Shell not found: ${shellId}`)
+    return null
+  }
+
+  const terminalId = shellRecord.terminal_id
 
   // Get terminal from database
   const terminal = await getTerminalById(terminalId)
@@ -922,6 +981,7 @@ export async function createSession(
     pty: backend,
     buffer: [],
     timeoutId: null,
+    shell: shellRecord,
     terminalId,
     sessionName: terminalName,
     cols,
@@ -1003,7 +1063,7 @@ export async function createSession(
 
   // Handle PTY exit
   backend.onExit(({ exitCode }) => {
-    sessions.delete(terminalId)
+    sessions.delete(shellId)
     lastDirtyStatus.delete(terminalId)
     lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()
@@ -1021,7 +1081,7 @@ export async function createSession(
     status: 'running',
   })
 
-  sessions.set(terminalId, session)
+  sessions.set(shellId, session)
 
   // Start global polling if not already running
   startGlobalProcessPolling()
@@ -1105,8 +1165,8 @@ export async function createSession(
   return session
 }
 
-export function writeToSession(terminalId: number, data: string): boolean {
-  const session = sessions.get(terminalId)
+export function writeToSession(shellId: number, data: string): boolean {
+  const session = sessions.get(shellId)
   if (!session) {
     return false
   }
@@ -1115,11 +1175,11 @@ export function writeToSession(terminalId: number, data: string): boolean {
 }
 
 export function resizeSession(
-  terminalId: number,
+  shellId: number,
   cols: number,
   rows: number,
 ): boolean {
-  const session = sessions.get(terminalId)
+  const session = sessions.get(shellId)
   if (!session) {
     return false
   }
@@ -1129,16 +1189,16 @@ export function resizeSession(
   return true
 }
 
-export function getSessionBuffer(terminalId: number): string[] {
-  const session = sessions.get(terminalId)
+export function getSessionBuffer(shellId: number): string[] {
+  const session = sessions.get(shellId)
   if (!session) {
     return []
   }
   return [...session.buffer]
 }
 
-export function startSessionTimeout(terminalId: number): void {
-  const session = sessions.get(terminalId)
+export function startSessionTimeout(shellId: number): void {
+  const session = sessions.get(shellId)
   if (!session) {
     return
   }
@@ -1150,12 +1210,12 @@ export function startSessionTimeout(terminalId: number): void {
 
   // Start new timeout
   session.timeoutId = setTimeout(() => {
-    destroySession(terminalId)
+    destroySession(shellId)
   }, SESSION_TIMEOUT_MS)
 }
 
-export function clearSessionTimeout(terminalId: number): void {
-  const session = sessions.get(terminalId)
+export function clearSessionTimeout(shellId: number): void {
+  const session = sessions.get(shellId)
   if (!session) {
     return
   }
@@ -1166,12 +1226,7 @@ export function clearSessionTimeout(terminalId: number): void {
   }
 }
 
-export function destroySession(terminalId: number): boolean {
-  const session = sessions.get(terminalId)
-  if (!session) {
-    return false
-  }
-
+function destroySessionInternal(session: PtySession): void {
   // Clear timeout
   if (session.timeoutId) {
     clearTimeout(session.timeoutId)
@@ -1180,16 +1235,12 @@ export function destroySession(terminalId: number): boolean {
   // Kill PTY process and all child processes
   try {
     const pid = session.pty.pid
-    // Kill the entire process group (negative PID kills the group)
-    // This ensures child processes (servers, etc.) are also killed
-    // Guard: pid must be > 0 (SSH sessions have pid=0, which would kill our own process group)
     if (pid && pid > 0) {
       try {
         process.kill(-pid, 'SIGTERM')
       } catch {
-        // Process group may not exist, try killing just the process
+        // Process group may not exist
       }
-      // Give processes a moment to clean up, then force kill
       setTimeout(() => {
         try {
           process.kill(-pid, 'SIGKILL')
@@ -1203,14 +1254,46 @@ export function destroySession(terminalId: number): boolean {
     // Process may already be dead
   }
 
+  sessions.delete(session.shell.id)
+}
+
+export function destroySession(shellId: number): boolean {
+  const session = sessions.get(shellId)
+  if (!session) {
+    return false
+  }
+
+  destroySessionInternal(session)
+
   // Update database (fire-and-forget since PTY is already killed)
+  updateTerminal(session.terminalId, {
+    pid: null,
+    status: 'stopped',
+    active_cmd: null,
+  }).catch(() => {})
+
+  lastDirtyStatus.delete(session.terminalId)
+  lastRemoteSyncStatus.delete(session.terminalId)
+  stopGlobalProcessPolling()
+  untrackTerminal(session.terminalId)
+  return true
+}
+
+// Destroy all sessions for a terminal (used when deleting a terminal)
+export function destroySessionsForTerminal(terminalId: number): boolean {
+  const terminalSessions = getSessionsForTerminal(terminalId)
+  if (terminalSessions.length === 0) return false
+
+  for (const session of terminalSessions) {
+    destroySessionInternal(session)
+  }
+
   updateTerminal(terminalId, {
     pid: null,
     status: 'stopped',
     active_cmd: null,
   }).catch(() => {})
 
-  sessions.delete(terminalId)
   lastDirtyStatus.delete(terminalId)
   lastRemoteSyncStatus.delete(terminalId)
   stopGlobalProcessPolling()
@@ -1218,18 +1301,22 @@ export function destroySession(terminalId: number): boolean {
   return true
 }
 
-export function hasActiveSession(terminalId: number): boolean {
-  return sessions.has(terminalId)
+export function hasActiveSession(shellId: number): boolean {
+  return sessions.has(shellId)
+}
+
+export function hasActiveSessionForTerminal(terminalId: number): boolean {
+  return getSessionsForTerminal(terminalId).length > 0
 }
 
 // Update callbacks when a new WebSocket connects to an existing session
 export function attachSession(
-  terminalId: number,
+  shellId: number,
   onData: (data: string) => void,
   onExit: (code: number) => void,
   onCommandEvent?: (event: CommandEvent) => void,
 ): boolean {
-  const session = sessions.get(terminalId)
+  const session = sessions.get(shellId)
   if (!session) {
     return false
   }
@@ -1241,16 +1328,16 @@ export function attachSession(
   return true
 }
 
-export function waitForMarker(terminalId: number): Promise<number> {
+export function waitForMarker(shellId: number): Promise<number> {
   return new Promise<number>((resolve, reject) => {
-    const session = sessions.get(terminalId)
+    const session = sessions.get(shellId)
     if (!session) {
       resolve(0)
       return
     }
     const timeout = setTimeout(() => {
       session.onDoneMarker = null
-      reject(new Error(`waitForMarker timed out for terminal ${terminalId}`))
+      reject(new Error(`waitForMarker timed out for shell ${shellId}`))
     }, LONG_TIMEOUT)
     session.onDoneMarker = (exitCode: number) => {
       clearTimeout(timeout)
@@ -1260,17 +1347,17 @@ export function waitForMarker(terminalId: number): Promise<number> {
 }
 
 export function waitForSession(
-  terminalId: number,
+  shellId: number,
   timeoutMs: number,
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    if (sessions.has(terminalId)) {
+    if (sessions.has(shellId)) {
       resolve(true)
       return
     }
     const start = Date.now()
     const interval = setInterval(() => {
-      if (sessions.has(terminalId)) {
+      if (sessions.has(shellId)) {
         clearInterval(interval)
         resolve(true)
         return
@@ -1283,15 +1370,15 @@ export function waitForSession(
   })
 }
 
-export function interruptSession(terminalId: number): void {
-  const session = sessions.get(terminalId)
+export function interruptSession(shellId: number): void {
+  const session = sessions.get(shellId)
   if (session) {
     session.pty.write('\x03')
   }
 }
 
-export function cancelWaitForMarker(terminalId: number): void {
-  const session = sessions.get(terminalId)
+export function cancelWaitForMarker(shellId: number): void {
+  const session = sessions.get(shellId)
   if (session?.onDoneMarker) {
     const cb = session.onDoneMarker
     session.onDoneMarker = null

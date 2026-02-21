@@ -93,8 +93,8 @@ export const TerminalItem = memo(function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-          ) ??
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
@@ -186,10 +186,9 @@ export const TerminalItem = memo(function TerminalItem({
           }
         }}
         className={cn(
-          `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
           }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
           ((!hasSessions &&
             !hasProcesses &&
@@ -199,18 +198,18 @@ export const TerminalItem = memo(function TerminalItem({
             !showRemoteSync) ||
             isSettingUp ||
             isDeleting) &&
-            'pl-2.5',
+          'pl-2.5',
           hideFolder && 'rounded-l-lg',
         )}
       >
         {!isSettingUp &&
-        !isDeleting &&
-        (hasSessions ||
-          hasProcesses ||
-          hasGitHub ||
-          hasPorts ||
-          isDirty ||
-          showRemoteSync) ? (
+          !isDeleting &&
+          (hasSessions ||
+            hasProcesses ||
+            hasGitHub ||
+            hasPorts ||
+            isDirty ||
+            showRemoteSync) ? (
           <Button
             variant="ghost"
             size="icon"
@@ -239,11 +238,11 @@ export const TerminalItem = memo(function TerminalItem({
                 className={cn(
                   'w-4 h-4 flex-shrink-0',
                   !hasProcesses &&
-                    'fill-muted-foreground/60 group-hover:fill-muted-foreground',
+                  'fill-muted-foreground/60 group-hover:fill-muted-foreground',
                   !hasProcesses && isActive && 'fill-muted-foreground',
                   hasProcesses &&
-                    !isActive &&
-                    'fill-green-500/70 group-hover:fill-green-500',
+                  !isActive &&
+                  'fill-green-500/70 group-hover:fill-green-500',
                   hasProcesses && isActive && 'fill-green-500',
                 )}
               />
@@ -373,251 +372,252 @@ export const TerminalItem = memo(function TerminalItem({
               hasPorts ||
               isDirty ||
               showRemoteSync) && (
-              <>
-                <div className="flex items-center px-2 pl-1 pt-1 flex-wrap">
-                  {hasGitHub && prForBranch && (
-                    <PRTabButton
-                      pr={prForBranch}
-                      withIcon
-                      active={activeTab === 'prs' && isActive}
-                      className={cn(
-                        'whitespace-nowrap',
-                        activeTab === 'prs' && isActive && 'mb-1',
-                      )}
-                      hasNewActivity={prForBranch.hasUnreadNotifications}
-                      onClick={() => {
-                        setActiveTab('prs')
-                      }}
-                    />
-                  )}
-                  {hasProcesses && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('processes')}
-                      className={cn(
-                        'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
-                        activeTab === 'processes'
-                          ? 'text-foreground bg-sidebar-accent'
-                          : 'text-muted-foreground/60 hover:text-muted-foreground',
-                      )}
-                    >
-                      <span className="flex items-center gap-1">
-                        {processes.some(
-                          (p) =>
-                            p.pid > 0 &&
-                            p.terminalId !== undefined &&
-                            isBellSubscribed(p.terminalId, p.pid),
-                        ) && (
-                          <BellRing className="w-2.5 h-2.5 text-yellow-400" />
+                <>
+                  <div className="flex items-center px-2 pl-1 pt-1 flex-wrap">
+                    {hasGitHub && prForBranch && (
+                      <PRTabButton
+                        pr={prForBranch}
+                        withIcon
+                        active={activeTab === 'prs' && isActive}
+                        className={cn(
+                          'whitespace-nowrap'
                         )}
-                        Processes ({processes.length})
-                      </span>
-                    </button>
-                  )}
-                  {hasPorts && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('ports')}
-                      className={cn(
-                        'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
-                        activeTab === 'ports'
-                          ? 'text-foreground bg-sidebar-accent'
-                          : 'text-muted-foreground/60 hover:text-muted-foreground',
-                      )}
-                    >
-                      Ports ({ports.length})
-                    </button>
-                  )}
-                  {isDirty && diffStat && (
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-100 transition-opacity',
-                        isActive && 'opacity-80',
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setCommitOpen(true)
-                      }}
-                    >
-                      {diffStat.added > 0 && (
-                        <span className="text-green-500/80">
-                          +{diffStat.added}
-                        </span>
-                      )}
-                      {diffStat.added > 0 && diffStat.removed > 0 && '/'}
-                      {diffStat.removed > 0 && (
-                        <span className="text-red-400/80">
-                          -{diffStat.removed}
-                        </span>
-                      )}
-                      {diffStat.untracked > 0 &&
-                        (diffStat.added > 0 || diffStat.removed > 0) &&
-                        '/'}
-                      {diffStat.untracked > 0 && (
-                        <span className="text-yellow-500/80">
-                          ?{diffStat.untracked}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                  {showRemoteSync && remoteSyncStat && (
-                    <span
-                      className={cn(
-                        'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded flex items-center gap-1 font-mono',
-                        isActive && 'opacity-80',
-                      )}
-                    >
-                      {remoteSyncStat.noRemote ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex gap-0 group/norem">
-                              <ArrowDown className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500" />
-                              <ArrowUp className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500 translate-x-[-3px]" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>No remote configured</TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <>
-                          {remoteSyncStat.behind > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="flex items-center text-blue-500/80 hover:text-blue-500">
-                                  {remoteSyncStat.behind}
-                                  <ArrowDown className="w-3 h-3" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {remoteSyncStat.behind} commit
-                                {remoteSyncStat.behind > 1 ? 's' : ''} behind
-                                remote
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                          {remoteSyncStat.ahead > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="flex items-center text-green-500/80 hover:text-green-500">
-                                  {remoteSyncStat.ahead}
-                                  <ArrowUp className="w-3 h-3" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {remoteSyncStat.ahead} commit
-                                {remoteSyncStat.ahead > 1 ? 's' : ''} ahead of
-                                remote
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </>
-                      )}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  {activeTab === 'processes' &&
-                    hasProcesses &&
-                    processes.map((process) => {
-                      const subscribed =
-                        process.pid > 0 &&
-                        process.terminalId !== undefined &&
-                        isBellSubscribed(process.terminalId, process.pid)
-                      return (
-                        <div
-                          key={`${process.pid}-${process.command}`}
-                          className="group/proc flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
-                        >
-                          <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
-                          <span className="text-xs truncate w-fit">
-                            {process.command}
-                          </span>
-                          <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
-                            {process.pid > 0 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (subscribed) {
-                                    unsubscribeFromBell(
-                                      terminal.id,
-                                      process.pid,
-                                    )
-                                    toast('Unsubscribed from process')
-                                  } else {
-                                    subscribeToBell(process, displayName)
-                                    toast('Subscribed — will notify when done')
-                                  }
-                                }}
-                                className={cn(
-                                  'transition-colors cursor-pointer',
-                                  subscribed
-                                    ? 'text-yellow-400'
-                                    : 'text-muted-foreground hover:text-foreground hidden group-hover/proc:block',
-                                )}
-                              >
-                                {subscribed ? (
-                                  <BellRing className="w-3 h-3" />
-                                ) : (
-                                  <Bell className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-                            {process.isZellij && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  emit('zellij-attach', {
-                                    terminalId: terminal.id,
-                                  })
-                                }}
-                                className="hidden group-hover/proc:block text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <Link className="w-3 h-3" />
-                              </button>
-                            )}
-                            {process.pid > 0 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  emit('kill-process', { pid: process.pid })
-                                  toast('Process killed')
-                                }}
-                                className="hidden group-hover/proc:block text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  {activeTab === 'ports' &&
-                    hasPorts &&
-                    ports.map((port) => (
-                      <a
-                        key={port}
-                        href={`http://localhost:${port}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                        hasNewActivity={prForBranch.hasUnreadNotifications}
+                        onClick={() => {
+                          setActiveTab('prs')
+                        }}
+                      />
+                    )}
+                    {hasProcesses && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('processes')}
+                        className={cn(
+                          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+                          activeTab === 'processes'
+                            ? 'text-foreground bg-sidebar-accent'
+                            : 'text-muted-foreground/60 hover:text-muted-foreground',
+                        )}
                       >
-                        <span className="text-xs">{port}</span>
-                        <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
-                      </a>
-                    ))}
-                  {activeTab === 'prs' && hasGitHub && prForBranch && (
-                    <PRStatusContent
-                      pr={prForBranch}
-                      expanded={true}
-                      hasNewActivity={prForBranch.hasUnreadNotifications}
-                    />
-                  )}
-                </div>
-              </>
-            )}
+                        <span className="flex items-center gap-1">
+                          {processes.some(
+                            (p) =>
+                              p.pid > 0 &&
+                              p.terminalId !== undefined &&
+                              isBellSubscribed(p.terminalId, p.pid),
+                          ) && (
+                              <BellRing className="w-2.5 h-2.5 text-yellow-400" />
+                            )}
+                          Processes ({processes.length})
+                        </span>
+                      </button>
+                    )}
+                    {hasPorts && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('ports')}
+                        className={cn(
+                          'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors cursor-pointer',
+                          activeTab === 'ports'
+                            ? 'text-foreground bg-sidebar-accent'
+                            : 'text-muted-foreground/60 hover:text-muted-foreground',
+                        )}
+                      >
+                        Ports ({ports.length})
+                      </button>
+                    )}
+                    {isDirty && diffStat && (
+                      <button
+                        type="button"
+                        className={cn(
+                          'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded font-mono cursor-pointer hover:opacity-100 transition-opacity',
+                          isActive && 'opacity-80',
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setCommitOpen(true)
+                        }}
+                      >
+                        {diffStat.added > 0 && (
+                          <span className="text-green-500/80">
+                            +{diffStat.added}
+                          </span>
+                        )}
+                        {diffStat.added > 0 && diffStat.removed > 0 && '/'}
+                        {diffStat.removed > 0 && (
+                          <span className="text-red-400/80">
+                            -{diffStat.removed}
+                          </span>
+                        )}
+                        {diffStat.untracked > 0 &&
+                          (diffStat.added > 0 || diffStat.removed > 0) &&
+                          '/'}
+                        {diffStat.untracked > 0 && (
+                          <span className="text-yellow-500/80">
+                            ?{diffStat.untracked}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    {showRemoteSync && remoteSyncStat && (
+                      <span
+                        className={cn(
+                          'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded flex items-center gap-1 font-mono',
+                          isActive && 'opacity-80',
+                        )}
+                      >
+                        {remoteSyncStat.noRemote ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex gap-0 group/norem">
+                                <ArrowDown className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500" />
+                                <ArrowUp className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500 translate-x-[-3px]" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>No remote configured</TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <>
+                            {remoteSyncStat.behind > 0 && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center text-blue-500/80 hover:text-blue-500">
+                                    {remoteSyncStat.behind}
+                                    <ArrowDown className="w-3 h-3" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {remoteSyncStat.behind} commit
+                                  {remoteSyncStat.behind > 1 ? 's' : ''} behind
+                                  remote
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {remoteSyncStat.ahead > 0 && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center text-green-500/80 hover:text-green-500">
+                                    {remoteSyncStat.ahead}
+                                    <ArrowUp className="w-3 h-3" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {remoteSyncStat.ahead} commit
+                                  {remoteSyncStat.ahead > 1 ? 's' : ''} ahead of
+                                  remote
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    {activeTab === 'processes' &&
+                      hasProcesses &&
+                      processes.map((process) => {
+                        const subscribed =
+                          process.pid > 0 &&
+                          process.terminalId !== undefined &&
+                          isBellSubscribed(process.terminalId, process.pid)
+                        return (
+                          <div
+                            key={`${process.pid}-${process.command}`}
+                            className="group/proc flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                          >
+                            <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                            <span className="text-xs truncate w-fit">
+                              {process.command}
+                            </span>
+                            <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
+                              {process.pid > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (subscribed) {
+                                      unsubscribeFromBell(
+                                        terminal.id,
+                                        process.pid,
+                                      )
+                                      toast('Unsubscribed from process')
+                                    } else {
+                                      subscribeToBell(process, displayName)
+                                      toast('Subscribed — will notify when done')
+                                    }
+                                  }}
+                                  className={cn(
+                                    'transition-colors cursor-pointer',
+                                    subscribed
+                                      ? 'text-yellow-400'
+                                      : 'text-muted-foreground hover:text-foreground hidden group-hover/proc:block',
+                                  )}
+                                >
+                                  {subscribed ? (
+                                    <BellRing className="w-3 h-3" />
+                                  ) : (
+                                    <Bell className="w-3 h-3" />
+                                  )}
+                                </button>
+                              )}
+                              {process.isZellij && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    emit('zellij-attach', {
+                                      terminalId: terminal.id,
+                                    })
+                                  }}
+                                  className="hidden group-hover/proc:block text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                >
+                                  <Link className="w-3 h-3" />
+                                </button>
+                              )}
+                              {process.pid > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    emit('kill-process', { pid: process.pid })
+                                    toast('Process killed')
+                                  }}
+                                  className="hidden group-hover/proc:block text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    {activeTab === 'ports' &&
+                      hasPorts &&
+                      ports.map((port) => (
+                        <a
+                          key={port}
+                          href={`http://localhost:${port}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center group/port ml-4 gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                        >
+                          <span className="text-xs">{port}</span>
+                          <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block" />
+                        </a>
+                      ))}
+                    {activeTab === 'prs' && hasGitHub && prForBranch && (
+                      <div className={cn(isActive && 'mt-1')}>
+                        <PRStatusContent
+                          pr={prForBranch}
+                          expanded={true}
+                          hasNewActivity={prForBranch.hasUnreadNotifications}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             {sessions.length > 0 && (
               <>
                 <button

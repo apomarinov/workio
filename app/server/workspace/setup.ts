@@ -6,6 +6,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import {
   deleteTerminal,
+  getMainShellForTerminal,
   getTerminalById,
   insertNotification,
   logCommand,
@@ -15,8 +16,8 @@ import { getIO } from '../io'
 import { log } from '../logger'
 import {
   cancelWaitForMarker,
-  destroySession,
-  getSession,
+  destroySessionsForTerminal,
+  getSessionByTerminalId,
   interruptSession,
   waitForMarker,
   waitForSession,
@@ -675,14 +676,16 @@ export async function setupTerminalWorkspace(
       )
       if (setupScript) {
         const setupCmd = `bash "${setupScript}"`
-        const hasSession = await waitForSession(terminalId, 30_000)
+        const mainShell = await getMainShellForTerminal(terminalId)
+        const shellId = mainShell?.id ?? 0
+        const hasSession = await waitForSession(shellId, 30_000)
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
         if (hasSession) {
           writeToSession(
-            terminalId,
+            shellId,
             `cd "${targetPath}" && bash "${setupScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
           )
-          const exitCode = await waitForMarker(terminalId)
+          const exitCode = await waitForMarker(shellId)
           if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
           logCommand({
             terminalId,
@@ -707,7 +710,7 @@ export async function setupTerminalWorkspace(
       const terminal = await getTerminalById(terminalId)
       if (terminal?.git_repo?.status === 'setup') {
         // Clone phase: destroy session, rm partial dir, delete terminal
-        destroySession(terminalId)
+        destroySessionsForTerminal(terminalId)
         if (targetPath) {
           try {
             await rmrf(targetPath, sshHost)
@@ -783,16 +786,17 @@ export async function deleteTerminalWorkspace(
     )
     if (deleteScript) {
       const deleteCmd = `bash "${deleteScript}"`
-      const session = getSession(terminalId)
+      const session = getSessionByTerminalId(terminalId)
       if (session) {
-        interruptSession(terminalId)
+        const shellId = session.shell.id
+        interruptSession(shellId)
         await new Promise((r) => setTimeout(r, 300))
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
         writeToSession(
-          terminalId,
+          shellId,
           `cd "${terminal.cwd}" && bash "${deleteScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
         )
-        const exitCode = await waitForMarker(terminalId)
+        const exitCode = await waitForMarker(shellId)
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
         logCommand({
           terminalId,
@@ -807,8 +811,8 @@ export async function deleteTerminalWorkspace(
       }
     }
 
-    // Cleanup: destroy session, remove files, delete from DB
-    destroySession(terminalId)
+    // Cleanup: destroy all shell sessions, remove files, delete from DB
+    destroySessionsForTerminal(terminalId)
     const rmCmd = `rm -rf ${terminal.cwd}`
     await rmrf(terminal.cwd, sshHost)
     logCommand({
@@ -857,8 +861,11 @@ export function cancelWorkspaceOperation(terminalId: number): boolean {
   const controller = activeOperations.get(terminalId)
   if (!controller) return false
 
-  interruptSession(terminalId)
-  cancelWaitForMarker(terminalId)
+  const session = getSessionByTerminalId(terminalId)
+  if (session) {
+    interruptSession(session.shell.id)
+    cancelWaitForMarker(session.shell.id)
+  }
   controller.abort()
 
   return true

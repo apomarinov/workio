@@ -109,9 +109,10 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
     })
   }, [])
 
+  const mainShellId = terminal?.shells?.[0]?.id ?? null
   const plusCols = 0
   const { status, sendInput, sendResize } = useTerminalSocket({
-    terminalId: isCloning ? null : terminalId,
+    shellId: isCloning ? null : mainShellId,
     cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
     onData: handleData,

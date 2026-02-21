@@ -13,6 +13,13 @@ export interface SetupStatus {
   error?: string
 }
 
+export interface Shell {
+  id: number
+  terminal_id: number
+  name: string
+  created_at: string
+}
+
 export interface Terminal {
   id: number
   cwd: string
@@ -26,6 +33,7 @@ export interface Terminal {
   git_repo: GitRepoStatus | null
   setup: SetupStatus | null
   settings: { defaultClaudeCommand?: string } | null
+  shells: Shell[]
   orphaned?: boolean
   created_at: string
   updated_at: string

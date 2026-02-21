@@ -10,6 +10,7 @@ import type {
   SessionSearchMatch,
   SessionWithProject,
   Settings,
+  Shell,
   Terminal,
 } from '../src/types'
 import { DEFAULT_KEYMAP } from '../src/types'
@@ -457,12 +458,33 @@ export async function searchSessionMessages(
 
 // Terminal queries
 
+async function attachShellsToTerminals(
+  terminals: Terminal[],
+): Promise<Terminal[]> {
+  if (terminals.length === 0) return terminals
+  const ids = terminals.map((t) => t.id)
+  const { rows: shells } = await pool.query(
+    'SELECT * FROM shells WHERE terminal_id = ANY($1) ORDER BY id',
+    [ids],
+  )
+  const shellsByTerminal = new Map<number, Shell[]>()
+  for (const s of shells) {
+    const list = shellsByTerminal.get(s.terminal_id) || []
+    list.push(s)
+    shellsByTerminal.set(s.terminal_id, list)
+  }
+  for (const t of terminals) {
+    t.shells = shellsByTerminal.get(t.id) || []
+  }
+  return terminals
+}
+
 export async function getAllTerminals(): Promise<Terminal[]> {
   const { rows } = await pool.query(`
     SELECT * FROM terminals
     ORDER BY created_at DESC
   `)
-  return rows
+  return attachShellsToTerminals(rows)
 }
 
 export async function getTerminalById(
@@ -474,7 +496,9 @@ export async function getTerminalById(
   `,
     [id],
   )
-  return rows[0]
+  if (rows.length === 0) return undefined
+  const [terminal] = await attachShellsToTerminals(rows)
+  return terminal
 }
 
 // Generate unique terminal name by appending -1, -2, etc. if name exists
@@ -539,7 +563,16 @@ export async function createTerminal(
       settings ? JSON.stringify(settings) : null,
     ],
   )
-  return rows[0]
+  const terminal = rows[0] as Terminal
+
+  // Auto-create main shell
+  const { rows: shellRows } = await pool.query(
+    `INSERT INTO shells (terminal_id, name) VALUES ($1, 'main') RETURNING *`,
+    [terminal.id],
+  )
+  terminal.shells = shellRows
+
+  return terminal
 }
 
 export async function updateTerminal(
@@ -651,7 +684,51 @@ export async function updateTerminal(
 }
 
 export async function deleteTerminal(id: number): Promise<boolean> {
+  // shells are deleted via ON DELETE CASCADE
   const result = await pool.query('DELETE FROM terminals WHERE id = $1', [id])
+  return (result.rowCount ?? 0) > 0
+}
+
+// Shell queries
+
+export async function createShell(
+  terminalId: number,
+  name = 'main',
+): Promise<Shell> {
+  const { rows } = await pool.query(
+    `INSERT INTO shells (terminal_id, name) VALUES ($1, $2) RETURNING *`,
+    [terminalId, name],
+  )
+  return rows[0]
+}
+
+export async function getShellsForTerminal(
+  terminalId: number,
+): Promise<Shell[]> {
+  const { rows } = await pool.query(
+    'SELECT * FROM shells WHERE terminal_id = $1 ORDER BY id',
+    [terminalId],
+  )
+  return rows
+}
+
+export async function getShellById(id: number): Promise<Shell | undefined> {
+  const { rows } = await pool.query('SELECT * FROM shells WHERE id = $1', [id])
+  return rows[0]
+}
+
+export async function getMainShellForTerminal(
+  terminalId: number,
+): Promise<Shell | undefined> {
+  const { rows } = await pool.query(
+    'SELECT * FROM shells WHERE terminal_id = $1 ORDER BY id LIMIT 1',
+    [terminalId],
+  )
+  return rows[0]
+}
+
+export async function deleteShell(id: number): Promise<boolean> {
+  const result = await pool.query('DELETE FROM shells WHERE id = $1', [id])
   return (result.rowCount ?? 0) > 0
 }
 

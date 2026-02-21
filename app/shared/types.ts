@@ -3,6 +3,7 @@ export interface ActiveProcess {
   name: string
   command: string
   terminalId?: number
+  shellId?: number
   source?: 'direct' | 'zellij'
   isZellij?: boolean
 }
