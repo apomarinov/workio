@@ -28,6 +28,7 @@ type Subscriptions = Record<string, Subscription>
 interface ProcessContextValue {
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
+  shellPorts: Record<number, number[]>
   gitDirtyStatus: Record<
     number,
     { added: number; removed: number; untracked: number }
@@ -51,6 +52,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
   const [terminalPorts, setTerminalPorts] = useState<Record<number, number[]>>(
     {},
   )
+  const [shellPorts, setShellPorts] = useState<Record<number, number[]>>({})
   const [gitDirtyStatus, setGitDirtyStatus] = useState<
     Record<number, { added: number; removed: number; untracked: number }>
   >({})
@@ -138,6 +140,24 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
             return next
           }
           return data.ports ?? {}
+        })
+      }
+
+      if (data.shellPorts) {
+        setShellPorts((prev) => {
+          if (data.terminalId !== undefined) {
+            // Partial update: merge shell ports for this terminal's shells
+            const next = { ...prev }
+            for (const [shellId, ports] of Object.entries(data.shellPorts!)) {
+              if (ports.length > 0) {
+                next[Number(shellId)] = ports
+              } else {
+                delete next[Number(shellId)]
+              }
+            }
+            return next
+          }
+          return data.shellPorts ?? {}
         })
       }
     })
@@ -233,6 +253,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     () => ({
       processes,
       terminalPorts,
+      shellPorts,
       gitDirtyStatus,
       gitRemoteSyncStatus,
       subscribeToBell,
@@ -242,6 +263,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     [
       processes,
       terminalPorts,
+      shellPorts,
       gitDirtyStatus,
       gitRemoteSyncStatus,
       subscriptions,

@@ -12,6 +12,7 @@ export interface ProcessesPayload {
   terminalId?: number
   processes: ActiveProcess[]
   ports?: Record<number, number[]>
+  shellPorts?: Record<number, number[]>
 }
 
 export interface FailedPRCheck {

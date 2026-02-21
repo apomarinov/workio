@@ -52,7 +52,11 @@ import {
 import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
-import { getSession, startGitDirtyPolling, writeToSession } from './pty/manager'
+import {
+  getSessionByTerminalId,
+  startGitDirtyPolling,
+  writeToSession,
+} from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
 import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
@@ -147,12 +151,13 @@ io.on('connection', (socket) => {
 
   socket.on('zellij-attach', async (data: { terminalId: number }) => {
     const { terminalId } = data
-    const session = getSession(terminalId)
+    const session = getSessionByTerminalId(terminalId)
+    if (!session) return
     const sessionName =
-      session?.sessionName ||
+      session.sessionName ||
       (await getTerminalById(terminalId))?.name ||
       `terminal-${terminalId}`
-    writeToSession(terminalId, `zellij attach '${sessionName}'\n`)
+    writeToSession(session.shell.id, `zellij attach '${sessionName}'\n`)
   })
 
   socket.on(
@@ -166,19 +171,21 @@ io.on('connection', (socket) => {
       const fullCommand = `${cmd} --resume ${sessionId}`
 
       // Check if zellij is running for this terminal
-      const ptySession = getSession(terminalId)
+      const ptySession = getSessionByTerminalId(terminalId)
+      if (!ptySession) return
+      const shellId = ptySession.shell.id
       const zellijName =
-        ptySession?.sessionName || terminal?.name || `terminal-${terminalId}`
+        ptySession.sessionName || terminal?.name || `terminal-${terminalId}`
       const zellijSessions = await getActiveZellijSessionNames()
       const hasZellij = zellijSessions.has(zellijName)
 
       if (hasZellij) {
-        writeToSession(terminalId, 'zellij action new-tab\n')
+        writeToSession(shellId, 'zellij action new-tab\n')
         setTimeout(() => {
-          writeToSession(terminalId, `${fullCommand}\n`)
+          writeToSession(shellId, `${fullCommand}\n`)
         }, 300)
       } else {
-        writeToSession(terminalId, `${fullCommand}\n`)
+        writeToSession(shellId, `${fullCommand}\n`)
       }
     },
   )

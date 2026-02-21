@@ -8,6 +8,7 @@ import type {
   SessionSearchMatch,
   SessionWithProject,
   Settings,
+  Shell,
   Terminal,
 } from '../types'
 
@@ -894,6 +895,34 @@ export async function deleteAllNotifications(): Promise<{ count: number }> {
   })
   if (!res.ok) throw new Error('Failed to delete notifications')
   return res.json()
+}
+
+// Shell management
+
+export async function createShellForTerminal(
+  terminalId: number,
+  name?: string,
+): Promise<Shell> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/shells`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to create shell')
+  }
+  return res.json()
+}
+
+export async function deleteShell(shellId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/shells/${shellId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to delete shell')
+  }
 }
 
 // Session move

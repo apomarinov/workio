@@ -190,11 +190,17 @@ async function getProcessesForTerminal(
       // Try current terminal name from DB (in case zellij restarted with new name)
       const terminal = await getTerminalById(terminalId)
       const currentName = terminal?.name || `terminal-${terminalId}`
-      if (currentName !== session.sessionName) {
-        zellijProcs = await getZellijSessionProcesses(currentName, terminalId)
+      // For main shell, the session name is the terminal name
+      // For other shells, it's terminalName-shellName
+      const expectedName =
+        session.shell.name === 'main'
+          ? currentName
+          : `${currentName}-${session.shell.name}`
+      if (expectedName !== session.sessionName) {
+        zellijProcs = await getZellijSessionProcesses(expectedName, terminalId)
         // Update session name if we found processes with the new name
         if (zellijProcs.length > 0) {
-          session.sessionName = currentName
+          session.sessionName = expectedName
         }
       }
     }
@@ -234,12 +240,16 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const allProcesses: ActiveProcess[] = []
   const systemPorts = await getSystemListeningPorts()
   const allPorts: number[] = []
+  const shellPorts: Record<number, number[]> = {}
 
   for (const session of terminalSessions) {
     const procs = await getProcessesForTerminal(terminalId, session)
     allProcesses.push(...procs)
     const ports = await getPortsForTerminal(session, systemPorts)
     allPorts.push(...ports)
+    if (ports.length > 0) {
+      shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+    }
   }
 
   const terminalPorts: Record<number, number[]> = {}
@@ -250,6 +260,7 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
     terminalId,
     processes: allProcesses,
     ports: terminalPorts,
+    shellPorts,
   })
 }
 
@@ -257,6 +268,7 @@ async function scanAndEmitAllProcesses() {
   const allProcesses: ActiveProcess[] = []
   const systemPorts = await getSystemListeningPorts()
   const terminalPorts: Record<number, number[]> = {}
+  const shellPorts: Record<number, number[]> = {}
 
   for (const [_shellId, session] of sessions) {
     const procs = await getProcessesForTerminal(session.terminalId, session)
@@ -268,23 +280,36 @@ async function scanAndEmitAllProcesses() {
       terminalPorts[session.terminalId] = [
         ...new Set([...existing, ...ports]),
       ].sort((a, b) => a - b)
+      shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
     }
   }
 
-  // Check for active zellij sessions matching each terminal
+  // Check for active zellij sessions matching each shell's session name
   try {
     const zellijSessions = await getActiveZellijSessionNames()
     if (zellijSessions.size > 0) {
+      // Check active sessions first
+      const sessionTerminalIds = new Set<number>()
+      for (const [_shellId, session] of sessions) {
+        sessionTerminalIds.add(session.terminalId)
+        if (zellijSessions.has(session.sessionName)) {
+          allProcesses.push({
+            pid: 0,
+            name: 'zellij',
+            command: 'zellij',
+            terminalId: session.terminalId,
+            shellId: session.shell.id,
+            source: 'zellij',
+            isZellij: true,
+          })
+        }
+      }
+      // Also check terminals without active sessions (zellij might still be running)
       const terminals = await getAllTerminals()
       for (const terminal of terminals) {
-        // Try the PTY session name first (set at creation, may differ from current name)
-        const ptySession = getMainSessionForTerminal(terminal.id)
-        const sessionName = ptySession?.sessionName
+        if (sessionTerminalIds.has(terminal.id)) continue
         const terminalName = terminal.name || `terminal-${terminal.id}`
-        if (
-          (sessionName && zellijSessions.has(sessionName)) ||
-          zellijSessions.has(terminalName)
-        ) {
+        if (zellijSessions.has(terminalName)) {
           allProcesses.push({
             pid: 0,
             name: 'zellij',
@@ -300,7 +325,11 @@ async function scanAndEmitAllProcesses() {
     // Ignore zellij detection errors
   }
 
-  getIO()?.emit('processes', { processes: allProcesses, ports: terminalPorts })
+  getIO()?.emit('processes', {
+    processes: allProcesses,
+    ports: terminalPorts,
+    shellPorts,
+  })
 }
 
 function startGlobalProcessPolling() {
@@ -983,7 +1012,10 @@ export async function createSession(
     timeoutId: null,
     shell: shellRecord,
     terminalId,
-    sessionName: terminalName,
+    sessionName:
+      shellRecord.name === 'main'
+        ? terminalName
+        : `${terminalName}-${shellRecord.name}`,
     cols,
     rows,
     onData,

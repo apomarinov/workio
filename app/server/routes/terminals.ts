@@ -150,9 +150,12 @@ function parseChangedFiles(
 }
 
 import {
+  createShell,
   createTerminal,
+  deleteShell,
   deleteTerminal,
   getAllTerminals,
+  getShellById,
   getTerminalById,
   logCommand,
   terminalNameExists,
@@ -162,6 +165,7 @@ import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
+  destroySession,
   destroySessionsForTerminal,
   detectGitBranch,
 } from '../pty/manager'
@@ -2374,6 +2378,61 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           error: errorMessage,
         })
       }
+    },
+  )
+
+  // Create a new shell for a terminal
+  fastify.post<{ Params: TerminalParams; Body: { name?: string } }>(
+    '/api/terminals/:id/shells',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      const name = request.body?.name?.trim()
+      if (name === 'main') {
+        return reply
+          .status(400)
+          .send({ error: '"main" is a reserved shell name' })
+      }
+
+      // Auto-generate name if not provided
+      const shellName = name || `shell-${terminal.shells.length + 1}`
+
+      const shell = await createShell(id, shellName)
+      return reply.status(201).send(shell)
+    },
+  )
+
+  // Delete a shell
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/shells/:id',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid shell id' })
+      }
+
+      const shell = await getShellById(id)
+      if (!shell) {
+        return reply.status(404).send({ error: 'Shell not found' })
+      }
+
+      if (shell.name === 'main') {
+        return reply.status(400).send({ error: 'Cannot delete the main shell' })
+      }
+
+      // Destroy PTY session for this shell
+      destroySession(id)
+
+      await deleteShell(id)
+      return reply.status(204).send()
     },
   )
 }

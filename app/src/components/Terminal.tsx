@@ -16,10 +16,11 @@ import { openInIDE } from '../lib/api'
 
 interface TerminalProps {
   terminalId: number
+  shellId: number
   isVisible: boolean
 }
 
-export function Terminal({ terminalId, isVisible }: TerminalProps) {
+export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const { terminals } = useTerminalContext()
   const terminal = terminals.find((t) => t.id === terminalId)
   const isCloning = terminal?.git_repo?.status === 'setup'
@@ -109,10 +110,9 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
     })
   }, [])
 
-  const mainShellId = terminal?.shells?.[0]?.id ?? null
   const plusCols = 0
   const { status, sendInput, sendResize } = useTerminalSocket({
-    shellId: isCloning ? null : mainShellId,
+    shellId: isCloning ? null : shellId,
     cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
     onData: handleData,
@@ -141,9 +141,10 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
   }, [sendInput, sendResize])
 
   // Listen for terminal-paste events (e.g. from file picker)
+  // Guard with isVisible so only the active shell receives the paste
   useEffect(() => {
     const handler = (e: CustomEvent<{ terminalId: number; text: string }>) => {
-      if (e.detail.terminalId === terminalId) {
+      if (e.detail.terminalId === terminalId && isVisibleRef.current) {
         sendInputRef.current(e.detail.text)
       }
     }
@@ -155,7 +156,7 @@ export function Terminal({ terminalId, isVisible }: TerminalProps) {
   // Listen for terminal-focus events (e.g. from resume session)
   useEffect(() => {
     const handler = (e: CustomEvent<{ terminalId: number }>) => {
-      if (e.detail.terminalId === terminalId) {
+      if (e.detail.terminalId === terminalId && isVisibleRef.current) {
         terminalRef.current?.focus()
       }
     }

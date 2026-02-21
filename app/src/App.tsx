@@ -8,10 +8,11 @@ import {
   useDefaultLayout,
 } from 'react-resizable-panels'
 import { Button } from '@/components/ui/button'
-import { Toaster } from '@/components/ui/sonner'
+import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
+import { ShellTabs } from './components/ShellTabs'
 import { Sidebar } from './components/Sidebar'
 
 const SessionChat = lazy(() =>
@@ -25,7 +26,10 @@ import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSocket } from './hooks/useSocket'
+import { createShellForTerminal, deleteShell } from './lib/api'
+import { cn } from './lib/utils'
 import type { HookEvent } from './types'
 
 function setFavicon(href: string) {
@@ -45,6 +49,7 @@ function AppContent() {
     activeTerminal,
     selectTerminal,
     selectPreviousTerminal,
+    refetch,
   } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe } = useSocket()
@@ -54,6 +59,102 @@ function AppContent() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
+
+  // Multi-shell state
+  const [activeShells, setActiveShells] = useState<Record<number, number>>({})
+  const [tabBar] = useLocalStorage('shell-tabs-bar', true)
+
+  // Clean up stale activeShells entries when terminals/shells change
+  useEffect(() => {
+    setActiveShells((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const [tidStr, shellId] of Object.entries(next)) {
+        const tid = Number(tidStr)
+        const terminal = terminals.find((t) => t.id === tid)
+        if (!terminal || !terminal.shells.some((s) => s.id === shellId)) {
+          const main = terminal?.shells.find((s) => s.name === 'main')
+          if (main) {
+            next[tid] = main.id
+          } else {
+            delete next[tid]
+          }
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [terminals])
+
+  const handleCreateShell = async (terminalId: number) => {
+    try {
+      const shell = await createShellForTerminal(terminalId)
+      await refetch()
+      setActiveShells((prev) => ({ ...prev, [terminalId]: shell.id }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create shell')
+    }
+  }
+
+  const handleDeleteShell = async (terminalId: number, shellId: number) => {
+    try {
+      await deleteShell(shellId)
+      await refetch()
+      const terminal = terminalsRef.current.find((t) => t.id === terminalId)
+      const main = terminal?.shells.find((s) => s.name === 'main')
+      if (main) setActiveShells((prev) => ({ ...prev, [terminalId]: main.id }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete shell')
+    }
+  }
+
+  // Refs for shell handlers so event listeners get latest versions
+  const handleCreateShellRef = useRef(handleCreateShell)
+  handleCreateShellRef.current = handleCreateShell
+  const handleDeleteShellRef = useRef(handleDeleteShell)
+  handleDeleteShellRef.current = handleDeleteShell
+
+  // Shell event listeners (dispatched from TerminalItem sidebar)
+  useEffect(() => {
+    const onSelect = (
+      e: CustomEvent<{ terminalId: number; shellId: number }>,
+    ) => {
+      setActiveShells((prev) => ({
+        ...prev,
+        [e.detail.terminalId]: e.detail.shellId,
+      }))
+    }
+    const onCreate = (e: CustomEvent<{ terminalId: number }>) => {
+      handleCreateShellRef.current(e.detail.terminalId)
+    }
+    const onDelete = (
+      e: CustomEvent<{ terminalId: number; shellId: number }>,
+    ) => {
+      handleDeleteShellRef.current(e.detail.terminalId, e.detail.shellId)
+    }
+    const onReset = (e: CustomEvent<{ terminalId: number }>) => {
+      const terminal = terminalsRef.current.find(
+        (t) => t.id === e.detail.terminalId,
+      )
+      const main = terminal?.shells.find((s) => s.name === 'main')
+      if (main)
+        setActiveShells((prev) => ({
+          ...prev,
+          [e.detail.terminalId]: main.id,
+        }))
+    }
+
+    window.addEventListener('shell-select', onSelect as EventListener)
+    window.addEventListener('shell-create', onCreate as EventListener)
+    window.addEventListener('shell-delete', onDelete as EventListener)
+    window.addEventListener('shell-reset', onReset as EventListener)
+    return () => {
+      window.removeEventListener('shell-select', onSelect as EventListener)
+      window.removeEventListener('shell-create', onCreate as EventListener)
+      window.removeEventListener('shell-delete', onDelete as EventListener)
+      window.removeEventListener('shell-reset', onReset as EventListener)
+    }
+  }, [])
 
   useKeyboardShortcuts({
     goToTab: (index) => {
@@ -264,13 +365,51 @@ function AppContent() {
                 />
               </div>
             ) : null}
-            {terminals.map((t) => (
-              <Terminal
-                key={t.id}
-                terminalId={t.id}
-                isVisible={!activeSessionId && t.id === activeTerminal?.id}
-              />
-            ))}
+            {terminals.map((t) => {
+              const mainShell = t.shells.find((s) => s.name === 'main')
+              const activeShellId =
+                activeShells[t.id] ?? mainShell?.id ?? t.shells[0]?.id
+              const isTermVisible =
+                !activeSessionId && t.id === activeTerminal?.id
+
+              return (
+                <div
+                  key={t.id}
+                  className={cn(
+                    'absolute inset-0 flex flex-col bg-[#1a1a1a]',
+                    !isTermVisible && 'invisible',
+                  )}
+                >
+                  {tabBar && activeShellId != null && (
+                    <ShellTabs
+                      terminal={t}
+                      activeShellId={activeShellId}
+                      onSelectShell={(shellId) =>
+                        setActiveShells((prev) => ({
+                          ...prev,
+                          [t.id]: shellId,
+                        }))
+                      }
+                      onCreateShell={() => handleCreateShell(t.id)}
+                      onDeleteShell={(shellId) =>
+                        handleDeleteShell(t.id, shellId)
+                      }
+                      className="px-2 py-0.5 bg-[#1a1a1a] border-b border-zinc-800"
+                    />
+                  )}
+                  <div className="relative flex-1 min-h-0">
+                    {t.shells.map((shell) => (
+                      <Terminal
+                        key={shell.id}
+                        terminalId={t.id}
+                        shellId={shell.id}
+                        isVisible={isTermVisible && shell.id === activeShellId}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </Panel>
       </Group>
