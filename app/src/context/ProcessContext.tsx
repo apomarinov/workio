@@ -1,11 +1,29 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type {
   ActiveProcess,
   GitDirtyPayload,
   GitRemoteSyncPayload,
   ProcessesPayload,
 } from '../../shared/types'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
+import { useNotifications } from './NotificationContext'
+
+interface Subscription {
+  terminalId: number
+  pid: number
+  command: string
+  terminalName: string
+}
+
+type Subscriptions = Record<string, Subscription>
 
 interface ProcessContextValue {
   processes: ActiveProcess[]
@@ -18,12 +36,16 @@ interface ProcessContextValue {
     number,
     { behind: number; ahead: number; noRemote: boolean }
   >
+  subscribeToBell: (process: ActiveProcess, terminalName: string) => void
+  unsubscribeFromBell: (terminalId: number, pid: number) => void
+  isBellSubscribed: (terminalId: number, pid: number) => boolean
 }
 
 const ProcessContext = createContext<ProcessContextValue | null>(null)
 
 export function ProcessProvider({ children }: { children: React.ReactNode }) {
   const { subscribe } = useSocket()
+  const { sendNotification } = useNotifications()
 
   const [processes, setProcesses] = useState<ActiveProcess[]>([])
   const [terminalPorts, setTerminalPorts] = useState<Record<number, number[]>>(
@@ -35,6 +57,14 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
   const [gitRemoteSyncStatus, setGitRemoteSyncStatus] = useState<
     Record<number, { behind: number; ahead: number; noRemote: boolean }>
   >({})
+
+  // Bell subscriptions
+  const [subscriptions, setSubscriptions] = useLocalStorage<Subscriptions>(
+    'process-subscriptions',
+    {},
+  )
+  const prevKeysRef = useRef<Set<string> | null>(null)
+  const staleCountRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     return subscribe<GitDirtyPayload>('git:dirty-status', (data) => {
@@ -113,9 +143,109 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe])
 
+  // Bell subscription: detect process removal and fire notifications
+  useEffect(() => {
+    const currentKeys = new Set(
+      processes
+        .filter((p) => p.pid > 0 && p.terminalId !== undefined)
+        .map((p) => `${p.terminalId}:${p.pid}`),
+    )
+
+    // Skip comparison on first render to avoid false positives after page refresh
+    if (prevKeysRef.current !== null) {
+      const prev = prevKeysRef.current
+      const removedKeys: string[] = []
+
+      for (const key of prev) {
+        if (!currentKeys.has(key) && subscriptions[key]) {
+          removedKeys.push(key)
+        }
+      }
+
+      if (removedKeys.length > 0) {
+        setSubscriptions((prev) => {
+          const next = { ...prev }
+          for (const key of removedKeys) {
+            const sub = next[key]
+            if (sub) {
+              sendNotification(`✅ ${sub.command}`, {
+                body: sub.terminalName,
+                audio: 'done',
+              })
+              delete next[key]
+            }
+          }
+          return next
+        })
+      }
+
+      // Stale subscription cleanup: remove subscriptions for processes not in current list
+      const staleCounts = staleCountRef.current
+      const subKeys = Object.keys(subscriptions)
+      for (const key of subKeys) {
+        if (!currentKeys.has(key)) {
+          staleCounts[key] = (staleCounts[key] || 0) + 1
+          if (staleCounts[key] >= 2) {
+            setSubscriptions((prev) => {
+              const next = { ...prev }
+              delete next[key]
+              return next
+            })
+            delete staleCounts[key]
+          }
+        } else {
+          delete staleCounts[key]
+        }
+      }
+    }
+
+    prevKeysRef.current = currentKeys
+  }, [processes, subscriptions, sendNotification, setSubscriptions])
+
+  const subscribeToBell = (process: ActiveProcess, terminalName: string) => {
+    if (!process.terminalId || process.pid <= 0) return
+    const key = `${process.terminalId}:${process.pid}`
+    setSubscriptions((prev) => ({
+      ...prev,
+      [key]: {
+        terminalId: process.terminalId!,
+        pid: process.pid,
+        command: process.command,
+        terminalName,
+      },
+    }))
+  }
+
+  const unsubscribeFromBell = (terminalId: number, pid: number) => {
+    const key = `${terminalId}:${pid}`
+    setSubscriptions((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  const isBellSubscribed = (terminalId: number, pid: number) => {
+    return `${terminalId}:${pid}` in subscriptions
+  }
+
   const value = useMemo(
-    () => ({ processes, terminalPorts, gitDirtyStatus, gitRemoteSyncStatus }),
-    [processes, terminalPorts, gitDirtyStatus, gitRemoteSyncStatus],
+    () => ({
+      processes,
+      terminalPorts,
+      gitDirtyStatus,
+      gitRemoteSyncStatus,
+      subscribeToBell,
+      unsubscribeFromBell,
+      isBellSubscribed,
+    }),
+    [
+      processes,
+      terminalPorts,
+      gitDirtyStatus,
+      gitRemoteSyncStatus,
+      subscriptions,
+    ],
   )
 
   return (

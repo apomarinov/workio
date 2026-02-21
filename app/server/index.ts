@@ -183,6 +183,25 @@ io.on('connection', (socket) => {
     },
   )
 
+  socket.on(
+    'kill-process',
+    (data: { pid: number }, callback?: (result: { ok: boolean }) => void) => {
+      const { pid } = data
+      if (!pid || pid <= 0) {
+        callback?.({ ok: false })
+        return
+      }
+      try {
+        process.kill(pid, 'SIGTERM')
+        log.info(`[socket] Killed process ${pid}`)
+        callback?.({ ok: true })
+      } catch (err) {
+        log.error({ err }, `[socket] Failed to kill process ${pid}`)
+        callback?.({ ok: false })
+      }
+    },
+  )
+
   socket.on('disconnect', () => {
     log.info(`Client disconnected: ${socket.id}`)
   })

@@ -172,6 +172,7 @@ async function getProcessesOnTty(tty: string): Promise<Map<number, string>> {
 
 // Zellij session detection
 export interface ZellijPaneProcess {
+  pid: number
   command: string
   isIdle: boolean
   terminalId?: number
@@ -247,7 +248,12 @@ export async function getZellijSessionProcesses(
           try {
             const cmdArgs = await getProcessArgs(cmdPid)
             if (cmdArgs && !shouldIgnoreProcess(cmdArgs)) {
-              results.push({ command: cmdArgs, isIdle: false, terminalId })
+              results.push({
+                pid: cmdPid,
+                command: cmdArgs,
+                isIdle: false,
+                terminalId,
+              })
             }
           } catch {
             // Process may have exited
@@ -258,7 +264,12 @@ export async function getZellijSessionProcesses(
         // runs directly as a child of the server, not wrapped in a shell
         const isIgnored = shellComm ? shouldIgnoreProcess(shellComm) : true
         if (!isIgnored && shellArgs) {
-          results.push({ command: shellArgs, isIdle: false, terminalId })
+          results.push({
+            pid: shellPid,
+            command: shellArgs,
+            isIdle: false,
+            terminalId,
+          })
         }
       }
     }

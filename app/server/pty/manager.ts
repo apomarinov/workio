@@ -27,7 +27,9 @@ import { emitWorkspace } from '../workspace/setup'
 import { type CommandEvent, createOscParser } from './osc-parser'
 import {
   getActiveZellijSessionNames,
+  getChildPids,
   getListeningPortsForTerminal,
+  getProcessComm,
   getSystemListeningPorts,
   getZellijSessionProcesses,
 } from './process-tree'
@@ -121,8 +123,29 @@ async function getProcessesForTerminal(
       session.currentCommand &&
       !COMMAND_IGNORE_LIST.includes(session.currentCommand)
     ) {
+      // Find actual child process PID for direct (OSC-detected) processes
+      let directPid = 0
+      const shellPid = session.pty.pid
+      if (shellPid > 0) {
+        try {
+          const childPids = await getChildPids(shellPid)
+          const cmdName = session.currentCommand.split(' ')[0] || ''
+          for (const cpid of childPids) {
+            const comm = await getProcessComm(cpid)
+            if (comm) {
+              const basename = comm.split('/').pop() || comm
+              if (basename === cmdName || comm === cmdName) {
+                directPid = cpid
+                break
+              }
+            }
+          }
+        } catch {
+          // Fall back to pid 0
+        }
+      }
       processes.push({
-        pid: 0,
+        pid: directPid,
         name: session.currentCommand.split(' ')[0] || '',
         command: session.currentCommand,
         terminalId: terminalId,
@@ -150,7 +173,7 @@ async function getProcessesForTerminal(
     }
     for (const p of zellijProcs.filter((p) => !p.isIdle)) {
       processes.push({
-        pid: 0,
+        pid: p.pid,
         name: p.command.split(' ')[0] || '',
         command: p.command,
         terminalId: p.terminalId,

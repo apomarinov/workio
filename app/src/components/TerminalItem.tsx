@@ -3,6 +3,8 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Bell,
+  BellRing,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -13,6 +15,7 @@ import {
   MoreVertical,
   Pin,
   TerminalSquare as TerminalIcon,
+  X,
 } from 'lucide-react'
 import {
   lazy,
@@ -77,6 +80,9 @@ export const TerminalItem = memo(function TerminalItem({
     terminalPorts,
     gitDirtyStatus,
     gitRemoteSyncStatus,
+    subscribeToBell,
+    unsubscribeFromBell,
+    isBellSubscribed,
   } = useProcessContext()
   const processes = useMemo(
     () => allProcesses.filter((p) => p.terminalId === terminal.id),
@@ -389,7 +395,17 @@ export const TerminalItem = memo(function TerminalItem({
                           : 'text-muted-foreground/60 hover:text-muted-foreground',
                       )}
                     >
-                      Processes ({processes.length})
+                      <span className="flex items-center gap-1">
+                        {processes.some(
+                          (p) =>
+                            p.pid > 0 &&
+                            p.terminalId !== undefined &&
+                            isBellSubscribed(p.terminalId, p.pid),
+                        ) && (
+                          <BellRing className="w-2.5 h-2.5 text-yellow-400" />
+                        )}
+                        Processes ({processes.length})
+                      </span>
                     </button>
                   )}
                   {hasPorts && (
@@ -496,31 +512,82 @@ export const TerminalItem = memo(function TerminalItem({
                 <div>
                   {activeTab === 'processes' &&
                     hasProcesses &&
-                    processes.map((process) => (
-                      <div
-                        key={`${process.pid}-${process.command}`}
-                        className="group/proc flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
-                      >
-                        <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
-                        <span className="text-xs truncate w-fit">
-                          {process.command}
-                        </span>
-                        {process.isZellij && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              emit('zellij-attach', {
-                                terminalId: terminal.id,
-                              })
-                            }}
-                            className="flex-shrink-0 hidden group-hover/proc:block text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                          >
-                            <Link className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                    processes.map((process) => {
+                      const subscribed =
+                        process.pid > 0 &&
+                        process.terminalId !== undefined &&
+                        isBellSubscribed(process.terminalId, process.pid)
+                      return (
+                        <div
+                          key={`${process.pid}-${process.command}`}
+                          className="group/proc flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                        >
+                          <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                          <span className="text-xs truncate w-fit">
+                            {process.command}
+                          </span>
+                          <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
+                            {process.pid > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (subscribed) {
+                                    unsubscribeFromBell(
+                                      terminal.id,
+                                      process.pid,
+                                    )
+                                    toast('Unsubscribed from process')
+                                  } else {
+                                    subscribeToBell(process, displayName)
+                                    toast('Subscribed — will notify when done')
+                                  }
+                                }}
+                                className={cn(
+                                  'transition-colors cursor-pointer',
+                                  subscribed
+                                    ? 'text-yellow-400'
+                                    : 'text-muted-foreground hover:text-foreground hidden group-hover/proc:block',
+                                )}
+                              >
+                                {subscribed ? (
+                                  <BellRing className="w-3 h-3" />
+                                ) : (
+                                  <Bell className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                            {process.isZellij && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  emit('zellij-attach', {
+                                    terminalId: terminal.id,
+                                  })
+                                }}
+                                className="hidden group-hover/proc:block text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <Link className="w-3 h-3" />
+                              </button>
+                            )}
+                            {process.pid > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  emit('kill-process', { pid: process.pid })
+                                  toast('Process killed')
+                                }}
+                                className="hidden group-hover/proc:block text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                      )
+                    })}
                   {activeTab === 'ports' &&
                     hasPorts &&
                     ports.map((port) => (
