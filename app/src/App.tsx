@@ -28,7 +28,7 @@ import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSocket } from './hooks/useSocket'
-import { createShellForTerminal, deleteShell } from './lib/api'
+import { createShellForTerminal, deleteShell, renameShell } from './lib/api'
 import { cn } from './lib/utils'
 import type { HookEvent } from './types'
 
@@ -108,11 +108,18 @@ function AppContent() {
     }
   }
 
+  const handleRenameShell = async (shellId: number, name: string) => {
+    await renameShell(shellId, name)
+    await refetch()
+  }
+
   // Refs for shell handlers so event listeners get latest versions
   const handleCreateShellRef = useRef(handleCreateShell)
   handleCreateShellRef.current = handleCreateShell
   const handleDeleteShellRef = useRef(handleDeleteShell)
   handleDeleteShellRef.current = handleDeleteShell
+  const handleRenameShellRef = useRef(handleRenameShell)
+  handleRenameShellRef.current = handleRenameShell
 
   // Shell event listeners (dispatched from TerminalItem sidebar)
   useEffect(() => {
@@ -132,6 +139,9 @@ function AppContent() {
     ) => {
       handleDeleteShellRef.current(e.detail.terminalId, e.detail.shellId)
     }
+    const onRename = (e: CustomEvent<{ shellId: number; name: string }>) => {
+      handleRenameShellRef.current(e.detail.shellId, e.detail.name)
+    }
     const onReset = (e: CustomEvent<{ terminalId: number }>) => {
       const terminal = terminalsRef.current.find(
         (t) => t.id === e.detail.terminalId,
@@ -147,11 +157,13 @@ function AppContent() {
     window.addEventListener('shell-select', onSelect as EventListener)
     window.addEventListener('shell-create', onCreate as EventListener)
     window.addEventListener('shell-delete', onDelete as EventListener)
+    window.addEventListener('shell-rename', onRename as EventListener)
     window.addEventListener('shell-reset', onReset as EventListener)
     return () => {
       window.removeEventListener('shell-select', onSelect as EventListener)
       window.removeEventListener('shell-create', onCreate as EventListener)
       window.removeEventListener('shell-delete', onDelete as EventListener)
+      window.removeEventListener('shell-rename', onRename as EventListener)
       window.removeEventListener('shell-reset', onReset as EventListener)
     }
   }, [])
@@ -394,6 +406,7 @@ function AppContent() {
                       onDeleteShell={(shellId) =>
                         handleDeleteShell(t.id, shellId)
                       }
+                      onRenameShell={handleRenameShell}
                       className="px-2 py-0.5 bg-[#1a1a1a] border-b border-zinc-800"
                     />
                   )}

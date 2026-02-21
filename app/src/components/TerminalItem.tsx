@@ -431,6 +431,13 @@ export const TerminalItem = memo(function TerminalItem({
                 }),
               )
             }}
+            onRenameShell={async (shellId, name) => {
+              window.dispatchEvent(
+                new CustomEvent('shell-rename', {
+                  detail: { shellId, name },
+                }),
+              )
+            }}
           />
         </div>
       )}

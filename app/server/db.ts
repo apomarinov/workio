@@ -732,6 +732,17 @@ export async function deleteShell(id: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0
 }
 
+export async function updateShellName(
+  id: number,
+  name: string,
+): Promise<Shell> {
+  const { rows } = await pool.query(
+    'UPDATE shells SET name = $1 WHERE id = $2 RETURNING *',
+    [name, id],
+  )
+  return rows[0]
+}
+
 // Settings queries
 
 const DEFAULT_CONFIG = {

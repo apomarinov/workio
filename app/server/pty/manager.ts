@@ -105,6 +105,7 @@ const lastRemoteSyncStatus = new Map<
 
 // Terminal name file helpers for dynamic zellij session naming
 const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
+const WORKIO_SHELLS_DIR = path.join(os.homedir(), '.workio', 'shells')
 
 export async function writeTerminalNameFile(
   terminalId: number,
@@ -121,6 +122,21 @@ export async function writeTerminalNameFile(
       { err },
       `[pty] Failed to write terminal name file for ${terminalId}`,
     )
+  }
+}
+
+export async function writeShellNameFile(
+  shellId: number,
+  name: string,
+): Promise<void> {
+  try {
+    await fs.promises.mkdir(WORKIO_SHELLS_DIR, { recursive: true })
+    await fs.promises.writeFile(
+      path.join(WORKIO_SHELLS_DIR, String(shellId)),
+      name,
+    )
+  } catch (err) {
+    log.error({ err }, `[pty] Failed to write shell name file for ${shellId}`)
   }
 }
 
@@ -1118,11 +1134,14 @@ export async function createSession(
   // Start global polling if not already running
   startGlobalProcessPolling()
 
-  // Write terminal name file for dynamic zellij session naming (fire-and-forget)
+  // Write terminal/shell name files for dynamic zellij session naming (fire-and-forget)
   writeTerminalNameFile(terminalId, terminalName).catch(() => {})
+  writeShellNameFile(shellId, shellRecord.name).catch(() => {})
 
   // wioname function to read current terminal name (for zellij session naming)
   const wionameFunc = `wioname() { cat "${WORKIO_TERMINALS_DIR}/${terminalId}" 2>/dev/null || echo "terminal-${terminalId}"; }`
+  // wiosession function to compute the full zellij session name: terminalName for main, terminalName-shellName for others
+  const wiosessionFunc = `wiosession() { local sn; sn=$(cat "${WORKIO_SHELLS_DIR}/${shellId}" 2>/dev/null || echo "${shellRecord.name}"); if [ "$sn" = "main" ]; then wioname; else echo "$(wioname)-$sn"; fi; }`
 
   if (terminal.ssh_host) {
     // Inject shell integration for SSH terminals inline via heredoc
@@ -1138,7 +1157,7 @@ export async function createSession(
           // Use heredoc + eval so the script is interpreted with real newlines
           const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
           backend.write(injection)
-          backend.write(`${wionameFunc}\n`)
+          backend.write(`${wionameFunc}\n${wiosessionFunc}\n`)
           if (terminal.cwd && terminal.cwd !== '~') {
             backend.write(`cd ${terminal.cwd}\n`)
           }
@@ -1180,12 +1199,12 @@ export async function createSession(
       if (integrationScript && scriptExists) {
         // Source the integration silently, then reset and position cursor at top
         backend.write(
-          `source "${integrationScript}"; ${wionameFunc}; printf '\\033c\\x1b[1;1H'\n`,
+          `source "${integrationScript}"; ${wionameFunc}; ${wiosessionFunc}; printf '\\033c\\x1b[1;1H'\n`,
         )
         backend.write('clear\n')
       } else {
-        // Still inject wioname even without shell integration
-        backend.write(`${wionameFunc}\n`)
+        // Still inject wioname/wiosession even without shell integration
+        backend.write(`${wionameFunc}\n${wiosessionFunc}\n`)
       }
     }, 100)
   }
@@ -1195,6 +1214,16 @@ export async function createSession(
   trackTerminal(terminalId).then(() => startChecksPolling())
 
   return session
+}
+
+export function updateSessionName(
+  shellId: number,
+  newSessionName: string,
+): void {
+  const session = sessions.get(shellId)
+  if (session) {
+    session.sessionName = newSessionName
+  }
 }
 
 export function writeToSession(shellId: number, data: string): boolean {

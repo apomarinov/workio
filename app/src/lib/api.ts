@@ -925,6 +925,22 @@ export async function deleteShell(shellId: number): Promise<void> {
   }
 }
 
+export async function renameShell(
+  shellId: number,
+  name: string,
+): Promise<Shell> {
+  const res = await fetch(`${API_BASE}/shells/${shellId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to rename shell')
+  }
+  return res.json()
+}
+
 // Session move
 
 import type { MoveTarget } from '../types'

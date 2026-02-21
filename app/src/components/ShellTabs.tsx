@@ -20,6 +20,12 @@ import { ChevronDown, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -30,6 +36,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
 import type { Shell, Terminal } from '../types'
 import { ConfirmModal } from './ConfirmModal'
+import { RenameModal } from './EditSessionModal'
 
 interface ShellTabsProps {
   terminal: Terminal
@@ -38,6 +45,7 @@ interface ShellTabsProps {
   onSelectShell: (shellId: number) => void
   onCreateShell: () => void
   onDeleteShell: (shellId: number) => void
+  onRenameShell: (shellId: number, name: string) => Promise<void>
   className?: string
 }
 
@@ -48,6 +56,8 @@ function SortableShellPill({
   isMain,
   onSelect,
   onDelete,
+  ref,
+  ...rest
 }: {
   shell: Shell
   isActive: boolean
@@ -55,7 +65,8 @@ function SortableShellPill({
   isMain: boolean
   onSelect: () => void
   onDelete: () => void
-}) {
+  ref?: React.Ref<HTMLButtonElement>
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
     attributes,
     listeners,
@@ -75,10 +86,17 @@ function SortableShellPill({
 
   return (
     <button
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node)
+        if (typeof ref === 'function') ref(node)
+        else if (ref)
+          (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
+            node
+      }}
       style={style}
       {...attributes}
       {...listeners}
+      {...rest}
       key={shell.id}
       type="button"
       onClick={onSelect}
@@ -118,6 +136,8 @@ function SortableShellTab({
   isMain,
   onSelect,
   onDelete,
+  ref,
+  ...rest
 }: {
   shell: Shell
   isActive: boolean
@@ -125,7 +145,8 @@ function SortableShellTab({
   isMain: boolean
   onSelect: () => void
   onDelete: () => void
-}) {
+  ref?: React.Ref<HTMLButtonElement>
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
     attributes,
     listeners,
@@ -145,10 +166,17 @@ function SortableShellTab({
 
   return (
     <button
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node)
+        if (typeof ref === 'function') ref(node)
+        else if (ref)
+          (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
+            node
+      }}
       style={style}
       {...attributes}
       {...listeners}
+      {...rest}
       key={shell.id}
       type="button"
       onClick={onSelect}
@@ -190,6 +218,7 @@ export function ShellTabs({
   onSelectShell,
   onCreateShell,
   onDeleteShell,
+  onRenameShell,
   className,
 }: ShellTabsProps) {
   const { processes } = useProcessContext()
@@ -200,6 +229,7 @@ export function ShellTabs({
     {},
   )
   const [deleteShellId, setDeleteShellId] = useState<number | null>(null)
+  const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const sensors = useSensors(
@@ -238,6 +268,14 @@ export function ShellTabs({
 
   const isMainShell = (shellId: number) =>
     terminal.shells.find((s) => s.id === shellId)?.name === 'main'
+
+  const handleDeleteShell = (shellId: number) => {
+    if (shellHasActivity(shellId)) {
+      setDeleteShellId(shellId)
+    } else {
+      onDeleteShell(shellId)
+    }
+  }
 
   const deleteShellName = deleteShellId
     ? terminal.shells.find((s) => s.id === deleteShellId)?.name
@@ -309,17 +347,38 @@ export function ShellTabs({
                 items={shellIds}
                 strategy={horizontalListSortingStrategy}
               >
-                {sortedShells.map((shell) => (
-                  <SortableShellPill
-                    key={shell.id}
-                    shell={shell}
-                    isActive={shell.id === activeShellId}
-                    hasActivity={shellHasActivity(shell.id)}
-                    isMain={isMainShell(shell.id) ?? false}
-                    onSelect={() => onSelectShell(shell.id)}
-                    onDelete={() => setDeleteShellId(shell.id)}
-                  />
-                ))}
+                {sortedShells.map((shell) => {
+                  const isMain = isMainShell(shell.id) ?? false
+                  return (
+                    <ContextMenu key={shell.id}>
+                      <ContextMenuTrigger asChild>
+                        <SortableShellPill
+                          shell={shell}
+                          isActive={shell.id === activeShellId}
+                          hasActivity={shellHasActivity(shell.id)}
+                          isMain={isMain}
+                          onSelect={() => onSelectShell(shell.id)}
+                          onDelete={() => handleDeleteShell(shell.id)}
+                        />
+                      </ContextMenuTrigger>
+                      {!isMain && (
+                        <ContextMenuContent>
+                          <ContextMenuItem
+                            onClick={() => setRenameShellTarget(shell)}
+                          >
+                            Rename
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => handleDeleteShell(shell.id)}
+                            className="text-destructive"
+                          >
+                            Close
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      )}
+                    </ContextMenu>
+                  )
+                })}
               </SortableContext>
             </DndContext>
             <button
@@ -347,17 +406,38 @@ export function ShellTabs({
                 items={shellIds}
                 strategy={horizontalListSortingStrategy}
               >
-                {sortedShells.map((shell) => (
-                  <SortableShellTab
-                    key={shell.id}
-                    shell={shell}
-                    isActive={shell.id === activeShellId}
-                    hasActivity={shellHasActivity(shell.id)}
-                    isMain={isMainShell(shell.id) ?? false}
-                    onSelect={() => onSelectShell(shell.id)}
-                    onDelete={() => setDeleteShellId(shell.id)}
-                  />
-                ))}
+                {sortedShells.map((shell) => {
+                  const isMain = isMainShell(shell.id) ?? false
+                  return (
+                    <ContextMenu key={shell.id}>
+                      <ContextMenuTrigger asChild>
+                        <SortableShellTab
+                          shell={shell}
+                          isActive={shell.id === activeShellId}
+                          hasActivity={shellHasActivity(shell.id)}
+                          isMain={isMain}
+                          onSelect={() => onSelectShell(shell.id)}
+                          onDelete={() => handleDeleteShell(shell.id)}
+                        />
+                      </ContextMenuTrigger>
+                      {!isMain && (
+                        <ContextMenuContent>
+                          <ContextMenuItem
+                            onClick={() => setRenameShellTarget(shell)}
+                          >
+                            Rename
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => handleDeleteShell(shell.id)}
+                            className="text-destructive"
+                          >
+                            Close
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      )}
+                    </ContextMenu>
+                  )
+                })}
               </SortableContext>
             </DndContext>
             <button
@@ -385,6 +465,19 @@ export function ShellTabs({
           }
         }}
         onCancel={() => setDeleteShellId(null)}
+      />
+      <RenameModal
+        open={renameShellTarget !== null}
+        currentName={renameShellTarget?.name ?? ''}
+        title="Rename Shell"
+        placeholder="Shell name"
+        onSave={async (name) => {
+          if (renameShellTarget) {
+            await onRenameShell(renameShellTarget.id, name)
+            setRenameShellTarget(null)
+          }
+        }}
+        onCancel={() => setRenameShellTarget(null)}
       />
     </>
   )

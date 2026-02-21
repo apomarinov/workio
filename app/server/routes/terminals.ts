@@ -159,6 +159,7 @@ import {
   getTerminalById,
   logCommand,
   terminalNameExists,
+  updateShellName,
   updateTerminal,
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
@@ -168,6 +169,9 @@ import {
   destroySession,
   destroySessionsForTerminal,
   detectGitBranch,
+  renameZellijSession,
+  updateSessionName,
+  writeShellNameFile,
 } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
@@ -2433,6 +2437,54 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       await deleteShell(id)
       return reply.status(204).send()
+    },
+  )
+
+  // Rename a shell
+  fastify.patch<{ Params: { id: string }; Body: { name: string } }>(
+    '/api/shells/:id',
+    async (request, reply) => {
+      const id = Number(request.params.id)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid shell id' })
+      }
+
+      const shell = await getShellById(id)
+      if (!shell) {
+        return reply.status(404).send({ error: 'Shell not found' })
+      }
+
+      if (shell.name === 'main') {
+        return reply.status(400).send({ error: 'Cannot rename the main shell' })
+      }
+
+      const { name } = request.body
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return reply.status(400).send({ error: 'Name is required' })
+      }
+
+      const trimmedName = name.trim()
+      if (trimmedName === 'main') {
+        return reply
+          .status(400)
+          .send({ error: 'Cannot use reserved name "main"' })
+      }
+
+      const terminal = await getTerminalById(shell.terminal_id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      const terminalName = terminal.name || `terminal-${terminal.id}`
+      const oldSessionName = `${terminalName}-${shell.name}`
+      const newSessionName = `${terminalName}-${trimmedName}`
+
+      const updated = await updateShellName(id, trimmedName)
+      renameZellijSession(oldSessionName, newSessionName)
+      updateSessionName(id, newSessionName)
+      writeShellNameFile(id, trimmedName).catch(() => {})
+
+      return reply.send(updated)
     },
   )
 }
