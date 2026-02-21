@@ -704,6 +704,12 @@ export function ShellTabs({
         placeholder="Shell name"
         onSave={async (name) => {
           if (renameShellTarget) {
+            const isDuplicate = terminal.shells.some(
+              (s) => s.id !== renameShellTarget.id && s.name === name,
+            )
+            if (isDuplicate) {
+              throw new Error('A shell with that name already exists')
+            }
             await onRenameShell(renameShellTarget.id, name)
             setRenameShellTarget(null)
           }

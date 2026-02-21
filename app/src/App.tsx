@@ -109,18 +109,32 @@ function AppContent() {
 
   const handleDeleteShell = async (terminalId: number, shellId: number) => {
     try {
+      // Snapshot shell list before deletion to find adjacent shell
+      const terminalBefore = terminalsRef.current.find(
+        (t) => t.id === terminalId,
+      )
+      const shellsBefore = terminalBefore?.shells ?? []
+      const deletedIndex = shellsBefore.findIndex((s) => s.id === shellId)
+
       await deleteShell(shellId)
       await refetch()
+
       const terminal = terminalsRef.current.find((t) => t.id === terminalId)
-      const main = terminal?.shells.find((s) => s.name === 'main')
-      if (main) {
-        setActiveShells((prev) => ({ ...prev, [terminalId]: main.id }))
-        window.dispatchEvent(
-          new CustomEvent('shell-select', {
-            detail: { terminalId, shellId: main.id },
-          }),
-        )
-      }
+      const remaining = terminal?.shells ?? []
+      if (remaining.length === 0) return
+
+      // Pick next shell at same index (or last if deleted was at end), fallback to main
+      const nextShell =
+        remaining[Math.min(deletedIndex, remaining.length - 1)] ??
+        remaining.find((s) => s.name === 'main') ??
+        remaining[0]
+
+      setActiveShells((prev) => ({ ...prev, [terminalId]: nextShell.id }))
+      window.dispatchEvent(
+        new CustomEvent('shell-select', {
+          detail: { terminalId, shellId: nextShell.id },
+        }),
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete shell')
     }
