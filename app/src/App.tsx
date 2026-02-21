@@ -59,9 +59,13 @@ function AppContent() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
+  const activeTerminalRef = useRef(activeTerminal)
+  activeTerminalRef.current = activeTerminal
 
   // Multi-shell state
   const [activeShells, setActiveShells] = useState<Record<number, number>>({})
+  const activeShellsRef = useRef(activeShells)
+  activeShellsRef.current = activeShells
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
 
   // Clean up stale activeShells entries when terminals/shells change
@@ -191,6 +195,49 @@ function AppContent() {
     goToLastTab: () => {
       selectPreviousTerminal()
       clearSession()
+    },
+    goToShell: (index) => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      const shell = t.shells[index - 1]
+      if (shell) {
+        setActiveShells((prev) => ({ ...prev, [t.id]: shell.id }))
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId: t.id, shellId: shell.id },
+          }),
+        )
+      }
+    },
+    prevShell: () => {
+      const t = activeTerminalRef.current
+      if (!t || t.shells.length < 2) return
+      const currentId = activeShellsRef.current[t.id] ?? t.shells[0]?.id
+      const idx = t.shells.findIndex((s) => s.id === currentId)
+      const prev = idx > 0 ? t.shells[idx - 1] : t.shells[t.shells.length - 1]
+      if (prev) {
+        setActiveShells((p) => ({ ...p, [t.id]: prev.id }))
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId: t.id, shellId: prev.id },
+          }),
+        )
+      }
+    },
+    nextShell: () => {
+      const t = activeTerminalRef.current
+      if (!t || t.shells.length < 2) return
+      const currentId = activeShellsRef.current[t.id] ?? t.shells[0]?.id
+      const idx = t.shells.findIndex((s) => s.id === currentId)
+      const next = idx < t.shells.length - 1 ? t.shells[idx + 1] : t.shells[0]
+      if (next) {
+        setActiveShells((p) => ({ ...p, [t.id]: next.id }))
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId: t.id, shellId: next.id },
+          }),
+        )
+      }
     },
     palette: () => {
       window.dispatchEvent(new Event('open-palette'))

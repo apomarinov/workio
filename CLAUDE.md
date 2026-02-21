@@ -50,3 +50,13 @@
 - Icons come from `lucide-react`.
 - Toast notifications use `sonner` via `import { toast } from '@/components/ui/sonner'`.
 - For confirmation dialogs (discard, delete, destructive actions), use `ConfirmModal` from `src/components/ConfirmModal.tsx` instead of raw `AlertDialog` primitives.
+
+## Keyboard Shortcuts
+
+To add a new shortcut:
+
+1. **`src/types.ts`** — Add entry to `Keymap` interface and `DEFAULT_KEYMAP` with the default binding. Digit-based shortcuts (like `goToTab`) use modifier-only bindings (e.g. `{ altKey: true }`); key-based shortcuts include `key` (e.g. `{ metaKey: true, key: '[' }`).
+2. **`src/hooks/useKeyboardShortcuts.tsx`** — Add handler to `KeymapHandlers` interface, resolve the binding from settings (same pattern as existing ones), add detection logic in `handleKeyDown` (key-match for regular shortcuts, digit-match for index-based), and add to the `useEffect` dependency array.
+3. **`src/App.tsx`** — Add handler implementation in the `useKeyboardShortcuts({...})` call. **Use refs** (`activeTerminalRef`, `activeShellsRef`, `terminalsRef`) instead of direct state — the handler closures are stale since they're stored in a ref inside the hook.
+4. **`src/components/KeymapModal.tsx`** — Wire up in all places: `ShortcutName` union, `useState`, `useEffect` sync from settings, `finalize` in recording, `handleSave`, `handleReset`, `handleDiscardChanges`, `hasUnsavedChanges`, `findDuplicates`, and add a `<ShortcutRow>` in the UI.
+5. If the shortcut changes state that the sidebar also tracks (e.g. active shell), **dispatch a custom event** (e.g. `shell-select`) so sidebar components stay in sync.

@@ -149,6 +149,9 @@ interface KeymapHandlers {
   palette?: (e: KeyboardEvent) => void
   goToTab?: (index: number) => void
   goToLastTab?: () => void
+  goToShell?: (index: number) => void
+  prevShell?: () => void
+  nextShell?: () => void
   togglePip?: () => void
   itemActions?: () => void
   collapseAll?: () => void
@@ -186,6 +189,18 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     settings?.keymap?.goToLastTab === null
       ? null
       : (settings?.keymap?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab)
+  const goToShellBinding =
+    settings?.keymap?.goToShell === null
+      ? null
+      : (settings?.keymap?.goToShell ?? DEFAULT_KEYMAP.goToShell)
+  const prevShellBinding =
+    settings?.keymap?.prevShell === null
+      ? null
+      : (settings?.keymap?.prevShell ?? DEFAULT_KEYMAP.prevShell)
+  const nextShellBinding =
+    settings?.keymap?.nextShell === null
+      ? null
+      : (settings?.keymap?.nextShell ?? DEFAULT_KEYMAP.nextShell)
   const togglePipBinding =
     settings?.keymap?.togglePip === null
       ? null
@@ -371,22 +386,66 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           return
         }
 
-        // Check goToTab: modifiers match + physical digit key pressed
-        // Use e.code for digit detection (Shift+3 gives e.key='#' but e.code='Digit3')
-        const digit =
-          e.code >= 'Digit0' && e.code <= 'Digit9' ? e.code[5] : null
+        // Check prevShell
         if (
-          h.goToTab &&
-          goToTabBinding &&
-          digit &&
-          modifiersMatchBinding(modifierBuffer, goToTabBinding)
+          h.prevShell &&
+          prevShellBinding &&
+          prevShellBinding.key &&
+          modifiersMatchBinding(modifierBuffer, prevShellBinding) &&
+          keyBuffer.join('') === prevShellBinding.key
         ) {
           e.preventDefault()
           e.stopPropagation()
-          digitBuffer.push(digit)
-          h.goToTab(Number.parseInt(digitBuffer.join(''), 10))
+          h.prevShell()
           consumed = true
           suppressModifiers()
+          return
+        }
+
+        // Check nextShell
+        if (
+          h.nextShell &&
+          nextShellBinding &&
+          nextShellBinding.key &&
+          modifiersMatchBinding(modifierBuffer, nextShellBinding) &&
+          keyBuffer.join('') === nextShellBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.nextShell()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
+        // Check goToTab / goToShell: modifiers match + physical digit key pressed
+        // Use e.code for digit detection (Shift+3 gives e.key='#' but e.code='Digit3')
+        const digit =
+          e.code >= 'Digit0' && e.code <= 'Digit9' ? e.code[5] : null
+        if (digit) {
+          if (
+            h.goToTab &&
+            goToTabBinding &&
+            modifiersMatchBinding(modifierBuffer, goToTabBinding)
+          ) {
+            e.preventDefault()
+            e.stopPropagation()
+            digitBuffer.push(digit)
+            h.goToTab(Number.parseInt(digitBuffer.join(''), 10))
+            consumed = true
+            suppressModifiers()
+          } else if (
+            h.goToShell &&
+            goToShellBinding &&
+            modifiersMatchBinding(modifierBuffer, goToShellBinding)
+          ) {
+            e.preventDefault()
+            e.stopPropagation()
+            digitBuffer.push(digit)
+            h.goToShell(Number.parseInt(digitBuffer.join(''), 10))
+            consumed = true
+            suppressModifiers()
+          }
         }
 
         return
@@ -477,6 +536,9 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     paletteBinding,
     goToTabBinding,
     goToLastTabBinding,
+    goToShellBinding,
+    prevShellBinding,
+    nextShellBinding,
     togglePipBinding,
     itemActionsBinding,
     collapseAllBinding,

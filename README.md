@@ -41,7 +41,7 @@ A developer dashboard that brings together your projects, temrinals, Claude AI s
 - **Zellij Tweaks**
   - copy to clipboard of multipage selection in panes
   - detect running processes in tabs
-  - map project to session by using `--session-name "$(wioname)"` when starting zellij
+  - map project to session by using `--session-name "$(wiosession)"` when starting zellij
 - **Keyboard Shortcuts**
 - **PWA Ready**
 

@@ -107,6 +107,9 @@ type ShortcutName =
   | 'palette'
   | 'goToTab'
   | 'goToLastTab'
+  | 'goToShell'
+  | 'prevShell'
+  | 'nextShell'
   | 'togglePip'
   | 'itemActions'
   | 'collapseAll'
@@ -165,6 +168,15 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const [goToLastTab, setGoToLastTab] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.goToLastTab,
   )
+  const [goToShell, setGoToShell] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.goToShell,
+  )
+  const [prevShell, setPrevShell] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.prevShell,
+  )
+  const [nextShell, setNextShell] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.nextShell,
+  )
   const [togglePip, setTogglePip] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.togglePip,
   )
@@ -193,6 +205,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     const savedPalette = saved?.palette ?? DEFAULT_KEYMAP.palette
     const savedGoToTab = saved?.goToTab ?? DEFAULT_KEYMAP.goToTab
     const savedGoToLastTab = saved?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab
+    const savedGoToShell = saved?.goToShell ?? DEFAULT_KEYMAP.goToShell
+    const savedPrevShell = saved?.prevShell ?? DEFAULT_KEYMAP.prevShell
+    const savedNextShell = saved?.nextShell ?? DEFAULT_KEYMAP.nextShell
     const savedTogglePip = saved?.togglePip ?? DEFAULT_KEYMAP.togglePip
     const savedItemActions = saved?.itemActions ?? DEFAULT_KEYMAP.itemActions
     const savedCollapseAll = saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll
@@ -205,6 +220,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       !bindingsEqual(palette, savedPalette) ||
       !bindingsEqual(goToTab, savedGoToTab) ||
       !bindingsEqual(goToLastTab, savedGoToLastTab) ||
+      !bindingsEqual(goToShell, savedGoToShell) ||
+      !bindingsEqual(prevShell, savedPrevShell) ||
+      !bindingsEqual(nextShell, savedNextShell) ||
       !bindingsEqual(togglePip, savedTogglePip) ||
       !bindingsEqual(itemActions, savedItemActions) ||
       !bindingsEqual(collapseAll, savedCollapseAll) ||
@@ -217,6 +235,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     palette,
     goToTab,
     goToLastTab,
+    goToShell,
+    prevShell,
+    nextShell,
     togglePip,
     itemActions,
     collapseAll,
@@ -240,6 +261,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setPalette(saved?.palette ?? DEFAULT_KEYMAP.palette)
     setGoToTab(saved?.goToTab ?? DEFAULT_KEYMAP.goToTab)
     setGoToLastTab(saved?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab)
+    setGoToShell(saved?.goToShell ?? DEFAULT_KEYMAP.goToShell)
+    setPrevShell(saved?.prevShell ?? DEFAULT_KEYMAP.prevShell)
+    setNextShell(saved?.nextShell ?? DEFAULT_KEYMAP.nextShell)
     setTogglePip(saved?.togglePip ?? DEFAULT_KEYMAP.togglePip)
     setItemActions(saved?.itemActions ?? DEFAULT_KEYMAP.itemActions)
     setCollapseAll(saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
@@ -255,6 +279,15 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       setGoToTab(settings.keymap.goToTab)
       if (settings.keymap.goToLastTab !== undefined) {
         setGoToLastTab(settings.keymap.goToLastTab)
+      }
+      if (settings.keymap.goToShell !== undefined) {
+        setGoToShell(settings.keymap.goToShell)
+      }
+      if (settings.keymap.prevShell !== undefined) {
+        setPrevShell(settings.keymap.prevShell)
+      }
+      if (settings.keymap.nextShell !== undefined) {
+        setNextShell(settings.keymap.nextShell)
       }
       if (settings.keymap.togglePip !== undefined) {
         setTogglePip(settings.keymap.togglePip)
@@ -303,6 +336,18 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         setGoToTab(binding)
       } else if (recording === 'goToLastTab') {
         setGoToLastTab(binding)
+      } else if (recording === 'goToShell') {
+        setGoToShell(binding)
+      } else if (recording === 'prevShell') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setPrevShell(binding)
+      } else if (recording === 'nextShell') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setNextShell(binding)
       } else if (recording === 'togglePip') {
         if (keyBuffer.length > 0) {
           binding.key = keyBuffer.join('')
@@ -436,6 +481,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           palette,
           goToTab,
           goToLastTab,
+          goToShell,
+          prevShell,
+          nextShell,
           togglePip,
           itemActions,
           collapseAll,
@@ -459,6 +507,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setPalette(DEFAULT_KEYMAP.palette)
     setGoToTab(DEFAULT_KEYMAP.goToTab)
     setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)
+    setGoToShell(DEFAULT_KEYMAP.goToShell)
+    setPrevShell(DEFAULT_KEYMAP.prevShell)
+    setNextShell(DEFAULT_KEYMAP.nextShell)
     setTogglePip(DEFAULT_KEYMAP.togglePip)
     setItemActions(DEFAULT_KEYMAP.itemActions)
     setCollapseAll(DEFAULT_KEYMAP.collapseAll)
@@ -475,6 +526,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         palette,
         goToTab,
         goToLastTab,
+        goToShell,
+        prevShell,
+        nextShell,
         togglePip,
         itemActions,
         collapseAll,
@@ -486,6 +540,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       palette,
       goToTab,
       goToLastTab,
+      goToShell,
+      prevShell,
+      nextShell,
       togglePip,
       itemActions,
       collapseAll,
@@ -546,6 +603,62 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(goToLastTab)}
               hasConflict={duplicates.has('goToLastTab')}
             />
+            <div className="pt-2 border-t border-zinc-700">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Shells
+              </span>
+            </div>
+            <ShortcutRow
+              label="Go to shell"
+              binding={goToShell}
+              isRecording={recording === 'goToShell'}
+              recordingKeys={recording === 'goToShell' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'goToShell' ? null : 'goToShell')
+              }
+              onReset={() => setGoToShell(DEFAULT_KEYMAP.goToShell)}
+              onUnset={() => setGoToShell(null)}
+              defaultBinding={DEFAULT_KEYMAP.goToShell}
+              display={formatBinding(
+                goToShell,
+                goToShell ? '1 - 9' : undefined,
+              )}
+              hasConflict={duplicates.has('goToShell')}
+            />
+            <ShortcutRow
+              label="Previous shell"
+              binding={prevShell}
+              isRecording={recording === 'prevShell'}
+              recordingKeys={recording === 'prevShell' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'prevShell' ? null : 'prevShell')
+              }
+              onReset={() => setPrevShell(DEFAULT_KEYMAP.prevShell)}
+              onUnset={() => setPrevShell(null)}
+              defaultBinding={DEFAULT_KEYMAP.prevShell}
+              display={formatBinding(prevShell)}
+              hasConflict={duplicates.has('prevShell')}
+            />
+            <ShortcutRow
+              label="Next shell"
+              binding={nextShell}
+              isRecording={recording === 'nextShell'}
+              recordingKeys={recording === 'nextShell' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'nextShell' ? null : 'nextShell')
+              }
+              onReset={() => setNextShell(DEFAULT_KEYMAP.nextShell)}
+              onUnset={() => setNextShell(null)}
+              defaultBinding={DEFAULT_KEYMAP.nextShell}
+              display={formatBinding(nextShell)}
+              hasConflict={duplicates.has('nextShell')}
+            />
+
+            <div className="pt-2 border-t border-zinc-700">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Other
+              </span>
+            </div>
             <ShortcutRow
               label="Toggle PiP Window"
               binding={togglePip}

@@ -266,6 +266,9 @@ export interface Keymap {
   palette: ShortcutBinding | null
   goToTab: ShortcutBinding | null
   goToLastTab: ShortcutBinding | null
+  goToShell: ShortcutBinding | null
+  prevShell: ShortcutBinding | null
+  nextShell: ShortcutBinding | null
   togglePip: ShortcutBinding | null
   itemActions: ShortcutBinding | null
   collapseAll: ShortcutBinding | null
@@ -278,6 +281,9 @@ export const DEFAULT_KEYMAP: Keymap = {
   palette: { metaKey: true, key: 'k' },
   goToTab: { metaKey: true },
   goToLastTab: { metaKey: true, shiftKey: true },
+  goToShell: { altKey: true },
+  prevShell: { metaKey: true, key: '[' },
+  nextShell: { metaKey: true, key: ']' },
   togglePip: { metaKey: true, key: 'p' },
   itemActions: { metaKey: true, key: 'i' },
   collapseAll: { metaKey: true, key: 'arrowup' },

@@ -88,7 +88,7 @@ export async function initPgListener(
 
       if (msg.channel === 'hook') {
         io.emit('hook', payload)
-        log.info(`LISTEN: hook event session=${payload.session_id}`)
+        // log.info(`LISTEN: hook event session=${payload.session_id}`)
 
         if (payload.hook_type === 'SessionStart') {
           // Fire-and-forget branch detection
