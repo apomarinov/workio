@@ -642,9 +642,9 @@ export const TerminalItem = memo(function TerminalItem({
                                     return (
                                       <div
                                         key={`${process.pid}-${process.command}`}
-                                        className="group/proc flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70"
+                                        className="group/proc flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/30 transition-colors"
                                       >
-                                        <Activity className="w-3 h-3 flex-shrink-0 text-green-500" />
+                                        <Activity className="w-3 h-3 flex-shrink-0 text-green-500/70" />
                                         <span className="text-xs truncate w-fit">
                                           {process.command}
                                         </span>
@@ -676,7 +676,7 @@ export const TerminalItem = memo(function TerminalItem({
                                                 'transition-colors cursor-pointer',
                                                 subscribed
                                                   ? 'text-yellow-400'
-                                                  : 'text-muted-foreground hover:text-foreground hidden group-hover/proc:block',
+                                                  : 'text-muted-foreground/60 hover:text-foreground/90 hidden group-hover/proc:text-muted-foreground/80 group-hover/proc:block',
                                               )}
                                             >
                                               {subscribed ? (
@@ -695,7 +695,7 @@ export const TerminalItem = memo(function TerminalItem({
                                                   terminalId: terminal.id,
                                                 })
                                               }}
-                                              className="hidden group-hover/proc:block text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                              className="hidden group-hover/proc:block text-muted-foreground/60 hover:text-foreground/90 group-hover/proc:text-muted-foreground/80 transition-colors cursor-pointer"
                                             >
                                               <Link className="w-3 h-3" />
                                             </button>
@@ -710,7 +710,7 @@ export const TerminalItem = memo(function TerminalItem({
                                                 })
                                                 toast('Process killed')
                                               }}
-                                              className="hidden group-hover/proc:block text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                                              className="hidden group-hover/proc:block text-muted-foreground/60 group-hover/proc:text-muted-foreground/80 hover:text-red-400/90 transition-colors cursor-pointer"
                                             >
                                               <X className="w-3.5 h-3.5" />
                                             </button>

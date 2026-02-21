@@ -29,9 +29,11 @@ export const SortableTerminalItem = memo(function SortableTerminalItem({
   } = useSortable({ id: terminal.id })
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : undefined,
+    opacity: isDragging ? 0.7 : undefined,
+    zIndex: isDragging ? 10 : undefined,
+    position: isDragging ? ('relative' as const) : undefined,
   }
 
   return (
