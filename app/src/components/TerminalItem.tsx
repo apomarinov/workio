@@ -14,7 +14,6 @@ import {
   Link,
   MoreVertical,
   Pin,
-  TerminalSquare as TerminalIcon,
   X,
 } from 'lucide-react'
 import {
@@ -43,6 +42,7 @@ import { cn } from '@/lib/utils'
 import { useProcessContext } from '../context/ProcessContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
+import { TerminalIcon2 } from './icons'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'
 import { SessionItem } from './SessionItem'
 import { TruncatedPath } from './TruncatedPath'
@@ -235,10 +235,16 @@ export const TerminalItem = memo(function TerminalItem({
             ) : terminal.orphaned ? (
               <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
             ) : (
-              <TerminalIcon
+              <TerminalIcon2
                 className={cn(
                   'w-4 h-4 flex-shrink-0',
-                  hasProcesses && 'text-green-500',
+                  !hasProcesses &&
+                    'fill-muted-foreground/60 group-hover:fill-muted-foreground',
+                  !hasProcesses && isActive && 'fill-muted-foreground',
+                  hasProcesses &&
+                    !isActive &&
+                    'fill-green-500/70 group-hover:fill-green-500',
+                  hasProcesses && isActive && 'fill-green-500',
                 )}
               />
             )}

@@ -1,9 +1,5 @@
-import {
-  AlertCircle,
-  CornerDownLeft,
-  GitBranch,
-  TerminalSquare,
-} from 'lucide-react'
+import { AlertCircle, CornerDownLeft, GitBranch } from 'lucide-react'
+import { TerminalIcon2 } from '@/components/icons'
 import type { AppActions, AppData } from '../createPaletteModes'
 import { getLastPathSegment } from '../createPaletteModes'
 import type {
@@ -68,7 +64,7 @@ export function createPRCheckoutMode(
           )}
         </span>
       ) : undefined,
-      icon: <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />,
+      icon: <TerminalIcon2 className="h-4 w-4 shrink-0 fill-zinc-400" />,
       disabled: !canCheckout,
       disabledReason: isOnBranch
         ? 'already on this branch'

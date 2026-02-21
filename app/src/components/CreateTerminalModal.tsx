@@ -5,7 +5,6 @@ import {
   FolderOpen,
   Loader2,
   Plus,
-  TerminalSquare,
   XCircle,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -48,6 +47,7 @@ import {
   type SSHHostEntry,
 } from '../lib/api'
 import { DirectoryBrowser } from './DirectoryBrowser'
+import { TerminalIcon2 } from './icons'
 
 function FolderPicker({
   value,
@@ -291,7 +291,7 @@ export function CreateTerminalModal({
                 Shell
               </label>
               <div className="relative">
-                <TerminalSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <TerminalIcon2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fill-muted-foreground" />
                 <Input
                   id="shell"
                   type="text"

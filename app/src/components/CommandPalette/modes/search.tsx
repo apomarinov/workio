@@ -9,8 +9,8 @@ import {
   Heart,
   ScrollText,
   Search,
-  TerminalSquare,
 } from 'lucide-react'
+import { TerminalIcon2 } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../../../shared/types'
@@ -123,7 +123,7 @@ export function createSearchMode(
       ) : t.ssh_host ? (
         <Globe className="h-4 w-4 shrink-0 text-blue-400" />
       ) : (
-        <TerminalSquare className="h-4 w-4 shrink-0 text-zinc-400" />
+        <TerminalIcon2 className="h-4 w-4 shrink-0 fill-zinc-400" />
       ),
       keywords: [
         t.name ?? '',

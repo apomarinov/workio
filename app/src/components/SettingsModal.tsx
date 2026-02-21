@@ -4,7 +4,6 @@ import {
   Brain,
   Code,
   Keyboard,
-  TerminalSquare,
   Type,
   Webhook,
   Wrench,
@@ -32,7 +31,7 @@ import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
 import type { PreferredIDE } from '../types'
-import { CursorIcon, VSCodeIcon } from './icons'
+import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
 import { useWebhookWarning, WebhooksModal } from './WebhooksModal'
 
@@ -112,7 +111,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               Default Shell <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <TerminalSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <TerminalIcon2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fill-muted-foreground" />
               <Input
                 id="default_shell"
                 type="text"
