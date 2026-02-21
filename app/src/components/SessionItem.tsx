@@ -244,7 +244,7 @@ export const SessionItem = memo(function SessionItem({
                   </div>
                 )}
                 <div
-                  className="text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
+                  className="max-h-[300px] overflow-y-scroll text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
                   style={{
                     display: '-webkit-box',
                     WebkitLineClamp: settings?.message_line_clamp ?? 5,

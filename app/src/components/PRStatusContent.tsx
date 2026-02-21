@@ -1518,6 +1518,20 @@ export function PRStatusContent({
                   key={check.name}
                   className="group/check flex items-center gap-2 px-2 py-1 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors"
                 >
+                  {check.status === 'COMPLETED' && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRerunCheck({
+                          name: check.name,
+                          url: check.detailsUrl,
+                        })
+                      }
+                      className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
+                    >
+                      <RefreshIcon className="w-3 h-3" />
+                    </button>
+                  )}
                   <a
                     href={check.detailsUrl}
                     target="_blank"
@@ -1537,20 +1551,6 @@ export function PRStatusContent({
                       </span>
                     )}
                   </a>
-                  {check.status === 'COMPLETED' && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRerunCheck({
-                          name: check.name,
-                          url: check.detailsUrl,
-                        })
-                      }
-                      className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
-                    >
-                      <RefreshIcon className="w-3 h-3" />
-                    </button>
-                  )}
                 </div>
               ))}
 

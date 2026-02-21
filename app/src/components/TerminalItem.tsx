@@ -170,9 +170,8 @@ export const TerminalItem = memo(function TerminalItem({
   }, [prForBranch])
 
   return (
-    <div>
+    <div data-terminal-id={terminal.id}>
       <div
-        data-terminal-id={terminal.id}
         onClick={() => {
           selectTerminal(terminal.id)
           clearSession()
@@ -369,7 +368,10 @@ export const TerminalItem = memo(function TerminalItem({
                       pr={prForBranch}
                       withIcon
                       active={activeTab === 'prs' && isActive}
-                      className="whitespace-nowrap"
+                      className={cn(
+                        'whitespace-nowrap',
+                        activeTab === 'prs' && isActive && 'mb-1',
+                      )}
                       hasNewActivity={prForBranch.hasUnreadNotifications}
                       onClick={() => {
                         setActiveTab('prs')
@@ -558,48 +560,63 @@ export const TerminalItem = memo(function TerminalItem({
                   />
                   Claude ({sessions.length})
                 </button>
-                {sessionsListExpanded && (
-                  <>
-                    {sessions.slice(0, 1).map((session, idx) => (
-                      <SessionItem
-                        defaultCollapsed={idx > 0}
-                        key={session.session_id}
-                        session={session}
-                      />
-                    ))}
-                    {sessions.length > 1 && (
+                {sessionsListExpanded &&
+                  (() => {
+                    const activeSessions = sessions.filter(
+                      (s) =>
+                        s.status === 'active' ||
+                        s.status === 'permission_needed',
+                    )
+                    const visibleSessions =
+                      activeSessions.length > 1
+                        ? activeSessions
+                        : sessions.slice(0, 1)
+                    const hiddenSessions = sessions.filter(
+                      (s) => !visibleSessions.includes(s),
+                    )
+                    return (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => setShowAllSessions(!showAllSessions)}
-                          className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2"
-                        >
-                          {showAllSessions ? (
-                            <>
-                              <ChevronUp className="w-3 h-3" />
-                              Hide older
-                            </>
-                          ) : (
-                            <>
-                              <ChevronRight className="w-3 h-3" />
-                              Show {sessions.length - 1} older
-                            </>
-                          )}
-                        </button>
-                        {showAllSessions &&
-                          sessions
-                            .slice(1)
-                            .map((session) => (
-                              <SessionItem
-                                defaultCollapsed
-                                key={session.session_id}
-                                session={session}
-                              />
-                            ))}
+                        {visibleSessions.map((session, idx) => (
+                          <SessionItem
+                            defaultCollapsed={idx > 0}
+                            key={session.session_id}
+                            session={session}
+                          />
+                        ))}
+                        {hiddenSessions.length > 0 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowAllSessions(!showAllSessions)
+                              }
+                              className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2"
+                            >
+                              {showAllSessions ? (
+                                <>
+                                  <ChevronUp className="w-3 h-3" />
+                                  Hide older
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronRight className="w-3 h-3" />
+                                  Show {hiddenSessions.length} older
+                                </>
+                              )}
+                            </button>
+                            {showAllSessions &&
+                              hiddenSessions.map((session) => (
+                                <SessionItem
+                                  defaultCollapsed
+                                  key={session.session_id}
+                                  session={session}
+                                />
+                              ))}
+                          </>
+                        )}
                       </>
-                    )}
-                  </>
-                )}
+                    )
+                  })()}
               </>
             )}
           </div>

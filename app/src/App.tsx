@@ -70,6 +70,9 @@ function AppContent() {
       if (terminal) {
         selectTerminal(terminal.id)
         clearSession()
+        window.dispatchEvent(
+          new CustomEvent('reveal-terminal', { detail: { id: terminal.id } }),
+        )
       }
     },
     goToLastTab: () => {
@@ -158,15 +161,15 @@ function AppContent() {
         (t) => t.id === data.terminal_id || t.cwd === data.project_path,
       )
       const terminalName =
-        session?.latest_user_message ||
+        session?.latest_agent_message ||
         terminal?.name ||
         terminal?.cwd ||
         data.project_path ||
         'Claude'
+      let title = session?.latest_user_message || session?.name
 
       if (data.status === 'permission_needed') {
-        const title =
-          session?.latest_user_message || session?.name || 'Permission Required'
+        title ||= 'Permission Required'
 
         sendNotification(`⚠️ ${title}`, {
           body: `"${terminalName}" needs permissions`,
@@ -183,7 +186,7 @@ function AppContent() {
           },
         })
       } else if (data.hook_type === 'Stop') {
-        const title = session?.name || 'Done'
+        title ||= 'Done'
 
         sendNotification(`✅ ${title}`, {
           body: `"${terminalName}" has finished`,

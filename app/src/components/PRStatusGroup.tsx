@@ -110,7 +110,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           </button>
         )}
         {hasNewActivity && (
-          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 group-hover/pr:hidden" />
         )}
       </div>
       {!prInfo.isMerged && expanded && (

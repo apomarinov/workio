@@ -22,6 +22,7 @@ import {
   GitBranch,
   Github,
   GitMerge,
+  GitPullRequest,
   GitPullRequestArrow,
   LayoutList,
   Loader2,
@@ -332,10 +333,11 @@ export function Sidebar({ width }: SidebarProps) {
 
   const collapseAll = useCallback(() => {
     setExpandedSessionGroups([])
-    setExpandedTerminalSessions([])
+    setExpandedTerminalSessions(activeTerminal ? [activeTerminal.id] : [])
     setCollapsedSessions(allSessionIds)
     setExpandedGitHubPRs([])
   }, [
+    activeTerminal,
     allSessionIds,
     setExpandedSessionGroups,
     setExpandedTerminalSessions,
@@ -973,6 +975,19 @@ export function Sidebar({ width }: SidebarProps) {
                             />
                             <Github className="w-3 h-3" />
                             <span className="truncate">{repoName}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              window.open(
+                                `https://github.com/${repo}/pulls?q=is%3Aopen+is%3Apr+author%3A%40me`,
+                                '_blank',
+                              )
+                            }
+                            className="mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                            title="View my PRs"
+                          >
+                            <GitPullRequest className="w-3 h-3" />
                           </button>
                           {hasHiddenItems && (
                             <button
