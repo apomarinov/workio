@@ -16,13 +16,15 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, Plus, X } from 'lucide-react'
+import { ChevronDown, PencilIcon, Plus, TrashIcon, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
   ContextMenuContent,
+  ContextMenuGroup,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import {
@@ -32,6 +34,7 @@ import {
 } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
+import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
 import type { Shell, Terminal } from '../types'
@@ -56,6 +59,7 @@ function SortableShellPill({
   isMain,
   onSelect,
   onDelete,
+  shortcutHint,
   ref,
   ...rest
 }: {
@@ -65,6 +69,7 @@ function SortableShellPill({
   isMain: boolean
   onSelect: () => void
   onDelete: () => void
+  shortcutHint?: React.ReactNode
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -124,7 +129,16 @@ function SortableShellPill({
           <X className="w-3 h-3" />
         </button>
       )}
-      <span className="truncate max-w-[80px]">{shell.name}</span>
+      <span className="truncate max-w-[80px] relative">
+        <span className={shortcutHint ? 'invisible' : undefined}>
+          {shell.name}
+        </span>
+        {shortcutHint && (
+          <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
+            {shortcutHint}
+          </span>
+        )}
+      </span>
     </button>
   )
 }
@@ -136,6 +150,7 @@ function SortableShellTab({
   isMain,
   onSelect,
   onDelete,
+  shortcutHint,
   ref,
   ...rest
 }: {
@@ -145,6 +160,7 @@ function SortableShellTab({
   isMain: boolean
   onSelect: () => void
   onDelete: () => void
+  shortcutHint?: React.ReactNode
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -194,7 +210,16 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
-      <span className="truncate">{shell.name}</span>
+      <span className="truncate relative">
+        <span className={shortcutHint ? 'invisible' : undefined}>
+          {shell.name}
+        </span>
+        {shortcutHint && (
+          <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
+            {shortcutHint}
+          </span>
+        )}
+      </span>
       {!isMain && (
         <button
           type="button"
@@ -222,6 +247,8 @@ export function ShellTabs({
   className,
 }: ShellTabsProps) {
   const { processes } = useProcessContext()
+  const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
+  const showShortcuts = isActiveTerminal && isGoToShellModifierHeld
   const [wrap, setWrap] = useLocalStorage('shell-tabs-wrap', false)
   const [tabBar, setTabBar] = useLocalStorage('shell-tabs-bar', true)
   const [shellOrder, setShellOrder] = useLocalStorage<Record<number, number[]>>(
@@ -306,11 +333,11 @@ export function ShellTabs({
         </button>
         <div className="my-1 h-px bg-border" />
         <label className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
-          Wrap Tabs
+          Wrap
           <Switch checked={wrap} onCheckedChange={(v) => setWrap(v)} />
         </label>
         <label className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
-          Tab Bar
+          Tabs
           <Switch checked={tabBar} onCheckedChange={(v) => setTabBar(v)} />
         </label>
       </PopoverContent>
@@ -323,11 +350,14 @@ export function ShellTabs({
     <>
       <div
         className={cn(
-          '@container/shells group/tabs flex items-center',
+          '@container/shells group/tabs flex items-center relative',
           !isActiveTerminal && 'opacity-50',
           className,
         )}
       >
+        {tabBar && (
+          <div className="absolute bottom-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
+        )}
         {/* Shell items — responsive */}
         <div className="flex-1 min-w-0 @container/inner">
           {/* <400px: pills */}
@@ -347,8 +377,9 @@ export function ShellTabs({
                 items={shellIds}
                 strategy={horizontalListSortingStrategy}
               >
-                {sortedShells.map((shell) => {
+                {sortedShells.map((shell, index) => {
                   const isMain = isMainShell(shell.id) ?? false
+                  const shortcutIndex = index + 1
                   return (
                     <ContextMenu key={shell.id}>
                       <ContextMenuTrigger asChild>
@@ -359,21 +390,36 @@ export function ShellTabs({
                           isMain={isMain}
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
+                          shortcutHint={
+                            showShortcuts && shortcutIndex <= 9 ? (
+                              <>
+                                {modifierIcons.goToShell('w-2.5 h-2.5')}
+                                {shortcutIndex}
+                              </>
+                            ) : undefined
+                          }
                         />
                       </ContextMenuTrigger>
                       {!isMain && (
                         <ContextMenuContent>
-                          <ContextMenuItem
-                            onClick={() => setRenameShellTarget(shell)}
-                          >
-                            Rename
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            onClick={() => handleDeleteShell(shell.id)}
-                            className="text-destructive"
-                          >
-                            Close
-                          </ContextMenuItem>
+                          <ContextMenuGroup>
+                            <ContextMenuItem
+                              onClick={() => setRenameShellTarget(shell)}
+                            >
+                              <PencilIcon />
+                              Rename
+                            </ContextMenuItem>
+                          </ContextMenuGroup>
+                          <ContextMenuSeparator />
+                          <ContextMenuGroup>
+                            <ContextMenuItem
+                              variant="destructive"
+                              onClick={() => handleDeleteShell(shell.id)}
+                            >
+                              <TrashIcon />
+                              Close
+                            </ContextMenuItem>
+                          </ContextMenuGroup>
                         </ContextMenuContent>
                       )}
                     </ContextMenu>
@@ -406,8 +452,9 @@ export function ShellTabs({
                 items={shellIds}
                 strategy={horizontalListSortingStrategy}
               >
-                {sortedShells.map((shell) => {
+                {sortedShells.map((shell, index) => {
                   const isMain = isMainShell(shell.id) ?? false
+                  const shortcutIndex = index + 1
                   return (
                     <ContextMenu key={shell.id}>
                       <ContextMenuTrigger asChild>
@@ -418,21 +465,36 @@ export function ShellTabs({
                           isMain={isMain}
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
+                          shortcutHint={
+                            showShortcuts && shortcutIndex <= 9 ? (
+                              <>
+                                {modifierIcons.goToShell('w-2.5 h-2.5')}
+                                {shortcutIndex}
+                              </>
+                            ) : undefined
+                          }
                         />
                       </ContextMenuTrigger>
                       {!isMain && (
                         <ContextMenuContent>
-                          <ContextMenuItem
-                            onClick={() => setRenameShellTarget(shell)}
-                          >
-                            Rename
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            onClick={() => handleDeleteShell(shell.id)}
-                            className="text-destructive"
-                          >
-                            Close
-                          </ContextMenuItem>
+                          <ContextMenuGroup>
+                            <ContextMenuItem
+                              onClick={() => setRenameShellTarget(shell)}
+                            >
+                              <PencilIcon />
+                              Rename
+                            </ContextMenuItem>
+                          </ContextMenuGroup>
+                          <ContextMenuSeparator />
+                          <ContextMenuGroup>
+                            <ContextMenuItem
+                              variant="destructive"
+                              onClick={() => handleDeleteShell(shell.id)}
+                            >
+                              <TrashIcon />
+                              Close
+                            </ContextMenuItem>
+                          </ContextMenuGroup>
                         </ContextMenuContent>
                       )}
                     </ContextMenu>

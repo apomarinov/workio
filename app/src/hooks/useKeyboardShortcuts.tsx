@@ -121,6 +121,10 @@ export function useModifiersHeld() {
     settings?.keymap?.goToTab === null
       ? null
       : (settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab)
+  const goToShellBinding =
+    settings?.keymap?.goToShell === null
+      ? null
+      : (settings?.keymap?.goToShell ?? DEFAULT_KEYMAP.goToShell)
 
   const isGoToTabModifierHeld =
     goToTabBinding !== null &&
@@ -129,15 +133,26 @@ export function useModifiersHeld() {
     held.alt === !!goToTabBinding.altKey &&
     held.shift === !!goToTabBinding.shiftKey
 
+  const isGoToShellModifierHeld =
+    goToShellBinding !== null &&
+    held.meta === !!goToShellBinding.metaKey &&
+    held.ctrl === !!goToShellBinding.ctrlKey &&
+    held.alt === !!goToShellBinding.altKey &&
+    held.shift === !!goToShellBinding.shiftKey
+
   return {
     held,
     isGoToTabModifierHeld,
+    isGoToShellModifierHeld,
     modifierIcons: {
       palette: paletteBinding
         ? renderModifierIcons(paletteBinding)
         : () => null,
       goToTab: goToTabBinding
         ? renderModifierIcons(goToTabBinding)
+        : () => null,
+      goToShell: goToShellBinding
+        ? renderModifierIcons(goToShellBinding)
         : () => null,
     } as Record<keyof Keymap, (className?: string) => ReactNode>,
   }
