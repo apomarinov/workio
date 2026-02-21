@@ -3,6 +3,7 @@ import {
   deleteSession,
   deleteSessions,
   getAllSessions,
+  getOldSessionIds,
   getSessionById,
   getSessionMessages,
   getSettings,
@@ -48,6 +49,25 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
         : favorites.filter((fid) => fid !== id)
       await updateSettings({ favorite_sessions: updated })
       return { is_favorite: isFavorite }
+    },
+  )
+
+  // Cleanup old sessions
+  fastify.post<{ Body: { weeks: number } }>(
+    '/api/sessions/cleanup',
+    async (request, reply) => {
+      const { weeks } = request.body
+      if (!weeks || weeks < 1) {
+        return reply.status(400).send({ error: 'weeks must be at least 1' })
+      }
+      const settings = await getSettings()
+      const favoriteIds = settings.favorite_sessions ?? []
+      const oldIds = await getOldSessionIds(weeks, favoriteIds)
+      if (oldIds.length === 0) {
+        return { deleted: 0 }
+      }
+      const deleted = await deleteSessions(oldIds)
+      return { deleted }
     },
   )
 

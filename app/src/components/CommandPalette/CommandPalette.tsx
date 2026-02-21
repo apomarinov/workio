@@ -34,6 +34,7 @@ const CommitDialog = lazy(() =>
   import('../CommitDialog').then((m) => ({ default: m.CommitDialog })),
 )
 
+import { CleanupSessionsModal } from '../CleanupSessionsModal'
 import { ConfirmModal } from '../ConfirmModal'
 import { CreateBranchDialog } from '../CreateBranchDialog'
 import { DirectoryBrowser } from '../DirectoryBrowser'
@@ -97,6 +98,7 @@ export function CommandPalette() {
     branch: string
   } | null>(null)
   const [createBranchLoading, setCreateBranchLoading] = useState(false)
+  const [cleanupModalOpen, setCleanupModalOpen] = useState(false)
 
   // Session search state
   const [searchText, setSearchText] = useState('')
@@ -757,6 +759,12 @@ export function CommandPalette() {
         }
       },
 
+      // Cleanup actions
+      openCleanupModal: () => {
+        closePalette()
+        setTimeout(() => setCleanupModalOpen(true), 150)
+      },
+
       // Shell actions
       openFilePicker: (terminal) => {
         closePalette()
@@ -1081,6 +1089,12 @@ export function CommandPalette() {
           sshHost={filePickerTerminal.ssh_host ?? undefined}
         />
       )}
+
+      <CleanupSessionsModal
+        open={cleanupModalOpen}
+        onClose={() => setCleanupModalOpen(false)}
+        onSuccess={() => refetchSessions()}
+      />
     </>
   )
 }

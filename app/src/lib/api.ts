@@ -272,6 +272,18 @@ export async function deleteSessions(ids: string[]): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete sessions')
 }
 
+export async function cleanupOldSessions(
+  weeks: number,
+): Promise<{ deleted: number }> {
+  const res = await fetch(`${API_BASE}/sessions/cleanup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weeks }),
+  })
+  if (!res.ok) throw new Error('Failed to cleanup sessions')
+  return res.json()
+}
+
 export async function toggleFavoriteSession(
   sessionId: string,
 ): Promise<{ is_favorite: boolean }> {

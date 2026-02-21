@@ -272,6 +272,19 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0
 }
 
+export async function getOldSessionIds(
+  weeks: number,
+  excludeIds: string[],
+): Promise<string[]> {
+  const { rows } = await pool.query(
+    `SELECT session_id FROM sessions
+     WHERE updated_at < NOW() - INTERVAL '1 week' * $1
+       AND session_id != ALL($2)`,
+    [weeks, excludeIds],
+  )
+  return rows.map((r: { session_id: string }) => r.session_id)
+}
+
 export async function deleteSessions(sessionIds: string[]): Promise<number> {
   if (sessionIds.length === 0) return 0
   let deleted = 0

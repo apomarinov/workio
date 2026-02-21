@@ -9,6 +9,7 @@ import {
   Heart,
   ScrollText,
   Search,
+  Trash2,
 } from 'lucide-react'
 import { TerminalIcon2 } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -83,7 +84,7 @@ function SessionIcon({ status }: { status: string }) {
 export function createSearchMode(
   data: AppData,
   _level: PaletteLevel,
-  _actions: AppActions,
+  actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
   const { terminals, sessions, githubPRs, mergedPRs } = data
@@ -341,6 +342,13 @@ export function createSearchMode(
           api.push({ mode: 'favorite-sessions', title: 'Favorite Sessions' }),
       })
     }
+    sessionActions.push({
+      id: 'action:cleanup-sessions',
+      label: 'Cleanup',
+      icon: <Trash2 className="h-4 w-4 shrink-0 text-zinc-400" />,
+      keywords: ['cleanup', 'delete old', 'clean'],
+      onSelect: () => actions.openCleanupModal(),
+    })
 
     // Group sessions by terminal name
     const terminalMap = new Map(terminals.map((t) => [t.id, t]))

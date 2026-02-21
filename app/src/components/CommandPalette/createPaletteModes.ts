@@ -76,6 +76,9 @@ export type AppActions = {
   requestCreateBranch: (terminalId: number, fromBranch: string) => void
   requestRenameBranch: (terminalId: number, branch: string) => void
 
+  // Cleanup actions
+  openCleanupModal: () => void
+
   // Shell actions
   openFilePicker: (terminal: Terminal) => void
 

@@ -61,54 +61,6 @@ def get_favorite_session_ids(conn) -> set[str]:
     return set()
 
 
-def delete_old_session_data(conn) -> tuple[int, list[str]]:
-    """Delete messages and prompts for sessions older than a week. Returns (count deleted, deleted session IDs)."""
-    cur = get_cursor(conn)
-    favorite_ids = get_favorite_session_ids(conn)
-
-    # Get old session IDs
-    cur.execute('''
-        SELECT session_id FROM sessions
-        WHERE updated_at < NOW() - INTERVAL '7 days'
-    ''')
-    old_sessions = cur.fetchall()
-
-    if not old_sessions:
-        return 0, []
-
-    session_ids = [s['session_id'] for s in old_sessions if s['session_id'] not in favorite_ids]
-
-    if not session_ids:
-        return 0, []
-
-    # Delete messages for old sessions' prompts
-    cur.execute('''
-        DELETE FROM messages WHERE prompt_id IN (
-            SELECT id FROM prompts WHERE session_id = ANY(%s)
-        )
-    ''', (session_ids,))
-    messages_deleted = cur.rowcount
-
-    # Delete prompts for old sessions
-    cur.execute('DELETE FROM prompts WHERE session_id = ANY(%s)', (session_ids,))
-    prompts_deleted = cur.rowcount
-
-    # Delete old sessions
-    cur.execute('DELETE FROM sessions WHERE session_id = ANY(%s)', (session_ids,))
-    sessions_deleted = cur.rowcount
-
-    return messages_deleted + prompts_deleted + sessions_deleted, session_ids
-
-
-def delete_old_messages(conn) -> int:
-    """Delete messages older than 3 days. Returns count deleted."""
-    cur = conn.cursor()
-    cur.execute('''
-        DELETE FROM messages WHERE created_at < NOW() - INTERVAL '3 days'
-    ''')
-    return cur.rowcount
-
-
 def delete_orphan_projects(conn) -> int:
     """Delete projects with no sessions. Returns count deleted."""
     cur = conn.cursor()
@@ -181,32 +133,18 @@ def cleanup_stale_files(directory: Path, max_age: int) -> int:
 
 
 def run_data_cleanup(conn) -> None:
-    """Run database data cleanup (weekly)."""
-    deleted_session_ids: list[str] = []
-
+    """Run database data cleanup."""
     log(conn, "cleanup empty")
     end_stale_sessions(conn)
     _, empty_ids = delete_empty_sessions(conn)
-    deleted_session_ids.extend(empty_ids)
     delete_orphan_projects(conn)
 
-    if has_recent_cleanup(conn, 'data', DATA_CLEANUP_INTERVAL):
-        log(conn, "skip old cleanup")
-        if deleted_session_ids:
-            notify(conn, "sessions_deleted", {"session_ids": deleted_session_ids})
-        conn.commit()
-        return
+    if not has_recent_cleanup(conn, 'data', DATA_CLEANUP_INTERVAL):
+        record_cleanup(conn, 'data')
+        delete_old_logs_and_hooks(conn)
 
-    log(conn, "cleanup old")
-    record_cleanup(conn, 'data')
-
-    delete_old_messages(conn)
-    delete_old_logs_and_hooks(conn)
-    _, old_ids = delete_old_session_data(conn)
-    deleted_session_ids.extend(old_ids)
-
-    if deleted_session_ids:
-        notify(conn, "sessions_deleted", {"session_ids": deleted_session_ids})
+    if empty_ids:
+        notify(conn, "sessions_deleted", {"session_ids": empty_ids})
     conn.commit()
 
 
