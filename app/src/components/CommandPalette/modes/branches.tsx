@@ -1,6 +1,7 @@
 import {
   ArrowDown,
   ArrowUp,
+  Bot,
   Check,
   CornerDownLeft,
   GitBranch,
@@ -157,10 +158,10 @@ export function createBranchActionsMode(
   data: AppData,
   level: PaletteLevel,
   actions: AppActions,
-  _api: PaletteAPI,
+  api: PaletteAPI,
 ): PaletteMode {
   const { terminal, branch, branches, loadingStates = {} } = level
-  const { gitDirtyStatus } = data
+  const { gitDirtyStatus, sessions } = data
 
   if (!terminal || !branch) {
     return {
@@ -350,6 +351,26 @@ export function createBranchActionsMode(
         }
       },
     })
+  }
+
+  // Claude Sessions for this branch
+  {
+    const count = sessions.filter((s) => s.data?.branch === branch.name).length
+    if (count > 0) {
+      items.push({
+        id: 'action:claude-sessions',
+        label: `Claude Sessions (${count})`,
+        icon: <Bot className="h-4 w-4 shrink-0 text-zinc-400" />,
+        onSelect: () => {
+          api.push({
+            mode: 'branch-claude-sessions',
+            title: 'Claude Sessions',
+            terminal,
+            branch,
+          })
+        },
+      })
+    }
   }
 
   return {

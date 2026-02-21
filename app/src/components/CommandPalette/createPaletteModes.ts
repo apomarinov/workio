@@ -10,6 +10,7 @@ import type {
   Terminal,
 } from '../../types'
 import { createActionsMode } from './modes/actions'
+import { createBranchClaudeSessionsMode } from './modes/branch-claude-sessions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createFavoriteSessionsMode } from './modes/favorite-sessions'
 import { createPRActionsMode } from './modes/pr-actions'
@@ -99,6 +100,12 @@ export function createPaletteModes(
     actions: createActionsMode(data, level, actions, api),
     branches: createBranchesMode(data, level, actions, api),
     'branch-actions': createBranchActionsMode(data, level, actions, api),
+    'branch-claude-sessions': createBranchClaudeSessionsMode(
+      data,
+      level,
+      actions,
+      api,
+    ),
     'pr-actions': createPRActionsMode(data, level, actions, api),
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
     shell: createShellMode(data, level, actions, api),
