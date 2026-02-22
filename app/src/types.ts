@@ -18,6 +18,7 @@ export interface Shell {
   terminal_id: number
   name: string
   created_at: string
+  isSuspended?: boolean
 }
 
 export interface Terminal {

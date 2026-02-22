@@ -53,6 +53,7 @@ function setFavicon(href: string) {
 function AppContent() {
   const {
     terminals,
+    markShellActive,
     loading,
     activeTerminal,
     selectTerminal,
@@ -76,6 +77,20 @@ function AppContent() {
   const activeShellsRef = useRef(activeShells)
   activeShellsRef.current = activeShells
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
+
+  // Mark active shells so the context can track suspension timestamps
+  useEffect(() => {
+    for (const shellId of Object.values(activeShells)) {
+      markShellActive(shellId)
+    }
+    // Also refresh on interval to prevent the current shell from going stale
+    const id = setInterval(() => {
+      for (const shellId of Object.values(activeShellsRef.current)) {
+        markShellActive(shellId)
+      }
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [activeShells, markShellActive])
 
   // Clean up stale activeShells entries when terminals/shells change
   useEffect(() => {
@@ -551,9 +566,10 @@ function AppContent() {
               </div>
             ) : null}
             {terminals.map((t) => {
-              const mainShell = t.shells.find((s) => s.name === 'main')
               const activeShellId =
-                activeShells[t.id] ?? mainShell?.id ?? t.shells[0]?.id
+                activeShells[t.id] ??
+                t.shells.find((s) => s.name === 'main')?.id ??
+                t.shells[0]?.id
               const isTermVisible =
                 !activeSessionId && t.id === activeTerminal?.id
 
@@ -584,14 +600,20 @@ function AppContent() {
                     />
                   )}
                   <div className="relative flex-1 min-h-0">
-                    {t.shells.map((shell) => (
-                      <Terminal
-                        key={shell.id}
-                        terminalId={t.id}
-                        shellId={shell.id}
-                        isVisible={isTermVisible && shell.id === activeShellId}
-                      />
-                    ))}
+                    {t.shells.map((shell) => {
+                      if (shell.isSuspended && shell.id !== activeShellId)
+                        return null
+                      return (
+                        <Terminal
+                          key={shell.id}
+                          terminalId={t.id}
+                          shellId={shell.id}
+                          isVisible={
+                            isTermVisible && shell.id === activeShellId
+                          }
+                        />
+                      )
+                    })}
                   </div>
                 </div>
               )

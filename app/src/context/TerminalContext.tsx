@@ -24,6 +24,7 @@ import { useNotifications } from './NotificationContext'
 
 interface TerminalContextValue {
   terminals: Terminal[]
+  markShellActive: (shellId: number) => void
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
@@ -118,6 +119,52 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }
     return ordered
   }, [raw, terminalOrder])
+
+  // Shell suspension: track last-active timestamps and periodically re-evaluate
+  const shellLastActiveRef = useRef<Record<number, number>>({})
+  const [suspendTick, setSuspendTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setSuspendTick((t) => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const markShellActive = useCallback((shellId: number) => {
+    shellLastActiveRef.current[shellId] = Date.now()
+  }, [])
+
+  // Initialize timestamps for newly appeared shells
+  useEffect(() => {
+    for (const t of terminals) {
+      for (const s of t.shells) {
+        shellLastActiveRef.current[s.id] ??= Date.now()
+      }
+    }
+  }, [terminals])
+
+  const SUSPEND_AFTER = 10 * 60 * 1000
+  const SUSPEND_ENABLED = false // TODO: enable shell suspension
+  const prevSuspendedRef = useRef<Record<number, boolean>>({})
+  const enrichedTerminals = useMemo(() => {
+    if (!SUSPEND_ENABLED) return terminals
+    const now = Date.now()
+    const result = terminals.map((t) => ({
+      ...t,
+      shells: t.shells.map((s) => {
+        const isSuspended =
+          now - (shellLastActiveRef.current[s.id] ?? now) > SUSPEND_AFTER
+        const wasSuspended = prevSuspendedRef.current[s.id] ?? false
+        if (isSuspended && !wasSuspended) {
+          console.log(`[shell-suspend] shell ${s.id} "${s.name}" suspended`)
+        } else if (!isSuspended && wasSuspended) {
+          console.log(`[shell-suspend] shell ${s.id} "${s.name}" reactivated`)
+        }
+        prevSuspendedRef.current[s.id] = isSuspended
+        return { ...s, isSuspended }
+      }),
+    }))
+    return result
+  }, [terminals, suspendTick])
 
   const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
   const previousTerminalIdRef = useRef<number | null>(null)
@@ -912,7 +959,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      terminals,
+      terminals: enrichedTerminals,
+      markShellActive,
       loading: isLoading,
       activeTerminal,
       selectTerminal,
@@ -939,7 +987,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       reactToPR,
     }),
     [
-      terminals,
+      enrichedTerminals,
+      markShellActive,
       isLoading,
       activeTerminal,
       selectTerminal,
