@@ -17,6 +17,9 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
+  AlertTriangle,
+  Bot,
+  CheckIcon,
   ChevronDown,
   FolderOpen,
   PencilIcon,
@@ -42,11 +45,17 @@ import {
 } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
+import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
-import type { Shell, ShellTemplate, Terminal } from '../types'
+import type {
+  SessionWithProject,
+  Shell,
+  ShellTemplate,
+  Terminal,
+} from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { RenameModal } from './EditSessionModal'
 import { ShellTemplateModal } from './ShellTemplateModal'
@@ -62,6 +71,57 @@ interface ShellTabsProps {
   className?: string
 }
 
+const sessionStatusColor: Record<string, string> = {
+  started: 'text-green-500',
+  active: 'text-[#D97757]',
+  done: 'text-gray-500',
+  permission_needed: 'text-[#D97757]',
+  idle: 'text-gray-400',
+}
+
+function ShellSessionIcon({ session }: { session: SessionWithProject }) {
+  const s = 'w-3 h-3 shrink-0'
+  if (session.status === 'done')
+    return <CheckIcon className={cn(s, 'text-green-500/70')} />
+  if (session.status === 'active' || session.status === 'permission_needed')
+    return (
+      <>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 300 150"
+          className={s}
+        >
+          <path
+            fill="none"
+            stroke="#D97757"
+            strokeWidth="40"
+            strokeLinecap="round"
+            strokeDasharray="300 385"
+            strokeDashoffset="0"
+            d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              calcMode="spline"
+              dur="2s"
+              values="685;-685"
+              keySplines="0 0 1 1"
+              repeatCount="indefinite"
+            />
+          </path>
+        </svg>
+        {session.status === 'permission_needed' && (
+          <AlertTriangle className={cn(s, 'text-yellow-500 animate-pulse')} />
+        )}
+      </>
+    )
+  return (
+    <Bot
+      className={cn(s, sessionStatusColor[session.status] ?? 'text-gray-400')}
+    />
+  )
+}
+
 function SortableShellPill({
   shell,
   isActive,
@@ -71,6 +131,7 @@ function SortableShellPill({
   onSelect,
   onDelete,
   shortcutHint,
+  shellSession,
   ref,
   ...rest
 }: {
@@ -82,6 +143,7 @@ function SortableShellPill({
   onSelect: () => void
   onDelete: () => void
   shortcutHint?: React.ReactNode
+  shellSession?: SessionWithProject
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -141,6 +203,7 @@ function SortableShellPill({
           <X className="w-3 h-3" />
         </button>
       )}
+      {shellSession && <ShellSessionIcon session={shellSession} />}
       <span className="truncate max-w-[80px] relative">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
@@ -164,6 +227,7 @@ function SortableShellTab({
   onSelect,
   onDelete,
   shortcutHint,
+  shellSession,
   ref,
   ...rest
 }: {
@@ -175,6 +239,7 @@ function SortableShellTab({
   onSelect: () => void
   onDelete: () => void
   shortcutHint?: React.ReactNode
+  shellSession?: SessionWithProject
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -224,6 +289,7 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
+      {shellSession && <ShellSessionIcon session={shellSession} />}
       <span className="truncate relative">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
@@ -261,7 +327,23 @@ export function ShellTabs({
   className,
 }: ShellTabsProps) {
   const { processes } = useProcessContext()
+  const { sessions } = useSessionContext()
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
+
+  // Map shell_id -> most recent non-ended session for this terminal
+  const shellSessionMap = new Map<number, SessionWithProject>()
+  for (const session of sessions) {
+    if (
+      session.shell_id != null &&
+      session.terminal_id === terminal.id &&
+      session.status !== 'ended'
+    ) {
+      const existing = shellSessionMap.get(session.shell_id)
+      if (!existing || session.updated_at > existing.updated_at) {
+        shellSessionMap.set(session.shell_id, session)
+      }
+    }
+  }
   const showShortcuts = isActiveTerminal && isGoToShellModifierHeld
   const [wrap, setWrap] = useLocalStorage('shell-tabs-wrap', false)
   const [tabBar, setTabBar] = useLocalStorage('shell-tabs-bar', true)
@@ -522,6 +604,7 @@ export function ShellTabs({
                           }
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
+                          shellSession={shellSessionMap.get(shell.id)}
                           shortcutHint={
                             showShortcuts && shortcutIndex <= 9 ? (
                               <>
@@ -617,6 +700,7 @@ export function ShellTabs({
                           }
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
+                          shellSession={shellSessionMap.get(shell.id)}
                           shortcutHint={
                             showShortcuts && shortcutIndex <= 9 ? (
                               <>
