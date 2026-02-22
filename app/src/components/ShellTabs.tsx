@@ -575,7 +575,7 @@ export function ShellTabs({
           <div
             className={cn(
               'flex gap-1 items-center @[400px]/shells:hidden',
-              wrap ? 'flex-wrap' : 'overflow-x-auto flex-nowrap',
+              wrap ? 'flex-wrap' : 'overflow-x-auto flex-nowrap p-0.5',
             )}
           >
             <DndContext

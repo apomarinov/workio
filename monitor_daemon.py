@@ -213,8 +213,10 @@ def process_event(event: dict, env: dict) -> dict:
 
             if hook_type == 'SessionStart':
                 clean_sessions(conn, project_id, session_id)
-                create_prompt(conn, session_id)
-                log(conn, "Created prompt", session_id=session_id)
+                # Only create an initial empty prompt for new sessions, not resumes
+                if event.get('source') != 'resume':
+                    create_prompt(conn, session_id)
+                    log(conn, "Created prompt", session_id=session_id)
 
             if hook_type in ('SessionStart', 'UserPromptSubmit'):
                 stored_path = get_session_project_path(conn, session_id) or project_path

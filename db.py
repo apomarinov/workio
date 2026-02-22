@@ -125,10 +125,12 @@ def upsert_session(conn, session_id: str, project_id: int, status: str, transcri
 
 
 def update_session_metadata(conn, session_id: str, name: str | None, message_count: int | None) -> None:
-    """Update session metadata."""
+    """Update session metadata. Preserves existing name/message_count when new values are NULL."""
     cur = conn.cursor()
     cur.execute('''
-        UPDATE sessions SET name = %s, message_count = %s
+        UPDATE sessions SET
+            name = COALESCE(%s, sessions.name),
+            message_count = COALESCE(%s, sessions.message_count)
         WHERE session_id = %s
     ''', (name[:200] if name else None, message_count, session_id))
 
