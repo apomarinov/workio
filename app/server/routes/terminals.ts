@@ -158,11 +158,13 @@ import {
   getShellById,
   getTerminalById,
   logCommand,
+  setPermissionNeededSessionDone,
   terminalNameExists,
   updateShellName,
   updateTerminal,
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
+import { getIO } from '../io'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
@@ -2537,6 +2539,19 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const shell = await getShellById(id)
       if (!shell) {
         return reply.status(404).send({ error: 'Shell not found' })
+      }
+
+      // If the shell's session is waiting for permission, mark it done
+      const doneSessionId = await setPermissionNeededSessionDone(id)
+      if (doneSessionId) {
+        log.info(
+          `[interrupt] Set permission_needed session=${doneSessionId} to done (shell=${id})`,
+        )
+        const io = getIO()
+        io?.emit('session:updated', {
+          sessionId: doneSessionId,
+          data: { status: 'done' },
+        })
       }
 
       interruptSession(id)

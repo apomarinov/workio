@@ -48,6 +48,7 @@ export interface Session {
   session_id: string
   project_id: number
   terminal_id: number | null
+  shell_id: number | null
   name: string | null
   message_count: number | null
   status: 'started' | 'active' | 'done' | 'ended' | 'permission_needed' | 'idle'
@@ -137,7 +138,7 @@ export interface TodoWriteInput {
 interface BaseTool {
   tool_use_id: string
   name: string
-  status: 'success' | 'error'
+  status: 'success' | 'error' | 'pending'
 }
 
 export interface BashTool extends BaseTool {
@@ -196,6 +197,27 @@ export interface GenericTool extends BaseTool {
   answers?: Record<string, string>
 }
 
+export type PermissionPromptType = 'plan_mode' | 'tool_permission'
+
+export interface PermissionOption {
+  number: number
+  label: string
+  keySequence: string
+}
+
+export interface PermissionPromptInput {
+  type: PermissionPromptType
+  title: string
+  question: string
+  context: string
+  options: PermissionOption[]
+}
+
+export interface PermissionPromptTool extends BaseTool {
+  name: 'PermissionPrompt'
+  input: PermissionPromptInput
+}
+
 export type ToolData =
   | BashTool
   | EditTool
@@ -204,6 +226,7 @@ export type ToolData =
   | GrepTool
   | TaskTool
   | TodoWriteTool
+  | PermissionPromptTool
   | GenericTool
 
 export interface MessageImage {

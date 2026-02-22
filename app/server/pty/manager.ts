@@ -1027,6 +1027,7 @@ export async function createSession(
           TERM: 'xterm-256color',
           COLORTERM: 'truecolor',
           WORKIO_TERMINAL_ID: String(terminalId),
+          WORKIO_SHELL_ID: String(shellId),
         } as Record<string, string>,
       })
     } catch (err) {

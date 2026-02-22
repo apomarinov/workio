@@ -127,9 +127,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           const idx = prev.findIndex((s) => s.session_id === event.sessionId)
           if (idx < 0) return prev
           const next = [...prev]
+          const { status, ...rest } = event.data
           next[idx] = {
             ...next[idx],
-            data: { ...next[idx].data, ...event.data },
+            ...(status !== undefined
+              ? { status: status as SessionWithProject['status'] }
+              : {}),
+            data: { ...next[idx].data, ...rest },
           }
           return next
         },

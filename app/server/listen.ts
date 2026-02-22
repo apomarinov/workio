@@ -3,6 +3,7 @@ import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
 import { getMessagesByIds, getTerminalById, updateSessionData } from './db'
 import { log } from './logger'
+import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
 import { execSSHCommand } from './ssh/exec'
 
 function detectLocalBranch(cwd: string): Promise<string> {
@@ -98,6 +99,19 @@ export async function initPgListener(
             payload.terminal_id ?? null,
             payload.project_path,
           )
+        }
+
+        // Scan terminal buffer for permission prompts when status changes
+        if (payload.status === 'permission_needed') {
+          log.info(
+            `LISTEN: permission_needed session=${payload.session_id} shell_id=${payload.shell_id}`,
+          )
+          if (payload.shell_id) {
+            // Small delay to let the buffer fill with the full prompt
+            setTimeout(() => {
+              scanAndStorePermissionPrompt(payload.session_id, payload.shell_id)
+            }, 500)
+          }
         }
       }
 

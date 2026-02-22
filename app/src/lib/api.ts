@@ -231,6 +231,18 @@ export async function updateSettings(
   return res.json()
 }
 
+export interface ActivePermission extends SessionWithProject {
+  message_id: number
+  source: 'ask_user_question' | 'terminal_prompt'
+  tools: Record<string, unknown>
+}
+
+export async function getActivePermissions(): Promise<ActivePermission[]> {
+  const res = await fetch(`${API_BASE}/permissions/active`)
+  if (!res.ok) throw new Error('Failed to fetch active permissions')
+  return res.json()
+}
+
 export async function getClaudeSessions(): Promise<SessionWithProject[]> {
   const res = await fetch(`${API_BASE}/sessions`)
   if (!res.ok) throw new Error('Failed to fetch sessions')

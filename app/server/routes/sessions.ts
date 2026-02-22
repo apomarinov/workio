@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify'
 import {
   deleteSession,
   deleteSessions,
+  getActivePermissions,
   getAllSessions,
   getAllTerminals,
   getOldSessionIds,
@@ -79,6 +80,11 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
       return { deleted }
     },
   )
+
+  // Get active permissions across all sessions
+  fastify.get('/api/permissions/active', async () => {
+    return await getActivePermissions()
+  })
 
   // Search session messages
   fastify.get<{ Querystring: { q?: string } }>(

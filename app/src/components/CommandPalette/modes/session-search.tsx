@@ -153,6 +153,7 @@ export function createSessionSearchMode(
               status: match.status as 'active',
               project_id: 0,
               terminal_id: null,
+              shell_id: null,
               message_count: null,
               transcript_path: null,
               data: null,

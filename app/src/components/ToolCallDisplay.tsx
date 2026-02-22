@@ -40,12 +40,16 @@ interface ToolCallDisplayProps {
   tool: ToolData
 }
 
-function StatusDot({ status }: { status: 'success' | 'error' }) {
-  return status === 'success' ? (
-    <CheckCircle2 className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-green-500" />
-  ) : (
-    <XCircle className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-red-400" />
-  )
+function StatusDot({ status }: { status: 'success' | 'error' | 'pending' }) {
+  if (status === 'success')
+    return (
+      <CheckCircle2 className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-green-500" />
+    )
+  if (status === 'pending')
+    return (
+      <Circle className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-yellow-500" />
+    )
+  return <XCircle className="w-3.5 h-3.5 min-w-3.5 min-h-3.5 text-red-400" />
 }
 
 function ToolHeader({
@@ -58,7 +62,7 @@ function ToolHeader({
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
-  status: 'success' | 'error'
+  status: 'success' | 'error' | 'pending'
   meta?: React.ReactNode
   onExpand?: () => void
   diff?: boolean
@@ -341,7 +345,7 @@ function CollapsibleOutput({
 }: {
   output: string
   truncated: boolean
-  status?: 'success' | 'error'
+  status?: 'success' | 'error' | 'pending'
 }) {
   const { settings } = useSettings()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)

@@ -1,6 +1,8 @@
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
+import { setPermissionNeededSessionDone } from '../db'
+import { getIO } from '../io'
 import { log } from '../logger'
 import {
   attachSession,
@@ -168,6 +170,31 @@ wss.on('connection', (ws: WebSocket) => {
         if (shellId === null) {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
+        }
+        // Ctrl+C: if session is waiting for permission, mark it done
+        if (message.data.includes('\x03')) {
+          log.info(
+            `[ws] Ctrl+C detected on shell=${shellId}, checking for permission_needed session`,
+          )
+          setPermissionNeededSessionDone(shellId)
+            .then((sessionId) => {
+              log.info(
+                `[ws] setPermissionNeededSessionDone result: sessionId=${sessionId} shell=${shellId}`,
+              )
+              if (sessionId) {
+                const io = getIO()
+                io?.emit('session:updated', {
+                  sessionId,
+                  data: { status: 'done' },
+                })
+              }
+            })
+            .catch((err) => {
+              log.error(
+                { err },
+                `[ws] Failed to check permission_needed for shell=${shellId}`,
+              )
+            })
         }
         writeToSession(shellId, message.data)
         break

@@ -110,17 +110,18 @@ def update_project_path_by_session(conn, session_id: str, path: str) -> bool:
 
 # Sessions
 
-def upsert_session(conn, session_id: str, project_id: int, status: str, transcript_path: str, terminal_id: int | None = None) -> None:
+def upsert_session(conn, session_id: str, project_id: int, status: str, transcript_path: str, terminal_id: int | None = None, shell_id: int | None = None) -> None:
     """Insert or update a session. Note: project_id is only set on insert, not updated."""
     cur = conn.cursor()
     cur.execute('''
-        INSERT INTO sessions (session_id, project_id, terminal_id, status, transcript_path)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO sessions (session_id, project_id, terminal_id, shell_id, status, transcript_path)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT(session_id) DO UPDATE SET
             terminal_id = COALESCE(EXCLUDED.terminal_id, sessions.terminal_id),
+            shell_id = COALESCE(EXCLUDED.shell_id, sessions.shell_id),
             status = EXCLUDED.status,
             transcript_path = EXCLUDED.transcript_path
-    ''', (session_id, project_id, terminal_id, status, transcript_path))
+    ''', (session_id, project_id, terminal_id, shell_id, status, transcript_path))
 
 
 def update_session_metadata(conn, session_id: str, name: str | None, message_count: int | None) -> None:

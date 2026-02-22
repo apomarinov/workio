@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     session_id VARCHAR(100) PRIMARY KEY,
     project_id INTEGER REFERENCES projects(id),
     terminal_id INTEGER,
+    shell_id INTEGER,
     name VARCHAR(200),
     message_count INTEGER,
     status VARCHAR(20),
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE INDEX IF NOT EXISTS idx_cleans_type ON cleans(type);
 CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_shell_id ON sessions(shell_id);
 CREATE INDEX IF NOT EXISTS idx_hooks_session_id ON hooks(session_id);
 CREATE INDEX IF NOT EXISTS idx_hooks_created_at ON hooks(created_at);
 CREATE INDEX IF NOT EXISTS idx_prompts_session_id ON prompts(session_id);

@@ -28,6 +28,7 @@ def main() -> None:
         "event": event,
         "env": {
             "WORKIO_TERMINAL_ID": os.environ.get("WORKIO_TERMINAL_ID", ""),
+            "WORKIO_SHELL_ID": os.environ.get("WORKIO_SHELL_ID", ""),
         }
     })
 

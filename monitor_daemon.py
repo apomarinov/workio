@@ -183,6 +183,8 @@ def process_event(event: dict, env: dict) -> dict:
             hook_type = event.get('hook_event_name', '')
             terminal_id_str = env.get('WORKIO_TERMINAL_ID')
             terminal_id = int(terminal_id_str) if terminal_id_str else None
+            shell_id_str = env.get('WORKIO_SHELL_ID')
+            shell_id = int(shell_id_str) if shell_id_str else None
 
             log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=terminal_id_str)
             save_hook(conn, session_id, hook_type, event)
@@ -207,7 +209,7 @@ def process_event(event: dict, env: dict) -> dict:
             project_id = upsert_project(conn, project_path)
 
             if status:
-                upsert_session(conn, session_id, project_id, status, transcript_path, terminal_id)
+                upsert_session(conn, session_id, project_id, status, transcript_path, terminal_id, shell_id)
 
             if hook_type == 'SessionStart':
                 clean_sessions(conn, project_id, session_id)
@@ -230,6 +232,7 @@ def process_event(event: dict, env: dict) -> dict:
                 "status": status,
                 "project_path": project_path,
                 "terminal_id": terminal_id,
+                "shell_id": shell_id,
             })
 
             conn.commit()

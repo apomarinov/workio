@@ -26,6 +26,7 @@ import { useNotifications } from './context/NotificationContext'
 import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
+import { useActivePermissions } from './hooks/useActivePermissions'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSocket } from './hooks/useSocket'
@@ -61,6 +62,7 @@ function AppContent() {
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe } = useSocket()
   const { sendNotification } = useNotifications()
+  useActivePermissions()
   const { clearSession } = useSessionContext()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
   const [createModalOpen, setCreateModalOpen] = useState(false)
