@@ -57,6 +57,7 @@ function AppContent() {
     loading,
     activeTerminal,
     selectTerminal,
+    clearTerminal,
     selectPreviousTerminal,
     refetch,
   } = useTerminalContext()
@@ -469,22 +470,38 @@ function AppContent() {
         'Claude'
       let title = session?.latest_user_message || session?.name
 
+      const navigateToSession = () => {
+        if (terminal && data.shell_id) {
+          selectTerminal(terminal.id)
+          setActiveShells((prev) => ({
+            ...prev,
+            [terminal.id]: data.shell_id!,
+          }))
+          window.dispatchEvent(
+            new CustomEvent('shell-select', {
+              detail: { terminalId: terminal.id, shellId: data.shell_id },
+            }),
+          )
+        } else if (terminal) {
+          selectTerminal(terminal.id)
+        } else {
+          selectSession(data.session_id)
+          clearTerminal()
+        }
+        window.dispatchEvent(
+          new CustomEvent('flash-session', {
+            detail: { sessionId: data.session_id },
+          }),
+        )
+      }
+
       if (data.status === 'permission_needed') {
         title ||= 'Permission Required'
 
         sendNotification(`⚠️ ${title}`, {
           body: `"${terminalName}" needs permissions`,
           audio: 'permission',
-          onClick: () => {
-            if (terminal) {
-              selectTerminal(terminal.id)
-            }
-            window.dispatchEvent(
-              new CustomEvent('flash-session', {
-                detail: { sessionId: data.session_id },
-              }),
-            )
-          },
+          onClick: navigateToSession,
         })
       } else if (data.hook_type === 'Stop') {
         title ||= 'Done'
@@ -492,20 +509,19 @@ function AppContent() {
         sendNotification(`✅ ${title}`, {
           body: `"${terminalName}" has finished`,
           audio: 'done',
-          onClick: () => {
-            if (terminal) {
-              selectTerminal(terminal.id)
-            }
-            window.dispatchEvent(
-              new CustomEvent('flash-session', {
-                detail: { sessionId: data.session_id },
-              }),
-            )
-          },
+          onClick: navigateToSession,
         })
       }
     })
-  }, [subscribe, sendNotification, terminals, selectTerminal, sessions])
+  }, [
+    subscribe,
+    sendNotification,
+    terminals,
+    selectTerminal,
+    clearTerminal,
+    selectSession,
+    sessions,
+  ])
 
   if (loading) {
     return (

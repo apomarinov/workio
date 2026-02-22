@@ -28,6 +28,7 @@ interface TerminalContextValue {
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
+  clearTerminal: () => void
   selectPreviousTerminal: () => void
   createTerminal: (opts: {
     cwd: string
@@ -896,6 +897,15 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const clearTerminal = useCallback(() => {
+    setActiveTerminalId((prev) => {
+      if (prev !== null) {
+        previousTerminalIdRef.current = prev
+      }
+      return null
+    })
+  }, [])
+
   const selectPreviousTerminal = useCallback(() => {
     const prevId = previousTerminalIdRef.current
     if (prevId !== null && terminals.some((t) => t.id === prevId)) {
@@ -964,6 +974,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       loading: isLoading,
       activeTerminal,
       selectTerminal,
+      clearTerminal,
       selectPreviousTerminal,
       createTerminal,
       updateTerminal,
@@ -992,6 +1003,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       activeTerminal,
       selectTerminal,
+      clearTerminal,
       selectPreviousTerminal,
       createTerminal,
       updateTerminal,
