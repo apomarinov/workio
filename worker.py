@@ -15,7 +15,7 @@ from db import (
     get_db, log, notify,
     get_session, get_latest_prompt, update_prompt_text,
     message_exists, create_message, get_latest_user_message, upsert_todo_message,
-    compute_state_key, compute_todo_hash
+    compute_state_key, compute_todo_hash, update_session_name_if_empty
 )
 
 DEBOUNCE_DIR = Path(__file__).parent / "debounce"
@@ -297,6 +297,10 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
                                 'content': item.get('content'),
                                 'is_error': item.get('is_error', False)
                             }
+                            # Capture AskUserQuestion answers if present
+                            tool_use_result = entry.get('toolUseResult')
+                            if isinstance(tool_use_result, dict) and 'answers' in tool_use_result:
+                                tool_results[tool_use_id]['answers'] = tool_use_result['answers']
         except Exception as e:
             log(conn, "Error processing user entry for tools", session_id=session_id, error=str(e))
             continue
@@ -322,6 +326,11 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
 
             if not tool_json:
                 continue
+
+            # Merge AskUserQuestion answers into tool JSON
+            answers = result.get('answers')
+            if answers:
+                tool_json['answers'] = answers
 
             tool_name = tool_use.get('name')
             tools_str = json.dumps(tool_json)
@@ -484,6 +493,14 @@ def process_transcript(conn, session_id: str, transcript_path: str) -> list[dict
             'UPDATE sessions SET name = %s WHERE session_id = %s',
             (custom_title, session_id)
         )
+    else:
+        # Fall back to first user message body as session name
+        first_user_body = next(
+            (m['body'] for m in new_messages if m['is_user'] and m['body']),
+            None
+        )
+        if first_user_body:
+            update_session_name_if_empty(conn, session_id, first_user_body)
 
     log(conn, "Processed transcript", session_id=session_id, messages_added=len(new_messages))
 

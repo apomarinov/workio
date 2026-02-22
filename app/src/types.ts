@@ -193,6 +193,7 @@ export interface GenericTool extends BaseTool {
   input: Record<string, unknown>
   output?: string
   output_truncated?: boolean
+  answers?: Record<string, string>
 }
 
 export type ToolData =

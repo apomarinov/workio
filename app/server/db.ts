@@ -215,7 +215,7 @@ export async function getSessionMessages(
       FROM messages m
       JOIN prompts p ON m.prompt_id = p.id
       WHERE p.session_id = $1
-      ORDER BY COALESCE(m.updated_at, m.created_at) DESC
+      ORDER BY m.created_at DESC
       LIMIT $2 OFFSET $3
     `,
     [sessionId, limit, offset],
