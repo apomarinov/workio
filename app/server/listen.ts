@@ -4,6 +4,7 @@ import type { Server as SocketIOServer } from 'socket.io'
 import { getMessagesByIds, getTerminalById, updateSessionData } from './db'
 import { log } from './logger'
 import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
+import { sendPushNotification } from './push'
 import { execSSHCommand } from './ssh/exec'
 
 function detectLocalBranch(cwd: string): Promise<string> {
@@ -99,6 +100,40 @@ export async function initPgListener(
             payload.terminal_id ?? null,
             payload.project_path,
           )
+        }
+
+        // Send push notification for permission_needed
+        if (payload.status === 'permission_needed') {
+          const terminal = payload.terminal_id
+            ? await getTerminalById(payload.terminal_id)
+            : null
+          sendPushNotification({
+            title: 'Permission Required',
+            body: `"${terminal?.name || 'Terminal'}" needs permissions`,
+            data: {
+              type: 'permission_needed',
+              terminalId: payload.terminal_id,
+              shellId: payload.shell_id,
+              sessionId: payload.session_id,
+            },
+          })
+        }
+
+        // Send push notification for Stop events
+        if (payload.hook_type === 'Stop') {
+          const terminal = payload.terminal_id
+            ? await getTerminalById(payload.terminal_id)
+            : null
+          sendPushNotification({
+            title: 'Done',
+            body: `"${terminal?.name || 'Terminal'}" has finished`,
+            data: {
+              type: 'stop',
+              terminalId: payload.terminal_id,
+              shellId: payload.shell_id,
+              sessionId: payload.session_id,
+            },
+          })
         }
 
         // Scan terminal buffer for permission prompts when status changes

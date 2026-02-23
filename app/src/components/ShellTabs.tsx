@@ -646,12 +646,12 @@ export function ShellTabs({
           className,
         )}
       >
-        {tabBar && false && (
+        {tabBar && (
           <div className="absolute bottom-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
         )}
         {children && <div className="flex-shrink-0">{children}</div>}
         {/* Shell items — responsive */}
-        <div className="flex-1 min-w-0 @container/inner">
+        <div className="flex-1 min-w-0 @container/inner pb-1">
           {/* <400px: pills (hidden on mobile) */}
           <div
             className={cn(

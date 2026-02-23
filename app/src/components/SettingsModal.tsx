@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   AlignLeft,
+  Bell,
   Brain,
   Code,
   Keyboard,
@@ -36,6 +37,7 @@ import type { CustomTerminalAction, PreferredIDE } from '../types'
 import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
+import { PushNotificationModal } from './PushNotificationModal'
 import { useWebhookWarning, WebhooksModal } from './WebhooksModal'
 
 interface SettingsModalProps {
@@ -56,6 +58,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [showCustomizeKeyboard, setShowCustomizeKeyboard] = useState(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
   const [showWebhooksModal, setShowWebhooksModal] = useState(false)
+  const [showPushModal, setShowPushModal] = useState(false)
   const {
     hasWarning: hasWebhookWarning,
     missingCount,
@@ -104,7 +107,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-sidebar">
+      <DialogContent className="bg-sidebar max-h-[70vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
@@ -202,56 +205,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-3 border-t-[1px] mt-1 pt-3">
-            <span className="font-semibold">Claude Chat</span>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Brain className="w-4 h-4 text-muted-foreground" />
-                <label htmlFor="show_thinking" className="text-sm font-medium">
-                  Thinking
-                </label>
-              </div>
-              <Switch
-                id="show_thinking"
-                checked={showThinking}
-                onCheckedChange={setShowThinking}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-muted-foreground" />
-                <label htmlFor="show_tools" className="text-sm font-medium">
-                  Tools
-                </label>
-              </div>
-              <Switch
-                id="show_tools"
-                checked={showTools}
-                onCheckedChange={setShowTools}
-              />
-            </div>
-
-            {showTools && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Code className="w-4 h-4 text-muted-foreground" />
-                  <label
-                    htmlFor="show_tool_output"
-                    className="text-sm font-medium"
-                  >
-                    Tool Output
-                  </label>
-                </div>
-                <Switch
-                  id="show_tool_output"
-                  checked={showToolOutput}
-                  onCheckedChange={setShowToolOutput}
-                />
-              </div>
-            )}
-          </div>
-
           <div className="flex flex-col gap-3 border-t-[1px] pt-3">
             <div className="flex items-center justify-between">
               <div>
@@ -318,6 +271,27 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
           <div className="flex flex-col gap-3 -mx-1 px-1">
             <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">
+                    Push Notifications
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                  Get notified even when the app is closed
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPushModal(true)}
+              >
+                Configure
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Webhook
                   className={cn(
@@ -350,6 +324,61 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             open={showWebhooksModal}
             onOpenChange={setShowWebhooksModal}
           />
+
+          <PushNotificationModal
+            open={showPushModal}
+            onOpenChange={setShowPushModal}
+          />
+
+          <div className="flex flex-col gap-3 border-t-[1px] pt-3">
+            <span className="font-semibold">Claude Chat</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-muted-foreground" />
+                <label htmlFor="show_thinking" className="text-sm font-medium">
+                  Thinking
+                </label>
+              </div>
+              <Switch
+                id="show_thinking"
+                checked={showThinking}
+                onCheckedChange={setShowThinking}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-muted-foreground" />
+                <label htmlFor="show_tools" className="text-sm font-medium">
+                  Tools
+                </label>
+              </div>
+              <Switch
+                id="show_tools"
+                checked={showTools}
+                onCheckedChange={setShowTools}
+              />
+            </div>
+
+            {showTools && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4 text-muted-foreground" />
+                  <label
+                    htmlFor="show_tool_output"
+                    className="text-sm font-medium"
+                  >
+                    Tool Output
+                  </label>
+                </div>
+                <Switch
+                  id="show_tool_output"
+                  checked={showToolOutput}
+                  onCheckedChange={setShowToolOutput}
+                />
+              </div>
+            )}
+          </div>
 
           <DialogFooter>
             <div className="mt-3">

@@ -8,12 +8,12 @@ import {
   deleteTerminal,
   getMainShellForTerminal,
   getTerminalById,
-  insertNotification,
   logCommand,
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
+import { emitNotification } from '../notify'
 import {
   cancelWaitForMarker,
   destroySessionsForTerminal,
@@ -271,15 +271,12 @@ export async function emitWorkspace(
 
   // Additionally insert notification for terminal states that need it
   if (notificationType) {
-    const notification = await insertNotification(
+    await emitNotification(
       notificationType,
-      'workspace', // Use 'workspace' as repo for workspace notifications
+      'workspace',
       { terminalId, ...payload },
-      `${terminalId}:${notificationType}`, // Dedup by terminalId + type
+      `${terminalId}:${notificationType}`,
     )
-    if (notification) {
-      io?.emit('notifications:new', notification)
-    }
   }
 }
 

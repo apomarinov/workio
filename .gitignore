@@ -8,3 +8,4 @@ debounce/
 daemon.sock
 data.db*
 .pytest_cache/
+certs/

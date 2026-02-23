@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { io, type Socket } from 'socket.io-client'
 
-const SOCKET_URL = import.meta.env.DEV
-  ? `${window.location.protocol}//${window.location.hostname}:5176`
-  : window.location.origin
+// In dev, go through the Vite proxy (same origin) so HTTPS/WSS works seamlessly
+const SOCKET_URL = window.location.origin
 
 let socket: Socket | null = null
 let connectionCount = 0

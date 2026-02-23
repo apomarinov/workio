@@ -59,6 +59,7 @@ import {
   writeToSession,
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
+import { initWebPush } from './push'
 import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -94,7 +95,20 @@ if (env.NODE_ENV !== 'production') {
 }
 const logStream = pino.multistream(logStreams)
 
+// Try to load HTTPS certs
+const certsDir = path.join(__dirname, '../../certs')
+const certPath = path.join(certsDir, 'cert.pem')
+const keyPath = path.join(certsDir, 'key.pem')
+let httpsOptions: { key: Buffer; cert: Buffer } | undefined
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  httpsOptions = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
+  }
+}
+
 const fastify = Fastify({
+  ...(httpsOptions ? { https: httpsOptions } : {}),
   loggerInstance: pino(
     {
       level: 'info',
@@ -127,6 +141,9 @@ fastify.addHook('onError', async (request, _reply, error) => {
 
 // Initialize database
 await initDb()
+
+// Initialize Web Push
+await initWebPush()
 
 // Setup Socket.IO
 const io = new SocketIOServer(fastify.server, {
@@ -795,6 +812,13 @@ process.on('SIGINT', () => {
 const start = async () => {
   try {
     startDaemon()
+    if (httpsOptions) {
+      log.info(`[server] HTTPS enabled (certs from ${certsDir})`)
+    } else {
+      log.info(
+        '[server] No certs found, running HTTP. Run `npm run certs` to enable HTTPS.',
+      )
+    }
     await fastify.listen({ port, host: '0.0.0.0' })
 
     // Handle WebSocket upgrades for terminal PTY

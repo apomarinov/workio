@@ -1,8 +1,14 @@
 import { execFile } from 'node:child_process'
 import type { FastifyInstance } from 'fastify'
-import type { Settings } from '../../src/types'
-import { getAllTerminals, getSettings, updateSettings } from '../db'
+import type { PushSubscriptionRecord, Settings } from '../../src/types'
+import {
+  getAllTerminals,
+  getOrCreateVapidKeys,
+  getSettings,
+  updateSettings,
+} from '../db'
 import { refreshPRChecks } from '../github/checks'
+import { sendPushNotification } from '../push'
 
 type UpdateSettingsBody = Partial<Omit<Settings, 'id'>>
 
@@ -106,4 +112,58 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
       return settings
     },
   )
+
+  // Push notification routes
+
+  fastify.get('/api/push/vapid-key', async () => {
+    const { publicKey } = await getOrCreateVapidKeys()
+    return { publicKey }
+  })
+
+  fastify.post<{
+    Body: {
+      endpoint: string
+      keys: { p256dh: string; auth: string }
+      userAgent?: string
+    }
+  }>('/api/push/subscribe', async (request) => {
+    const { endpoint, keys, userAgent } = request.body
+    const settings = await getSettings()
+    const existing = settings.push_subscriptions ?? []
+
+    // Upsert by endpoint
+    const filtered = existing.filter(
+      (s: PushSubscriptionRecord) => s.endpoint !== endpoint,
+    )
+    const newSub: PushSubscriptionRecord = {
+      endpoint,
+      keys,
+      userAgent,
+      created_at: new Date().toISOString(),
+    }
+    await updateSettings({ push_subscriptions: [...filtered, newSub] })
+    return { ok: true }
+  })
+
+  fastify.post<{
+    Body: { endpoint: string }
+  }>('/api/push/unsubscribe', async (request) => {
+    const { endpoint } = request.body
+    const settings = await getSettings()
+    const existing = settings.push_subscriptions ?? []
+    const filtered = existing.filter(
+      (s: PushSubscriptionRecord) => s.endpoint !== endpoint,
+    )
+    await updateSettings({ push_subscriptions: filtered })
+    return { ok: true }
+  })
+
+  fastify.post('/api/push/test', async () => {
+    await sendPushNotification({
+      title: 'WorkIO Test',
+      body: 'Push notifications are working!',
+      data: { type: 'test' },
+    })
+    return { ok: true }
+  })
 }

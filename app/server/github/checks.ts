@@ -15,12 +15,12 @@ import {
   getAllTerminals,
   getSettings,
   getTerminalById,
-  insertNotification,
   logCommand,
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
+import { emitNotification } from '../notify'
 import { detectGitBranch } from '../pty/manager'
 import { execSSHCommand } from '../ssh/exec'
 
@@ -1936,7 +1936,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
   const settings = await getSettings()
   const hiddenAuthors = settings.hide_gh_authors
   const silencedAuthors = settings.silence_gh_authors
-  const io = getIO()
 
   for (const pr of newPRs) {
     const key = `${pr.repo}#${pr.prNumber}`
@@ -1944,30 +1943,24 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
 
     // PR merged
     if (prev && prev.state !== 'MERGED' && pr.state === 'MERGED') {
-      const notification = await insertNotification(
+      await emitNotification(
         'pr_merged',
         pr.repo,
         { prTitle: pr.prTitle, prUrl: pr.prUrl, prNumber: pr.prNumber },
         undefined,
         pr.prNumber,
       )
-      if (notification) {
-        io?.emit('notifications:new', notification)
-      }
     }
 
     // PR closed (not merged)
     if (prev && prev.state !== 'CLOSED' && pr.state === 'CLOSED') {
-      const notification = await insertNotification(
+      await emitNotification(
         'pr_closed',
         pr.repo,
         { prTitle: pr.prTitle, prUrl: pr.prUrl, prNumber: pr.prNumber },
         undefined,
         pr.prNumber,
       )
-      if (notification) {
-        io?.emit('notifications:new', notification)
-      }
     }
 
     // Check failed
@@ -1979,7 +1972,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           c.conclusion !== 'SKIPPED' &&
           c.conclusion !== 'NEUTRAL',
       )
-      const notification = await insertNotification(
+      await emitNotification(
         'check_failed',
         pr.repo,
         {
@@ -1992,9 +1985,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         `${failedCheck?.detailsUrl || failedCheck?.name}:${pr.updatedAt}`,
         pr.prNumber,
       )
-      if (notification) {
-        io?.emit('notifications:new', notification)
-      }
       // Track that this commit had a check failure, so we can suppress
       // the false "checks_passed" notification when a failed check is retried
       if (pr.headCommitSha) {
@@ -2017,16 +2007,13 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
     if (prev && !prev.areAllChecksOk && pr.areAllChecksOk) {
       const failedSha = checkFailedOnCommit.get(key)
       if (!failedSha || failedSha !== pr.headCommitSha) {
-        const notification = await insertNotification(
+        await emitNotification(
           'checks_passed',
           pr.repo,
           { prTitle: pr.prTitle, prUrl: pr.prUrl, prNumber: pr.prNumber },
           pr.updatedAt,
           pr.prNumber,
         )
-        if (notification) {
-          io?.emit('notifications:new', notification)
-        }
       }
       checkFailedOnCommit.delete(key)
     }
@@ -2047,7 +2034,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         !isHiddenAuthor(hiddenAuthors, pr.repo, reviewer) &&
         !isSilencedAuthor(silencedAuthors, pr.repo, reviewer)
       ) {
-        const notification = await insertNotification(
+        await emitNotification(
           'changes_requested',
           pr.repo,
           {
@@ -2060,9 +2047,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           `${reviewer}:${pr.updatedAt}`,
           pr.prNumber,
         )
-        if (notification) {
-          io?.emit('notifications:new', notification)
-        }
       }
     }
 
@@ -2080,7 +2064,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         !isHiddenAuthor(hiddenAuthors, pr.repo, approver) &&
         !isSilencedAuthor(silencedAuthors, pr.repo, approver)
       ) {
-        const notification = await insertNotification(
+        await emitNotification(
           'pr_approved',
           pr.repo,
           {
@@ -2093,9 +2077,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           `${approver}:${pr.updatedAt}`,
           pr.prNumber,
         )
-        if (notification) {
-          io?.emit('notifications:new', notification)
-        }
       }
     }
 
@@ -2110,7 +2091,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         if (isSilencedAuthor(silencedAuthors, pr.repo, comment.author)) continue
         // Skip if we've seen this comment before (by ID)
         if (comment.id && prevCommentIds.has(comment.id)) continue
-        const notification = await insertNotification(
+        await emitNotification(
           'new_comment',
           pr.repo,
           {
@@ -2127,9 +2108,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
             : `${comment.author}:${comment.createdAt}`,
           pr.prNumber,
         )
-        if (notification) {
-          io?.emit('notifications:new', notification)
-        }
       }
     }
 
@@ -2147,7 +2125,7 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
         // Skip reviews with no body - these are just containers for code comments
         // which are already captured by new_comment notifications
         if (!review.body) continue
-        const notification = await insertNotification(
+        await emitNotification(
           'new_review',
           pr.repo,
           {
@@ -2162,9 +2140,6 @@ async function processNewPRData(newPRs: PRCheckStatus[]): Promise<void> {
           review.id ? String(review.id) : `${review.author}:${review.state}`,
           pr.prNumber,
         )
-        if (notification) {
-          io?.emit('notifications:new', notification)
-        }
       }
     }
 

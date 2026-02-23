@@ -621,6 +621,41 @@ function AppContent() {
     sessions,
   ])
 
+  // Handle push notification clicks from service worker
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type !== 'NOTIFICATION_CLICK') return
+      const data = event.data.data as Record<string, unknown> | undefined
+      if (!data) return
+
+      const terminalId = data.terminalId as number | undefined
+      const shellId = data.shellId as number | undefined
+      const terminal = terminalId
+        ? terminals.find((t) => t.id === terminalId)
+        : undefined
+
+      if (terminal && shellId) {
+        selectTerminal(terminal.id)
+        setActiveShells((prev) => ({
+          ...prev,
+          [terminal.id]: shellId,
+        }))
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId: terminal.id, shellId },
+          }),
+        )
+        setMobileKeyboardMode('input')
+      } else if (terminal) {
+        selectTerminal(terminal.id)
+        setMobileKeyboardMode('input')
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', handler)
+    return () =>
+      navigator.serviceWorker?.removeEventListener('message', handler)
+  }, [terminals, selectTerminal])
+
   // Auto-close mobile sidebar when navigating to a terminal or session
   const prevActiveTerminalId = useRef(activeTerminal?.id)
   const prevActiveSessionId = useRef(activeSessionId)

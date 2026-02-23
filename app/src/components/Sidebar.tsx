@@ -570,7 +570,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
       className="h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden"
       style={width ? { width: `${width}px` } : undefined}
     >
-      <div className="px-4 py-4 border-b border-sidebar-border flex items-center justify-between">
+      <div className="px-3 py-2.5 border-b border-sidebar-border flex items-center justify-between">
         <div className="text-sm flex items-center gap-2">
           <Button
             variant="ghost"

@@ -60,3 +60,7 @@ To add a new shortcut:
 3. **`src/App.tsx`** — Add handler implementation in the `useKeyboardShortcuts({...})` call. **Use refs** (`activeTerminalRef`, `activeShellsRef`, `terminalsRef`) instead of direct state — the handler closures are stale since they're stored in a ref inside the hook.
 4. **`src/components/KeymapModal.tsx`** — Wire up in all places: `ShortcutName` union, `useState`, `useEffect` sync from settings, `finalize` in recording, `handleSave`, `handleReset`, `handleDiscardChanges`, `hasUnsavedChanges`, `findDuplicates`, and add a `<ShortcutRow>` in the UI.
 5. If the shortcut changes state that the sidebar also tracks (e.g. active shell), **dispatch a custom event** (e.g. `shell-select`) so sidebar components stay in sync.
+
+## Database access
+
+Use the db env from .env.local to access the DB

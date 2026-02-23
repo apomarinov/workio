@@ -417,6 +417,13 @@ export interface CustomTerminalAction {
   command: string // text to send to terminal (+ \r appended on send)
 }
 
+export interface PushSubscriptionRecord {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+  userAgent?: string
+  created_at: string
+}
+
 export type PreferredIDE = 'cursor' | 'vscode'
 
 export interface Settings {
@@ -440,6 +447,10 @@ export interface Settings {
   shell_templates?: ShellTemplate[]
   mobile_keyboard_rows?: MobileKeyboardRow[]
   custom_terminal_actions?: CustomTerminalAction[]
+  // Push notification settings
+  vapid_public_key?: string
+  vapid_private_key?: string
+  push_subscriptions?: PushSubscriptionRecord[]
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number

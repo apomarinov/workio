@@ -1,3 +1,4 @@
+import fs from 'fs'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -9,6 +10,16 @@ export default defineConfig(({ mode }) => {
   const clientPort = parseInt(env.CLIENT_PORT || '5175')
   const serverPort = parseInt(env.SERVER_PORT || '5176')
 
+  // Try to load HTTPS certs
+  const certPath = path.join(__dirname, '../certs/cert.pem')
+  const keyPath = path.join(__dirname, '../certs/key.pem')
+  const hasCerts = fs.existsSync(certPath) && fs.existsSync(keyPath)
+  const httpsConfig = hasCerts
+    ? { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }
+    : undefined
+  const serverScheme = hasCerts ? 'https' : 'http'
+  const wsScheme = hasCerts ? 'wss' : 'ws'
+
   return {
     plugins: [
       react({
@@ -17,12 +28,16 @@ export default defineConfig(({ mode }) => {
         },
       }),
       VitePWA({
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
         registerType: 'autoUpdate',
-        workbox: {
+        injectManifest: {
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         },
         devOptions: {
           enabled: true,
+          type: 'module',
         },
         includeAssets: [
           'favicon.svg',
@@ -92,11 +107,21 @@ export default defineConfig(({ mode }) => {
     server: {
       port: clientPort,
       host: true,
+      ...(httpsConfig ? { https: httpsConfig } : {}),
       proxy: {
-        '/api': `http://localhost:${serverPort}`,
+        '/api': {
+          target: `${serverScheme}://localhost:${serverPort}`,
+          secure: false,
+        },
         '/ws': {
-          target: `ws://localhost:${serverPort}`,
+          target: `${wsScheme}://localhost:${serverPort}`,
           ws: true,
+          secure: false,
+        },
+        '/socket.io': {
+          target: `${serverScheme}://localhost:${serverPort}`,
+          ws: true,
+          secure: false,
         },
       },
     },
