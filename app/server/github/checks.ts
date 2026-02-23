@@ -62,6 +62,10 @@ const lastPRData = new Map<string, PRCheckStatus>()
 const checkFailedOnCommit = new Map<string, string>()
 let initialFullFetchDone = false
 
+// Track API rate limits between polls to compute cost per cycle
+let lastRESTRateRemaining: number | null = null
+let lastGraphQLRateRemaining: number | null = null
+
 export function parseGitHubRemoteUrl(
   url: string,
 ): { owner: string; repo: string } | null {
@@ -830,7 +834,7 @@ async function fetchPRsViaRESTAndGraphQL(
   const openPRs: PRCheckStatus[] = []
 
   if (openPRsByRepo.size > 0) {
-    const queryParts: string[] = ['rateLimit { cost remaining resetAt }']
+    const queryParts: string[] = []
     const prLookup: Array<{ repoIdx: number; prNumber: number }> = []
     let repoIdx = 0
     for (const [repoKey, prNumbers] of openPRsByRepo) {
@@ -858,16 +862,6 @@ async function fetchPRsViaRESTAndGraphQL(
     if (stdout) {
       try {
         const resp = JSON.parse(stdout)
-
-        const rl = resp.data?.rateLimit
-        if (rl) {
-          const resetMin = rl.resetAt
-            ? Math.ceil((new Date(rl.resetAt).getTime() - Date.now()) / 60000)
-            : '?'
-          log.info(
-            `[github] GraphQL rate limit: cost=${rl.cost} remaining=${rl.remaining} resets_in=${resetMin}m`,
-          )
-        }
 
         for (const { repoIdx: ri, prNumber } of prLookup) {
           const prNode = resp.data?.[`repo_${ri}`]?.[`pr_${prNumber}`]
@@ -1200,6 +1194,52 @@ async function pollAllPRChecks(force = false): Promise<void> {
   await processNewPRData(allPRs)
 
   await emitPRChecks(allPRs)
+
+  // Log API rate limits after all calls are done
+  try {
+    const rlStdout = await execFileAsync(
+      'gh',
+      [
+        'api',
+        'rate_limit',
+        '--jq',
+        '{rest: .rate, graphql: .resources.graphql}',
+      ],
+      { timeout: 5000, maxBuffer: 1024 * 1024 },
+    )
+    if (rlStdout) {
+      const data = JSON.parse(rlStdout) as {
+        rest: { limit: number; remaining: number; reset: number }
+        graphql: { limit: number; remaining: number; reset: number }
+      }
+
+      const restResetMin = Math.ceil(
+        (data.rest.reset * 1000 - Date.now()) / 60000,
+      )
+      const restUsed =
+        lastRESTRateRemaining !== null
+          ? lastRESTRateRemaining - data.rest.remaining
+          : '?'
+      log.info(
+        `[github] REST rate limit: used=${restUsed} remaining=${data.rest.remaining}/${data.rest.limit} resets_in=${restResetMin}m`,
+      )
+      lastRESTRateRemaining = data.rest.remaining
+
+      const gqlResetMin = Math.ceil(
+        (data.graphql.reset * 1000 - Date.now()) / 60000,
+      )
+      const gqlUsed =
+        lastGraphQLRateRemaining !== null
+          ? lastGraphQLRateRemaining - data.graphql.remaining
+          : '?'
+      log.info(
+        `[github] GraphQL rate limit: used=${gqlUsed} remaining=${data.graphql.remaining}/${data.graphql.limit} resets_in=${gqlResetMin}m`,
+      )
+      lastGraphQLRateRemaining = data.graphql.remaining
+    }
+  } catch (err) {
+    log.error({ err }, '[github] Failed to check rate limit')
+  }
 }
 
 async function emitPRChecks(allPRs: PRCheckStatus[]): Promise<void> {
