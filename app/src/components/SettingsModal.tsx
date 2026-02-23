@@ -207,6 +207,61 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
           <div className="flex flex-col gap-3 border-t-[1px] pt-3">
             <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Keyboard className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Keyboard Shortcuts</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowKeymapModal(true)}
+              >
+                Configure
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Webhook
+                  className={cn(
+                    'w-4 h-4',
+                    hasWebhookWarning && 'text-amber-500',
+                  )}
+                />
+                <span className="text-sm font-medium">GitHub Webhooks</span>
+                {hasWebhookWarning && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                    <AlertTriangle className="w-3 h-3" />
+                    {missingCount > 0 && `${missingCount} missing`}
+                    {missingCount > 0 && orphanedCount > 0 && ', '}
+                    {orphanedCount > 0 && `${orphanedCount} orphaned`}
+                  </span>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowWebhooksModal(true)}
+              >
+                Configure
+              </Button>
+            </div>
+          </div>
+
+          <KeymapModal
+            open={showKeymapModal}
+            onOpenChange={setShowKeymapModal}
+          />
+
+          <WebhooksModal
+            open={showWebhooksModal}
+            onOpenChange={setShowWebhooksModal}
+          />
+
+          <div className="flex flex-col gap-3 border-t-[1px] pt-3">
+            <span className="font-semibold">Mobile</span>
+            <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-muted-foreground" />
@@ -226,15 +281,22 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </Button>
             </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Keyboard className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Keyboard Shortcuts</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">
+                    Push Notifications
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                  Get notified even when the app is closed
+                </p>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowKeymapModal(true)}
+                onClick={() => setShowPushModal(true)}
               >
                 Configure
               </Button>
@@ -270,67 +332,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               })
             }}
             onClose={() => setShowCustomizeKeyboard(false)}
-          />
-
-          <KeymapModal
-            open={showKeymapModal}
-            onOpenChange={setShowKeymapModal}
-          />
-
-          <div className="flex flex-col gap-3 -mx-1 px-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">
-                    Push Notifications
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 ml-6">
-                  Get notified even when the app is closed
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowPushModal(true)}
-              >
-                Configure
-              </Button>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Webhook
-                  className={cn(
-                    'w-4 h-4',
-                    hasWebhookWarning && 'text-amber-500',
-                  )}
-                />
-                <span className="text-sm font-medium">GitHub Webhooks</span>
-                {hasWebhookWarning && (
-                  <span className="inline-flex items-center gap-1 text-xs text-amber-500">
-                    <AlertTriangle className="w-3 h-3" />
-                    {missingCount > 0 && `${missingCount} missing`}
-                    {missingCount > 0 && orphanedCount > 0 && ', '}
-                    {orphanedCount > 0 && `${orphanedCount} orphaned`}
-                  </span>
-                )}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowWebhooksModal(true)}
-              >
-                Configure
-              </Button>
-            </div>
-          </div>
-
-          <WebhooksModal
-            open={showWebhooksModal}
-            onOpenChange={setShowWebhooksModal}
           />
 
           <PushNotificationModal
