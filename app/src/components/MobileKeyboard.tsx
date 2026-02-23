@@ -16,7 +16,7 @@ import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 interface MobileKeyboardProps {
   terminalId: number
   mode: 'hidden' | 'input' | 'actions'
-  inputRef?: React.RefObject<HTMLInputElement | null>
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>
 }
 
 const DEFAULT_MODIFIERS: Modifiers = { ctrl: false, alt: false, shift: false }
@@ -58,6 +58,7 @@ export function MobileKeyboard({
     // as part of a paste blob (which would insert a newline instead of submitting)
     setTimeout(() => sendToTerminal(terminalId, '\r'), 10)
     setInputValue('')
+    if (inputRef?.current) inputRef.current.style.height = 'auto'
     resetModifiers()
   }
 
@@ -169,29 +170,34 @@ export function MobileKeyboard({
           </div>
         )}
         <div
-          className={cn(
-            'flex items-center gap-1.5',
-            isInput && 'px-1.5 pb-1.5',
-          )}
+          className={cn('flex items-end gap-1.5', isInput && 'px-1.5 pb-1.5')}
         >
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
             inputMode="text"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
+            rows={1}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value)
+              // Auto-resize: reset then clamp to 5 lines
+              const el = e.target
+              el.style.height = 'auto'
+              const lineHeight =
+                parseInt(getComputedStyle(el).lineHeight, 10) || 20
+              el.style.height = `${Math.min(el.scrollHeight, lineHeight * 5)}px`
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 handleSubmit()
               }
             }}
             placeholder="Type here..."
-            className="flex-1 min-w-0 px-3 py-1 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
+            className="flex-1 min-w-0 px-3 py-1 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50 resize-none leading-5 overflow-y-auto"
           />
           {isInput && (
             <button

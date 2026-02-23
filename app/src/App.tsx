@@ -164,7 +164,7 @@ function AppContent() {
   const [mobileKeyboardMode, setMobileKeyboardMode] = useState<
     'hidden' | 'input' | 'actions'
   >('hidden')
-  const mobileInputRef = useRef<HTMLInputElement>(null)
+  const mobileInputRef = useRef<HTMLTextAreaElement>(null)
 
   // Mark active shells so the context can track suspension timestamps
   useEffect(() => {

@@ -79,7 +79,7 @@ interface ShellTabsProps {
 }
 
 const sessionStatusColor: Record<string, string> = {
-  started: 'text-green-500',
+  started: 'text-green-500/80',
   active: 'text-[#D97757]',
   done: 'text-gray-500',
   permission_needed: 'text-[#D97757]',
@@ -293,7 +293,7 @@ function SortableShellTab({
         position === 'top' ? 'border-t-2' : 'border-b-2',
         hasActivity
           ? isActive
-            ? 'border-green-500'
+            ? 'border-green-500/80'
             : 'border-green-500/50 hover:border-green-500'
           : isActive
             ? 'border-primary'
@@ -865,7 +865,7 @@ export function ShellTabs({
         variant="danger"
         onConfirm={() => {
           for (const shell of terminal.shells) {
-            killShell(shell.id).catch(() => {})
+            killShell(shell.id).catch(() => { })
           }
           toast(`Killed processes in ${terminal.shells.length} shell(s)`)
           setKillAllConfirm(false)
