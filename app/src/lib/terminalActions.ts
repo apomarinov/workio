@@ -1,10 +1,17 @@
-import type { MobileKeyboardRow } from '../types'
+import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 
 export interface TerminalAction {
   id: string
   label: string
   sequence: string
-  category: 'modifier' | 'special' | 'ctrl' | 'nav' | 'symbol' | 'function'
+  category:
+    | 'modifier'
+    | 'special'
+    | 'ctrl'
+    | 'nav'
+    | 'symbol'
+    | 'function'
+    | 'custom'
   isModifier?: boolean
 }
 
@@ -276,6 +283,22 @@ export function applyModifier(char: string, modifiers: Modifiers): string {
     result = `\x1b${result}`
   }
   return result
+}
+
+export function buildActionsMap(
+  customActions?: CustomTerminalAction[],
+): Record<string, TerminalAction> {
+  if (!customActions?.length) return ACTIONS
+  const merged = { ...ACTIONS }
+  for (const ca of customActions) {
+    merged[ca.id] = {
+      id: ca.id,
+      label: ca.label,
+      sequence: ca.command,
+      category: 'custom',
+    }
+  }
+  return merged
 }
 
 /** Apply sticky modifiers to an action's sequence */

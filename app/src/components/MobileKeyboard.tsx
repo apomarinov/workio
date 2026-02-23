@@ -2,14 +2,14 @@ import { ArrowUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSettings } from '@/hooks/useSettings'
 import {
-  ACTIONS,
   applyModifier,
   applyModifierToAction,
+  buildActionsMap,
   DEFAULT_KEYBOARD_ROWS,
   type Modifiers,
 } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
-import type { MobileKeyboardRow } from '../types'
+import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 import { MobileKeyboardActions } from './MobileKeyboardActions'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 
@@ -40,6 +40,7 @@ export function MobileKeyboard({
 
   const rows: MobileKeyboardRow[] =
     settings?.mobile_keyboard_rows ?? DEFAULT_KEYBOARD_ROWS
+  const allActions = buildActionsMap(settings?.custom_terminal_actions)
 
   const resetModifiers = () => setActiveModifiers(DEFAULT_MODIFIERS)
 
@@ -56,7 +57,7 @@ export function MobileKeyboard({
   }
 
   const handleActionTap = (actionId: string) => {
-    const action = ACTIONS[actionId]
+    const action = allActions[actionId]
     if (!action) return
 
     if (action.isModifier) {
@@ -73,7 +74,13 @@ export function MobileKeyboard({
         .then((text) => {
           if (text) sendToTerminal(terminalId, text)
         })
-        .catch(() => { })
+        .catch(() => {})
+      resetModifiers()
+      return
+    }
+
+    if (action.category === 'custom') {
+      sendToTerminal(terminalId, `${action.sequence}\r`)
       resetModifiers()
       return
     }
@@ -86,6 +93,11 @@ export function MobileKeyboard({
   const handleSaveCustomize = (newRows: MobileKeyboardRow[]) => {
     updateSettings({ mobile_keyboard_rows: newRows })
     setCustomizeOpen(false)
+  }
+
+  const handleCustomActionCreated = (action: CustomTerminalAction) => {
+    const existing = settings?.custom_terminal_actions ?? []
+    updateSettings({ custom_terminal_actions: [...existing, action] })
   }
 
   useEffect(() => {
@@ -117,7 +129,7 @@ export function MobileKeyboard({
           <div className="flex gap-1 px-1.5 py-1 overflow-x-auto">
             {rows.flatMap((row) =>
               row.actions.map((actionId) => {
-                const action = ACTIONS[actionId]
+                const action = allActions[actionId]
                 if (!action) return null
                 const isModifier = action.isModifier === true
                 const isActive =
@@ -184,6 +196,7 @@ export function MobileKeyboard({
           <MobileKeyboardActions
             rows={rows}
             activeModifiers={activeModifiers}
+            allActions={allActions}
             onActionTap={handleActionTap}
           />
         </div>
@@ -192,7 +205,9 @@ export function MobileKeyboard({
       <MobileKeyboardCustomize
         open={customizeOpen}
         rows={rows}
+        customActions={settings?.custom_terminal_actions ?? []}
         onSave={handleSaveCustomize}
+        onCustomActionCreated={handleCustomActionCreated}
         onClose={() => setCustomizeOpen(false)}
       />
     </>

@@ -409,6 +409,12 @@ export interface MobileKeyboardRow {
   actions: string[] // action IDs, max 8 per row
 }
 
+export interface CustomTerminalAction {
+  id: string // e.g. "custom-1708901234-abc123"
+  label: string // user-defined display label
+  command: string // text to send to terminal (+ \r appended on send)
+}
+
 export type PreferredIDE = 'cursor' | 'vscode'
 
 export interface Settings {
@@ -431,6 +437,7 @@ export interface Settings {
   favorite_sessions?: string[]
   shell_templates?: ShellTemplate[]
   mobile_keyboard_rows?: MobileKeyboardRow[]
+  custom_terminal_actions?: CustomTerminalAction[]
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number

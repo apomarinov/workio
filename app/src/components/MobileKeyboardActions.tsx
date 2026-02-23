@@ -1,16 +1,18 @@
-import { ACTIONS, type Modifiers } from '@/lib/terminalActions'
+import type { Modifiers, TerminalAction } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { MobileKeyboardRow } from '../types'
 
 interface MobileKeyboardActionsProps {
   rows: MobileKeyboardRow[]
   activeModifiers: Modifiers
+  allActions: Record<string, TerminalAction>
   onActionTap: (actionId: string) => void
 }
 
 export function MobileKeyboardActions({
   rows,
   activeModifiers,
+  allActions,
   onActionTap,
 }: MobileKeyboardActionsProps) {
   return (
@@ -18,7 +20,7 @@ export function MobileKeyboardActions({
       {rows.map((row) => (
         <div key={row.id} className="flex gap-1">
           {row.actions.map((actionId, i) => {
-            const action = ACTIONS[actionId]
+            const action = allActions[actionId]
             if (!action) return null
             const isModifier = action.isModifier === true
             const isActive =

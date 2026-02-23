@@ -1,26 +1,32 @@
-import { ArrowDown, ArrowUp, Minus, Plus, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Minus, Pencil, Plus, X } from 'lucide-react'
 import { useState } from 'react'
-import { ACTIONS } from '@/lib/terminalActions'
+import { buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
-import type { MobileKeyboardRow } from '../types'
+import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 import { MobileKeyboardNewGroup } from './MobileKeyboardNewGroup'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
 interface MobileKeyboardCustomizeProps {
   open: boolean
   rows: MobileKeyboardRow[]
+  customActions: CustomTerminalAction[]
   onSave: (rows: MobileKeyboardRow[]) => void
+  onCustomActionCreated: (action: CustomTerminalAction) => void
   onClose: () => void
 }
 
 export function MobileKeyboardCustomize({
   open,
   rows,
+  customActions,
   onSave,
+  onCustomActionCreated,
   onClose,
 }: MobileKeyboardCustomizeProps) {
   const [localRows, setLocalRows] = useState<MobileKeyboardRow[]>(rows)
   const [newGroupOpen, setNewGroupOpen] = useState(false)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const actionsMap = buildActionsMap(customActions)
 
   // Reset local state when dialog opens
   const handleOpenChange = (isOpen: boolean) => {
@@ -35,7 +41,7 @@ export function MobileKeyboardCustomize({
     const target = index + direction
     if (target < 0 || target >= localRows.length) return
     const next = [...localRows]
-      ;[next[index], next[target]] = [next[target], next[index]]
+    ;[next[index], next[target]] = [next[target], next[index]]
     setLocalRows(next)
   }
 
@@ -44,8 +50,22 @@ export function MobileKeyboardCustomize({
   }
 
   const handleAddGroup = (newRow: MobileKeyboardRow) => {
-    setLocalRows((prev) => [...prev, newRow])
+    if (editingIndex !== null) {
+      setLocalRows((prev) =>
+        prev.map((row, i) =>
+          i === editingIndex ? { ...row, actions: newRow.actions } : row,
+        ),
+      )
+      setEditingIndex(null)
+    } else {
+      setLocalRows((prev) => [...prev, newRow])
+    }
     setNewGroupOpen(false)
+  }
+
+  const handleEditGroup = (index: number) => {
+    setEditingIndex(index)
+    setNewGroupOpen(true)
   }
 
   return (
@@ -78,7 +98,7 @@ export function MobileKeyboardCustomize({
               <div className="flex gap-1 px-1 overflow-x-auto">
                 {localRows.flatMap((row) =>
                   row.actions.map((actionId) => {
-                    const action = ACTIONS[actionId]
+                    const action = actionsMap[actionId]
                     if (!action) return null
                     return (
                       <div
@@ -112,9 +132,16 @@ export function MobileKeyboardCustomize({
                   >
                     <Minus className="w-4 h-4" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEditGroup(index)}
+                    className="text-muted-foreground hover:text-foreground flex-shrink-0"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
                   <div className="flex-1 min-w-0 flex gap-1 overflow-x-auto">
                     {row.actions.map((actionId, i) => {
-                      const action = ACTIONS[actionId]
+                      const action = actionsMap[actionId]
                       return (
                         <div
                           key={`${row.id}-${actionId}-${i}`}
@@ -167,8 +194,17 @@ export function MobileKeyboardCustomize({
       </Dialog>
       <MobileKeyboardNewGroup
         open={newGroupOpen}
+        title={editingIndex !== null ? 'Edit Group' : 'New Group'}
+        initialActions={
+          editingIndex !== null ? localRows[editingIndex]?.actions : undefined
+        }
+        customActions={customActions}
         onSave={handleAddGroup}
-        onClose={() => setNewGroupOpen(false)}
+        onCustomActionCreated={onCustomActionCreated}
+        onClose={() => {
+          setNewGroupOpen(false)
+          setEditingIndex(null)
+        }}
       />
     </>
   )
