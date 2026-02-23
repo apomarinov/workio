@@ -1,4 +1,4 @@
-import { ArrowUp } from 'lucide-react'
+import { CornerDownLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSettings } from '@/hooks/useSettings'
 import {
@@ -45,13 +45,18 @@ export function MobileKeyboard({
   const resetModifiers = () => setActiveModifiers(DEFAULT_MODIFIERS)
 
   const handleSubmit = () => {
-    if (!inputValue) return
+    if (!inputValue) {
+      sendToTerminal(terminalId, '\r')
+      return
+    }
     let text = ''
     for (const char of inputValue) {
       text += applyModifier(char, activeModifiers)
     }
-    text += '\r'
     sendToTerminal(terminalId, text)
+    // Send Enter separately so programs like Claude Code don't treat it
+    // as part of a paste blob (which would insert a newline instead of submitting)
+    setTimeout(() => sendToTerminal(terminalId, '\r'), 10)
     setInputValue('')
     resetModifiers()
   }
@@ -185,7 +190,7 @@ export function MobileKeyboard({
               onClick={handleSubmit}
               className="flex-shrink-0 w-14 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
             >
-              <ArrowUp className="w-4 h-4" />
+              <CornerDownLeft className="w-4 h-4" />
             </button>
           )}
         </div>
