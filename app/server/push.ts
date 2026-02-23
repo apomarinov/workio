@@ -27,13 +27,16 @@ export async function initWebPush(): Promise<void> {
   }
 }
 
-export async function sendPushNotification(payload: {
-  title: string
-  body: string
-  data?: Record<string, unknown>
-}): Promise<void> {
+export async function sendPushNotification(
+  payload: {
+    title: string
+    body: string
+    data?: Record<string, unknown>
+  },
+  options?: { force?: boolean },
+): Promise<void> {
   if (!initialized) return
-  if (isUserActive()) return
+  if (!options?.force && isUserActive()) return
 
   const settings = await getSettings()
   const subscriptions = settings.push_subscriptions

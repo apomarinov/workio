@@ -159,11 +159,14 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post('/api/push/test', async () => {
-    await sendPushNotification({
-      title: 'WorkIO Test',
-      body: 'Push notifications are working!',
-      data: { type: 'test' },
-    })
+    await sendPushNotification(
+      {
+        title: 'WorkIO Test',
+        body: 'Push notifications are working!',
+        data: { type: 'test' },
+      },
+      { force: true },
+    )
     return { ok: true }
   })
 }
