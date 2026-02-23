@@ -79,7 +79,7 @@ export function MobileKeyboard({
         .then((text) => {
           if (text) sendToTerminal(terminalId, text)
         })
-        .catch(() => { })
+        .catch(() => {})
       resetModifiers()
       return
     }

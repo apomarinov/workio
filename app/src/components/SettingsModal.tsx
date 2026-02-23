@@ -4,6 +4,7 @@ import {
   Brain,
   Code,
   Keyboard,
+  Smartphone,
   Type,
   Webhook,
   Wrench,
@@ -27,12 +28,14 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
+import { DEFAULT_KEYBOARD_ROWS } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
-import type { PreferredIDE } from '../types'
+import type { CustomTerminalAction, PreferredIDE } from '../types'
 import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
+import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 import { useWebhookWarning, WebhooksModal } from './WebhooksModal'
 
 interface SettingsModalProps {
@@ -50,6 +53,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [preferredIDE, setPreferredIDE] = useState<PreferredIDE>('cursor')
   const [saving, setSaving] = useState(false)
+  const [showCustomizeKeyboard, setShowCustomizeKeyboard] = useState(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
   const [showWebhooksModal, setShowWebhooksModal] = useState(false)
   const {
@@ -250,6 +254,25 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
           <div className="flex flex-col gap-3 border-t-[1px] pt-3">
             <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Terminal Actions</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                  Quick terminal actions when using on mobile
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCustomizeKeyboard(true)}
+              >
+                Configure
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Keyboard className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Keyboard Shortcuts</span>
@@ -264,6 +287,29 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </Button>
             </div>
           </div>
+
+          <MobileKeyboardCustomize
+            open={showCustomizeKeyboard}
+            rows={settings?.mobile_keyboard_rows ?? DEFAULT_KEYBOARD_ROWS}
+            customActions={settings?.custom_terminal_actions ?? []}
+            onSave={(rows) => {
+              updateSettings({ mobile_keyboard_rows: rows })
+              setShowCustomizeKeyboard(false)
+            }}
+            onCustomActionCreated={(action: CustomTerminalAction) => {
+              const existing = settings?.custom_terminal_actions ?? []
+              updateSettings({ custom_terminal_actions: [...existing, action] })
+            }}
+            onCustomActionUpdated={(action: CustomTerminalAction) => {
+              const existing = settings?.custom_terminal_actions ?? []
+              updateSettings({
+                custom_terminal_actions: existing.map((a) =>
+                  a.id === action.id ? action : a,
+                ),
+              })
+            }}
+            onClose={() => setShowCustomizeKeyboard(false)}
+          />
 
           <KeymapModal
             open={showKeymapModal}
