@@ -17,7 +17,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
-import { ConfirmModal } from './components/ConfirmModal'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
 import { ShellTabs } from './components/ShellTabs'
@@ -225,11 +224,6 @@ function AppContent() {
   handleRenameShellRef.current = handleRenameShell
 
   // Shell template execution
-  const [runTemplateTarget, setRunTemplateTarget] = useState<{
-    terminalId: number
-    template: ShellTemplate
-  } | null>(null)
-
   const handleRunTemplate = async (
     terminalId: number,
     template: ShellTemplate,
@@ -288,7 +282,6 @@ function AppContent() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to run template')
     }
-    setRunTemplateTarget(null)
   }
 
   // Listen for shell-template-run events
@@ -296,7 +289,7 @@ function AppContent() {
     const handler = (
       e: CustomEvent<{ terminalId: number; template: ShellTemplate }>,
     ) => {
-      setRunTemplateTarget(e.detail)
+      handleRunTemplate(e.detail.terminalId, e.detail.template)
     }
     window.addEventListener('shell-template-run', handler as EventListener)
     return () =>
@@ -883,21 +876,6 @@ function AppContent() {
       <Toaster />
       <CommandPalette />
       <PinnedSessionsPip />
-      <ConfirmModal
-        open={runTemplateTarget !== null}
-        title={`Run "${runTemplateTarget?.template.name}"?`}
-        message="This will close all custom shells, interrupt the main shell, then recreate shells and run all template commands."
-        confirmLabel="Run"
-        onConfirm={() => {
-          if (runTemplateTarget) {
-            handleRunTemplate(
-              runTemplateTarget.terminalId,
-              runTemplateTarget.template,
-            )
-          }
-        }}
-        onCancel={() => setRunTemplateTarget(null)}
-      />
     </>
   )
 }

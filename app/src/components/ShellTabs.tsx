@@ -176,10 +176,12 @@ function SortableShellPill({
           (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
             node
       }}
-      style={style}
+      // Order matters: rest (from ContextMenuTrigger asChild) must come before
+      // listeners and style so dnd-kit's onPointerDown and transform aren't overridden.
       {...attributes}
-      {...listeners}
       {...rest}
+      {...listeners}
+      style={style}
       key={shell.id}
       type="button"
       onClick={onSelect}
@@ -274,10 +276,12 @@ function SortableShellTab({
           (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
             node
       }}
-      style={style}
+      // Order matters: rest (from ContextMenuTrigger asChild) must come before
+      // listeners and style so dnd-kit's onPointerDown and transform aren't overridden.
       {...attributes}
-      {...listeners}
       {...rest}
+      {...listeners}
+      style={style}
       key={shell.id}
       type="button"
       onClick={onSelect}
@@ -379,6 +383,8 @@ export function ShellTabs({
   >()
   const [deleteTemplateTarget, setDeleteTemplateTarget] =
     useState<ShellTemplate | null>(null)
+  const [runTemplateTarget, setRunTemplateTarget] =
+    useState<ShellTemplate | null>(null)
   const { settings, updateSettings } = useSettings()
 
   const sensors = useSensors(
@@ -464,11 +470,18 @@ export function ShellTabs({
 
   const handleRunTemplate = (template: ShellTemplate) => {
     setMenuOpen(false)
-    window.dispatchEvent(
-      new CustomEvent('shell-template-run', {
-        detail: { terminalId: terminal.id, template },
-      }),
-    )
+    setRunTemplateTarget(template)
+  }
+
+  const confirmRunTemplate = () => {
+    if (runTemplateTarget) {
+      window.dispatchEvent(
+        new CustomEvent('shell-template-run', {
+          detail: { terminalId: terminal.id, template: runTemplateTarget },
+        }),
+      )
+      setRunTemplateTarget(null)
+    }
   }
 
   const menuButton = (
@@ -517,48 +530,44 @@ export function ShellTabs({
           </div>
         ) : (
           templates.map((tmpl) => (
-            <ContextMenu key={tmpl.id}>
-              <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                  onClick={() => handleRunTemplate(tmpl)}
-                >
-                  <Play className="w-3 h-3" />
-                  <span className="truncate">{tmpl.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {tmpl.entries.length}
-                  </span>
-                </button>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem onClick={() => handleRunTemplate(tmpl)}>
-                  <Play />
-                  Run
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onClick={() => {
-                    setEditingTemplate(tmpl)
-                    setTemplateModalOpen(true)
-                    setMenuOpen(false)
-                  }}
-                >
-                  <PencilIcon />
-                  Edit
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                  variant="destructive"
-                  onClick={() => {
-                    setDeleteTemplateTarget(tmpl)
-                    setMenuOpen(false)
-                  }}
-                >
-                  <TrashIcon />
-                  Delete
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+            <div
+              key={tmpl.id}
+              className="flex w-full items-center gap-1 rounded-sm px-1 py-0.5"
+            >
+              <button
+                type="button"
+                className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-accent cursor-pointer text-muted-foreground hover:text-foreground flex-shrink-0"
+                onClick={() => handleRunTemplate(tmpl)}
+                title="Run template"
+              >
+                <Play className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                className="flex-1 min-w-0 flex items-center gap-2 rounded-sm px-1.5 py-1 text-sm hover:bg-accent cursor-pointer text-left"
+                onClick={() => {
+                  setEditingTemplate(tmpl)
+                  setTemplateModalOpen(true)
+                  setMenuOpen(false)
+                }}
+              >
+                <span className="truncate">{tmpl.name}</span>
+                <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
+                  {tmpl.entries.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-accent cursor-pointer text-muted-foreground hover:text-destructive flex-shrink-0"
+                onClick={() => {
+                  setDeleteTemplateTarget(tmpl)
+                  setMenuOpen(false)
+                }}
+                title="Delete template"
+              >
+                <TrashIcon className="w-3 h-3" />
+              </button>
+            </div>
           ))
         )}
         <div className="my-1 h-px bg-border" />
@@ -873,6 +882,34 @@ export function ShellTabs({
         }}
         onCancel={() => setDeleteTemplateTarget(null)}
       />
+      <ConfirmModal
+        open={runTemplateTarget !== null}
+        title={`Run "${runTemplateTarget?.name}"`}
+        message={`This will create ${runTemplateTarget?.entries.length ?? 0} shell${(runTemplateTarget?.entries.length ?? 0) !== 1 ? 's' : ''}:`}
+        confirmLabel="Run"
+        onConfirm={confirmRunTemplate}
+        onCancel={() => setRunTemplateTarget(null)}
+      >
+        <div className="space-y-1.5 px-1">
+          {runTemplateTarget?.entries.map((entry) => (
+            <div
+              key={entry.name}
+              className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+            >
+              <span className="font-medium shrink-0">{entry.name}</span>
+              {entry.command ? (
+                <code className="text-muted-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded truncate">
+                  {entry.command}
+                </code>
+              ) : (
+                <span className="text-muted-foreground/60 text-xs italic">
+                  no command
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </ConfirmModal>
     </>
   )
 }
