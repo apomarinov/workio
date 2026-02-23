@@ -16,6 +16,7 @@ import {
   BellOff,
   Bot,
   ChevronDown,
+  ChevronRight,
   ChevronsDownUp,
   Ellipsis,
   EyeOff,
@@ -72,9 +73,10 @@ type GroupingMode = 'all' | 'sessions'
 
 interface SidebarProps {
   width?: number
+  onDismiss?: () => void
 }
 
-export function Sidebar({ width }: SidebarProps) {
+export function Sidebar({ width, onDismiss }: SidebarProps) {
   const pip = useDocumentPip()
   const { terminals, activeTerminal, selectTerminal, setTerminalOrder } =
     useTerminalContext()
@@ -690,6 +692,16 @@ export function Sidebar({ width }: SidebarProps) {
                 </button>
               </PopoverContent>
             </Popover>
+            {onDismiss && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onDismiss}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-1">
@@ -794,6 +806,16 @@ export function Sidebar({ width }: SidebarProps) {
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
               )}
             </Button>
+            {onDismiss && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onDismiss}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         )}
       </div>

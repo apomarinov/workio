@@ -48,6 +48,7 @@ import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
 import type {
@@ -68,7 +69,9 @@ interface ShellTabsProps {
   onCreateShell: () => void
   onDeleteShell: (shellId: number) => void
   onRenameShell: (shellId: number, name: string) => Promise<void>
+  position?: 'top' | 'bottom'
   className?: string
+  children?: React.ReactNode
 }
 
 const sessionStatusColor: Record<string, string> = {
@@ -228,6 +231,7 @@ function SortableShellTab({
   onDelete,
   shortcutHint,
   shellSession,
+  position = 'top',
   ref,
   ...rest
 }: {
@@ -240,6 +244,7 @@ function SortableShellTab({
   onDelete: () => void
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
+  position?: 'top' | 'bottom'
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -276,7 +281,8 @@ function SortableShellTab({
       type="button"
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 max-w-[150px] border-t-2',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 max-w-[150px]',
+        position === 'top' ? 'border-t-2' : 'border-b-2',
         hasActivity
           ? isActive
             ? 'border-green-500'
@@ -324,7 +330,9 @@ export function ShellTabs({
   onCreateShell,
   onDeleteShell,
   onRenameShell,
+  position = 'top',
   className,
+  children,
 }: ShellTabsProps) {
   const { processes } = useProcessContext()
   const { sessions } = useSessionContext()
@@ -347,6 +355,15 @@ export function ShellTabs({
   const showShortcuts = isActiveTerminal && isGoToShellModifierHeld
   const [wrap, setWrap] = useLocalStorage('shell-tabs-wrap', false)
   const [tabBar, setTabBar] = useLocalStorage('shell-tabs-bar', true)
+  const [tabsTop, setTabsTop] = useLocalStorage('shell-tabs-top', true)
+  const isMobile = useIsMobile()
+
+  // Force tabs mode on mobile
+  useEffect(() => {
+    if (isMobile && !tabBar) {
+      setTabBar(true)
+    }
+  }, [isMobile, tabBar, setTabBar])
   const [shellOrder, setShellOrder] = useLocalStorage<Record<number, number[]>>(
     'shell-order',
     {},
@@ -400,7 +417,7 @@ export function ShellTabs({
     terminal.shells.find((s) => s.id === shellId)?.name === 'main'
 
   const handleDeleteShell = (shellId: number) => {
-    if (shellHasActivity(shellId)) {
+    if (isMobile || shellHasActivity(shellId)) {
       setDeleteShellId(shellId)
     } else {
       onDeleteShell(shellId)
@@ -547,9 +564,33 @@ export function ShellTabs({
           Wrap
           <Switch checked={wrap} onCheckedChange={(v) => setWrap(v)} />
         </label>
-        <label className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
+        <label
+          className={cn(
+            'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
+            isMobile ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+          )}
+        >
           Tabs
-          <Switch checked={tabBar} onCheckedChange={(v) => setTabBar(v)} />
+          <Switch
+            checked={tabBar}
+            onCheckedChange={(v) => setTabBar(v)}
+            disabled={isMobile}
+          />
+        </label>
+        <label
+          className={cn(
+            'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
+            tabBar && !isMobile
+              ? 'cursor-pointer'
+              : 'opacity-50 cursor-not-allowed',
+          )}
+        >
+          Top
+          <Switch
+            checked={tabsTop}
+            onCheckedChange={(v) => setTabsTop(v)}
+            disabled={!tabBar || isMobile}
+          />
         </label>
       </PopoverContent>
     </Popover>
@@ -569,12 +610,14 @@ export function ShellTabs({
         {tabBar && false && (
           <div className="absolute bottom-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
         )}
+        {children && <div className="flex-shrink-0">{children}</div>}
         {/* Shell items — responsive */}
         <div className="flex-1 min-w-0 @container/inner">
-          {/* <400px: pills */}
+          {/* <400px: pills (hidden on mobile) */}
           <div
             className={cn(
               'flex gap-1 items-center @[400px]/shells:hidden',
+              isMobile && 'hidden',
               wrap ? 'flex-wrap' : 'overflow-x-auto flex-nowrap p-0.5',
             )}
           >
@@ -667,10 +710,11 @@ export function ShellTabs({
               <Plus className="w-3 h-3" />
             </button>
           </div>
-          {/* >=400px: tabs */}
+          {/* >=400px: tabs (always on mobile) */}
           <div
             className={cn(
-              'hidden @[400px]/shells:flex items-center',
+              '@[400px]/shells:flex items-center',
+              isMobile ? 'flex' : 'hidden',
               wrap ? 'flex-wrap gap-0.5' : 'overflow-x-auto',
             )}
           >
@@ -701,6 +745,7 @@ export function ShellTabs({
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
                           shellSession={shellSessionMap.get(shell.id)}
+                          position={position}
                           shortcutHint={
                             showShortcuts && shortcutIndex <= 9 ? (
                               <>
@@ -758,7 +803,10 @@ export function ShellTabs({
             <button
               type="button"
               onClick={onCreateShell}
-              className="flex items-center justify-center w-5 h-5 border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0"
+              className={cn(
+                'flex items-center justify-center w-5 h-5 border-transparent text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
+                position === 'top' ? 'border-t-2' : 'border-b-2',
+              )}
             >
               <Plus className="w-3 h-3" />
             </button>

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { ChevronLeft, Plus } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
 import {
@@ -29,6 +29,7 @@ import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useActivePermissions } from './hooks/useActivePermissions'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { useIsMobile } from './hooks/useMediaQuery'
 import { useSocket } from './hooks/useSocket'
 import {
   createShellForTerminal,
@@ -78,6 +79,9 @@ function AppContent() {
   const activeShellsRef = useRef(activeShells)
   activeShellsRef.current = activeShells
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
+  const [tabsTop] = useLocalStorage('shell-tabs-top', true)
+  const isMobile = useIsMobile()
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   // Mark active shells so the context can track suspension timestamps
   useEffect(() => {
@@ -523,6 +527,23 @@ function AppContent() {
     sessions,
   ])
 
+  // Auto-close mobile sidebar when navigating to a terminal or session
+  const prevActiveTerminalId = useRef(activeTerminal?.id)
+  const prevActiveSessionId = useRef(activeSessionId)
+  useEffect(() => {
+    if (
+      mobileSidebarOpen &&
+      (activeTerminal?.id !== prevActiveTerminalId.current ||
+        activeSessionId !== prevActiveSessionId.current)
+    ) {
+      setMobileSidebarOpen(false)
+    }
+    prevActiveTerminalId.current = activeTerminal?.id
+    prevActiveSessionId.current = activeSessionId
+  }, [activeTerminal?.id, activeSessionId, mobileSidebarOpen])
+
+  const effectiveTabsTop = isMobile ? true : tabsTop
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-zinc-950 text-white">
@@ -531,112 +552,154 @@ function AppContent() {
     )
   }
 
+  const mainContent = (
+    <div className="h-full relative">
+      {activeSessionId ? (
+        <div className="absolute inset-0 z-20">
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
+                Loading...
+              </div>
+            }
+          >
+            <SessionChat />
+          </Suspense>
+        </div>
+      ) : terminals.length === 0 ? (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#1a1a1a]">
+          <Button
+            variant="outline"
+            size="lg"
+            className="gap-2 text-base"
+            onClick={() => setCreateModalOpen(true)}
+          >
+            <Plus className="w-5 h-5" />
+            Create New Project
+          </Button>
+          <CreateTerminalModal
+            open={createModalOpen}
+            onOpenChange={setCreateModalOpen}
+            onCreated={(id) => selectTerminal(id)}
+          />
+        </div>
+      ) : null}
+      {terminals.map((t) => {
+        const activeShellId =
+          activeShells[t.id] ??
+          t.shells.find((s) => s.name === 'main')?.id ??
+          t.shells[0]?.id
+        const isTermVisible = !activeSessionId && t.id === activeTerminal?.id
+
+        return (
+          <div
+            key={t.id}
+            className={cn(
+              'absolute inset-0 flex bg-[#1a1a1a]',
+              effectiveTabsTop ? 'flex-col' : 'flex-col-reverse',
+              !isTermVisible && 'invisible',
+            )}
+          >
+            {tabBar && activeShellId != null && (
+              <ShellTabs
+                terminal={t}
+                activeShellId={activeShellId}
+                onSelectShell={(shellId) =>
+                  setActiveShells((prev) => ({
+                    ...prev,
+                    [t.id]: shellId,
+                  }))
+                }
+                onCreateShell={() => handleCreateShell(t.id)}
+                onDeleteShell={(shellId) => handleDeleteShell(t.id, shellId)}
+                onRenameShell={handleRenameShell}
+                position={effectiveTabsTop ? 'top' : 'bottom'}
+                className="pr-2 pl-1 bg-[#1a1a1a]"
+              >
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileSidebarOpen(true)}
+                    className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                )}
+              </ShellTabs>
+            )}
+            <div className="relative flex-1 min-h-0">
+              {t.shells.map((shell) => {
+                if (shell.isSuspended && shell.id !== activeShellId) return null
+                return (
+                  <Terminal
+                    key={shell.id}
+                    terminalId={t.id}
+                    shellId={shell.id}
+                    isVisible={isTermVisible && shell.id === activeShellId}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
     <>
-      <Group
-        orientation="horizontal"
-        className="h-full bg-zinc-950"
-        defaultLayout={defaultLayout}
-        onLayoutChanged={onLayoutChanged}
-      >
-        <Panel
-          id="sidebar"
-          defaultSize="250px"
-          minSize="150px"
-          maxSize="50%"
-          onResize={handleSidebarResize}
-        >
-          <Sidebar width={sidebarWidth} />
-        </Panel>
-        <Separator className="panel-resize-handle" />
-        <Panel id="main">
-          <div className="h-full relative">
-            {activeSessionId ? (
-              <div className="absolute inset-0 z-20">
-                <Suspense
-                  fallback={
-                    <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
-                      Loading...
-                    </div>
-                  }
-                >
-                  <SessionChat />
-                </Suspense>
-              </div>
-            ) : terminals.length === 0 ? (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#1a1a1a]">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="gap-2 text-base"
-                  onClick={() => setCreateModalOpen(true)}
-                >
-                  <Plus className="w-5 h-5" />
-                  Create New Project
-                </Button>
-                <CreateTerminalModal
-                  open={createModalOpen}
-                  onOpenChange={setCreateModalOpen}
-                  onCreated={(id) => selectTerminal(id)}
-                />
-              </div>
-            ) : null}
-            {terminals.map((t) => {
-              const activeShellId =
-                activeShells[t.id] ??
-                t.shells.find((s) => s.name === 'main')?.id ??
-                t.shells[0]?.id
-              const isTermVisible =
-                !activeSessionId && t.id === activeTerminal?.id
-
-              return (
-                <div
-                  key={t.id}
-                  className={cn(
-                    'absolute inset-0 flex flex-col bg-[#1a1a1a]',
-                    !isTermVisible && 'invisible',
-                  )}
-                >
-                  {tabBar && activeShellId != null && (
-                    <ShellTabs
-                      terminal={t}
-                      activeShellId={activeShellId}
-                      onSelectShell={(shellId) =>
-                        setActiveShells((prev) => ({
-                          ...prev,
-                          [t.id]: shellId,
-                        }))
-                      }
-                      onCreateShell={() => handleCreateShell(t.id)}
-                      onDeleteShell={(shellId) =>
-                        handleDeleteShell(t.id, shellId)
-                      }
-                      onRenameShell={handleRenameShell}
-                      className="pr-2 pl-1 bg-[#1a1a1a]"
-                    />
-                  )}
-                  <div className="relative flex-1 min-h-0">
-                    {t.shells.map((shell) => {
-                      if (shell.isSuspended && shell.id !== activeShellId)
-                        return null
-                      return (
-                        <Terminal
-                          key={shell.id}
-                          terminalId={t.id}
-                          shellId={shell.id}
-                          isVisible={
-                            isTermVisible && shell.id === activeShellId
-                          }
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
+      {isMobile ? (
+        <div className="h-full flex flex-col bg-zinc-950">
+          {/* Fullscreen terminal */}
+          <div className="flex-1 min-h-0">{mainContent}</div>
+          {/* Sidebar overlay */}
+          <div
+            className={cn(
+              'fixed inset-0 z-50',
+              !mobileSidebarOpen && 'pointer-events-none',
+            )}
+          >
+            {/* Backdrop */}
+            <div
+              className={cn(
+                'fixed inset-0 bg-black/50 transition-opacity duration-300',
+                mobileSidebarOpen
+                  ? 'opacity-100'
+                  : 'opacity-0 pointer-events-none',
+              )}
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            {/* Sidebar panel */}
+            <div
+              className={cn(
+                'fixed inset-y-0 left-0 w-full bg-sidebar transition-transform duration-300 ease-in-out',
+                mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
+              )}
+            >
+              <Sidebar onDismiss={() => setMobileSidebarOpen(false)} />
+            </div>
           </div>
-        </Panel>
-      </Group>
+        </div>
+      ) : (
+        <Group
+          orientation="horizontal"
+          className="h-full bg-zinc-950"
+          defaultLayout={defaultLayout}
+          onLayoutChanged={onLayoutChanged}
+        >
+          <Panel
+            id="sidebar"
+            defaultSize="250px"
+            minSize="150px"
+            maxSize="50%"
+            onResize={handleSidebarResize}
+          >
+            <Sidebar width={sidebarWidth} />
+          </Panel>
+          <Separator className="panel-resize-handle" />
+          <Panel id="main">{mainContent}</Panel>
+        </Group>
+      )}
       <Toaster />
       <CommandPalette />
       <PinnedSessionsPip />

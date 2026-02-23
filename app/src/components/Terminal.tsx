@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useTerminalContext } from '../context/TerminalContext'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
 import { openInIDE } from '../lib/api'
@@ -22,6 +23,7 @@ interface TerminalProps {
 
 export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const { terminals } = useTerminalContext()
+  const isMobile = useIsMobile()
   const terminal = terminals.find((t) => t.id === terminalId)
   const isCloning = terminal?.git_repo?.status === 'setup'
   const isSettingUp = terminal?.setup?.status === 'setup'
@@ -261,6 +263,16 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     })
 
     terminal.open(containerRef.current)
+
+    // Prevent mobile keyboard from appearing
+    if (isMobile) {
+      const xtermTextarea = containerRef.current.querySelector(
+        '.xterm-helper-textarea',
+      ) as HTMLTextAreaElement | null
+      if (xtermTextarea) {
+        xtermTextarea.inputMode = 'none'
+      }
+    }
 
     // Accelerate scrolling in alternate screen mode (Zellij, vim, etc.)
     // xterm.js sends one mouse event per wheel tick which feels slow.
