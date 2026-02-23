@@ -556,13 +556,14 @@ function AppContent() {
 
   // Track visual viewport height on mobile so the layout shrinks when the
   // iOS keyboard opens, keeping our bottom bar visible above it.
-  const [mobileVH, setMobileVH] = useState<number | undefined>()
   useEffect(() => {
     if (!isMobile) return
+    const root = document.getElementById('root')
+    if (!root) return
     const vv = window.visualViewport
     if (!vv) return
     const update = () => {
-      setMobileVH(vv.height)
+      root.style.height = `${vv.height}px`
       // iOS scrolls the page when a fixed-input gets focus.  Since our input
       // lives inside the in-flow bottom bar, undo that scroll so the terminal
       // doesn't get pushed up leaving blank space.
@@ -573,6 +574,7 @@ function AppContent() {
     return () => {
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      root.style.height = ''
     }
   }, [isMobile])
 
@@ -674,8 +676,8 @@ function AppContent() {
     <>
       {isMobile ? (
         <div
-          className="flex flex-col bg-zinc-950 overflow-hidden"
-          style={{ height: mobileVH ? `${mobileVH}px` : '100dvh' }}
+          className="flex flex-col bg-zinc-950 overflow-hidden h-full"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           {/* Fullscreen terminal */}
           <div className="flex-1 min-h-0">{mainContent}</div>
@@ -689,7 +691,7 @@ function AppContent() {
                 t.shells.find((s) => s.name === 'main')?.id ??
                 t.shells[0]?.id
               return (
-                <div className="flex-shrink-0 bg-[#1a1a1a]">
+                <div className="flex-shrink-0 bg-zinc-900">
                   {tabBar && activeShellId != null && (
                     <ShellTabs
                       terminal={t}
@@ -790,11 +792,6 @@ function AppContent() {
                     mode={mobileKeyboardMode}
                     inputRef={mobileInputRef}
                   />
-                  {/* Safe area spacer */}
-                  <div
-                    className="bg-zinc-900"
-                    style={{ height: 'env(safe-area-inset-bottom)' }}
-                  />
                 </div>
               )
             })()}
@@ -818,7 +815,7 @@ function AppContent() {
             {/* Sidebar panel */}
             <div
               className={cn(
-                'fixed inset-y-0 left-0 w-full bg-sidebar transition-transform duration-300 ease-in-out',
+                'fixed inset-y-0 left-0 w-full bg-sidebar transition-transform duration-300 ease-in-out pt-[env(safe-area-inset-top)]',
                 mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
               )}
             >
