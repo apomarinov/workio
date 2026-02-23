@@ -12,6 +12,7 @@ interface MobileKeyboardCustomizeProps {
   customActions: CustomTerminalAction[]
   onSave: (rows: MobileKeyboardRow[]) => void
   onCustomActionCreated: (action: CustomTerminalAction) => void
+  onCustomActionUpdated: (action: CustomTerminalAction) => void
   onClose: () => void
 }
 
@@ -21,6 +22,7 @@ export function MobileKeyboardCustomize({
   customActions,
   onSave,
   onCustomActionCreated,
+  onCustomActionUpdated,
   onClose,
 }: MobileKeyboardCustomizeProps) {
   const [localRows, setLocalRows] = useState<MobileKeyboardRow[]>(rows)
@@ -201,6 +203,7 @@ export function MobileKeyboardCustomize({
         customActions={customActions}
         onSave={handleAddGroup}
         onCustomActionCreated={onCustomActionCreated}
+        onCustomActionUpdated={onCustomActionUpdated}
         onClose={() => {
           setNewGroupOpen(false)
           setEditingIndex(null)

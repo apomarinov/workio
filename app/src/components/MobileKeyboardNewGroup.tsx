@@ -16,7 +16,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, Delete, Plus, X } from 'lucide-react'
+import { Check, Delete, Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ALL_ACTIONS, buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
@@ -92,6 +92,7 @@ interface MobileKeyboardNewGroupProps {
   customActions: CustomTerminalAction[]
   onSave: (row: MobileKeyboardRow) => void
   onCustomActionCreated: (action: CustomTerminalAction) => void
+  onCustomActionUpdated: (action: CustomTerminalAction) => void
   onClose: () => void
 }
 
@@ -102,10 +103,14 @@ export function MobileKeyboardNewGroup({
   customActions,
   onSave,
   onCustomActionCreated,
+  onCustomActionUpdated,
   onClose,
 }: MobileKeyboardNewGroupProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [customActionOpen, setCustomActionOpen] = useState(false)
+  const [editingAction, setEditingAction] = useState<
+    CustomTerminalAction | undefined
+  >()
 
   const actionsMap = buildActionsMap(customActions)
 
@@ -161,7 +166,12 @@ export function MobileKeyboardNewGroup({
   }
 
   const handleCustomActionSaved = (action: CustomTerminalAction) => {
-    onCustomActionCreated(action)
+    if (editingAction) {
+      onCustomActionUpdated(action)
+      setEditingAction(undefined)
+    } else {
+      onCustomActionCreated(action)
+    }
     setCustomActionOpen(false)
   }
 
@@ -284,21 +294,41 @@ export function MobileKeyboardNewGroup({
                 <div className="flex flex-wrap gap-1">
                   {group.actions.map((action) => {
                     const isSelected = selected.includes(action.id)
+                    const customAction =
+                      group.category === 'custom'
+                        ? customActions.find((ca) => ca.id === action.id)
+                        : undefined
                     return (
-                      <button
+                      <div
                         key={action.id}
-                        type="button"
-                        onClick={() => toggleAction(action.id)}
-                        className={cn(
-                          'px-2 py-1 rounded text-xs font-medium transition-colors',
-                          isSelected
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
-                          selected.length >= 8 && !isSelected && 'opacity-40',
-                        )}
+                        className="flex items-center gap-0.5"
                       >
-                        {action.label}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleAction(action.id)}
+                          className={cn(
+                            'px-2 py-1 rounded text-xs font-medium transition-colors',
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
+                            selected.length >= 8 && !isSelected && 'opacity-40',
+                          )}
+                        >
+                          {action.label}
+                        </button>
+                        {customAction && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAction(customAction)
+                              setCustomActionOpen(true)
+                            }}
+                            className="text-muted-foreground hover:text-foreground p-0.5"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     )
                   })}
                   {group.category === 'custom' &&
@@ -315,8 +345,12 @@ export function MobileKeyboardNewGroup({
       </Dialog>
       <MobileKeyboardCustomAction
         open={customActionOpen}
+        initialAction={editingAction}
         onSave={handleCustomActionSaved}
-        onClose={() => setCustomActionOpen(false)}
+        onClose={() => {
+          setCustomActionOpen(false)
+          setEditingAction(undefined)
+        }}
       />
     </>
   )

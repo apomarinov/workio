@@ -105,6 +105,15 @@ export function MobileKeyboard({
     updateSettings({ custom_terminal_actions: [...existing, action] })
   }
 
+  const handleCustomActionUpdated = (action: CustomTerminalAction) => {
+    const existing = settings?.custom_terminal_actions ?? []
+    updateSettings({
+      custom_terminal_actions: existing.map((a) =>
+        a.id === action.id ? action : a,
+      ),
+    })
+  }
+
   useEffect(() => {
     const handler = () => setCustomizeOpen(true)
     window.addEventListener('mobile-keyboard-customize', handler)
@@ -213,6 +222,7 @@ export function MobileKeyboard({
         customActions={settings?.custom_terminal_actions ?? []}
         onSave={handleSaveCustomize}
         onCustomActionCreated={handleCustomActionCreated}
+        onCustomActionUpdated={handleCustomActionUpdated}
         onClose={() => setCustomizeOpen(false)}
       />
     </>

@@ -1,27 +1,33 @@
 import { Check, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CustomTerminalAction } from '../types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
 interface MobileKeyboardCustomActionProps {
   open: boolean
+  initialAction?: CustomTerminalAction
   onSave: (action: CustomTerminalAction) => void
   onClose: () => void
 }
 
 export function MobileKeyboardCustomAction({
   open,
+  initialAction,
   onSave,
   onClose,
 }: MobileKeyboardCustomActionProps) {
   const [label, setLabel] = useState('')
   const [command, setCommand] = useState('')
 
+  useEffect(() => {
+    if (open) {
+      setLabel(initialAction?.label ?? '')
+      setCommand(initialAction?.command ?? '')
+    }
+  }, [open])
+
   const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen) {
-      setLabel('')
-      setCommand('')
-    } else {
+    if (!isOpen) {
       onClose()
     }
   }
@@ -31,7 +37,9 @@ export function MobileKeyboardCustomAction({
     const trimmedCommand = command.trim()
     if (!trimmedLabel || !trimmedCommand) return
     onSave({
-      id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id:
+        initialAction?.id ??
+        `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       label: trimmedLabel,
       command: trimmedCommand,
     })
@@ -43,7 +51,7 @@ export function MobileKeyboardCustomAction({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md p-0">
+      <DialogContent className="max-w-md p-0 top-[10%] translate-y-0">
         <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 pt-4 pb-2 space-y-0">
           <button
             type="button"
@@ -53,7 +61,7 @@ export function MobileKeyboardCustomAction({
             <X className="w-5 h-5" />
           </button>
           <DialogTitle className="text-base font-semibold">
-            New Action
+            {initialAction ? 'Edit Action' : 'New Action'}
           </DialogTitle>
           <button
             type="button"
@@ -79,7 +87,7 @@ export function MobileKeyboardCustomAction({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g. deploy"
-              className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
+              className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
             />
           </div>
           <div>
@@ -91,7 +99,7 @@ export function MobileKeyboardCustomAction({
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               placeholder="e.g. npm run deploy"
-              className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-sm placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
+              className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
             />
           </div>
           <p className="text-xs text-muted-foreground/50">
