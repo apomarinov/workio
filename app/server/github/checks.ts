@@ -175,132 +175,110 @@ function decodeNodeId(nodeId: string): number | null {
   }
 }
 
-// GitHub GraphQL rate limit cost = sum of (first/last values multiplied across nesting levels).
-// Keep limits low: we rarely have >10 open PRs, >20 checks, >10 reviews, etc.
-const GRAPHQL_QUERY = `query($openQ: String!, $closedQ: String!, $openFirst: Int!, $closedFirst: Int!) {
-  rateLimit { cost remaining resetAt }
-  openPRs: search(query: $openQ, type: ISSUE, first: $openFirst) {
-    nodes {
-      ... on PullRequest {
-        number
-        title
+// GraphQL fields for enriching open PRs with checks, reviews, comments, etc.
+const PR_DETAIL_FIELDS = `
+number
+title
+body
+headRefName
+url
+createdAt
+updatedAt
+state
+mergeable
+reviewDecision
+repository { nameWithOwner }
+commits(last: 1) {
+  nodes {
+    commit {
+      oid
+      statusCheckRollup {
+        contexts(first: 15) {
+          nodes {
+            __typename
+            ... on CheckRun {
+              name
+              status
+              conclusion
+              detailsUrl
+              startedAt
+            }
+            ... on StatusContext {
+              context
+              state
+              targetUrl
+            }
+          }
+        }
+      }
+    }
+  }
+}
+reviews(last: 10) {
+  nodes {
+    databaseId
+    url
+    author { login }
+    state
+    body
+    submittedAt
+    reactionGroups {
+      content
+      viewerHasReacted
+      reactors(first: 3) {
+        nodes { ... on User { login } }
+      }
+    }
+  }
+}
+reviewRequests(first: 10) {
+  nodes {
+    requestedReviewer {
+      ... on User { login }
+    }
+  }
+}
+comments(last: 10) {
+  nodes {
+    databaseId
+    url
+    author { login }
+    body
+    createdAt
+    reactionGroups {
+      content
+      viewerHasReacted
+      reactors(first: 3) {
+        nodes { ... on User { login } }
+      }
+    }
+  }
+}
+reviewThreads(last: 10) {
+  nodes {
+    comments(first: 10) {
+      nodes {
+        databaseId
+        url
+        author { login }
         body
-        headRefName
-        url
         createdAt
-        updatedAt
-        state
-        mergeable
-        reviewDecision
-        repository { nameWithOwner }
-        commits(last: 1) {
-          nodes {
-            commit {
-              oid
-              statusCheckRollup {
-                contexts(first: 15) {
-                  nodes {
-                    __typename
-                    ... on CheckRun {
-                      name
-                      status
-                      conclusion
-                      detailsUrl
-                      startedAt
-                    }
-                    ... on StatusContext {
-                      context
-                      state
-                      targetUrl
-                    }
-                  }
-                }
-              }
-            }
-          }
+        path
+        pullRequestReview {
+          databaseId
         }
-        reviews(last: 10) {
-          nodes {
-            databaseId
-            url
-            author { login }
-            state
-            body
-            submittedAt
-            reactionGroups {
-              content
-              viewerHasReacted
-              reactors(first: 3) {
-                nodes { ... on User { login } }
-              }
-            }
-          }
-        }
-        reviewRequests(first: 10) {
-          nodes {
-            requestedReviewer {
-              ... on User { login }
-            }
-          }
-        }
-        comments(last: 10) {
-          nodes {
-            databaseId
-            url
-            author { login }
-            body
-            createdAt
-            reactionGroups {
-              content
-              viewerHasReacted
-              reactors(first: 3) {
-                nodes { ... on User { login } }
-              }
-            }
-          }
-        }
-        reviewThreads(last: 10) {
-          nodes {
-            comments(first: 10) {
-              nodes {
-                databaseId
-                url
-                author { login }
-                body
-                createdAt
-                path
-                pullRequestReview {
-                  databaseId
-                }
-                reactionGroups {
-                  content
-                  viewerHasReacted
-                  reactors(first: 3) {
-                    nodes { ... on User { login } }
-                  }
-                }
-              }
-            }
+        reactionGroups {
+          content
+          viewerHasReacted
+          reactors(first: 3) {
+            nodes { ... on User { login } }
           }
         }
       }
     }
   }
-  closedPRs: search(query: $closedQ, type: ISSUE, first: $closedFirst) {
-    nodes {
-      ... on PullRequest {
-        number
-        title
-        headRefName
-        url
-        createdAt
-        updatedAt
-        state
-        repository { nameWithOwner }
-      }
-    }
-  }
-}`
+}
+`
 
 interface GraphQLCheckContext {
   __typename: 'CheckRun' | 'StatusContext'
@@ -390,17 +368,6 @@ interface GraphQLOpenPR {
       }
     }[]
   }
-}
-
-interface GraphQLClosedPR {
-  number: number
-  title: string
-  headRefName: string
-  url: string
-  createdAt: string
-  updatedAt: string
-  state: 'MERGED' | 'CLOSED'
-  repository: { nameWithOwner: string }
 }
 
 function normalizeCheckContext(ctx: GraphQLCheckContext): {
@@ -738,220 +705,282 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
   }
 }
 
-function mapClosedPRNode(pr: GraphQLClosedPR): PRCheckStatus {
-  return {
-    prNumber: pr.number,
-    prTitle: pr.title,
-    prUrl: pr.url,
-    prBody: '',
-    branch: pr.headRefName,
-    repo: pr.repository.nameWithOwner,
-    state: pr.state,
-    reviewDecision: '',
-    reviews: [],
-    checks: [],
-    comments: [],
-    discussion: [],
-    createdAt: pr.createdAt || '',
-    updatedAt: pr.updatedAt || '',
-    areAllChecksOk: false,
-    isMerged: pr.state === 'MERGED',
-    isApproved: false,
-    hasChangesRequested: false,
-    hasConflicts: false,
-    hasPendingReviews: false,
-    hasFailedChecks: false,
-    runningChecksCount: 0,
-    failedChecksCount: 0,
-    headCommitSha: '',
-  }
-}
-
-/** Fetch all open + closed PRs across all repos in a single GraphQL call. */
-function fetchAllPRsViaGraphQL(
+/** Fetch all open + closed PRs across all repos.
+ * Uses REST API for PR discovery (bypasses GitHub search index issues)
+ * and GraphQL for enrichment of open PRs with checks, reviews, etc. */
+async function fetchAllPRsViaGraphQL(
   repos: string[],
   trackedBranches: Map<string, Set<string>>,
   force = false,
 ): Promise<{ openPRs: PRCheckStatus[]; closedPRs: PRCheckStatus[] }> {
   if (!force && Date.now() - lastFetchedAt < CACHE_TTL) {
-    // Filter cached results to only repos we care about
     const repoSet = new Set(repos)
-    return Promise.resolve({
+    return {
       openPRs: lastFetchedPRs.filter(
         (pr) => pr.state === 'OPEN' && repoSet.has(pr.repo),
       ),
       closedPRs: lastFetchedPRs.filter(
         (pr) => pr.state !== 'OPEN' && repoSet.has(pr.repo),
       ),
-    })
+    }
   }
 
   if (repos.length === 0) {
-    return Promise.resolve({ openPRs: [], closedPRs: [] })
+    return { openPRs: [], closedPRs: [] }
   }
 
-  const author = ghUsername || '@me'
-  const repoFilter = repos.map((r) => `repo:${r}`).join(' ')
-  const openQ = `is:pr is:open author:${author} ${repoFilter}`
-  const closedQ = `is:pr is:closed author:${author} ${repoFilter} sort:updated-desc`
-
-  return new Promise((resolve) => {
-    execFile(
-      'gh',
-      [
-        'api',
-        'graphql',
-        '-f',
-        `query=${GRAPHQL_QUERY}`,
-        '-f',
-        `openQ=${openQ}`,
-        '-f',
-        `closedQ=${closedQ}`,
-        '-F',
-        'openFirst=15',
-        '-F',
-        'closedFirst=10',
-      ],
-      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
-      (err, stdout) => {
-        if (err) {
-          resolve({
-            openPRs: lastFetchedPRs.filter((pr) => pr.state === 'OPEN'),
-            closedPRs: lastFetchedPRs.filter((pr) => pr.state !== 'OPEN'),
-          })
-          return
-        }
-
-        try {
-          const resp = JSON.parse(stdout)
-
-          // Log rate limit from the response itself
-          const rl = resp.data?.rateLimit
-          if (rl) {
-            const resetMin = rl.resetAt
-              ? Math.ceil((new Date(rl.resetAt).getTime() - Date.now()) / 60000)
-              : '?'
-            log.info(
-              `[github] GraphQL rate limit: cost=${rl.cost} remaining=${rl.remaining} resets_in=${resetMin}m`,
-            )
-          }
-
-          const openNodes: GraphQLOpenPR[] = (
-            resp.data.openPRs.nodes as GraphQLOpenPR[]
-          ).filter((n) => n.number != null)
-          const closedNodes: GraphQLClosedPR[] = (
-            resp.data.closedPRs.nodes as GraphQLClosedPR[]
-          ).filter((n) => n.number != null)
-
-          const openPRs = openNodes.map(mapOpenPRNode)
-
-          // Filter closed PRs: only branches in trackedBranches without an open PR
-          const openBranches = new Map<string, Set<string>>()
-          for (const pr of openPRs) {
-            const existing = openBranches.get(pr.repo)
-            if (existing) {
-              existing.add(pr.branch)
-            } else {
-              openBranches.set(pr.repo, new Set([pr.branch]))
-            }
-          }
-
-          const closedPRs = closedNodes
-            .filter((n) => {
-              const repo = n.repository.nameWithOwner
-              const branchSet = trackedBranches.get(repo)
-              if (!branchSet || !branchSet.has(n.headRefName)) return false
-              const openSet = openBranches.get(repo)
-              return !openSet || !openSet.has(n.headRefName)
-            })
-            .map(mapClosedPRNode)
-
-          // Update cache
-          lastFetchedAt = Date.now()
-          lastFetchedPRs = [...openPRs, ...closedPRs]
-
-          resolve({ openPRs, closedPRs })
-        } catch {
-          resolve({
-            openPRs: lastFetchedPRs.filter((pr) => pr.state === 'OPEN'),
-            closedPRs: lastFetchedPRs.filter((pr) => pr.state !== 'OPEN'),
-          })
-        }
-      },
-    )
-  })
+  try {
+    return await fetchPRsViaRESTAndGraphQL(repos, trackedBranches)
+  } catch (err) {
+    log.error({ err }, '[github] Failed to fetch PRs')
+    return {
+      openPRs: lastFetchedPRs.filter((pr) => pr.state === 'OPEN'),
+      closedPRs: lastFetchedPRs.filter((pr) => pr.state !== 'OPEN'),
+    }
+  }
 }
 
-/** Fetch closed/merged PRs by @me across all repos in a single GraphQL call. */
-export function fetchAllClosedPRs(
+async function fetchPRsViaRESTAndGraphQL(
   repos: string[],
-  limit: number,
-): Promise<MergedPRSummary[]> {
-  if (repos.length === 0) return Promise.resolve([])
-  const repoFilter = repos.map((r) => `repo:${r}`).join(' ')
-  const author = ghUsername || '@me'
-  const searchQuery = `is:pr is:closed author:${author} ${repoFilter}`
-  const graphqlQuery = `query($q: String!, $first: Int!) {
-  search(query: $q, type: ISSUE, first: $first) {
-    nodes {
-      ... on PullRequest {
-        number
-        title
-        url
-        state
-        headRefName
-        repository { nameWithOwner }
+  trackedBranches: Map<string, Set<string>>,
+): Promise<{ openPRs: PRCheckStatus[]; closedPRs: PRCheckStatus[] }> {
+  const author = ghUsername || 'unknown'
+
+  // Step 1: Discover PRs via REST (bypasses broken GitHub search index)
+  const openPRsByRepo = new Map<string, number[]>()
+  const closedRESTData = new Map<
+    string,
+    Array<{
+      number: number
+      title: string
+      html_url: string
+      head: { ref: string }
+      merged_at: string | null
+      created_at: string
+      updated_at: string
+    }>
+  >()
+
+  await Promise.all(
+    repos.map(async (repoKey) => {
+      const [openStdout, closedStdout] = await Promise.all([
+        execFileAsync(
+          'gh',
+          ['api', `repos/${repoKey}/pulls?state=open&per_page=100`],
+          { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+        ),
+        execFileAsync(
+          'gh',
+          [
+            'api',
+            `repos/${repoKey}/pulls?state=closed&per_page=10&sort=updated&direction=desc`,
+          ],
+          { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+        ),
+      ])
+
+      if (openStdout) {
+        try {
+          const prs = JSON.parse(openStdout) as Array<{
+            number: number
+            user?: { login?: string }
+          }>
+          const myPRs = prs
+            .filter((pr) => pr.user?.login === author)
+            .map((pr) => pr.number)
+          if (myPRs.length > 0) {
+            openPRsByRepo.set(repoKey, myPRs)
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (closedStdout) {
+        try {
+          const prs = JSON.parse(closedStdout) as Array<{
+            number: number
+            title: string
+            html_url: string
+            head: { ref: string }
+            merged_at: string | null
+            created_at: string
+            updated_at: string
+            user?: { login?: string }
+          }>
+          const myPRs = prs.filter((pr) => pr.user?.login === author)
+          if (myPRs.length > 0) {
+            closedRESTData.set(repoKey, myPRs)
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }),
+  )
+
+  // Step 2: Enrich open PRs via GraphQL (per-PR queries bypass search index)
+  const openPRs: PRCheckStatus[] = []
+
+  if (openPRsByRepo.size > 0) {
+    const queryParts: string[] = ['rateLimit { cost remaining resetAt }']
+    const prLookup: Array<{ repoIdx: number; prNumber: number }> = []
+    let repoIdx = 0
+    for (const [repoKey, prNumbers] of openPRsByRepo) {
+      const [owner, name] = repoKey.split('/')
+      const prAliases = prNumbers.map(
+        (n) => `pr_${n}: pullRequest(number: ${n}) {${PR_DETAIL_FIELDS}}`,
+      )
+      queryParts.push(
+        `repo_${repoIdx}: repository(owner: "${owner}", name: "${name}") {\n${prAliases.join('\n')}\n}`,
+      )
+      for (const n of prNumbers) {
+        prLookup.push({ repoIdx, prNumber: n })
+      }
+      repoIdx++
+    }
+
+    const query = `query {\n${queryParts.join('\n')}\n}`
+
+    const stdout = await execFileAsync(
+      'gh',
+      ['api', 'graphql', '-f', `query=${query}`],
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
+    )
+
+    if (stdout) {
+      try {
+        const resp = JSON.parse(stdout)
+
+        const rl = resp.data?.rateLimit
+        if (rl) {
+          const resetMin = rl.resetAt
+            ? Math.ceil((new Date(rl.resetAt).getTime() - Date.now()) / 60000)
+            : '?'
+          log.info(
+            `[github] GraphQL rate limit: cost=${rl.cost} remaining=${rl.remaining} resets_in=${resetMin}m`,
+          )
+        }
+
+        for (const { repoIdx: ri, prNumber } of prLookup) {
+          const prNode = resp.data?.[`repo_${ri}`]?.[`pr_${prNumber}`]
+          if (prNode?.number != null) {
+            openPRs.push(mapOpenPRNode(prNode as GraphQLOpenPR))
+          }
+        }
+      } catch (e) {
+        log.error({ err: e }, '[github] Failed to parse GraphQL PR details')
       }
     }
   }
-}`
-  return new Promise((resolve) => {
-    execFile(
-      'gh',
-      [
-        'api',
-        'graphql',
-        '-f',
-        `query=${graphqlQuery}`,
-        '-f',
-        `q=${searchQuery}`,
-        '-F',
-        `first=${Math.min(limit, 100)}`,
-      ],
-      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
-      (err, stdout) => {
-        if (err) {
-          resolve([])
-          return
+
+  // Step 3: Map closed PRs from REST data (filter by tracked branches)
+  const openBranches = new Map<string, Set<string>>()
+  for (const pr of openPRs) {
+    const existing = openBranches.get(pr.repo) || new Set<string>()
+    existing.add(pr.branch)
+    openBranches.set(pr.repo, existing)
+  }
+
+  const closedPRs: PRCheckStatus[] = []
+  for (const [repoKey, prs] of closedRESTData) {
+    const branchSet = trackedBranches.get(repoKey)
+    const openSet = openBranches.get(repoKey)
+
+    for (const pr of prs) {
+      const branch = pr.head?.ref
+      if (!branch) continue
+      if (!branchSet || !branchSet.has(branch)) continue
+      if (openSet?.has(branch)) continue
+
+      closedPRs.push({
+        prNumber: pr.number,
+        prTitle: pr.title,
+        prUrl: pr.html_url,
+        prBody: '',
+        branch,
+        repo: repoKey,
+        state: pr.merged_at ? 'MERGED' : 'CLOSED',
+        reviewDecision: '',
+        reviews: [],
+        checks: [],
+        comments: [],
+        discussion: [],
+        createdAt: pr.created_at || '',
+        updatedAt: pr.updated_at || '',
+        areAllChecksOk: false,
+        isMerged: !!pr.merged_at,
+        isApproved: false,
+        hasChangesRequested: false,
+        hasConflicts: false,
+        hasPendingReviews: false,
+        hasFailedChecks: false,
+        runningChecksCount: 0,
+        failedChecksCount: 0,
+        headCommitSha: '',
+      })
+    }
+  }
+
+  // Update cache
+  lastFetchedAt = Date.now()
+  lastFetchedPRs = [...openPRs, ...closedPRs]
+
+  return { openPRs, closedPRs }
+}
+
+/** Fetch closed/merged PRs by @me across all repos via REST API. */
+export async function fetchAllClosedPRs(
+  repos: string[],
+  limit: number,
+): Promise<MergedPRSummary[]> {
+  if (repos.length === 0) return []
+
+  const author = ghUsername || 'unknown'
+  const results: MergedPRSummary[] = []
+
+  await Promise.all(
+    repos.map(async (repoKey) => {
+      const perPage = Math.min(limit, 100)
+      const stdout = await execFileAsync(
+        'gh',
+        [
+          'api',
+          `repos/${repoKey}/pulls?state=closed&per_page=${perPage}&sort=updated&direction=desc`,
+        ],
+        { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+      )
+
+      if (!stdout) return
+
+      try {
+        const prs = JSON.parse(stdout) as Array<{
+          number: number
+          title: string
+          html_url: string
+          head: { ref: string }
+          merged_at: string | null
+          user?: { login?: string }
+        }>
+
+        for (const pr of prs) {
+          if (pr.user?.login !== author) continue
+          results.push({
+            prNumber: pr.number,
+            prTitle: pr.title,
+            prUrl: pr.html_url,
+            branch: pr.head?.ref || '',
+            repo: repoKey,
+            state: pr.merged_at ? 'MERGED' : 'CLOSED',
+          })
         }
-        try {
-          const resp = JSON.parse(stdout)
-          const nodes: {
-            number: number
-            title: string
-            url: string
-            state: 'MERGED' | 'CLOSED'
-            headRefName: string
-            repository: { nameWithOwner: string }
-          }[] = resp.data.search.nodes
-          resolve(
-            nodes
-              .filter((n) => n.number != null)
-              .map((n) => ({
-                prNumber: n.number,
-                prTitle: n.title,
-                prUrl: n.url,
-                branch: n.headRefName,
-                repo: n.repository.nameWithOwner,
-                state: n.state,
-              })),
-          )
-        } catch {
-          resolve([])
-        }
-      },
-    )
-  })
+      } catch {
+        /* ignore */
+      }
+    }),
+  )
+
+  return results.slice(0, limit)
 }
 
 async function refreshSSHBranch(terminalId: number): Promise<void> {
