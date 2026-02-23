@@ -196,7 +196,8 @@ export function MobileKeyboard({
           {isInput && (
             <button
               type="button"
-              onClick={handleSubmit}
+              onPointerDown={(e) => e.preventDefault()}
+              onPointerUp={handleSubmit}
               className="flex-shrink-0 w-14 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
             >
               <CornerDownLeft className="w-4 h-4" />

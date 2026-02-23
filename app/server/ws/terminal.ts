@@ -145,7 +145,6 @@ wss.on('connection', (ws: WebSocket) => {
 
           // Add this client to the shell's client set
           let clients = shellClients.get(shellId)
-          const isFirstClient = !clients
           if (!clients) {
             // First client reconnecting — create the set and re-attach
             // with broadcast callbacks
@@ -160,10 +159,8 @@ wss.on('connection', (ws: WebSocket) => {
           clients.add(ws)
           wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
 
-          // First client becomes primary (controls PTY dimensions)
-          if (isFirstClient) {
-            shellPrimaryClient.set(shellId, ws)
-          }
+          // Latest client becomes primary (controls PTY dimensions)
+          shellPrimaryClient.set(shellId, ws)
 
           // Replay buffer to this client only
           const buffer = getSessionBuffer(shellId)
@@ -174,11 +171,8 @@ wss.on('connection', (ws: WebSocket) => {
           // Send ready message
           sendMessage(ws, { type: 'ready' })
 
-          // Only resize the PTY when this is the primary (first) client.
-          // Secondary clients observe at the primary's dimensions.
-          if (isFirstClient) {
-            resizeSession(shellId, message.cols, message.rows)
-          }
+          // Resize PTY to the new primary's dimensions
+          resizeSession(shellId, message.cols, message.rows)
           return
         }
 
