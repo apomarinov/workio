@@ -338,6 +338,67 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       )
     }
 
+    // Touch scrolling — xterm.js has no native touch scroll support.
+    // Translate touch gestures into scrollLines() / arrow key sequences.
+    if (scrollTarget) {
+      let lastTouchY: number | null = null
+      let touchAccum = 0
+
+      scrollTarget.addEventListener(
+        'touchstart',
+        (e: TouchEvent) => {
+          if (e.touches.length === 1) {
+            lastTouchY = e.touches[0].clientY
+            touchAccum = 0
+          }
+        },
+        { passive: true },
+      )
+
+      scrollTarget.addEventListener(
+        'touchmove',
+        (e: TouchEvent) => {
+          if (e.touches.length !== 1 || lastTouchY === null) return
+          if (!terminalRef.current) return
+
+          // Prevent Safari pull-to-refresh / page scroll
+          e.preventDefault()
+
+          const term = terminalRef.current
+          const touch = e.touches[0]
+          const deltaY = lastTouchY - touch.clientY
+          lastTouchY = touch.clientY
+
+          const cellHeight = scrollTarget.clientHeight / term.rows || 16
+          touchAccum += deltaY
+
+          const lines = Math.trunc(touchAccum / cellHeight)
+          if (lines === 0) return
+          touchAccum -= lines * cellHeight
+
+          if (term.buffer.active.type === 'alternate') {
+            const arrow = lines > 0 ? '\x1b[B' : '\x1b[A'
+            const count = Math.abs(lines)
+            for (let i = 0; i < count; i++) {
+              sendInputRef.current(arrow)
+            }
+          } else {
+            term.scrollLines(lines)
+          }
+        },
+        { passive: false },
+      )
+
+      scrollTarget.addEventListener(
+        'touchend',
+        () => {
+          lastTouchY = null
+          touchAccum = 0
+        },
+        { passive: true },
+      )
+    }
+
     // File path link provider — detect file paths in terminal output and open in IDE on click
     const filePathRegex =
       /(?:^|[\s'"`({[:])([~.]?\/[\w./@-]+(?:\/[\w./@-]+)*\.\w+(?::\d+(?::\d+)?)?|(?:[\w.@-]+\/)+[\w.@-]+\.\w+(?::\d+(?::\d+)?)?)/g

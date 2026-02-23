@@ -53,6 +53,27 @@ const actionsArray: TerminalAction[] = [
       category: 'ctrl' as const,
     }
   }),
+  // Extra ctrl combos
+  {
+    id: 'ctrl-underscore',
+    label: '^_',
+    sequence: '\x1f',
+    category: 'ctrl',
+  },
+  {
+    id: 'ctrl-x-ctrl-x',
+    label: '^X^X',
+    sequence: '\x18\x18',
+    category: 'ctrl',
+  },
+
+  // Alt combos
+  {
+    id: 'alt-r',
+    label: 'Alt-r',
+    sequence: '\x1br',
+    category: 'ctrl',
+  },
 
   // Navigation
   { id: 'up', label: '↑', sequence: '\x1b[A', category: 'nav' },
@@ -139,18 +160,96 @@ export const ACTIONS: Record<string, TerminalAction> = Object.fromEntries(
 export const ALL_ACTIONS = actionsArray
 
 export const DEFAULT_KEYBOARD_ROWS: MobileKeyboardRow[] = [
-  { id: 'row-1', actions: ['backspace', 'ins', 'del', 'paste'] },
-  { id: 'row-2', actions: ['shift-tab', 'sym-?', 'sym-/', 'sym-|'] },
-  { id: 'row-3', actions: ['esc', 'tab', 'ctrl', 'alt'] },
-  { id: 'row-4', actions: ['ctrl-c', 'ctrl-i', 'ctrl-s', 'ctrl-z'] },
-  { id: 'row-5', actions: ['sym-/', 'sym-|', 'sym-~', 'sym--'] },
-  { id: 'row-6', actions: ['home', 'pgup', 'pgdn', 'end'] },
-  { id: 'row-7', actions: ['sym-=', 'sym-:', 'sym-;', 'sym-!'] },
-  { id: 'row-8', actions: ['sym-*', 'sym-$', 'sym-%', 'sym-^'] },
-  { id: 'row-9', actions: ['sym-<', 'sym->', 'sym-(', 'sym-)'] },
-  { id: 'row-10', actions: ['sym-{', 'sym-}', 'sym-[', 'sym-]'] },
-  { id: 'row-11', actions: ['paste', 'del', 'ins', 'sym-@'] },
-  { id: 'row-12', actions: ['f1', 'f2', 'f3', 'f4'] },
+  {
+    id: 'row-1',
+    actions: [
+      'backspace',
+      'ins',
+      'del',
+      'paste',
+      'shift-tab',
+      'sym-?',
+      'sym-/',
+      'sym-|',
+    ],
+  },
+  {
+    id: 'row-2',
+    actions: [
+      'esc',
+      'tab',
+      'ctrl',
+      'alt',
+      'ctrl-c',
+      'ctrl-i',
+      'ctrl-s',
+      'ctrl-z',
+    ],
+  },
+  {
+    id: 'row-3',
+    actions: [
+      'sym-/',
+      'sym-|',
+      'sym-~',
+      'sym--',
+      'home',
+      'pgup',
+      'pgdn',
+      'end',
+    ],
+  },
+  {
+    id: 'row-4',
+    actions: [
+      'sym-=',
+      'sym-:',
+      'sym-;',
+      'sym-!',
+      'sym-*',
+      'sym-$',
+      'sym-%',
+      'sym-^',
+    ],
+  },
+  {
+    id: 'row-5',
+    actions: [
+      'sym-<',
+      'sym->',
+      'sym-(',
+      'sym-)',
+      'sym-{',
+      'sym-}',
+      'sym-[',
+      'sym-]',
+    ],
+  },
+  {
+    id: 'row-6',
+    actions: ['paste', 'del', 'ins', 'sym-@', 'f1', 'f2', 'f3', 'f4'],
+  },
+  {
+    id: 'row-7',
+    actions: ['f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12'],
+  },
+  {
+    id: 'row-8',
+    actions: [
+      'ctrl-underscore',
+      'ctrl-l',
+      'alt-r',
+      'ctrl-x-ctrl-x',
+      'ctrl-r',
+      'ctrl-g',
+      'ctrl-n',
+      'ctrl-p',
+    ],
+  },
+  {
+    id: 'row-9',
+    actions: ['left', 'up', 'down', 'right'],
+  },
 ]
 
 export interface Modifiers {

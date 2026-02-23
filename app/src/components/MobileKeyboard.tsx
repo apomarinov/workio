@@ -73,7 +73,7 @@ export function MobileKeyboard({
         .then((text) => {
           if (text) sendToTerminal(terminalId, text)
         })
-        .catch(() => {})
+        .catch(() => { })
       resetModifiers()
       return
     }
@@ -129,7 +129,7 @@ export function MobileKeyboard({
                     onPointerDown={(e) => e.preventDefault()}
                     onPointerUp={() => handleActionTap(actionId)}
                     className={cn(
-                      'px-3 py-1.5 rounded text-xs font-medium flex-shrink-0 select-none',
+                      'px-3 py-1.5 rounded-md text-xs font-medium flex-shrink-0 select-none',
                       isActive
                         ? 'bg-blue-600 text-white'
                         : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',
@@ -165,13 +165,13 @@ export function MobileKeyboard({
               }
             }}
             placeholder="Type here..."
-            className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
+            className="flex-1 min-w-0 px-3 py-1 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50"
           />
           {isInput && (
             <button
               type="button"
               onClick={handleSubmit}
-              className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
+              className="flex-shrink-0 w-14 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
             >
               <ArrowUp className="w-4 h-4" />
             </button>

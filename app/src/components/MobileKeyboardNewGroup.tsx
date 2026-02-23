@@ -61,7 +61,7 @@ export function MobileKeyboardNewGroup({
   const handleConfirm = () => {
     if (selected.length === 0) return
     onSave({
-      id: crypto.randomUUID(),
+      id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       actions: selected,
     })
     setSelected([])
@@ -93,7 +93,7 @@ export function MobileKeyboardNewGroup({
             onClick={handleConfirm}
             disabled={selected.length === 0}
             className={cn(
-              'text-muted-foreground',
+              'p-1 text-muted-foreground',
               selected.length > 0
                 ? 'hover:text-foreground text-green-400'
                 : 'opacity-40',
@@ -141,7 +141,7 @@ export function MobileKeyboardNewGroup({
         </div>
 
         {/* All actions grouped by category */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-3">
           {grouped.map((group) => (
             <div key={group.category}>
               <div className="text-xs font-medium text-muted-foreground/70 mb-1">

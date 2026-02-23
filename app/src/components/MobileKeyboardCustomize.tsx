@@ -35,7 +35,7 @@ export function MobileKeyboardCustomize({
     const target = index + direction
     if (target < 0 || target >= localRows.length) return
     const next = [...localRows]
-    ;[next[index], next[target]] = [next[target], next[index]]
+      ;[next[index], next[target]] = [next[target], next[index]]
     setLocalRows(next)
   }
 
@@ -72,7 +72,7 @@ export function MobileKeyboardCustomize({
             </button>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-3">
             {/* Preview of all actions */}
             {localRows.length > 0 && (
               <div className="flex gap-1 px-1 overflow-x-auto">
@@ -103,7 +103,7 @@ export function MobileKeyboardCustomize({
               {localRows.map((row, index) => (
                 <div
                   key={row.id}
-                  className="flex items-center gap-2 rounded-lg bg-zinc-800/50 px-2 py-1.5"
+                  className="flex items-center gap-2 rounded-lg bg-zinc-800/50 px-2 py-0.5"
                 >
                   <button
                     type="button"
@@ -112,17 +112,16 @@ export function MobileKeyboardCustomize({
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <div className="flex-1 min-w-0 flex gap-1 overflow-hidden">
+                  <div className="flex-1 min-w-0 flex gap-1 overflow-x-auto">
                     {row.actions.map((actionId, i) => {
                       const action = ACTIONS[actionId]
                       return (
-                        <span
+                        <div
                           key={`${row.id}-${actionId}-${i}`}
-                          className="text-xs text-zinc-400 truncate"
+                          className="flex-shrink-0 px-1.5 py-1 rounded bg-zinc-700/60 text-xs text-zinc-300"
                         >
                           {action?.label ?? actionId}
-                          {i < row.actions.length - 1 && ','}
-                        </span>
+                        </div>
                       )
                     })}
                   </div>

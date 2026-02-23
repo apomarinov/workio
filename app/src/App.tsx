@@ -721,6 +721,19 @@ function AppContent() {
                               <Keyboard className="w-4 h-4" />
                             </button>
                           )}
+                          {mobileKeyboardMode !== 'hidden' && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                window.dispatchEvent(
+                                  new Event('mobile-keyboard-customize'),
+                                )
+                              }
+                              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                          )}
                           {mobileKeyboardMode === 'input' && (
                             <>
                               <button
@@ -741,17 +754,6 @@ function AppContent() {
                           )}
                           {mobileKeyboardMode === 'actions' && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  window.dispatchEvent(
-                                    new Event('mobile-keyboard-customize'),
-                                  )
-                                }
-                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <Settings className="w-4 h-4" />
-                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
