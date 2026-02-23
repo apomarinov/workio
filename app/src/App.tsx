@@ -81,6 +81,41 @@ function AppContent() {
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
 
+  // Shell DnD order — kept in sync with localStorage used by ShellTabs
+  const shellOrderRef = useRef<Record<number, number[]>>(
+    (() => {
+      try {
+        const saved = localStorage.getItem('shell-order')
+        return saved ? JSON.parse(saved) : {}
+      } catch {
+        return {}
+      }
+    })(),
+  )
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'shell-order') {
+        try {
+          shellOrderRef.current = e.newValue ? JSON.parse(e.newValue) : {}
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    const onLocalSync = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.key === 'shell-order') {
+        shellOrderRef.current = detail.value ?? {}
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('local-storage-sync', onLocalSync)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('local-storage-sync', onLocalSync)
+    }
+  }, [])
+
   // Multi-shell state
   const storedShells = useRef<Record<number, number>>(
     (() => {
@@ -343,6 +378,20 @@ function AppContent() {
     }
   }, [])
 
+  // Helper: return shells in DnD-reordered display order for a terminal
+  const getSortedShells = (t: (typeof terminals)[number]) => {
+    const currentIds = new Set(t.shells.map((s) => s.id))
+    const storedOrder = shellOrderRef.current[t.id] ?? []
+    const validStored = storedOrder.filter((id: number) => currentIds.has(id))
+    const storedSet = new Set(validStored)
+    const newShells = t.shells
+      .filter((s) => !storedSet.has(s.id))
+      .map((s) => s.id)
+    const sortedIds = [...validStored, ...newShells]
+    const shellMap = new Map(t.shells.map((s) => [s.id, s]))
+    return sortedIds.map((id: number) => shellMap.get(id)!).filter(Boolean)
+  }
+
   useKeyboardShortcuts({
     goToTab: (index) => {
       // Use render order: repo-grouped terminals first, then ungrouped
@@ -370,7 +419,8 @@ function AppContent() {
     goToShell: (index) => {
       const t = activeTerminalRef.current
       if (!t) return
-      const shell = t.shells[index - 1]
+      const shells = getSortedShells(t)
+      const shell = shells[index - 1]
       if (shell) {
         setActiveShells((prev) => ({ ...prev, [t.id]: shell.id }))
         window.dispatchEvent(
@@ -383,9 +433,10 @@ function AppContent() {
     prevShell: () => {
       const t = activeTerminalRef.current
       if (!t || t.shells.length < 2) return
-      const currentId = activeShellsRef.current[t.id] ?? t.shells[0]?.id
-      const idx = t.shells.findIndex((s) => s.id === currentId)
-      const prev = idx > 0 ? t.shells[idx - 1] : t.shells[t.shells.length - 1]
+      const shells = getSortedShells(t)
+      const currentId = activeShellsRef.current[t.id] ?? shells[0]?.id
+      const idx = shells.findIndex((s) => s.id === currentId)
+      const prev = idx > 0 ? shells[idx - 1] : shells[shells.length - 1]
       if (prev) {
         setActiveShells((p) => ({ ...p, [t.id]: prev.id }))
         window.dispatchEvent(
@@ -398,9 +449,10 @@ function AppContent() {
     nextShell: () => {
       const t = activeTerminalRef.current
       if (!t || t.shells.length < 2) return
-      const currentId = activeShellsRef.current[t.id] ?? t.shells[0]?.id
-      const idx = t.shells.findIndex((s) => s.id === currentId)
-      const next = idx < t.shells.length - 1 ? t.shells[idx + 1] : t.shells[0]
+      const shells = getSortedShells(t)
+      const currentId = activeShellsRef.current[t.id] ?? shells[0]?.id
+      const idx = shells.findIndex((s) => s.id === currentId)
+      const next = idx < shells.length - 1 ? shells[idx + 1] : shells[0]
       if (next) {
         setActiveShells((p) => ({ ...p, [t.id]: next.id }))
         window.dispatchEvent(
