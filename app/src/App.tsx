@@ -1,4 +1,11 @@
-import { ChevronLeft, Plus } from 'lucide-react'
+import {
+  ChevronLeft,
+  Keyboard,
+  KeyboardOff,
+  LayoutGrid,
+  Plus,
+  Settings,
+} from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
 import {
@@ -20,6 +27,7 @@ const SessionChat = lazy(() =>
   import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
 )
 
+import { MobileKeyboard } from './components/MobileKeyboard'
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
 import { useNotifications } from './context/NotificationContext'
@@ -82,6 +90,10 @@ function AppContent() {
   const [tabsTop] = useLocalStorage('shell-tabs-top', true)
   const isMobile = useIsMobile()
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [mobileKeyboardMode, setMobileKeyboardMode] = useState<
+    'hidden' | 'input' | 'actions'
+  >('hidden')
+  const mobileInputRef = useRef<HTMLInputElement>(null)
 
   // Mark active shells so the context can track suspension timestamps
   useEffect(() => {
@@ -542,7 +554,29 @@ function AppContent() {
     prevActiveSessionId.current = activeSessionId
   }, [activeTerminal?.id, activeSessionId, mobileSidebarOpen])
 
-  const effectiveTabsTop = isMobile ? true : tabsTop
+  // Track visual viewport height on mobile so the layout shrinks when the
+  // iOS keyboard opens, keeping our bottom bar visible above it.
+  const [mobileVH, setMobileVH] = useState<number | undefined>()
+  useEffect(() => {
+    if (!isMobile) return
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      setMobileVH(vv.height)
+      // iOS scrolls the page when a fixed-input gets focus.  Since our input
+      // lives inside the in-flow bottom bar, undo that scroll so the terminal
+      // doesn't get pushed up leaving blank space.
+      window.scrollTo(0, 0)
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [isMobile])
+
+  const effectiveTabsTop = isMobile ? false : tabsTop
 
   if (loading) {
     return (
@@ -600,7 +634,7 @@ function AppContent() {
               !isTermVisible && 'invisible',
             )}
           >
-            {tabBar && activeShellId != null && (
+            {tabBar && activeShellId != null && !isMobile && (
               <ShellTabs
                 terminal={t}
                 activeShellId={activeShellId}
@@ -615,17 +649,7 @@ function AppContent() {
                 onRenameShell={handleRenameShell}
                 position={effectiveTabsTop ? 'top' : 'bottom'}
                 className="pr-2 pl-1 bg-[#1a1a1a]"
-              >
-                {isMobile && (
-                  <button
-                    type="button"
-                    onClick={() => setMobileSidebarOpen(true)}
-                    className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                )}
-              </ShellTabs>
+              />
             )}
             <div className="relative flex-1 min-h-0">
               {t.shells.map((shell) => {
@@ -649,9 +673,129 @@ function AppContent() {
   return (
     <>
       {isMobile ? (
-        <div className="h-full flex flex-col bg-zinc-950">
+        <div
+          className="flex flex-col bg-zinc-950 overflow-hidden"
+          style={{ height: mobileVH ? `${mobileVH}px` : '100dvh' }}
+        >
           {/* Fullscreen terminal */}
           <div className="flex-1 min-h-0">{mainContent}</div>
+          {/* Bottom bar: ShellTabs + MobileKeyboard (in flow so it sits above the iOS keyboard) */}
+          {activeTerminal &&
+            !activeSessionId &&
+            (() => {
+              const t = activeTerminal
+              const activeShellId =
+                activeShells[t.id] ??
+                t.shells.find((s) => s.name === 'main')?.id ??
+                t.shells[0]?.id
+              return (
+                <div className="flex-shrink-0 bg-[#1a1a1a]">
+                  {tabBar && activeShellId != null && (
+                    <ShellTabs
+                      terminal={t}
+                      activeShellId={activeShellId}
+                      onSelectShell={(shellId) =>
+                        setActiveShells((prev) => ({
+                          ...prev,
+                          [t.id]: shellId,
+                        }))
+                      }
+                      onCreateShell={() => handleCreateShell(t.id)}
+                      onDeleteShell={(shellId) =>
+                        handleDeleteShell(t.id, shellId)
+                      }
+                      onRenameShell={handleRenameShell}
+                      position="bottom"
+                      className="pr-2 pl-1 bg-[#1a1a1a]"
+                      rightExtra={
+                        <div className="flex items-center gap-0.5">
+                          {mobileKeyboardMode === 'hidden' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                mobileInputRef.current?.focus()
+                                setMobileKeyboardMode('input')
+                              }}
+                              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                              <Keyboard className="w-4 h-4" />
+                            </button>
+                          )}
+                          {mobileKeyboardMode === 'input' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setMobileKeyboardMode('actions')}
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <LayoutGrid className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMobileKeyboardMode('hidden')}
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <KeyboardOff className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {mobileKeyboardMode === 'actions' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  window.dispatchEvent(
+                                    new Event('mobile-keyboard-customize'),
+                                  )
+                                }
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  mobileInputRef.current?.focus()
+                                  setMobileKeyboardMode('input')
+                                }}
+                                className="flex items-center justify-center h-7 px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                ABC
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMobileKeyboardMode('hidden')}
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <KeyboardOff className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setMobileSidebarOpen(true)}
+                        className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                    </ShellTabs>
+                  )}
+                  <MobileKeyboard
+                    terminalId={t.id}
+                    mode={mobileKeyboardMode}
+                    inputRef={mobileInputRef}
+                  />
+                  {/* Safe area spacer */}
+                  <div
+                    className="bg-zinc-900"
+                    style={{ height: 'env(safe-area-inset-bottom)' }}
+                  />
+                </div>
+              )
+            })()}
           {/* Sidebar overlay */}
           <div
             className={cn(

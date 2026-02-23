@@ -28,7 +28,7 @@ body {
 }
 
 #root {
-  height: 100vh;
+  height: 100dvh;
 }
 
 @theme inline {

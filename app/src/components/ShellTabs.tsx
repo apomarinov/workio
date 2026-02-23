@@ -72,6 +72,7 @@ interface ShellTabsProps {
   position?: 'top' | 'bottom'
   className?: string
   children?: React.ReactNode
+  rightExtra?: React.ReactNode
 }
 
 const sessionStatusColor: Record<string, string> = {
@@ -333,6 +334,7 @@ export function ShellTabs({
   position = 'top',
   className,
   children,
+  rightExtra,
 }: ShellTabsProps) {
   const { processes } = useProcessContext()
   const { sessions } = useSessionContext()
@@ -813,7 +815,10 @@ export function ShellTabs({
           </div>
         </div>
         {/* Menu — single instance, always on the right */}
-        <div className="flex-shrink-0 ml-auto">{menuButton}</div>
+        <div className="flex-shrink-0 ml-auto flex items-center gap-0.5">
+          {menuButton}
+          {rightExtra}
+        </div>
       </div>
       <ConfirmModal
         open={deleteShellId !== null}

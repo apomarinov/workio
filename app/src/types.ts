@@ -404,6 +404,11 @@ export interface ShellTemplate {
   entries: ShellTemplateEntry[]
 }
 
+export interface MobileKeyboardRow {
+  id: string
+  actions: string[] // action IDs, max 8 per row
+}
+
 export type PreferredIDE = 'cursor' | 'vscode'
 
 export interface Settings {
@@ -425,6 +430,7 @@ export interface Settings {
   hidden_prs?: HiddenPR[]
   favorite_sessions?: string[]
   shell_templates?: ShellTemplate[]
+  mobile_keyboard_rows?: MobileKeyboardRow[]
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number
