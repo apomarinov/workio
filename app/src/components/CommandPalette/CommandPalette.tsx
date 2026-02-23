@@ -16,6 +16,7 @@ import {
   editPR,
   getBranches,
   getMoveTargets,
+  killShell,
   moveSession,
   openInExplorer,
   openInIDE,
@@ -103,6 +104,12 @@ export function CommandPalette() {
   } | null>(null)
   const [createBranchLoading, setCreateBranchLoading] = useState(false)
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false)
+  const [resumeConfirm, setResumeConfirm] = useState<{
+    session: SessionWithProject
+    shellId: number
+    shellName: string
+    processName: string
+  } | null>(null)
   const [moveSessionTarget, setMoveSessionTarget] = useState<{
     session: SessionWithProject
     target: MoveTarget
@@ -442,6 +449,29 @@ export function CommandPalette() {
     [closePalette],
   )
 
+  const doResumeSession = (
+    terminalId: number,
+    sessionId: string,
+    shellId: number,
+  ) => {
+    selectTerminal(terminalId)
+    clearSession()
+    window.dispatchEvent(
+      new CustomEvent('reveal-terminal', { detail: { id: terminalId } }),
+    )
+    window.dispatchEvent(
+      new CustomEvent('shell-select', {
+        detail: { terminalId, shellId },
+      }),
+    )
+    emit('resume-session', { terminalId, sessionId, shellId })
+    setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('terminal-focus', { detail: { terminalId } }),
+      )
+    }, 350)
+  }
+
   // App actions
   const appActions: AppActions = useMemo(
     () => ({
@@ -522,25 +552,37 @@ export function CommandPalette() {
       // Session actions
       resumeSession: (session) => {
         closePalette()
-        if (session.terminal_id) {
-          selectTerminal(session.terminal_id)
-          clearSession()
-          window.dispatchEvent(
-            new CustomEvent('reveal-terminal', {
-              detail: { id: session.terminal_id },
-            }),
-          )
-          emit('resume-session', {
-            terminalId: session.terminal_id,
-            sessionId: session.session_id,
+        if (!session.terminal_id) return
+
+        const terminal = terminals.find((t) => t.id === session.terminal_id)
+        if (!terminal) return
+
+        // Resolve target shell: prefer session's shell_id if it still exists, else main shell
+        const targetShell =
+          (session.shell_id &&
+            terminal.shells.find((s) => s.id === session.shell_id)) ||
+          terminal.shells.find((s) => s.name === 'main') ||
+          terminal.shells[0]
+        if (!targetShell) return
+
+        // Check if target shell has a running process
+        const shellProcess = processes.find(
+          (p) => p.shellId === targetShell.id && p.pid > 0,
+        )
+
+        if (shellProcess) {
+          setResumeConfirm({
+            session,
+            shellId: targetShell.id,
+            shellName: targetShell.name,
+            processName: shellProcess.name || shellProcess.command,
           })
-          setTimeout(() => {
-            window.dispatchEvent(
-              new CustomEvent('terminal-focus', {
-                detail: { terminalId: session.terminal_id },
-              }),
-            )
-          }, 350)
+        } else {
+          doResumeSession(
+            session.terminal_id,
+            session.session_id,
+            targetShell.id,
+          )
         }
       },
       openRenameModal: (session) => {
@@ -868,6 +910,8 @@ export function CommandPalette() {
       updateSettings,
       refetchSessions,
       emit,
+      terminals,
+      processes,
     ],
   )
 
@@ -983,6 +1027,23 @@ export function CommandPalette() {
             setDeleteSessionTarget(null)
           }}
           onCancel={() => setDeleteSessionTarget(null)}
+        />
+      )}
+
+      {resumeConfirm && (
+        <ConfirmModal
+          open={!!resumeConfirm}
+          title="Resume Session"
+          message={`"${resumeConfirm.processName}" is running in shell "${resumeConfirm.shellName}". Kill it to resume "${resumeConfirm.session.name || resumeConfirm.session.session_id}"?`}
+          confirmLabel="Kill & Resume"
+          variant="danger"
+          onConfirm={async () => {
+            const { session, shellId } = resumeConfirm
+            await killShell(shellId)
+            setResumeConfirm(null)
+            doResumeSession(session.terminal_id!, session.session_id, shellId)
+          }}
+          onCancel={() => setResumeConfirm(null)}
         />
       )}
 

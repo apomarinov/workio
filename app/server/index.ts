@@ -53,6 +53,7 @@ import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import {
+  getSession,
   getSessionByTerminalId,
   startGitDirtyPolling,
   writeToSession,
@@ -162,16 +163,22 @@ io.on('connection', (socket) => {
 
   socket.on(
     'resume-session',
-    async (data: { terminalId: number; sessionId: string }) => {
-      const { terminalId, sessionId } = data
+    async (data: {
+      terminalId: number
+      sessionId: string
+      shellId?: number
+    }) => {
+      const { terminalId, sessionId, shellId: targetShellId } = data
       const terminal = await getTerminalById(terminalId)
       const cmd =
         (terminal?.settings as { defaultClaudeCommand?: string } | null)
           ?.defaultClaudeCommand || 'claude'
       const fullCommand = `${cmd} --resume ${sessionId}`
 
-      // Check if zellij is running for this terminal
-      const ptySession = getSessionByTerminalId(terminalId)
+      // Use the target shell if provided and valid, otherwise fall back to main shell
+      const ptySession =
+        (targetShellId && getSession(targetShellId)) ||
+        getSessionByTerminalId(terminalId)
       if (!ptySession) return
       const shellId = ptySession.shell.id
       const zellijName =

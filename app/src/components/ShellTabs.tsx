@@ -865,7 +865,7 @@ export function ShellTabs({
         variant="danger"
         onConfirm={() => {
           for (const shell of terminal.shells) {
-            killShell(shell.id).catch(() => { })
+            killShell(shell.id).catch(() => {})
           }
           toast(`Killed processes in ${terminal.shells.length} shell(s)`)
           setKillAllConfirm(false)
