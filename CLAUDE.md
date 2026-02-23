@@ -14,6 +14,13 @@
 - `lint:fix` runs Biome auto-fix on `src/` and `server/`.
 - `check` runs Biome lint + TypeScript typecheck (both `tsconfig.json` and `tsconfig.node.json`).
 
+## Error Handling
+
+- **Never silently swallow errors** in catch blocks.
+- **Server**: Always log errors using the project logger (`log.error(...)` from `../logger`).
+- **Client (queries)**: Show an error toast on failure — `toast.error('Failed to ...')`. No need for `console.error` if showing a toast.
+- **Client (mutations)**: Show an error toast on failure **and** a success toast on success — `toast.success('...')`. No need for `console.error` if showing a toast.
+
 ## Server Code
 
 - **Never use `execSync` or `execFileSync`** — they block the event loop and cause choppy terminal input.
@@ -50,6 +57,11 @@
 - Icons come from `lucide-react`.
 - Toast notifications use `sonner` via `import { toast } from '@/components/ui/sonner'`.
 - For confirmation dialogs (discard, delete, destructive actions), use `ConfirmModal` from `src/components/ConfirmModal.tsx` instead of raw `AlertDialog` primitives.
+- For collapsible sections, use a single `ChevronDown` with animated rotation:
+  ```tsx
+  <ChevronDown className={cn('w-3 h-3 transition-transform', !expanded && '-rotate-90')} />
+  ```
+  Do **not** swap between `ChevronRight` / `ChevronDown` — use one icon with `-rotate-90`.
 
 ## Keyboard Shortcuts
 

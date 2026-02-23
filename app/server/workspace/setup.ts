@@ -329,7 +329,8 @@ async function dirExists(
   try {
     await execSSHCommand(sshHost, `test -d ${shellQuote(dirPath)}`)
     return true
-  } catch {
+  } catch (err) {
+    log.error({ err, dirPath }, '[workspace] Failed to check directory via SSH')
     return false
   }
 }
@@ -367,7 +368,8 @@ async function readFileContent(
       `cat ${shellQuote(filePath)}`,
     )
     return stdout
-  } catch {
+  } catch (err) {
+    log.error({ err, filePath }, '[workspace] Failed to read file via SSH')
     return null
   }
 }
@@ -548,8 +550,8 @@ export async function setupTerminalWorkspace(
           stdout: pruneResult.stdout,
           stderr: pruneResult.stderr,
         })
-      } catch {
-        // Ignore prune errors
+      } catch (err) {
+        log.error({ err }, '[workspace] Failed to prune worktrees')
       }
 
       if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')

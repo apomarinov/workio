@@ -1,4 +1,5 @@
 import {
+  AtSign,
   Check,
   CircleCheck,
   CircleX,
@@ -52,6 +53,10 @@ function getNotificationIcon(type: string) {
       return <MessageSquare className="w-4 h-4 text-muted-foreground" />
     case 'new_review':
       return <Eye className="w-4 h-4 text-blue-500" />
+    case 'review_requested':
+      return <Eye className="w-4 h-4 text-blue-400" />
+    case 'pr_mentioned':
+      return <AtSign className="w-4 h-4 text-yellow-400" />
     // Workspace notifications
     case 'workspace_ready':
     case 'workspace_deleted':
@@ -85,6 +90,12 @@ function getNotificationTitle(notification: Notification): string {
       return data.author ? `${data.author}` : 'New comment'
     case 'new_review':
       return data.author ? `${data.author} left a review` : 'New review'
+    case 'review_requested':
+      return data.author
+        ? `${data.author} requested your review`
+        : 'Review requested'
+    case 'pr_mentioned':
+      return data.author ? `${data.author} mentioned you` : 'You were mentioned'
     // Workspace notifications
     case 'workspace_ready':
       return `${data.name || 'Workspace'} is ready`
@@ -111,6 +122,8 @@ function getNotificationSubtitle(notification: Notification): string {
     case 'pr_approved':
     case 'new_comment':
     case 'new_review':
+    case 'review_requested':
+    case 'pr_mentioned':
       return data.prTitle || repo
     default:
       return ''
@@ -141,6 +154,10 @@ function getNotificationUrl(notification: Notification): string | undefined {
         return `${data.prUrl}#pullrequestreview-${data.reviewId}`
       }
       return data.prUrl
+    case 'review_requested':
+      return data.prUrl
+    case 'pr_mentioned':
+      return data.commentUrl || data.prUrl
     default:
       return undefined
   }
@@ -158,7 +175,11 @@ function NotificationItem({
   const subtitle = getNotificationSubtitle(notification)
   const url = getNotificationUrl(notification)
   const isWorkspace = type.startsWith('workspace_')
-  const hasBody = (type === 'new_comment' || type === 'new_review') && data.body
+  const hasBody =
+    (type === 'new_comment' ||
+      type === 'new_review' ||
+      type === 'pr_mentioned') &&
+    data.body
 
   const handleClick = () => {
     if (!read) {

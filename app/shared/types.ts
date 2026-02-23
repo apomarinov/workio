@@ -108,6 +108,15 @@ export interface MergedPRSummary {
   state: 'MERGED' | 'CLOSED'
 }
 
+export interface InvolvedPRSummary {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  repo: string
+  author: string
+  involvement: 'review-requested' | 'mentioned'
+}
+
 export interface GitDiffStat {
   added: number
   removed: number

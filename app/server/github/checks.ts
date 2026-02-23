@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type {
   FailedPRCheck,
+  InvolvedPRSummary,
   MergedPRSummary,
   PRCheckStatus,
   PRComment,
@@ -791,8 +792,11 @@ async function fetchPRsViaRESTAndGraphQL(
           if (myPRs.length > 0) {
             openPRsByRepo.set(repoKey, myPRs)
           }
-        } catch {
-          /* ignore */
+        } catch (err) {
+          log.error(
+            { err, repo: repoKey },
+            '[github] Failed to parse open PRs REST response',
+          )
         }
       }
 
@@ -812,8 +816,11 @@ async function fetchPRsViaRESTAndGraphQL(
           if (myPRs.length > 0) {
             closedRESTData.set(repoKey, myPRs)
           }
-        } catch {
-          /* ignore */
+        } catch (err) {
+          log.error(
+            { err, repo: repoKey },
+            '[github] Failed to parse closed PRs REST response',
+          )
         }
       }
     }),
@@ -974,11 +981,117 @@ export async function fetchAllClosedPRs(
             state: pr.merged_at ? 'MERGED' : 'CLOSED',
           })
         }
-      } catch {
-        /* ignore */
+      } catch (err) {
+        log.error(
+          { err, repo: repoKey },
+          '[github] Failed to fetch closed PRs for repo',
+        )
       }
     }),
   )
+
+  return results.slice(0, limit)
+}
+
+/** Fetch open PRs where the current user is a requested reviewer or mentioned. */
+export async function fetchInvolvedPRs(
+  repos: string[],
+  limit: number,
+): Promise<InvolvedPRSummary[]> {
+  if (repos.length === 0 || !ghUsername) return []
+
+  const seen = new Set<string>()
+  const results: InvolvedPRSummary[] = []
+
+  // 1. For each repo, fetch open PRs and check requested_reviewers
+  await Promise.all(
+    repos.map(async (repoKey) => {
+      try {
+        const stdout = await execFileAsync(
+          'gh',
+          ['api', `repos/${repoKey}/pulls?state=open&per_page=100`],
+          { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+        )
+        if (!stdout) return
+
+        const prs = JSON.parse(stdout) as Array<{
+          number: number
+          title: string
+          html_url: string
+          user?: { login?: string }
+          requested_reviewers?: Array<{ login?: string }>
+        }>
+
+        for (const pr of prs) {
+          if (pr.user?.login === ghUsername) continue
+          const isReviewer = pr.requested_reviewers?.some(
+            (r) => r.login === ghUsername,
+          )
+          if (!isReviewer) continue
+          const key = `${repoKey}#${pr.number}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          results.push({
+            prNumber: pr.number,
+            prTitle: pr.title,
+            prUrl: pr.html_url,
+            repo: repoKey,
+            author: pr.user?.login || 'unknown',
+            involvement: 'review-requested',
+          })
+        }
+      } catch (err) {
+        log.error(
+          { err, repo: repoKey },
+          '[github] Failed to fetch involved PRs for repo',
+        )
+      }
+    }),
+  )
+
+  // 2. Search for open PRs mentioning the user (across all repos)
+  try {
+    const repoSet = new Set(repos)
+    const stdout = await execFileAsync(
+      'gh',
+      [
+        'api',
+        `search/issues?q=type:pr+state:open+mentions:${ghUsername}+-author:${ghUsername}&per_page=${Math.min(limit, 100)}&sort=updated`,
+      ],
+      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+    )
+    if (stdout) {
+      const data = JSON.parse(stdout) as {
+        items?: Array<{
+          number: number
+          title: string
+          html_url: string
+          user?: { login?: string }
+          repository_url?: string
+        }>
+      }
+      for (const item of data.items || []) {
+        // Extract repo from repository_url: https://api.github.com/repos/owner/repo
+        const repoMatch = item.repository_url?.match(/repos\/(.+)$/)
+        const repo = repoMatch?.[1]
+        if (!repo || !repoSet.has(repo)) continue
+
+        const key = `${repo}#${item.number}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        results.push({
+          prNumber: item.number,
+          prTitle: item.title,
+          prUrl: item.html_url,
+          repo,
+          author: item.user?.login || 'unknown',
+          involvement: 'mentioned',
+        })
+      }
+    }
+  } catch (err) {
+    log.error({ err }, '[github] Failed to search mentioned PRs')
+  }
 
   return results.slice(0, limit)
 }
@@ -1173,8 +1286,8 @@ export async function trackTerminal(terminalId: number): Promise<void> {
           terminal.cwd,
         )
         hasConductor = result.stdout.trim() === 'yes'
-      } catch {
-        // ignore
+      } catch (err) {
+        log.error({ err }, '[github] Failed to check conductor.json via SSH')
       }
     } else {
       hasConductor = fs.existsSync(path.join(terminal.cwd, 'conductor.json'))
@@ -1277,14 +1390,14 @@ export async function fetchPRComments(
   try {
     const data = JSON.parse(issueCommentsStdout)
     issueCommentsData = data.comments || []
-  } catch {
-    // ignore parse errors
+  } catch (err) {
+    log.error({ err }, '[github] Failed to parse issue comments response')
   }
 
   try {
     codeCommentsData = JSON.parse(codeCommentsStdout) || []
-  } catch {
-    // ignore parse errors
+  } catch (err) {
+    log.error({ err }, '[github] Failed to parse code comments response')
   }
 
   const excludeSet = excludeAuthors ? new Set(excludeAuthors) : null
@@ -2228,6 +2341,7 @@ interface WebhookPayload {
     user?: { login?: string }
     pull_request?: { url: string }
   }
+  requested_reviewer?: { login: string }
 }
 
 function findPR(repo: string, prNumber: number): PRCheckStatus | undefined {
@@ -2553,6 +2667,66 @@ function tryApplyWebhookPatch(event: string, payload: WebhookPayload): boolean {
       return patchReviewComment(repo, payload)
     default:
       return false
+  }
+}
+
+/** Handle webhook events for PRs where we're involved (not author). */
+export async function handleInvolvedPRWebhook(
+  event: string,
+  payload: WebhookPayload,
+): Promise<void> {
+  if (!ghUsername) return
+  const repo = payload.repository?.full_name
+  if (!repo) return
+
+  const prData = payload.pull_request
+
+  // Review requested
+  if (
+    event === 'pull_request' &&
+    payload.action === 'review_requested' &&
+    payload.requested_reviewer?.login === ghUsername
+  ) {
+    const author = prData?.user?.login || 'unknown'
+    await emitNotification(
+      'review_requested',
+      repo,
+      {
+        prTitle: prData?.title || '',
+        prUrl: prData?.html_url || '',
+        prNumber: prData?.number,
+        author,
+      },
+      undefined,
+      prData?.number,
+    )
+    return
+  }
+
+  // Mentioned in a comment
+  if (event === 'issue_comment' || event === 'pull_request_review_comment') {
+    const comment = payload.comment
+    if (comment?.body?.includes(`@${ghUsername}`)) {
+      const prNumber = prData?.number || payload.issue?.number
+      const prTitle = prData?.title || ''
+      const prUrl = prData?.html_url || ''
+      const author = comment.user?.login || 'unknown'
+      await emitNotification(
+        'pr_mentioned',
+        repo,
+        {
+          prTitle,
+          prUrl,
+          prNumber,
+          author,
+          body: comment.body?.substring(0, 200),
+          commentUrl: comment.html_url,
+          commentId: comment.id,
+        },
+        comment.id ? String(comment.id) : undefined,
+        prNumber,
+      )
+    }
   }
 }
 

@@ -59,7 +59,7 @@ import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
 import { LogsModal } from './LogsModal'
-import { OlderMergedPRsList } from './MergedPRsList'
+import { InvolvedPRsList, OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
@@ -131,6 +131,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
   const {
     githubPRs,
     mergedPRs,
+    involvedPRs,
     hasAnyUnseenPRs,
     hasNotifications,
     hasUnreadNotifications,
@@ -327,6 +328,19 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
     }
     return grouped
   }, [mergedPRs])
+
+  const involvedPRsByRepo = useMemo(() => {
+    const grouped = new Map<string, typeof involvedPRs>()
+    for (const pr of involvedPRs) {
+      const existing = grouped.get(pr.repo)
+      if (existing) {
+        existing.push(pr)
+      } else {
+        grouped.set(pr.repo, [pr])
+      }
+    }
+    return grouped
+  }, [involvedPRs])
 
   const allSessionIds = useMemo(
     () => sessions.map((s) => s.session_id),
@@ -1070,6 +1084,9 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                               olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(
                                 3,
                               )}
+                            />
+                            <InvolvedPRsList
+                              prs={involvedPRsByRepo.get(repo) ?? []}
                             />
                           </>
                         )}

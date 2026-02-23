@@ -235,8 +235,8 @@ async function getProcessesForTerminal(
         source: 'zellij',
       })
     }
-  } catch {
-    // Ignore errors
+  } catch (err) {
+    log.error({ err }, '[pty] Failed to get zellij processes')
   }
 
   return processes
@@ -350,8 +350,8 @@ async function scanAndEmitAllProcesses() {
         }
       }
     }
-  } catch {
-    // Ignore zellij detection errors
+  } catch (err) {
+    log.error({ err }, '[pty] Failed to detect zellij sessions')
   }
 
   getIO()?.emit('processes', {
@@ -492,7 +492,8 @@ async function checkGitDirty(
         },
       )
     })
-  } catch {
+  } catch (err) {
+    log.error({ err, cwd }, '[pty] Failed to check git dirty status')
     return zero
   }
 }
@@ -571,7 +572,8 @@ async function checkGitRemoteSync(
         },
       )
     })
-  } catch {
+  } catch (err) {
+    log.error({ err, cwd }, '[pty] Failed to check git remote sync')
     return noRemote
   }
 }
@@ -692,13 +694,17 @@ async function scanAndEmitGitDirty() {
                 data: { git_branch: branch },
               })
             }
-          } catch {
-            // skip this terminal
+          } catch (err) {
+            log.error(
+              { err, terminalId: terminal.id },
+              '[pty] Failed to detect branch for terminal',
+            )
           }
         })(),
       )
     }
-  } catch {
+  } catch (err) {
+    log.error({ err }, '[pty] Failed to detect terminal branches')
     return
   }
 
@@ -770,8 +776,8 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       }
       getIO()?.emit('git:remote-sync', { syncStatus })
     }
-  } catch {
-    // ignore
+  } catch (err) {
+    log.error({ err }, '[pty] Failed to scan and emit git dirty status')
   }
 }
 
@@ -883,8 +889,8 @@ export async function detectGitBranch(
             await updateTerminal(terminalId, { git_repo: gitRepo })
             await emitWorkspace(terminalId, { git_repo: gitRepo })
           }
-        } catch {
-          // non-critical, ignore
+        } catch (err) {
+          log.error({ err, terminalId }, '[pty] Failed to detect repo slug')
         }
       }
     }

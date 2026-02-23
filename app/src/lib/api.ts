@@ -1,5 +1,6 @@
 import type {
   ChangedFile,
+  InvolvedPRSummary,
   MergedPRSummary,
   UnreadPRNotification,
 } from '../../shared/types'
@@ -328,6 +329,18 @@ export async function getClosedPRs(
   )
   if (!res.ok) throw new Error('Failed to fetch closed PRs')
   const data: { prs: MergedPRSummary[] } = await res.json()
+  return data.prs
+}
+
+export async function getInvolvedPRs(
+  repos: string[],
+  limit: number,
+): Promise<InvolvedPRSummary[]> {
+  const res = await fetch(
+    `${API_BASE}/github/involved-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
+  )
+  if (!res.ok) throw new Error('Failed to fetch involved PRs')
+  const data: { prs: InvolvedPRSummary[] } = await res.json()
   return data.prs
 }
 

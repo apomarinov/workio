@@ -38,6 +38,14 @@ const TYPE_TO_PUSH: Record<
     title: `👁️ ${d.author || 'Someone'}`,
     body: `${d.body || d.prTitle}`,
   }),
+  review_requested: (d) => ({
+    title: '👀 Review Requested',
+    body: `${d.author} wants your review on ${d.prTitle}`,
+  }),
+  pr_mentioned: (d) => ({
+    title: '💬 Mentioned',
+    body: `${d.author} mentioned you in ${d.prTitle}`,
+  }),
   workspace_ready: (d) => ({
     title: '✅ Workspace Ready',
     body: `${d.name || 'Workspace'} is ready`,

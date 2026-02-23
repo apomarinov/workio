@@ -10,6 +10,7 @@ import {
 import useSWR from 'swr'
 import { toast } from '@/components/ui/sonner'
 import type {
+  InvolvedPRSummary,
   MergedPRSummary,
   PRCheckStatus,
   PRChecksPayload,
@@ -57,6 +58,7 @@ interface TerminalContextValue {
   ghUsername: string | null
   githubPRs: PRCheckStatus[]
   mergedPRs: MergedPRSummary[]
+  involvedPRs: InvolvedPRSummary[]
   hasAnyUnseenPRs: boolean
   activePR: PRCheckStatus | null
   setActivePR: (pr: PRCheckStatus | null) => void
@@ -471,7 +473,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       }
       setUnreadPRData(map)
     } catch {
-      // silently fail
+      toast.error('Failed to fetch unread PR notifications')
     }
   }, [])
 
@@ -541,7 +543,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           setNotifications(result.notifications)
         }
       } catch {
-        // silently fail
+        toast.error('Failed to fetch notifications')
       }
     }
     fetchNotifications()
@@ -898,7 +900,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           setMergedPRs(allPRs)
         }
       } catch {
-        // silently fail
+        toast.error('Failed to fetch merged PRs')
       }
     }
 
@@ -908,6 +910,36 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       cancelled = true
     }
   }, [repos, githubPRs])
+
+  // Fetch involved PRs (review-requested / mentioned) for all repos
+  const [involvedPRs, setInvolvedPRs] = useState<InvolvedPRSummary[]>([])
+
+  useEffect(() => {
+    if (repos.length === 0) {
+      setInvolvedPRs([])
+      return
+    }
+
+    let cancelled = false
+
+    async function fetchInvolvedPRs() {
+      try {
+        const limit = Math.min(repos.length * 10, 100)
+        const prs = await api.getInvolvedPRs(repos, limit)
+        if (!cancelled) {
+          setInvolvedPRs(prs)
+        }
+      } catch {
+        toast.error('Failed to fetch involved PRs')
+      }
+    }
+
+    fetchInvolvedPRs()
+
+    return () => {
+      cancelled = true
+    }
+  }, [repos])
 
   const selectTerminal = useCallback((id: number) => {
     storedTerminalId.current = id
@@ -1007,6 +1039,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       ghUsername,
       githubPRs: enrichedGithubPRs,
       mergedPRs,
+      involvedPRs,
       hasAnyUnseenPRs,
       activePR,
       setActivePR,
@@ -1036,6 +1069,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       ghUsername,
       enrichedGithubPRs,
       mergedPRs,
+      involvedPRs,
       hasAnyUnseenPRs,
       activePR,
       notifications,

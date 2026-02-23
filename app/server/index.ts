@@ -28,7 +28,9 @@ import {
   editPR,
   emitCachedPRChecks,
   fetchAllClosedPRs,
+  fetchInvolvedPRs,
   getGhUsername,
+  handleInvolvedPRWebhook,
   initGitHubChecks,
   mergePR,
   refreshPRChecks,
@@ -294,7 +296,8 @@ fastify.get<{
       repos = repos.filter((r) => r.toLowerCase().includes(query))
     }
     return { repos }
-  } catch {
+  } catch (err) {
+    log.error({ err }, '[github] Failed to fetch repos')
     return { repos: [] }
   }
 })
@@ -318,7 +321,8 @@ fastify.get<{
       { timeout: 10000 },
     )
     return { hasConductor: true }
-  } catch {
+  } catch (err) {
+    log.error({ err }, '[github] Failed to check conductor.json')
     return { hasConductor: false }
   }
 })
@@ -330,6 +334,15 @@ fastify.get<{
   const repos = (request.query.repos || '').split(',').filter(Boolean)
   const limit = Math.min(Number(request.query.limit) || 20, 100)
   return { prs: await fetchAllClosedPRs(repos, limit) }
+})
+
+// Involved PRs (review-requested or mentioned) across all repos
+fastify.get<{
+  Querystring: { repos?: string; limit?: string }
+}>('/api/github/involved-prs', async (request) => {
+  const repos = (request.query.repos || '').split(',').filter(Boolean)
+  const limit = Math.min(Number(request.query.limit) || 30, 100)
+  return { prs: await fetchInvolvedPRs(repos, limit) }
 })
 
 // Re-request PR review
@@ -641,7 +654,7 @@ fastify.post<{
     const prAuthor = body?.pull_request?.user?.login || body?.issue?.user?.login
     const currentUser = getGhUsername()
 
-    // Only process if it's our PR or we can't determine the author
+    // Process if it's our PR or we can't determine the author
     if (
       event === 'check_suite' ||
       !prAuthor ||
@@ -651,9 +664,11 @@ fastify.post<{
       log.info(`[webhooks] Received ${event} event for ${repo}`)
       applyWebhookAndRefresh(event, request.body as Record<string, unknown>)
     } else {
+      // Not our PR - check if we're involved (review requested / mentioned)
       log.info(
-        `[webhooks] Ignoring ${event} event for ${repo} (author: ${prAuthor}, not ${currentUser})`,
+        `[webhooks] Received ${event} event for ${repo} (author: ${prAuthor}, checking involvement)`,
       )
+      handleInvolvedPRWebhook(event, request.body as Record<string, unknown>)
     }
   }
 
@@ -799,7 +814,9 @@ function stopDaemon() {
   const sockPath = path.join(projectRoot, 'daemon.sock')
   try {
     fs.unlinkSync(sockPath)
-  } catch {}
+  } catch (err) {
+    log.error({ err }, '[daemon] Failed to clean up socket file')
+  }
 }
 
 process.on('exit', stopDaemon)

@@ -117,7 +117,7 @@ export function DirectoryBrowser({
         setColumns(newColumns)
         setInputPath(segments[segments.length - 1])
       } catch {
-        // Fallback: just show root
+        toast.error('Failed to load directory')
         setColumns([{ path: defaultRoot, selectedDir: null }])
         setInputPath(defaultRoot)
       }
