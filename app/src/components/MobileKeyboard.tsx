@@ -79,7 +79,7 @@ export function MobileKeyboard({
         .then((text) => {
           if (text) sendToTerminal(terminalId, text)
         })
-        .catch(() => {})
+        .catch(() => { })
       resetModifiers()
       return
     }
@@ -155,7 +155,7 @@ export function MobileKeyboard({
                     onPointerDown={(e) => e.preventDefault()}
                     onPointerUp={() => handleActionTap(actionId)}
                     className={cn(
-                      'px-3 py-1.5 rounded-md text-xs font-medium flex-shrink-0 select-none',
+                      'px-3 py-2.5 rounded-md text-xs font-medium flex-shrink-0 select-none',
                       isActive
                         ? 'bg-blue-600 text-white'
                         : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',

@@ -60,6 +60,15 @@ type ServerMessage = OutputMessage | ExitMessage | ErrorMessage | ReadyMessage
 // Track which shell each WebSocket is connected to
 const wsShellMap = new WeakMap<WebSocket, number>()
 
+// Track all connected clients per shell for broadcasting output
+const shellClients = new Map<number, Set<WebSocket>>()
+
+// The primary client controls PTY dimensions — first to connect, promoted on disconnect
+const shellPrimaryClient = new Map<number, WebSocket>()
+
+// Each client's last known dimensions (for promoting a new primary)
+const wsClientSize = new WeakMap<WebSocket, { cols: number; rows: number }>()
+
 // Debounce resize events to prevent shell redraw spam during drag
 const resizeTimers = new Map<number, ReturnType<typeof setTimeout>>()
 const RESIZE_DEBOUNCE_MS = 500
@@ -73,16 +82,22 @@ function sendMessage(ws: WebSocket, message: ServerMessage): void {
   }
 }
 
-// Batch rapid output chunks into a single message to reduce WebSocket overhead
+// Batch rapid output chunks into a single broadcast to all connected clients
 // (helps with TUI apps that emit many small writes)
-function createOutputBatcher(ws: WebSocket): (data: string) => void {
+function createBroadcastBatcher(shellId: number): (data: string) => void {
   let pending = ''
   let timer: ReturnType<typeof setTimeout> | null = null
 
   const flush = () => {
     timer = null
     if (pending) {
-      sendMessage(ws, { type: 'output', data: pending })
+      const msg: ServerMessage = { type: 'output', data: pending }
+      const clients = shellClients.get(shellId)
+      if (clients) {
+        for (const client of clients) {
+          sendMessage(client, msg)
+        }
+      }
       pending = ''
     }
   }
@@ -91,6 +106,16 @@ function createOutputBatcher(ws: WebSocket): (data: string) => void {
     pending += data
     if (!timer) {
       timer = setTimeout(flush, 4)
+    }
+  }
+}
+
+// Broadcast exit to all connected clients for a shell
+function broadcastExit(shellId: number, code: number): void {
+  const clients = shellClients.get(shellId)
+  if (clients) {
+    for (const client of clients) {
+      sendMessage(client, { type: 'exit', code })
     }
   }
 }
@@ -118,13 +143,29 @@ wss.on('connection', (ws: WebSocket) => {
           // Clear timeout since client reconnected
           clearSessionTimeout(shellId)
 
-          // Update callbacks to use the new WebSocket
-          const batchOutput = createOutputBatcher(ws)
-          attachSession(shellId, batchOutput, (code) => {
-            sendMessage(ws, { type: 'exit', code })
-          })
+          // Add this client to the shell's client set
+          let clients = shellClients.get(shellId)
+          const isFirstClient = !clients
+          if (!clients) {
+            // First client reconnecting — create the set and re-attach
+            // with broadcast callbacks
+            clients = new Set()
+            shellClients.set(shellId, clients)
+            const sid = shellId
+            const batchOutput = createBroadcastBatcher(sid)
+            attachSession(sid, batchOutput, (code) => {
+              broadcastExit(sid, code)
+            })
+          }
+          clients.add(ws)
+          wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
 
-          // Replay buffer
+          // First client becomes primary (controls PTY dimensions)
+          if (isFirstClient) {
+            shellPrimaryClient.set(shellId, ws)
+          }
+
+          // Replay buffer to this client only
           const buffer = getSessionBuffer(shellId)
           for (const data of buffer) {
             sendMessage(ws, { type: 'output', data })
@@ -133,23 +174,29 @@ wss.on('connection', (ws: WebSocket) => {
           // Send ready message
           sendMessage(ws, { type: 'ready' })
 
-          // Force PTY resize to client dimensions — sends SIGWINCH to all
-          // foreground processes (e.g. Zellij), triggering a full redraw.
-          // Without this, TUI apps show stale buffer content and don't
-          // respond to mouse/scroll after reconnection.
-          resizeSession(shellId, message.cols, message.rows)
+          // Only resize the PTY when this is the primary (first) client.
+          // Secondary clients observe at the primary's dimensions.
+          if (isFirstClient) {
+            resizeSession(shellId, message.cols, message.rows)
+          }
           return
         }
 
-        // Create new session
-        const batchOutput = createOutputBatcher(ws)
+        // Create new session — set up broadcast client set first
+        const sid = shellId
+        const clients = new Set<WebSocket>([ws])
+        shellClients.set(sid, clients)
+        shellPrimaryClient.set(sid, ws)
+        wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
+
+        const batchOutput = createBroadcastBatcher(sid)
         const session = await createSession(
-          shellId,
+          sid,
           message.cols,
           message.rows,
           batchOutput,
           (code) => {
-            sendMessage(ws, { type: 'exit', code })
+            broadcastExit(sid, code)
           },
         )
 
@@ -205,13 +252,21 @@ wss.on('connection', (ws: WebSocket) => {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
         }
+        const { cols, rows } = message
+        // Always track this client's latest dimensions
+        wsClientSize.set(ws, { cols, rows })
+
+        // Only the primary client can resize the PTY
+        if (shellPrimaryClient.get(shellId) !== ws) {
+          break
+        }
+
         // Debounce resize to prevent shell redraw spam during drag
         const sid = shellId
         const existingTimer = resizeTimers.get(sid)
         if (existingTimer) {
           clearTimeout(existingTimer)
         }
-        const { cols, rows } = message
         resizeTimers.set(
           sid,
           setTimeout(() => {
@@ -226,8 +281,25 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('close', () => {
     if (shellId !== null) {
-      // Start timeout - session will be killed after 30 minutes
-      startSessionTimeout(shellId)
+      // Remove this client from the shell's set
+      const clients = shellClients.get(shellId)
+      if (clients) {
+        clients.delete(ws)
+        if (clients.size === 0) {
+          // No clients left — clean up and start timeout
+          shellClients.delete(shellId)
+          shellPrimaryClient.delete(shellId)
+          startSessionTimeout(shellId)
+        } else if (shellPrimaryClient.get(shellId) === ws) {
+          // Primary disconnected — promote next client and resize PTY
+          const next = clients.values().next().value as WebSocket
+          shellPrimaryClient.set(shellId, next)
+          const size = wsClientSize.get(next)
+          if (size) {
+            resizeSession(shellId, size.cols, size.rows)
+          }
+        }
+      }
     }
   })
 
