@@ -70,7 +70,7 @@ function AppContent() {
     refetch,
   } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
-  const { subscribe } = useSocket()
+  const { subscribe, emit } = useSocket()
   const { sendNotification } = useNotifications()
   useActivePermissions()
   const { clearSession } = useSessionContext()
@@ -655,6 +655,27 @@ function AppContent() {
     return () =>
       navigator.serviceWorker?.removeEventListener('message', handler)
   }, [terminals, selectTerminal])
+
+  // Report user activity to server so push notifications are suppressed while active
+  useEffect(() => {
+    let lastEmit = 0
+    const THROTTLE_MS = 30_000
+    const handler = () => {
+      const now = Date.now()
+      if (now - lastEmit > THROTTLE_MS) {
+        lastEmit = now
+        emit('user:active')
+      }
+    }
+    window.addEventListener('mousemove', handler)
+    window.addEventListener('keydown', handler)
+    // Emit once on mount so the server knows we're here
+    emit('user:active')
+    return () => {
+      window.removeEventListener('mousemove', handler)
+      window.removeEventListener('keydown', handler)
+    }
+  }, [emit])
 
   // Auto-close mobile sidebar when navigating to a terminal or session
   const prevActiveTerminalId = useRef(activeTerminal?.id)

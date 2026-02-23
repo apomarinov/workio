@@ -4,6 +4,17 @@ import { getOrCreateVapidKeys, getSettings, updateSettings } from './db'
 import { log } from './logger'
 
 let initialized = false
+let lastActiveAt = 0
+
+const ACTIVE_TIMEOUT_MS = 60_000
+
+export function markUserActive(): void {
+  lastActiveAt = Date.now()
+}
+
+export function isUserActive(): boolean {
+  return Date.now() - lastActiveAt < ACTIVE_TIMEOUT_MS
+}
 
 export async function initWebPush(): Promise<void> {
   try {
@@ -22,6 +33,7 @@ export async function sendPushNotification(payload: {
   data?: Record<string, unknown>
 }): Promise<void> {
   if (!initialized) return
+  if (isUserActive()) return
 
   const settings = await getSettings()
   const subscriptions = settings.push_subscriptions

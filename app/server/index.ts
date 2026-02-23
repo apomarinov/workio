@@ -59,7 +59,7 @@ import {
   writeToSession,
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
-import { initWebPush } from './push'
+import { initWebPush, markUserActive } from './push'
 import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -232,6 +232,10 @@ io.on('connection', (socket) => {
       }
     },
   )
+
+  socket.on('user:active', () => {
+    markUserActive()
+  })
 
   socket.on('disconnect', () => {
     log.info(`Client disconnected: ${socket.id}`)
