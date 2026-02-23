@@ -295,9 +295,6 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       }
       // Non-modifier key while a modifier sequence is active
       if (active) {
-        if (consumed || heldNonModKeys.has(e.code)) return
-        heldNonModKeys.add(e.code)
-
         const h = handlersRef.current
         // On macOS, Alt+key produces special characters (e.g. Alt+A → å).
         // Use e.code to get the physical key when Alt is held.
@@ -305,6 +302,51 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           modifierBuffer.alt && e.code.startsWith('Key')
             ? e.code[3].toLowerCase()
             : e.key.toLowerCase()
+
+        // --- triggerWhenDetected shortcuts: fire on every discrete keypress,
+        //     bypass consumed gate so hold-modifier + tap-key works repeatedly.
+        //     Use e.repeat instead of heldNonModKeys because macOS swallows
+        //     keyup events while Cmd is held, making heldNonModKeys unreliable. ---
+        if (!e.repeat) {
+          const prevShellTWD =
+            prevShellBinding?.triggerWhenDetected ??
+            DEFAULT_KEYMAP.prevShell?.triggerWhenDetected
+          if (
+            prevShellTWD &&
+            h.prevShell &&
+            prevShellBinding?.key &&
+            modifiersMatchBinding(modifierBuffer, prevShellBinding) &&
+            key === prevShellBinding.key
+          ) {
+            e.preventDefault()
+            e.stopPropagation()
+            h.prevShell()
+            consumed = true
+            return
+          }
+
+          const nextShellTWD =
+            nextShellBinding?.triggerWhenDetected ??
+            DEFAULT_KEYMAP.nextShell?.triggerWhenDetected
+          if (
+            nextShellTWD &&
+            h.nextShell &&
+            nextShellBinding?.key &&
+            modifiersMatchBinding(modifierBuffer, nextShellBinding) &&
+            key === nextShellBinding.key
+          ) {
+            e.preventDefault()
+            e.stopPropagation()
+            h.nextShell()
+            consumed = true
+            return
+          }
+        }
+
+        // --- Regular shortcuts: use heldNonModKeys + consumed gate ---
+        if (heldNonModKeys.has(e.code) || consumed) return
+        heldNonModKeys.add(e.code)
+
         keyBuffer.push(key)
 
         // Check palette: modifiers + accumulated keys match binding
@@ -452,8 +494,12 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           return
         }
 
-        // Check prevShell
+        // Check prevShell (non-triggerWhenDetected fallback)
         if (
+          !(
+            prevShellBinding?.triggerWhenDetected ??
+            DEFAULT_KEYMAP.prevShell?.triggerWhenDetected
+          ) &&
           h.prevShell &&
           prevShellBinding &&
           prevShellBinding.key &&
@@ -468,8 +514,12 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           return
         }
 
-        // Check nextShell
+        // Check nextShell (non-triggerWhenDetected fallback)
         if (
+          !(
+            nextShellBinding?.triggerWhenDetected ??
+            DEFAULT_KEYMAP.nextShell?.triggerWhenDetected
+          ) &&
           h.nextShell &&
           nextShellBinding &&
           nextShellBinding.key &&

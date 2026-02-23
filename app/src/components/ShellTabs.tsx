@@ -289,7 +289,7 @@ function SortableShellTab({
       type="button"
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 max-w-[150px]',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[150px]',
         position === 'top' ? 'border-t-2' : 'border-b-2',
         hasActivity
           ? isActive
@@ -304,7 +304,7 @@ function SortableShellTab({
       )}
     >
       {shellSession && <ShellSessionIcon session={shellSession} />}
-      <span className="truncate relative">
+      <span className="truncate relative w-full text-center">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
         </span>

@@ -286,6 +286,8 @@ export interface ShortcutBinding {
   altKey?: boolean
   shiftKey?: boolean
   key?: string
+  /** Fire on every keydown instead of buffering; allows hold-modifier + tap-key repeatedly */
+  triggerWhenDetected?: boolean
 }
 
 export interface Keymap {
@@ -310,8 +312,8 @@ export const DEFAULT_KEYMAP: Keymap = {
   goToTab: { metaKey: true },
   goToLastTab: { metaKey: true, shiftKey: true },
   goToShell: { altKey: true },
-  prevShell: { metaKey: true, key: '[' },
-  nextShell: { metaKey: true, key: ']' },
+  prevShell: { metaKey: true, key: '[', triggerWhenDetected: true },
+  nextShell: { metaKey: true, key: ']', triggerWhenDetected: true },
   togglePip: { metaKey: true, key: 'p' },
   itemActions: { metaKey: true, key: 'i' },
   collapseAll: { metaKey: true, key: 'arrowup' },
