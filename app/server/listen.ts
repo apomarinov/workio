@@ -108,7 +108,7 @@ export async function initPgListener(
             ? await getTerminalById(payload.terminal_id)
             : null
           sendPushNotification({
-            title: 'Permission Required',
+            title: '⚠️ Permission Required',
             body: `"${terminal?.name || 'Terminal'}" needs permissions`,
             data: {
               type: 'permission_needed',
@@ -125,7 +125,7 @@ export async function initPgListener(
             ? await getTerminalById(payload.terminal_id)
             : null
           sendPushNotification({
-            title: 'Done',
+            title: '✅ Done',
             body: `"${terminal?.name || 'Terminal'}" has finished`,
             data: {
               type: 'stop',

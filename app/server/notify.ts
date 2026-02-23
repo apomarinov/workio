@@ -7,48 +7,48 @@ const TYPE_TO_PUSH: Record<
   (data: Record<string, unknown>) => { title: string; body: string }
 > = {
   pr_merged: (d) => ({
-    title: 'PR Merged',
+    title: '✅ Merged',
     body: `${d.prTitle}`,
   }),
   pr_closed: (d) => ({
-    title: 'PR Closed',
+    title: '🚫 Closed',
     body: `${d.prTitle}`,
   }),
   check_failed: (d) => ({
-    title: 'Check Failed',
-    body: `${d.checkName || 'CI'} failed on ${d.prTitle}`,
+    title: '❌ Check Failed',
+    body: `${d.checkName || 'CI'} - ${d.prTitle}`,
   }),
   checks_passed: (d) => ({
-    title: 'Checks Passed',
-    body: `All checks passed on ${d.prTitle}`,
+    title: '✅ All Checks Passed',
+    body: `${d.prTitle}`,
   }),
   changes_requested: (d) => ({
-    title: 'Changes Requested',
-    body: `${d.reviewer} requested changes on ${d.prTitle}`,
+    title: '🔄 Changes Requested',
+    body: `${d.reviewer} on ${d.prTitle}`,
   }),
   pr_approved: (d) => ({
-    title: 'PR Approved',
-    body: `${d.approver} approved ${d.prTitle}`,
+    title: '✅ Approved',
+    body: `${d.approver ? `${d.approver} approved ${d.prTitle}` : `${d.prTitle}`}`,
   }),
   new_comment: (d) => ({
-    title: 'New Comment',
-    body: `${d.author} commented on ${d.prTitle}`,
+    title: `💬 ${d.author || 'Someone'}`,
+    body: `${d.body || d.prTitle}`,
   }),
   new_review: (d) => ({
-    title: 'New Review',
-    body: `${d.author} reviewed ${d.prTitle}`,
+    title: `👁️ ${d.author || 'Someone'}`,
+    body: `${d.body || d.prTitle}`,
   }),
   workspace_ready: (d) => ({
-    title: 'Workspace Ready',
+    title: '✅ Workspace Ready',
     body: `${d.name || 'Workspace'} is ready`,
   }),
   workspace_failed: (d) => ({
-    title: 'Workspace Failed',
-    body: `${d.name || 'Workspace'} setup failed`,
+    title: '❌ Workspace Failed',
+    body: `${d.name || 'Workspace'} failed`,
   }),
   workspace_deleted: (d) => ({
-    title: 'Workspace Deleted',
-    body: `${d.name || 'Workspace'} was deleted`,
+    title: '✅ Workspace Deleted',
+    body: `${d.name || 'Workspace'} deleted`,
   }),
 }
 
