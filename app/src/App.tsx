@@ -34,6 +34,7 @@ import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useActivePermissions } from './hooks/useActivePermissions'
+import { useActiveShells } from './hooks/useActiveShells'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useIsMobile } from './hooks/useMediaQuery'
@@ -117,81 +118,10 @@ function AppContent() {
   }, [])
 
   // Multi-shell state
-  const storedShells = useRef<Record<number, number>>(
-    (() => {
-      try {
-        const saved = localStorage.getItem('active-shells')
-        return saved ? JSON.parse(saved) : {}
-      } catch {
-        return {}
-      }
-    })(),
-  )
-  const [_activeShells, _setActiveShells] = useState<Record<number, number>>({})
-  const setActiveShells = (
-    value:
-      | Record<number, number>
-      | ((prev: Record<number, number>) => Record<number, number>),
-  ) => {
-    _setActiveShells((prev) => {
-      const next = value instanceof Function ? value(prev) : value
-      storedShells.current = { ...storedShells.current, ...next }
-      return next
-    })
-  }
-  // Derive: prefer stored shell ID if it still exists in the terminal
-  const activeShells: Record<number, number> = {}
-  for (const t of terminals) {
-    const storedId = storedShells.current[t.id]
-    const stateId = _activeShells[t.id]
-    if (storedId && t.shells.some((s) => s.id === storedId)) {
-      activeShells[t.id] = storedId
-    } else if (stateId) {
-      activeShells[t.id] = stateId
-    }
-  }
-  // Persist to localStorage
-  useEffect(() => {
-    localStorage.setItem('active-shells', JSON.stringify(activeShells))
-    storedShells.current = activeShells
-  })
-  const activeShellsRef = useRef(activeShells)
-  activeShellsRef.current = activeShells
-
-  // Track previous active shell per terminal so we can restore it when switching back
-  const prevActiveTerminalIdRef = useRef<number | null>(
+  const { activeShells, activeShellsRef, setShell } = useActiveShells(
+    terminals,
     activeTerminal?.id ?? null,
   )
-  const previousShellPerTerminal = useRef<Record<number, number>>({})
-
-  useEffect(() => {
-    const prevTid = prevActiveTerminalIdRef.current
-    const newTid = activeTerminal?.id ?? null
-
-    if (prevTid !== null && prevTid !== newTid) {
-      // Save outgoing terminal's active shell
-      const shellId = activeShellsRef.current[prevTid]
-      if (shellId) previousShellPerTerminal.current[prevTid] = shellId
-    }
-
-    if (newTid !== null && newTid !== prevTid) {
-      // Restore incoming terminal's previous shell
-      const prevShellId = previousShellPerTerminal.current[newTid]
-      if (prevShellId) {
-        const terminal = terminalsRef.current.find((t) => t.id === newTid)
-        if (terminal?.shells.some((s) => s.id === prevShellId)) {
-          setActiveShells((prev) => ({ ...prev, [newTid]: prevShellId }))
-          window.dispatchEvent(
-            new CustomEvent('shell-select', {
-              detail: { terminalId: newTid, shellId: prevShellId },
-            }),
-          )
-        }
-      }
-    }
-
-    prevActiveTerminalIdRef.current = newTid
-  }, [activeTerminal?.id])
 
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
   const [tabsTop] = useLocalStorage('shell-tabs-top', true)
@@ -216,33 +146,11 @@ function AppContent() {
     return () => clearInterval(id)
   }, [activeShells, markShellActive])
 
-  // Clean up stale activeShells entries when terminals/shells change
-  useEffect(() => {
-    setActiveShells((prev) => {
-      const next = { ...prev }
-      let changed = false
-      for (const [tidStr, shellId] of Object.entries(next)) {
-        const tid = Number(tidStr)
-        const terminal = terminals.find((t) => t.id === tid)
-        if (!terminal || !terminal.shells.some((s) => s.id === shellId)) {
-          const main = terminal?.shells.find((s) => s.name === 'main')
-          if (main) {
-            next[tid] = main.id
-          } else {
-            delete next[tid]
-          }
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-  }, [terminals])
-
   const handleCreateShell = async (terminalId: number) => {
     try {
       const shell = await createShellForTerminal(terminalId)
       await refetch()
-      setActiveShells((prev) => ({ ...prev, [terminalId]: shell.id }))
+      setShell(terminalId, shell.id)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create shell')
     }
@@ -270,7 +178,7 @@ function AppContent() {
         remaining.find((s) => s.name === 'main') ??
         remaining[0]
 
-      setActiveShells((prev) => ({ ...prev, [terminalId]: nextShell.id }))
+      setShell(terminalId, nextShell.id)
       window.dispatchEvent(
         new CustomEvent('shell-select', {
           detail: { terminalId, shellId: nextShell.id },
@@ -346,7 +254,7 @@ function AppContent() {
 
       // 8. Set active shell to main
       if (mainShell) {
-        setActiveShells((prev) => ({ ...prev, [terminalId]: mainShell.id }))
+        setShell(terminalId, mainShell.id)
       }
 
       toast.success(`Template "${template.name}" started`)
@@ -372,10 +280,7 @@ function AppContent() {
     const onSelect = (
       e: CustomEvent<{ terminalId: number; shellId: number }>,
     ) => {
-      setActiveShells((prev) => ({
-        ...prev,
-        [e.detail.terminalId]: e.detail.shellId,
-      }))
+      setShell(e.detail.terminalId, e.detail.shellId)
     }
     const onCreate = (e: CustomEvent<{ terminalId: number }>) => {
       handleCreateShellRef.current(e.detail.terminalId)
@@ -445,7 +350,7 @@ function AppContent() {
       const shells = getSortedShells(t)
       const shell = shells[index - 1]
       if (shell) {
-        setActiveShells((prev) => ({ ...prev, [t.id]: shell.id }))
+        setShell(t.id, shell.id)
         window.dispatchEvent(
           new CustomEvent('shell-select', {
             detail: { terminalId: t.id, shellId: shell.id },
@@ -461,7 +366,7 @@ function AppContent() {
       const idx = shells.findIndex((s) => s.id === currentId)
       const prev = idx > 0 ? shells[idx - 1] : shells[shells.length - 1]
       if (prev) {
-        setActiveShells((p) => ({ ...p, [t.id]: prev.id }))
+        setShell(t.id, prev.id)
         window.dispatchEvent(
           new CustomEvent('shell-select', {
             detail: { terminalId: t.id, shellId: prev.id },
@@ -477,7 +382,7 @@ function AppContent() {
       const idx = shells.findIndex((s) => s.id === currentId)
       const next = idx < shells.length - 1 ? shells[idx + 1] : shells[0]
       if (next) {
-        setActiveShells((p) => ({ ...p, [t.id]: next.id }))
+        setShell(t.id, next.id)
         window.dispatchEvent(
           new CustomEvent('shell-select', {
             detail: { terminalId: t.id, shellId: next.id },
@@ -603,10 +508,7 @@ function AppContent() {
       const navigateToSession = () => {
         if (terminal && data.shell_id) {
           selectTerminal(terminal.id)
-          setActiveShells((prev) => ({
-            ...prev,
-            [terminal.id]: data.shell_id!,
-          }))
+          setShell(terminal.id, data.shell_id!)
           window.dispatchEvent(
             new CustomEvent('shell-select', {
               detail: { terminalId: terminal.id, shellId: data.shell_id },
@@ -668,10 +570,7 @@ function AppContent() {
 
       if (terminal && shellId) {
         selectTerminal(terminal.id)
-        setActiveShells((prev) => ({
-          ...prev,
-          [terminal.id]: shellId,
-        }))
+        setShell(terminal.id, shellId)
         window.dispatchEvent(
           new CustomEvent('shell-select', {
             detail: { terminalId: terminal.id, shellId },
@@ -810,12 +709,7 @@ function AppContent() {
               <ShellTabs
                 terminal={t}
                 activeShellId={activeShellId}
-                onSelectShell={(shellId) =>
-                  setActiveShells((prev) => ({
-                    ...prev,
-                    [t.id]: shellId,
-                  }))
-                }
+                onSelectShell={(shellId) => setShell(t.id, shellId)}
                 onCreateShell={() => handleCreateShell(t.id)}
                 onDeleteShell={(shellId) => handleDeleteShell(t.id, shellId)}
                 onRenameShell={handleRenameShell}
@@ -866,12 +760,7 @@ function AppContent() {
                     <ShellTabs
                       terminal={t}
                       activeShellId={activeShellId}
-                      onSelectShell={(shellId) =>
-                        setActiveShells((prev) => ({
-                          ...prev,
-                          [t.id]: shellId,
-                        }))
-                      }
+                      onSelectShell={(shellId) => setShell(t.id, shellId)}
                       onCreateShell={() => handleCreateShell(t.id)}
                       onDeleteShell={(shellId) =>
                         handleDeleteShell(t.id, shellId)
