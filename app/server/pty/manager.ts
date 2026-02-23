@@ -1452,6 +1452,25 @@ export function interruptSession(shellId: number): void {
   }
 }
 
+export async function killShellChildren(shellId: number): Promise<boolean> {
+  const session = sessions.get(shellId)
+  if (!session) return false
+
+  const shellPid = session.pty.pid
+  if (!shellPid || shellPid <= 0) return false
+
+  // Kill direct children of the shell, not the shell itself
+  const childPids = await getChildPids(shellPid)
+  for (const cpid of childPids) {
+    try {
+      process.kill(cpid, 'SIGKILL')
+    } catch {
+      // Already dead
+    }
+  }
+  return childPids.length > 0
+}
+
 export function cancelWaitForMarker(shellId: number): void {
   const session = sessions.get(shellId)
   if (session?.onDoneMarker) {

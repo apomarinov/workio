@@ -172,6 +172,7 @@ import {
   destroySessionsForTerminal,
   detectGitBranch,
   interruptSession,
+  killShellChildren,
   renameZellijSession,
   updateSessionName,
   waitForSession,
@@ -2555,6 +2556,25 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       interruptSession(id)
+      return { success: true }
+    },
+  )
+
+  // Kill all child processes in a shell (SIGKILL to direct children)
+  fastify.post<{ Params: { id: string } }>(
+    '/api/shells/:id/kill',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid shell id' })
+      }
+
+      const shell = await getShellById(id)
+      if (!shell) {
+        return reply.status(404).send({ error: 'Shell not found' })
+      }
+
+      killShellChildren(id)
       return { success: true }
     },
   )

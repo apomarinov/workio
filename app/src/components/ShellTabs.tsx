@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   AlertTriangle,
+  Ban,
   Bot,
   CheckIcon,
   ChevronDown,
@@ -43,6 +44,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
@@ -50,6 +52,7 @@ import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
+import { killShell } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type {
   SessionWithProject,
@@ -342,6 +345,7 @@ export function ShellTabs({
 }: ShellTabsProps) {
   const { processes } = useProcessContext()
   const { sessions } = useSessionContext()
+
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
 
   // Map shell_id -> most recent non-ended session for this terminal
@@ -374,6 +378,7 @@ export function ShellTabs({
     'shell-order',
     {},
   )
+  const [killAllConfirm, setKillAllConfirm] = useState(false)
   const [deleteShellId, setDeleteShellId] = useState<number | null>(null)
   const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -506,6 +511,17 @@ export function ShellTabs({
         >
           <Plus className="w-3.5 h-3.5" />
           New Shell
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive"
+          onClick={() => {
+            setKillAllConfirm(true)
+            setMenuOpen(false)
+          }}
+        >
+          <Ban className="w-3.5 h-3.5" />
+          Kill All
         </button>
         <div className="my-1 h-px bg-border" />
         <div className="flex items-center justify-between px-2 py-1">
@@ -724,9 +740,9 @@ export function ShellTabs({
           {/* >=400px: tabs (always on mobile) */}
           <div
             className={cn(
-              '@[400px]/shells:flex items-center',
+              '@[400px]/shells:flex items-center gap-1',
               isMobile ? 'flex' : 'hidden',
-              wrap ? 'flex-wrap gap-0.5' : 'overflow-x-auto',
+              wrap ? 'flex-wrap' : 'overflow-x-auto',
             )}
           >
             <DndContext
@@ -829,6 +845,21 @@ export function ShellTabs({
           {rightExtra}
         </div>
       </div>
+      <ConfirmModal
+        open={killAllConfirm}
+        title="Kill All Processes"
+        message={`This will send Ctrl+C to all ${terminal.shells.length} shell(s) in this terminal.`}
+        confirmLabel="Kill All"
+        variant="danger"
+        onConfirm={() => {
+          for (const shell of terminal.shells) {
+            killShell(shell.id).catch(() => {})
+          }
+          toast(`Killed processes in ${terminal.shells.length} shell(s)`)
+          setKillAllConfirm(false)
+        }}
+        onCancel={() => setKillAllConfirm(false)}
+      />
       <ConfirmModal
         open={deleteShellId !== null}
         title="Delete Shell"

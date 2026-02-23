@@ -962,6 +962,16 @@ export async function interruptShell(shellId: number): Promise<void> {
   }
 }
 
+export async function killShell(shellId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/shells/${shellId}/kill`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const result = await res.json()
+    throw new Error(result.error || 'Failed to kill shell processes')
+  }
+}
+
 export async function renameShell(
   shellId: number,
   name: string,
