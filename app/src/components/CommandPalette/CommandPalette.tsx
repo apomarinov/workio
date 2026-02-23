@@ -187,6 +187,24 @@ export function CommandPalette() {
     return () => window.removeEventListener('open-palette', handler)
   }, [])
 
+  // Listen for open-shell-templates event (dispatched from keyboard shortcut)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number }>) => {
+      const terminal = terminals.find((t) => t.id === e.detail.terminalId)
+      setStack([
+        initialLevel,
+        { mode: 'shell-templates', title: 'Shell Templates', terminal },
+      ])
+      setOpen(true)
+    }
+    window.addEventListener('open-shell-templates', handler as EventListener)
+    return () =>
+      window.removeEventListener(
+        'open-shell-templates',
+        handler as EventListener,
+      )
+  }, [terminals])
+
   // Listen for open-file-picker event (dispatched from shell tab context menu)
   useEffect(() => {
     const handler = (e: CustomEvent<{ terminal: Terminal }>) => {
@@ -876,13 +894,12 @@ export function CommandPalette() {
         )
       },
       runTemplate: (template) => {
-        // Find the active terminal from current palette context or first terminal
         const terminalId = currentLevel.terminal?.id ?? terminals[0]?.id
         if (terminalId == null) return
         closePalette()
         setTimeout(() => {
           window.dispatchEvent(
-            new CustomEvent('shell-template-run', {
+            new CustomEvent('shell-template-request', {
               detail: { terminalId, template },
             }),
           )

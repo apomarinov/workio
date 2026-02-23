@@ -175,6 +175,7 @@ interface KeymapHandlers {
   closeShell?: () => void
   commitAmend?: () => void
   commitNoVerify?: () => void
+  shellTemplates?: () => void
 }
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
@@ -258,6 +259,10 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     settings?.keymap?.commitNoVerify === null
       ? null
       : (settings?.keymap?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
+  const shellTemplatesBinding =
+    settings?.keymap?.shellTemplates === null
+      ? null
+      : (settings?.keymap?.shellTemplates ?? DEFAULT_KEYMAP.shellTemplates)
 
   useEffect(() => {
     let modifierBuffer: ModifierBuffer = {
@@ -494,6 +499,22 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           return
         }
 
+        // Check shellTemplates
+        if (
+          h.shellTemplates &&
+          shellTemplatesBinding &&
+          shellTemplatesBinding.key &&
+          modifiersMatchBinding(modifierBuffer, shellTemplatesBinding) &&
+          keyBuffer.join('') === shellTemplatesBinding.key
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          h.shellTemplates()
+          consumed = true
+          suppressModifiers()
+          return
+        }
+
         // Check prevShell (non-triggerWhenDetected fallback)
         if (
           !(
@@ -663,6 +684,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     closeShellBinding,
     commitAmendBinding,
     commitNoVerifyBinding,
+    shellTemplatesBinding,
     pip.window,
   ])
 }

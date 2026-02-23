@@ -118,6 +118,7 @@ type ShortcutName =
   | 'closeShell'
   | 'commitAmend'
   | 'commitNoVerify'
+  | 'shellTemplates'
 
 // Pairs that intentionally share a binding (context-dependent shortcuts)
 const ALLOWED_DUPLICATE_PAIRS = new Set([
@@ -210,6 +211,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const [commitNoVerify, setCommitNoVerify] = useState<ShortcutBinding | null>(
     DEFAULT_KEYMAP.commitNoVerify,
   )
+  const [shellTemplates, setShellTemplates] = useState<ShortcutBinding | null>(
+    DEFAULT_KEYMAP.shellTemplates,
+  )
   const [recording, setRecording] = useState<ShortcutName | null>(null)
   const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -233,6 +237,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     const savedCommitAmend = saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend
     const savedCommitNoVerify =
       saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify
+    const savedShellTemplates =
+      saved?.shellTemplates ?? DEFAULT_KEYMAP.shellTemplates
 
     return (
       !bindingsEqual(palette, savedPalette) ||
@@ -248,7 +254,8 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       !bindingsEqual(newShell, savedNewShell) ||
       !bindingsEqual(closeShell, savedCloseShell) ||
       !bindingsEqual(commitAmend, savedCommitAmend) ||
-      !bindingsEqual(commitNoVerify, savedCommitNoVerify)
+      !bindingsEqual(commitNoVerify, savedCommitNoVerify) ||
+      !bindingsEqual(shellTemplates, savedShellTemplates)
     )
   }, [
     settings?.keymap,
@@ -266,6 +273,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     closeShell,
     commitAmend,
     commitNoVerify,
+    shellTemplates,
   ])
 
   const handleClose = (newOpen: boolean) => {
@@ -294,6 +302,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setCloseShell(saved?.closeShell ?? DEFAULT_KEYMAP.closeShell)
     setCommitAmend(saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend)
     setCommitNoVerify(saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
+    setShellTemplates(saved?.shellTemplates ?? DEFAULT_KEYMAP.shellTemplates)
     onOpenChange(false)
   }
 
@@ -336,6 +345,9 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       }
       if (settings.keymap.commitNoVerify !== undefined) {
         setCommitNoVerify(settings.keymap.commitNoVerify)
+      }
+      if (settings.keymap.shellTemplates !== undefined) {
+        setShellTemplates(settings.keymap.shellTemplates)
       }
     }
   }, [settings?.keymap])
@@ -418,6 +430,11 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           binding.key = keyBuffer.join('')
         }
         setCommitNoVerify(binding)
+      } else if (recording === 'shellTemplates') {
+        if (keyBuffer.length > 0) {
+          binding.key = keyBuffer.join('')
+        }
+        setShellTemplates(binding)
       }
 
       setRecording(null)
@@ -536,6 +553,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           closeShell,
           commitAmend,
           commitNoVerify,
+          shellTemplates,
         },
       })
       toast.success('Keyboard shortcuts saved')
@@ -564,6 +582,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     setCloseShell(DEFAULT_KEYMAP.closeShell)
     setCommitAmend(DEFAULT_KEYMAP.commitAmend)
     setCommitNoVerify(DEFAULT_KEYMAP.commitNoVerify)
+    setShellTemplates(DEFAULT_KEYMAP.shellTemplates)
     setRecording(null)
   }
 
@@ -585,6 +604,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         closeShell,
         commitAmend,
         commitNoVerify,
+        shellTemplates,
       }),
     [
       palette,
@@ -601,6 +621,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       closeShell,
       commitAmend,
       commitNoVerify,
+      shellTemplates,
     ],
   )
 
@@ -794,6 +815,24 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               hasConflict={duplicates.has('settings')}
               defaultBinding={DEFAULT_KEYMAP.settings}
               display={formatBinding(settingsShortcut)}
+            />
+            <ShortcutRow
+              label="Shell Templates"
+              binding={shellTemplates}
+              isRecording={recording === 'shellTemplates'}
+              recordingKeys={
+                recording === 'shellTemplates' ? recordingKeys : []
+              }
+              onRecord={() =>
+                setRecording(
+                  recording === 'shellTemplates' ? null : 'shellTemplates',
+                )
+              }
+              onReset={() => setShellTemplates(DEFAULT_KEYMAP.shellTemplates)}
+              onUnset={() => setShellTemplates(null)}
+              hasConflict={duplicates.has('shellTemplates')}
+              defaultBinding={DEFAULT_KEYMAP.shellTemplates}
+              display={formatBinding(shellTemplates)}
             />
 
             <div className="pt-2 border-t border-zinc-700">

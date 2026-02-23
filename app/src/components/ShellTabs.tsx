@@ -493,6 +493,22 @@ export function ShellTabs({
     }
   }
 
+  // Listen for external template-run requests (e.g. from command palette)
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number; template: ShellTemplate }>,
+    ) => {
+      if (e.detail.terminalId !== terminal.id) return
+      handleRunTemplate(e.detail.template)
+    }
+    window.addEventListener('shell-template-request', handler as EventListener)
+    return () =>
+      window.removeEventListener(
+        'shell-template-request',
+        handler as EventListener,
+      )
+  })
+
   const confirmRunTemplate = () => {
     if (runTemplateTarget) {
       runTemplate(runTemplateTarget)

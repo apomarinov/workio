@@ -297,7 +297,12 @@ export function MobileKeyboardNewGroup({
                     </button>
                   )}
                 </div>
-                <div className={cn("flex flex-wrap gap-1", group.category === 'custom' && 'gap-3')}>
+                <div
+                  className={cn(
+                    'flex flex-wrap gap-1',
+                    group.category === 'custom' && 'gap-3',
+                  )}
+                >
                   {group.actions.map((action) => {
                     const isSelected = selected.includes(action.id)
                     const customAction =

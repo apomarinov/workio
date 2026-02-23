@@ -305,6 +305,7 @@ export interface Keymap {
   closeShell: ShortcutBinding | null
   commitAmend: ShortcutBinding | null
   commitNoVerify: ShortcutBinding | null
+  shellTemplates: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -322,6 +323,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   closeShell: { altKey: true, key: 'w' },
   commitAmend: { altKey: true, key: 'a' },
   commitNoVerify: { altKey: true, key: 'n' },
+  shellTemplates: { shiftKey: true, altKey: true, key: 'k' },
 }
 
 export interface RepoWebhookStatus {

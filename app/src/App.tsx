@@ -508,6 +508,15 @@ function AppContent() {
     commitNoVerify: () => {
       window.dispatchEvent(new Event('commit-toggle-no-verify'))
     },
+    shellTemplates: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      window.dispatchEvent(
+        new CustomEvent('open-shell-templates', {
+          detail: { terminalId: t.id },
+        }),
+      )
+    },
   })
 
   // Example: Change favicon based on session status
