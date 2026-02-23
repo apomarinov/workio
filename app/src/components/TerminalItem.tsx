@@ -140,18 +140,11 @@ export const TerminalItem = memo(function TerminalItem({
         setSidebarActiveShellId(e.detail.shellId)
       }
     }
-    const resetHandler = (e: CustomEvent<{ terminalId: number }>) => {
-      if (e.detail.terminalId === terminal.id && mainShell) {
-        setSidebarActiveShellId(mainShell.id)
-      }
-    }
     window.addEventListener('shell-select', handler as EventListener)
-    window.addEventListener('shell-reset', resetHandler as EventListener)
     return () => {
       window.removeEventListener('shell-select', handler as EventListener)
-      window.removeEventListener('shell-reset', resetHandler as EventListener)
     }
-  }, [terminal.id, mainShell?.id])
+  }, [terminal.id])
 
   const [activeTab, _setActiveTab] = useState<
     'processes' | 'ports' | 'prs' | null
@@ -215,13 +208,6 @@ export const TerminalItem = memo(function TerminalItem({
         onClick={() => {
           selectTerminal(terminal.id)
           clearSession()
-          // Reset to main shell when clicking terminal item
-          window.dispatchEvent(
-            new CustomEvent('shell-reset', {
-              detail: { terminalId: terminal.id },
-            }),
-          )
-          if (mainShell) setSidebarActiveShellId(mainShell.id)
           if (!sessionsExpanded && !isSettingUp && !isDeleting) {
             onToggleTerminalSessions?.(terminal.id)
           }

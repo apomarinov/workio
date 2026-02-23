@@ -157,6 +157,42 @@ function AppContent() {
   })
   const activeShellsRef = useRef(activeShells)
   activeShellsRef.current = activeShells
+
+  // Track previous active shell per terminal so we can restore it when switching back
+  const prevActiveTerminalIdRef = useRef<number | null>(
+    activeTerminal?.id ?? null,
+  )
+  const previousShellPerTerminal = useRef<Record<number, number>>({})
+
+  useEffect(() => {
+    const prevTid = prevActiveTerminalIdRef.current
+    const newTid = activeTerminal?.id ?? null
+
+    if (prevTid !== null && prevTid !== newTid) {
+      // Save outgoing terminal's active shell
+      const shellId = activeShellsRef.current[prevTid]
+      if (shellId) previousShellPerTerminal.current[prevTid] = shellId
+    }
+
+    if (newTid !== null && newTid !== prevTid) {
+      // Restore incoming terminal's previous shell
+      const prevShellId = previousShellPerTerminal.current[newTid]
+      if (prevShellId) {
+        const terminal = terminalsRef.current.find((t) => t.id === newTid)
+        if (terminal?.shells.some((s) => s.id === prevShellId)) {
+          setActiveShells((prev) => ({ ...prev, [newTid]: prevShellId }))
+          window.dispatchEvent(
+            new CustomEvent('shell-select', {
+              detail: { terminalId: newTid, shellId: prevShellId },
+            }),
+          )
+        }
+      }
+    }
+
+    prevActiveTerminalIdRef.current = newTid
+  }, [activeTerminal?.id])
+
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
   const [tabsTop] = useLocalStorage('shell-tabs-top', true)
   const isMobile = useIsMobile()
@@ -352,29 +388,16 @@ function AppContent() {
     const onRename = (e: CustomEvent<{ shellId: number; name: string }>) => {
       handleRenameShellRef.current(e.detail.shellId, e.detail.name)
     }
-    const onReset = (e: CustomEvent<{ terminalId: number }>) => {
-      const terminal = terminalsRef.current.find(
-        (t) => t.id === e.detail.terminalId,
-      )
-      const main = terminal?.shells.find((s) => s.name === 'main')
-      if (main)
-        setActiveShells((prev) => ({
-          ...prev,
-          [e.detail.terminalId]: main.id,
-        }))
-    }
 
     window.addEventListener('shell-select', onSelect as EventListener)
     window.addEventListener('shell-create', onCreate as EventListener)
     window.addEventListener('shell-delete', onDelete as EventListener)
     window.addEventListener('shell-rename', onRename as EventListener)
-    window.addEventListener('shell-reset', onReset as EventListener)
     return () => {
       window.removeEventListener('shell-select', onSelect as EventListener)
       window.removeEventListener('shell-create', onCreate as EventListener)
       window.removeEventListener('shell-delete', onDelete as EventListener)
       window.removeEventListener('shell-rename', onRename as EventListener)
-      window.removeEventListener('shell-reset', onReset as EventListener)
     }
   }, [])
 
