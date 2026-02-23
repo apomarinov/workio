@@ -33,7 +33,7 @@ export function OlderMergedPRsList({ olderPRs }: OlderMergedPRsListProps) {
             !expanded && '-rotate-90',
           )}
         />
-        <span>Show More</span>
+        <span>Older PRs</span>
       </button>
       {expanded &&
         olderPRs.map((pr) => (
@@ -88,7 +88,7 @@ export function InvolvedPRsList({ prs }: InvolvedPRsListProps) {
             !expanded && '-rotate-90',
           )}
         />
-        <span>Involved</span>
+        <span>Involved PRs</span>
       </button>
       {expanded &&
         prs.map((pr) => (

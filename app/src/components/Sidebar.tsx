@@ -1080,13 +1080,13 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                                   </div>
                                 </a>
                               ))}
+                            <InvolvedPRsList
+                              prs={involvedPRsByRepo.get(repo) ?? []}
+                            />
                             <OlderMergedPRsList
                               olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(
                                 3,
                               )}
-                            />
-                            <InvolvedPRsList
-                              prs={involvedPRsByRepo.get(repo) ?? []}
                             />
                           </>
                         )}

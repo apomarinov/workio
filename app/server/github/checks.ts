@@ -937,54 +937,72 @@ export async function fetchAllClosedPRs(
 ): Promise<MergedPRSummary[]> {
   if (repos.length === 0) return []
 
-  const author = ghUsername || 'unknown'
-  const results: MergedPRSummary[] = []
-
-  await Promise.all(
-    repos.map(async (repoKey) => {
-      const perPage = Math.min(limit, 100)
-      const stdout = await execFileAsync(
-        'gh',
-        [
-          'api',
-          `repos/${repoKey}/pulls?state=closed&per_page=${perPage}&sort=updated&direction=desc`,
-        ],
-        { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
-      )
-
-      if (!stdout) return
-
-      try {
-        const prs = JSON.parse(stdout) as Array<{
-          number: number
-          title: string
-          html_url: string
-          head: { ref: string }
-          merged_at: string | null
-          user?: { login?: string }
-        }>
-
-        for (const pr of prs) {
-          if (pr.user?.login !== author) continue
-          results.push({
-            prNumber: pr.number,
-            prTitle: pr.title,
-            prUrl: pr.html_url,
-            branch: pr.head?.ref || '',
-            repo: repoKey,
-            state: pr.merged_at ? 'MERGED' : 'CLOSED',
-          })
-        }
-      } catch (err) {
-        log.error(
-          { err, repo: repoKey },
-          '[github] Failed to fetch closed PRs for repo',
-        )
+  const author = ghUsername || '@me'
+  const repoFilter = repos.map((r) => `repo:${r}`).join(' ')
+  const searchQuery = `is:pr is:closed author:${author} ${repoFilter}`
+  const graphqlQuery = `query($q: String!, $first: Int!) {
+  search(query: $q, type: ISSUE, first: $first) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        state
+        headRefName
+        repository { nameWithOwner }
       }
-    }),
-  )
+    }
+  }
+}`
 
-  return results.slice(0, limit)
+  try {
+    const stdout = await execFileAsync(
+      'gh',
+      [
+        'api',
+        'graphql',
+        '-f',
+        `query=${graphqlQuery}`,
+        '-f',
+        `q=${searchQuery}`,
+        '-F',
+        `first=${Math.min(limit, 100)}`,
+      ],
+      { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
+    )
+
+    if (!stdout) return []
+
+    const json = JSON.parse(stdout) as {
+      data?: {
+        search?: {
+          nodes?: Array<{
+            number: number
+            title: string
+            url: string
+            state: string
+            headRefName: string
+            repository?: { nameWithOwner: string }
+          }>
+        }
+      }
+    }
+
+    const nodes = json.data?.search?.nodes ?? []
+    return nodes
+      .filter((n) => n.number && n.repository?.nameWithOwner)
+      .map((n) => ({
+        prNumber: n.number,
+        prTitle: n.title,
+        prUrl: n.url,
+        branch: n.headRefName || '',
+        repo: n.repository!.nameWithOwner,
+        state: n.state === 'MERGED' ? ('MERGED' as const) : ('CLOSED' as const),
+      }))
+  } catch (err) {
+    log.error({ err }, '[github] Failed to fetch closed PRs')
+    return []
+  }
 }
 
 /** Fetch open PRs where the current user is a requested reviewer or mentioned. */
