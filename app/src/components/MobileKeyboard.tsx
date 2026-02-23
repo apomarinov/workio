@@ -115,6 +115,13 @@ export function MobileKeyboard({
     })
   }
 
+  const handleCustomActionDeleted = (actionId: string) => {
+    const existing = settings?.custom_terminal_actions ?? []
+    updateSettings({
+      custom_terminal_actions: existing.filter((a) => a.id !== actionId),
+    })
+  }
+
   useEffect(() => {
     const handler = () => setCustomizeOpen(true)
     window.addEventListener('mobile-keyboard-customize', handler)
@@ -141,7 +148,7 @@ export function MobileKeyboard({
         )}
       >
         {isInput && rows.length > 0 && (
-          <div className="flex gap-1 px-1.5 py-1 overflow-x-auto">
+          <div className="flex gap-1.5 p-1.5 overflow-x-auto">
             {rows.flatMap((row) =>
               row.actions.map((actionId) => {
                 const action = allActions[actionId]
@@ -197,14 +204,14 @@ export function MobileKeyboard({
               }
             }}
             placeholder="Type here..."
-            className="flex-1 min-w-0 px-3 py-1 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50 resize-none leading-5 overflow-y-auto"
+            className="flex-1 min-w-0 px-3 h-10 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50 resize-none leading-5 overflow-y-auto"
           />
           {isInput && (
             <button
               type="button"
               onPointerDown={(e) => e.preventDefault()}
               onPointerUp={handleSubmit}
-              className="flex-shrink-0 w-14 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
+              className="flex-shrink-0 w-14 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
             >
               <CornerDownLeft className="w-4 h-4" />
             </button>
@@ -230,6 +237,7 @@ export function MobileKeyboard({
         onSave={handleSaveCustomize}
         onCustomActionCreated={handleCustomActionCreated}
         onCustomActionUpdated={handleCustomActionUpdated}
+        onCustomActionDeleted={handleCustomActionDeleted}
         onClose={() => setCustomizeOpen(false)}
       />
     </>

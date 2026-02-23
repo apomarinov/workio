@@ -16,11 +16,12 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, Delete, Pencil, Plus, X } from 'lucide-react'
+import { Check, Delete, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ALL_ACTIONS, buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
+import { ConfirmModal } from './ConfirmModal'
 import { MobileKeyboardCustomAction } from './MobileKeyboardCustomAction'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
@@ -93,6 +94,7 @@ interface MobileKeyboardNewGroupProps {
   onSave: (row: MobileKeyboardRow) => void
   onCustomActionCreated: (action: CustomTerminalAction) => void
   onCustomActionUpdated: (action: CustomTerminalAction) => void
+  onCustomActionDeleted: (actionId: string) => void
   onClose: () => void
 }
 
@@ -104,11 +106,15 @@ export function MobileKeyboardNewGroup({
   onSave,
   onCustomActionCreated,
   onCustomActionUpdated,
+  onCustomActionDeleted,
   onClose,
 }: MobileKeyboardNewGroupProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [customActionOpen, setCustomActionOpen] = useState(false)
   const [editingAction, setEditingAction] = useState<
+    CustomTerminalAction | undefined
+  >()
+  const [deletingAction, setDeletingAction] = useState<
     CustomTerminalAction | undefined
   >()
 
@@ -291,7 +297,7 @@ export function MobileKeyboardNewGroup({
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1">
+                <div className={cn("flex flex-wrap gap-1", group.category === 'custom' && 'gap-3')}>
                   {group.actions.map((action) => {
                     const isSelected = selected.includes(action.id)
                     const customAction =
@@ -317,16 +323,25 @@ export function MobileKeyboardNewGroup({
                           {action.label}
                         </button>
                         {customAction && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingAction(customAction)
-                              setCustomActionOpen(true)
-                            }}
-                            className="text-muted-foreground hover:text-foreground p-0.5"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAction(customAction)
+                                setCustomActionOpen(true)
+                              }}
+                              className="text-muted-foreground hover:text-foreground p-0.5"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingAction(customAction)}
+                              className="text-red-400 hover:text-red-300 p-0.5"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </>
                         )}
                       </div>
                     )
@@ -351,6 +366,21 @@ export function MobileKeyboardNewGroup({
           setCustomActionOpen(false)
           setEditingAction(undefined)
         }}
+      />
+      <ConfirmModal
+        open={!!deletingAction}
+        title="Delete Custom Action"
+        message={`Delete "${deletingAction?.label}"? This will also remove it from any groups that use it.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (deletingAction) {
+            setSelected((prev) => prev.filter((id) => id !== deletingAction.id))
+            onCustomActionDeleted(deletingAction.id)
+          }
+          setDeletingAction(undefined)
+        }}
+        onCancel={() => setDeletingAction(undefined)}
       />
     </>
   )

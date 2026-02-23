@@ -919,7 +919,7 @@ function AppContent() {
                       <button
                         type="button"
                         onClick={() => setMobileSidebarOpen(true)}
-                        className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer mr-1"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>

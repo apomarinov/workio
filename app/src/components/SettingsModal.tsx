@@ -261,6 +261,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 ),
               })
             }}
+            onCustomActionDeleted={(actionId: string) => {
+              const existing = settings?.custom_terminal_actions ?? []
+              updateSettings({
+                custom_terminal_actions: existing.filter(
+                  (a) => a.id !== actionId,
+                ),
+              })
+            }}
             onClose={() => setShowCustomizeKeyboard(false)}
           />
 

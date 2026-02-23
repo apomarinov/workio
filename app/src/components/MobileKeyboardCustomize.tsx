@@ -13,6 +13,7 @@ interface MobileKeyboardCustomizeProps {
   onSave: (rows: MobileKeyboardRow[]) => void
   onCustomActionCreated: (action: CustomTerminalAction) => void
   onCustomActionUpdated: (action: CustomTerminalAction) => void
+  onCustomActionDeleted: (actionId: string) => void
   onClose: () => void
 }
 
@@ -23,6 +24,7 @@ export function MobileKeyboardCustomize({
   onSave,
   onCustomActionCreated,
   onCustomActionUpdated,
+  onCustomActionDeleted,
   onClose,
 }: MobileKeyboardCustomizeProps) {
   const [localRows, setLocalRows] = useState<MobileKeyboardRow[]>(rows)
@@ -154,7 +156,7 @@ export function MobileKeyboardCustomize({
                       )
                     })}
                   </div>
-                  <div className="flex flex-col gap-0.5 flex-shrink-0">
+                  <div className="flex gap-1 flex-shrink-0">
                     <button
                       type="button"
                       onClick={() => moveRow(index, -1)}
@@ -204,6 +206,7 @@ export function MobileKeyboardCustomize({
         onSave={handleAddGroup}
         onCustomActionCreated={onCustomActionCreated}
         onCustomActionUpdated={onCustomActionUpdated}
+        onCustomActionDeleted={onCustomActionDeleted}
         onClose={() => {
           setNewGroupOpen(false)
           setEditingIndex(null)

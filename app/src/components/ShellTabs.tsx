@@ -289,8 +289,7 @@ function SortableShellTab({
       type="button"
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[150px]',
-        position === 'top' ? 'border-t-2' : 'border-b-2',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[150px] border-t-2',
         hasActivity
           ? isActive
             ? 'border-green-500/80'
