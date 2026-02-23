@@ -105,7 +105,7 @@ export function MobileKeyboardCustomize({
                     return (
                       <div
                         key={`preview-${row.id}-${actionId}`}
-                        className="flex-shrink-0 px-2 py-1.5 rounded bg-zinc-700/60 text-center text-xs text-zinc-300"
+                        className="flex-shrink-0 px-2 py-2 min-w-10 rounded bg-zinc-700/60 text-center text-xs text-zinc-300"
                       >
                         {action.label}
                       </div>
@@ -147,7 +147,7 @@ export function MobileKeyboardCustomize({
                       return (
                         <div
                           key={`${row.id}-${actionId}-${i}`}
-                          className="flex-shrink-0 px-1.5 py-1 rounded bg-zinc-700/60 text-xs text-zinc-300"
+                          className="flex-shrink-0 px-2 py-1 min-w-8 text-center rounded bg-zinc-700/60 text-xs text-zinc-300"
                         >
                           {action?.label ?? actionId}
                         </div>

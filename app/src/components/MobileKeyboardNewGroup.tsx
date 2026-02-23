@@ -307,7 +307,7 @@ export function MobileKeyboardNewGroup({
                           type="button"
                           onClick={() => toggleAction(action.id)}
                           className={cn(
-                            'px-2 py-1 rounded text-xs font-medium transition-colors',
+                            'px-2.5 py-2 min-w-8 rounded text-xs font-medium transition-colors',
                             isSelected
                               ? 'bg-blue-600 text-white'
                               : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',

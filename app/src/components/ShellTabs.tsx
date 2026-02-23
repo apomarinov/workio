@@ -473,18 +473,30 @@ export function ShellTabs({
     setDeleteTemplateTarget(null)
   }
 
+  const terminalHasProcesses = terminal.shells.some((s) =>
+    shellHasActivity(s.id),
+  )
+
+  const runTemplate = (template: ShellTemplate) => {
+    window.dispatchEvent(
+      new CustomEvent('shell-template-run', {
+        detail: { terminalId: terminal.id, template },
+      }),
+    )
+  }
+
   const handleRunTemplate = (template: ShellTemplate) => {
     setMenuOpen(false)
-    setRunTemplateTarget(template)
+    if (terminalHasProcesses) {
+      setRunTemplateTarget(template)
+    } else {
+      runTemplate(template)
+    }
   }
 
   const confirmRunTemplate = () => {
     if (runTemplateTarget) {
-      window.dispatchEvent(
-        new CustomEvent('shell-template-run', {
-          detail: { terminalId: terminal.id, template: runTemplateTarget },
-        }),
-      )
+      runTemplate(runTemplateTarget)
       setRunTemplateTarget(null)
     }
   }
