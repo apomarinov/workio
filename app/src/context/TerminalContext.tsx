@@ -167,9 +167,30 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     return result
   }, [terminals, suspendTick])
 
-  const [activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
+  const storedTerminalId = useRef<number | null>(
+    (() => {
+      const saved = localStorage.getItem('active-terminal-id')
+      return saved ? Number(saved) : null
+    })(),
+  )
+  const [_activeTerminalId, setActiveTerminalId] = useState<number | null>(null)
   const previousTerminalIdRef = useRef<number | null>(null)
   const [activePR, setActivePR] = useState<PRCheckStatus | null>(null)
+
+  // Derive activeTerminalId: prefer stored ID if it still exists
+  const activeTerminalId =
+    storedTerminalId.current !== null &&
+    terminals.some((t) => t.id === storedTerminalId.current)
+      ? storedTerminalId.current
+      : _activeTerminalId
+
+  // Persist active terminal ID to localStorage
+  useEffect(() => {
+    if (activeTerminalId !== null) {
+      localStorage.setItem('active-terminal-id', String(activeTerminalId))
+      storedTerminalId.current = activeTerminalId
+    }
+  }, [activeTerminalId])
 
   // Auto-select first terminal when terminals load
   useEffect(() => {
@@ -889,6 +910,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [repos, githubPRs])
 
   const selectTerminal = useCallback((id: number) => {
+    storedTerminalId.current = id
     setActiveTerminalId((prev) => {
       if (prev !== null && prev !== id) {
         previousTerminalIdRef.current = prev
@@ -898,6 +920,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const clearTerminal = useCallback(() => {
+    storedTerminalId.current = null
     setActiveTerminalId((prev) => {
       if (prev !== null) {
         previousTerminalIdRef.current = prev

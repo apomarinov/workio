@@ -83,7 +83,44 @@ function AppContent() {
   activeTerminalRef.current = activeTerminal
 
   // Multi-shell state
-  const [activeShells, setActiveShells] = useState<Record<number, number>>({})
+  const storedShells = useRef<Record<number, number>>(
+    (() => {
+      try {
+        const saved = localStorage.getItem('active-shells')
+        return saved ? JSON.parse(saved) : {}
+      } catch {
+        return {}
+      }
+    })(),
+  )
+  const [_activeShells, _setActiveShells] = useState<Record<number, number>>({})
+  const setActiveShells = (
+    value:
+      | Record<number, number>
+      | ((prev: Record<number, number>) => Record<number, number>),
+  ) => {
+    _setActiveShells((prev) => {
+      const next = value instanceof Function ? value(prev) : value
+      storedShells.current = { ...storedShells.current, ...next }
+      return next
+    })
+  }
+  // Derive: prefer stored shell ID if it still exists in the terminal
+  const activeShells: Record<number, number> = {}
+  for (const t of terminals) {
+    const storedId = storedShells.current[t.id]
+    const stateId = _activeShells[t.id]
+    if (storedId && t.shells.some((s) => s.id === storedId)) {
+      activeShells[t.id] = storedId
+    } else if (stateId) {
+      activeShells[t.id] = stateId
+    }
+  }
+  // Persist to localStorage
+  useEffect(() => {
+    localStorage.setItem('active-shells', JSON.stringify(activeShells))
+    storedShells.current = activeShells
+  })
   const activeShellsRef = useRef(activeShells)
   activeShellsRef.current = activeShells
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
