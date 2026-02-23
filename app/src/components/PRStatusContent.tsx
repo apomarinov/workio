@@ -1531,11 +1531,13 @@ export function PRStatusContent({
                       <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
                     )}
                     <span className="text-xs truncate">{check.name}</span>
-                    {check.startedAt && (
-                      <span className="text-[10px] text-muted-foreground/40 flex-shrink-0 ml-auto">
-                        {formatTimeAgo(check.startedAt)}
-                      </span>
-                    )}
+                    {check.startedAt &&
+                      (check.status === 'IN_PROGRESS' ||
+                        check.status === 'QUEUED') && (
+                        <span className="text-[10px] text-muted-foreground/40 flex-shrink-0 ml-auto">
+                          {formatTimeAgo(check.startedAt)}
+                        </span>
+                      )}
                   </a>
                   {check.status === 'COMPLETED' && (
                     <button
