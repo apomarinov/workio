@@ -1,3 +1,21 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  restrictToHorizontalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers'
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Check, Delete, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ALL_ACTIONS, buildActionsMap } from '@/lib/terminalActions'
@@ -5,6 +23,47 @@ import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 import { MobileKeyboardCustomAction } from './MobileKeyboardCustomAction'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+
+function SortableChip({
+  actionId,
+  label,
+  onRemove,
+}: {
+  actionId: string
+  label: string
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: actionId })
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : undefined,
+    zIndex: isDragging ? 10 : undefined,
+    position: isDragging ? ('relative' as const) : undefined,
+  }
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      type="button"
+      onClick={onRemove}
+      className="px-2 py-0.5 rounded bg-blue-600/80 text-white text-xs font-medium touch-manipulation"
+    >
+      {label}
+    </button>
+  )
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   modifier: 'Modifiers',
@@ -50,11 +109,27 @@ export function MobileKeyboardNewGroup({
 
   const actionsMap = buildActionsMap(customActions)
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  )
+
   useEffect(() => {
     if (open) {
       setSelected(initialActions ?? [])
     }
   }, [open])
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = selected.indexOf(active.id as string)
+    const newIndex = selected.indexOf(over.id as string)
+    if (oldIndex === -1 || newIndex === -1) return
+    const next = [...selected]
+    next.splice(oldIndex, 1)
+    next.splice(newIndex, 0, active.id as string)
+    setSelected(next)
+  }
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
@@ -111,7 +186,7 @@ export function MobileKeyboardNewGroup({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+        <DialogContent className="max-w-md max-h-[70vh] flex flex-col p-0">
           <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 pt-4 pb-2 space-y-0">
             <button
               type="button"
@@ -146,19 +221,32 @@ export function MobileKeyboardNewGroup({
                   Tap actions below (max 8)
                 </span>
               ) : (
-                selected.map((actionId) => {
-                  const action = actionsMap[actionId]
-                  return (
-                    <button
-                      key={`sel-${actionId}`}
-                      type="button"
-                      onClick={() => toggleAction(actionId)}
-                      className="px-2 py-0.5 rounded bg-blue-600/80 text-white text-xs font-medium"
-                    >
-                      {action?.label ?? actionId}
-                    </button>
-                  )
-                })
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[
+                    restrictToHorizontalAxis,
+                    restrictToParentElement,
+                  ]}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={selected}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {selected.map((actionId) => {
+                      const action = actionsMap[actionId]
+                      return (
+                        <SortableChip
+                          key={`sel-${actionId}`}
+                          actionId={actionId}
+                          label={action?.label ?? actionId}
+                          onRemove={() => toggleAction(actionId)}
+                        />
+                      )
+                    })}
+                  </SortableContext>
+                </DndContext>
               )}
               {selected.length > 0 && (
                 <button
