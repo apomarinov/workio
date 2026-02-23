@@ -133,7 +133,7 @@ const io = new SocketIOServer(fastify.server, {
     origin:
       env.NODE_ENV === 'production'
         ? false
-        : `http://localhost:${env.CLIENT_PORT}`,
+        : (origin, callback) => callback(null, origin || true),
     methods: ['GET', 'POST'],
   },
 })

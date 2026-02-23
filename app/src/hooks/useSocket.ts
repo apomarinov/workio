@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { io, type Socket } from 'socket.io-client'
 
 const SOCKET_URL = import.meta.env.DEV
-  ? 'http://localhost:5176'
+  ? `${window.location.protocol}//${window.location.hostname}:5176`
   : window.location.origin
 
 let socket: Socket | null = null
