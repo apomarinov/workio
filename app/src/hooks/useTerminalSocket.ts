@@ -99,6 +99,10 @@ export function useTerminalSocket({
     if (isConnectingRef.current) return
     if (shellIdRef.current === null) return
 
+    // Don't connect when page is hidden (e.g. PWA woken in background by push notification).
+    // The visibilitychange listener will call connect() when the page becomes visible.
+    if (document.visibilityState === 'hidden') return
+
     // Check max retries
     if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
       setStatus('error')
@@ -206,6 +210,25 @@ export function useTerminalSocket({
 
     return cleanup
   }, [shellId, connect, cleanup])
+
+  // When page becomes visible, connect if we should be connected but aren't
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        shellIdRef.current !== null &&
+        !wsRef.current &&
+        !isConnectingRef.current
+      ) {
+        reconnectAttemptRef.current = 0
+        connect()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [connect])
 
   const sendInput = useCallback((data: string) => {
     if (

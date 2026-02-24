@@ -13,6 +13,7 @@ export function markUserActive(): void {
 }
 
 export function isUserActive(): boolean {
+  return false
   return Date.now() - lastActiveAt < ACTIVE_TIMEOUT_MS
 }
 

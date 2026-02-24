@@ -158,6 +158,9 @@ wss.on('connection', (ws: WebSocket) => {
           }
           clients.add(ws)
           wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
+          log.info(
+            `[ws] Client connected to shell=${shellId} (reconnect), clients=${clients.size}`,
+          )
 
           // Latest client becomes primary (controls PTY dimensions)
           shellPrimaryClient.set(shellId, ws)
@@ -182,6 +185,10 @@ wss.on('connection', (ws: WebSocket) => {
         shellClients.set(sid, clients)
         shellPrimaryClient.set(sid, ws)
         wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
+
+        log.info(
+          `[ws] Client connected to shell=${sid} (new session), clients=1`,
+        )
 
         const batchOutput = createBroadcastBatcher(sid)
         const session = await createSession(
@@ -279,10 +286,16 @@ wss.on('connection', (ws: WebSocket) => {
       const clients = shellClients.get(shellId)
       if (clients) {
         clients.delete(ws)
+        log.info(
+          `[ws] Client disconnected from shell=${shellId}, clients=${clients.size}`,
+        )
         if (clients.size === 0) {
           // No clients left — clean up and start timeout
           shellClients.delete(shellId)
           shellPrimaryClient.delete(shellId)
+          log.info(
+            `[ws] No clients left for shell=${shellId}, starting timeout`,
+          )
           startSessionTimeout(shellId)
         } else if (shellPrimaryClient.get(shellId) === ws) {
           // Primary disconnected — promote next client and resize PTY
