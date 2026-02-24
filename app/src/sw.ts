@@ -13,6 +13,7 @@ self.addEventListener('push', (event) => {
   const payload = event.data.json() as {
     title: string
     body: string
+    tag?: string
     data?: Record<string, unknown>
   }
 
@@ -22,6 +23,7 @@ self.addEventListener('push', (event) => {
       icon: '/icon2.png',
       badge: '/icon2.png',
       data: payload.data,
+      tag: payload.tag,
     }),
   )
 })
