@@ -52,7 +52,7 @@ import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
-import { killShell } from '@/lib/api'
+import { interruptShell, killShell } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type {
   SessionWithProject,
@@ -881,6 +881,7 @@ export function ShellTabs({
         onConfirm={() => {
           for (const shell of terminal.shells) {
             killShell(shell.id).catch(() => {})
+            interruptShell(shell.id).catch(() => {})
           }
           toast(`Killed processes in ${terminal.shells.length} shell(s)`)
           setKillAllConfirm(false)
