@@ -143,6 +143,19 @@ export function PushNotificationModal({
     }
   }
 
+  const [dismissing, setDismissing] = useState(false)
+  const handleTestDismiss = async () => {
+    setDismissing(true)
+    try {
+      await fetch('/api/push/test-dismiss', { method: 'POST' })
+      toast.success('Dismiss sent')
+    } catch {
+      toast.error('Failed to send dismiss')
+    } finally {
+      setDismissing(false)
+    }
+  }
+
   const isSubscribed = !!currentEndpoint
 
   return (
@@ -183,10 +196,24 @@ export function PushNotificationModal({
               </Button>
             )}
             {subscriptions.length > 0 && (
-              <Button variant="outline" onClick={handleTest} disabled={testing}>
-                <Send className="w-4 h-4 mr-2" />
-                {testing ? 'Sending...' : 'Test'}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleTest}
+                  disabled={testing}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {testing ? 'Sending...' : 'Test'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleTestDismiss}
+                  disabled={dismissing}
+                >
+                  <BellOff className="w-4 h-4 mr-2" />
+                  {dismissing ? 'Dismissing...' : 'Dismiss'}
+                </Button>
+              </>
             )}
           </div>
 

@@ -85,7 +85,7 @@ export async function emitNotification(
     sendPushNotification({
       title,
       body,
-      tag: notification.dedup_hash,
+      tag: notification.dedup_hash ?? undefined,
       data: { type, repo, prNumber, ...data },
     })
   }

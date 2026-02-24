@@ -13,6 +13,7 @@ export function markUserActive(): void {
 }
 
 export function isUserActive(): boolean {
+  return false;
   return Date.now() - lastActiveAt < ACTIVE_TIMEOUT_MS
 }
 
@@ -31,6 +32,8 @@ export async function sendPushNotification(
   payload: {
     title: string
     body: string
+    tag?: string
+    action?: string
     data?: Record<string, unknown>
   },
   options?: { force?: boolean },
