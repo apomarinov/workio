@@ -14,6 +14,7 @@ import {
   startSessionTimeout,
   writeToSession,
 } from '../pty/manager'
+import { sendPushNotification } from '../push'
 
 // Message types
 interface InitMessage {
@@ -235,6 +236,16 @@ wss.on('connection', (ws: WebSocket) => {
                   sessionId,
                   data: { status: 'done' },
                 })
+                // Dismiss the permission push notification
+                sendPushNotification(
+                  {
+                    title: '',
+                    body: '',
+                    tag: `session:${sessionId}`,
+                    action: 'dismiss',
+                  },
+                  { force: true },
+                )
               }
             })
             .catch((err) => {
