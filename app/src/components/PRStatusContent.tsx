@@ -158,9 +158,9 @@ export const PRTabButton = memo(function PRTabButton({
           active
             ? cn(colorClass || 'text-foreground', 'bg-sidebar-accent')
             : cn(
-              dimColorClass ||
-              'text-muted-foreground/60 hover:text-muted-foreground',
-            ),
+                dimColorClass ||
+                  'text-muted-foreground/60 hover:text-muted-foreground',
+              ),
           className,
         )}
       >
@@ -360,7 +360,7 @@ const ReviewRow = memo(function ReviewRow({
           onReact={
             onReact && review.id
               ? (content, remove) =>
-                onReact(review.id!, 'review', content, remove)
+                  onReact(review.id!, 'review', content, remove)
               : undefined
           }
         />
@@ -579,12 +579,12 @@ const CommentItem = memo(function CommentItem({
             onReact={
               onReact && comment.id
                 ? (content, remove) =>
-                  onReact(
-                    comment.id!,
-                    comment.path ? 'review_comment' : 'issue_comment',
-                    content,
-                    remove,
-                  )
+                    onReact(
+                      comment.id!,
+                      comment.path ? 'review_comment' : 'issue_comment',
+                      content,
+                      remove,
+                    )
                 : undefined
             }
           />
@@ -712,7 +712,7 @@ function ReviewThreadGroup({
             onMarkRead={
               pr && reply.isUnread && reply.id
                 ? () =>
-                  markNotificationReadByItem(pr.repo, pr.prNumber, reply.id)
+                    markNotificationReadByItem(pr.repo, pr.prNumber, reply.id)
                 : undefined
             }
             hidePath
@@ -913,12 +913,12 @@ function FullDiscussionDialog({
                       onMarkRead={
                         item.review.isUnread && item.review.id
                           ? () =>
-                            markNotificationReadByItem(
-                              pr.repo,
-                              pr.prNumber,
-                              undefined,
-                              item.review.id,
-                            )
+                              markNotificationReadByItem(
+                                pr.repo,
+                                pr.prNumber,
+                                undefined,
+                                item.review.id,
+                              )
                           : undefined
                       }
                     />
@@ -953,11 +953,11 @@ function FullDiscussionDialog({
                     onMarkRead={
                       item.comment.isUnread && item.comment.id
                         ? () =>
-                          markNotificationReadByItem(
-                            pr.repo,
-                            pr.prNumber,
-                            item.comment.id,
-                          )
+                            markNotificationReadByItem(
+                              pr.repo,
+                              pr.prNumber,
+                              item.comment.id,
+                            )
                         : undefined
                     }
                     defaultExpanded
@@ -1187,12 +1187,12 @@ function DiscussionTimeline({
                       onMarkRead={
                         item.review.isUnread && item.review.id
                           ? () =>
-                            markNotificationReadByItem(
-                              pr.repo,
-                              pr.prNumber,
-                              undefined,
-                              item.review.id,
-                            )
+                              markNotificationReadByItem(
+                                pr.repo,
+                                pr.prNumber,
+                                undefined,
+                                item.review.id,
+                              )
                           : undefined
                       }
                     />
@@ -1225,11 +1225,11 @@ function DiscussionTimeline({
                     onMarkRead={
                       item.comment.isUnread && item.comment.id
                         ? () =>
-                          markNotificationReadByItem(
-                            pr.repo,
-                            pr.prNumber,
-                            item.comment.id,
-                          )
+                            markNotificationReadByItem(
+                              pr.repo,
+                              pr.prNumber,
+                              item.comment.id,
+                            )
                         : undefined
                     }
                   />
@@ -1524,7 +1524,7 @@ export function PRStatusContent({
                     className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
                   >
                     {check.status === 'IN_PROGRESS' ||
-                      check.status === 'QUEUED' ? (
+                    check.status === 'QUEUED' ? (
                       <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                     ) : (
                       <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />

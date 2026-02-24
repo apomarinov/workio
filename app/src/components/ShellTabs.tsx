@@ -200,6 +200,17 @@ function SortableShellPill({
           : '',
       )}
     >
+      {shellSession && <ShellSessionIcon session={shellSession} />}
+      <span className="truncate max-w-[80px] relative">
+        <span className={shortcutHint ? 'invisible' : undefined}>
+          {displayName}
+        </span>
+        {shortcutHint && (
+          <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
+            {shortcutHint}
+          </span>
+        )}
+      </span>
       {!isMain && (
         <button
           type="button"
@@ -212,17 +223,6 @@ function SortableShellPill({
           <X className="w-3 h-3" />
         </button>
       )}
-      {shellSession && <ShellSessionIcon session={shellSession} />}
-      <span className="truncate max-w-[80px] relative">
-        <span className={shortcutHint ? 'invisible' : undefined}>
-          {displayName}
-        </span>
-        {shortcutHint && (
-          <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
-            {shortcutHint}
-          </span>
-        )}
-      </span>
     </button>
   )
 }
@@ -527,33 +527,35 @@ export function ShellTabs({
           <ChevronDown className="w-3 h-3" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-1" align="start" side="bottom">
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
-          onClick={() => {
-            onCreateShell()
-            setMenuOpen(false)
-          }}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New Shell
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive"
-          onClick={() => {
-            setKillAllConfirm(true)
-            setMenuOpen(false)
-          }}
-        >
-          <Ban className="w-3.5 h-3.5" />
-          Kill All
-        </button>
-        <div className="my-1 h-px bg-border" />
-        <div className="flex items-center justify-between px-2 py-1">
+      <PopoverContent className="w-48 p-0" align="start" side="bottom">
+        <div className='p-1'>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+            onClick={() => {
+              onCreateShell()
+              setMenuOpen(false)
+            }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Shell
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive"
+            onClick={() => {
+              setKillAllConfirm(true)
+              setMenuOpen(false)
+            }}
+          >
+            <Ban className="w-3.5 h-3.5" />
+            Kill All
+          </button>
+        </div>
+        <div className="my-0 h-px bg-border" />
+        <div className="flex items-center justify-between px-2 py-2">
           <span className="text-xs text-muted-foreground font-medium">
-            Templates
+            Shell Templates
           </span>
           <button
             type="button"
@@ -613,39 +615,41 @@ export function ShellTabs({
             </div>
           ))
         )}
-        <div className="my-1 h-px bg-border" />
-        <label className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
-          Wrap
-          <Switch checked={wrap} onCheckedChange={(v) => setWrap(v)} />
-        </label>
-        <label
-          className={cn(
-            'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
-            isMobile ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-          )}
-        >
-          Tabs
-          <Switch
-            checked={tabBar}
-            onCheckedChange={(v) => setTabBar(v)}
-            disabled={isMobile}
-          />
-        </label>
-        <label
-          className={cn(
-            'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
-            tabBar && !isMobile
-              ? 'cursor-pointer'
-              : 'opacity-50 cursor-not-allowed',
-          )}
-        >
-          Top
-          <Switch
-            checked={tabsTop}
-            onCheckedChange={(v) => setTabsTop(v)}
-            disabled={!tabBar || isMobile}
-          />
-        </label>
+        <div className="mt-1 h-px bg-border" />
+        <div className='p-1'>
+          <label className="flex hover:bg-accent w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
+            Wrap
+            <Switch checked={wrap} onCheckedChange={(v) => setWrap(v)} />
+          </label>
+          <label
+            className={cn(
+              'flex w-full items-center hover:bg-accent justify-between rounded-sm px-2 py-1.5 text-sm',
+              isMobile ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+            )}
+          >
+            Tabs
+            <Switch
+              checked={tabBar}
+              onCheckedChange={(v) => setTabBar(v)}
+              disabled={isMobile}
+            />
+          </label>
+          <label
+            className={cn(
+              'flex w-full items-center justify-between rounded-sm hover:bg-accent px-2 py-1.5 text-sm',
+              tabBar && !isMobile
+                ? 'cursor-pointer'
+                : 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            Top
+            <Switch
+              checked={tabsTop}
+              onCheckedChange={(v) => setTabsTop(v)}
+              disabled={!tabBar || isMobile}
+            />
+          </label>
+        </div>
       </PopoverContent>
     </Popover>
   )
@@ -880,9 +884,13 @@ export function ShellTabs({
         variant="danger"
         onConfirm={() => {
           for (const shell of terminal.shells) {
-            killShell(shell.id).catch(() => {})
-            interruptShell(shell.id).catch(() => {})
+            interruptShell(shell.id).catch(() => { })
           }
+          setTimeout(() => {
+            for (const shell of terminal.shells) {
+              killShell(shell.id).catch(() => { })
+            }
+          }, 1000)
           toast(`Killed processes in ${terminal.shells.length} shell(s)`)
           setKillAllConfirm(false)
         }}
@@ -944,7 +952,9 @@ export function ShellTabs({
       <ConfirmModal
         open={runTemplateTarget !== null}
         title={`Run "${runTemplateTarget?.name}"`}
-        message={`This will create ${runTemplateTarget?.entries.length ?? 0} shell${(runTemplateTarget?.entries.length ?? 0) !== 1 ? 's' : ''}:`}
+        message={<div>
+          This will <span className='mx-1 px-1.5 py-0.5 rounded-md border-[1px] border-red-400/80 text-red-400/80'>kill all</span> shells and create {`${runTemplateTarget?.entries.length ?? 0} new shell${(runTemplateTarget?.entries.length ?? 0) !== 1 ? 's' : ''}`}:
+        </div>}
         confirmLabel="Run"
         onConfirm={confirmRunTemplate}
         onCancel={() => setRunTemplateTarget(null)}

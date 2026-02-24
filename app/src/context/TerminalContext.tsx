@@ -314,7 +314,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           sendNotificationRef.current('✅ Merged', {
             body: prTitle,
             audio: 'pr-activity',
-            onClick: () => window.open(prUrl, '_blank'),
+            data: { url: prUrl },
           })
           break
 
@@ -322,7 +322,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           sendNotificationRef.current('🚫 Closed', {
             body: prTitle,
             audio: 'pr-activity',
-            onClick: () => window.open(prUrl, '_blank'),
+            data: { url: prUrl },
           })
           break
 
@@ -330,7 +330,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           sendNotificationRef.current('✅ All checks passed', {
             body: prTitle,
             audio: 'done',
-            onClick: () => window.open(prUrl, '_blank'),
+            data: { url: prUrl },
           })
           break
 
@@ -338,7 +338,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           sendNotificationRef.current('❌ Check failed', {
             body: data.checkName ? `${data.checkName} - ${prTitle}` : prTitle,
             audio: 'error',
-            onClick: () => window.open(data.checkUrl || prUrl, '_blank'),
+            data: { url: data.checkUrl || prUrl },
           })
           break
 
@@ -346,7 +346,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           sendNotificationRef.current('🔄 Changes requested', {
             body: data.reviewer ? `${data.reviewer} on ${prTitle}` : prTitle,
             audio: 'error',
-            onClick: () => window.open(prUrl, '_blank'),
+            data: { url: prUrl },
           })
           break
 
@@ -356,7 +356,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
               ? `${data.approver} approved ${prTitle}`
               : prTitle,
             audio: 'pr-activity',
-            onClick: () => window.open(prUrl, '_blank'),
+            data: { url: prUrl },
           })
           break
 
@@ -371,7 +371,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
               sendNotificationRef.current(`💬 ${data.author || 'Someone'}`, {
                 body: data.body || prTitle,
                 audio: 'pr-activity',
-                onClick: () => window.open(data.commentUrl || prUrl, '_blank'),
+                data: { url: data.commentUrl || prUrl },
               })
             }, 2000),
           )
@@ -406,7 +406,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
                 {
                   body: data.body || prTitle,
                   audio: 'pr-activity',
-                  onClick: () => window.open(reviewUrl, '_blank'),
+                  data: { url: reviewUrl },
                 },
               )
             }, 2000),

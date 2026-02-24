@@ -67,12 +67,20 @@ self.addEventListener('push', (event) => {
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  const data = event.notification.data as Record<string, unknown> | undefined
+  const url = data?.url as string | undefined
 
+  // External URL — open in a new tab
+  if (url) {
+    event.waitUntil(self.clients.openWindow(url))
+    return
+  }
+
+  // Otherwise focus the PWA and forward click data
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // Try to find an existing PWA window and focus it
         for (const client of clientList) {
           if ('focus' in client) {
             client.focus()
@@ -83,7 +91,6 @@ self.addEventListener('notificationclick', (event) => {
             return
           }
         }
-        // No open window — open a new one
         return self.clients.openWindow('/')
       }),
   )

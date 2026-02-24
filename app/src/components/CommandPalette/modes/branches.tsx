@@ -337,13 +337,14 @@ export function createBranchActionsMode(
 
   // Create Branch (available on all branches)
   {
-    const canCreate = !isDirty && !isLoading
+    const canCreate = (!isDirty || branch.isCurrent) && !isLoading
     items.push({
       id: 'action:create-branch',
       label: 'Create Branch',
       icon: <GitBranchPlus className="h-4 w-4 shrink-0 text-zinc-400" />,
       disabled: !canCreate,
-      disabledReason: isDirty ? 'uncommitted changes' : undefined,
+      disabledReason:
+        isDirty && !branch.isCurrent ? 'uncommitted changes' : undefined,
       loading: loadingStates.creatingBranch === branch.name,
       onSelect: () => {
         if (canCreate) {
