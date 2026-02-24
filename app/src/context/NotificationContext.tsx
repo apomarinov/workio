@@ -89,7 +89,15 @@ export function NotificationProvider({
 
       // Use service worker notification so clicks are handled by sw.ts
       // notificationclick handler (focus/open PWA + post NOTIFICATION_CLICK)
-      navigator.serviceWorker?.ready.then((reg) => {
+      navigator.serviceWorker?.ready.then(async (reg) => {
+        // Close existing notification with same tag before showing new one
+        // (iOS doesn't auto-replace by tag)
+        if (notificationOptions.tag) {
+          const existing = await reg.getNotifications({
+            tag: notificationOptions.tag,
+          })
+          for (const n of existing) n.close()
+        }
         reg.showNotification(title, {
           icon: '/icon2.png',
           ...notificationOptions,

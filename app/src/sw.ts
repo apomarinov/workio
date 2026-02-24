@@ -37,15 +37,31 @@ self.addEventListener('push', (event) => {
     return
   }
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: '/icon2.png',
-      badge: '/icon2.png',
-      data: payload.data,
-      tag: payload.tag,
-    }),
-  )
+  // iOS doesn't auto-replace notifications by tag, so explicitly close
+  // existing ones with the same tag before showing the new one
+  const show = payload.tag
+    ? self.registration
+        .getNotifications({ tag: payload.tag })
+        .then((existing) => {
+          for (const n of existing) n.close()
+        })
+        .then(() =>
+          self.registration.showNotification(payload.title, {
+            body: payload.body,
+            icon: '/icon2.png',
+            badge: '/icon2.png',
+            data: payload.data,
+            tag: payload.tag,
+          }),
+        )
+    : self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: '/icon2.png',
+        badge: '/icon2.png',
+        data: payload.data,
+      })
+
+  event.waitUntil(show)
 })
 
 // Handle notification clicks
