@@ -20,14 +20,10 @@ const audioFiles: Record<AudioType, string> = {
 
 interface SendNotificationOptions extends NotificationOptions {
   audio?: AudioType
-  onClick?: () => void
 }
 
 interface NotificationContextValue {
-  sendNotification: (
-    title: string,
-    options?: SendNotificationOptions,
-  ) => Notification | null
+  sendNotification: (title: string, options?: SendNotificationOptions) => void
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null)
@@ -74,14 +70,14 @@ export function NotificationProvider({
     (title: string, options?: SendNotificationOptions) => {
       if (permission === 'default') {
         setPromptOpen(true)
-        return null
+        return
       }
 
       if (permission !== 'granted') {
-        return null
+        return
       }
 
-      const { audio, onClick, ...notificationOptions } = options || {}
+      const { audio, ...notificationOptions } = options || {}
 
       if (audio) {
         const audioElement = new Audio(audioFiles[audio])
@@ -91,20 +87,14 @@ export function NotificationProvider({
         })
       }
 
-      const notification = new Notification(title, {
-        icon: '/icon2.png',
-        ...notificationOptions,
+      // Use service worker notification so clicks are handled by sw.ts
+      // notificationclick handler (focus/open PWA + post NOTIFICATION_CLICK)
+      navigator.serviceWorker?.ready.then((reg) => {
+        reg.showNotification(title, {
+          icon: '/icon2.png',
+          ...notificationOptions,
+        })
       })
-
-      if (onClick) {
-        notification.onclick = () => {
-          window.focus()
-          onClick()
-          notification.close()
-        }
-      }
-
-      return notification
     },
     [permission],
   )

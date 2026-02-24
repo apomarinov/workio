@@ -66,7 +66,6 @@ function AppContent() {
     loading,
     activeTerminal,
     selectTerminal,
-    clearTerminal,
     selectPreviousTerminal,
     refetch,
   } = useTerminalContext()
@@ -505,26 +504,12 @@ function AppContent() {
         'Claude'
       let title = session?.latest_user_message || session?.name
 
-      const navigateToSession = () => {
-        if (terminal && data.shell_id) {
-          selectTerminal(terminal.id)
-          setShell(terminal.id, data.shell_id!)
-          window.dispatchEvent(
-            new CustomEvent('shell-select', {
-              detail: { terminalId: terminal.id, shellId: data.shell_id },
-            }),
-          )
-        } else if (terminal) {
-          selectTerminal(terminal.id)
-        } else {
-          selectSession(data.session_id)
-          clearTerminal()
-        }
-        window.dispatchEvent(
-          new CustomEvent('flash-session', {
-            detail: { sessionId: data.session_id },
-          }),
-        )
+      const notiData = {
+        type:
+          data.status === 'permission_needed' ? 'permission_needed' : 'stop',
+        terminalId: terminal?.id ?? data.terminal_id,
+        shellId: data.shell_id,
+        sessionId: data.session_id,
       }
 
       if (data.status === 'permission_needed') {
@@ -533,7 +518,8 @@ function AppContent() {
         sendNotification(`⚠️ ${title}`, {
           body: `"${terminalName}" needs permissions`,
           audio: 'permission',
-          onClick: navigateToSession,
+          data: notiData,
+          tag: data.session_id ? `session:${data.session_id}` : undefined,
         })
       } else if (data.hook_type === 'Stop') {
         title ||= 'Done'
@@ -541,19 +527,12 @@ function AppContent() {
         sendNotification(`✅ ${title}`, {
           body: `"${terminalName}" has finished`,
           audio: 'done',
-          onClick: navigateToSession,
+          data: notiData,
+          tag: data.session_id ? `session:${data.session_id}` : undefined,
         })
       }
     })
-  }, [
-    subscribe,
-    sendNotification,
-    terminals,
-    selectTerminal,
-    clearTerminal,
-    selectSession,
-    sessions,
-  ])
+  }, [subscribe, sendNotification, terminals, sessions])
 
   // Handle push notification clicks from service worker
   useEffect(() => {

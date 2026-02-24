@@ -110,7 +110,9 @@ export async function initPgListener(
           sendPushNotification({
             title: '⚠️ Permission Required',
             body: `"${terminal?.name || 'Terminal'}" needs permissions`,
-            tag: payload.session_id ? `session:${payload.session_id}` : undefined,
+            tag: payload.session_id
+              ? `session:${payload.session_id}`
+              : undefined,
             data: {
               type: 'permission_needed',
               terminalId: payload.terminal_id,
@@ -128,7 +130,9 @@ export async function initPgListener(
           sendPushNotification({
             title: '✅ Done',
             body: `"${terminal?.name || 'Terminal'}" has finished`,
-            tag: payload.session_id ? `session:${payload.session_id}` : undefined,
+            tag: payload.session_id
+              ? `session:${payload.session_id}`
+              : undefined,
             data: {
               type: 'stop',
               terminalId: payload.terminal_id,
