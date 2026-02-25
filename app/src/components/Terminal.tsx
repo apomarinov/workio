@@ -51,6 +51,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const sessionLiveRef = useRef(false)
   const sessionLiveAtRef = useRef(0)
   const isVisibleRef = useRef(isVisible)
+  const pendingWritesRef = useRef<string[]>([])
   const { settings } = useSettings()
 
   const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
@@ -90,6 +91,10 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   }, [isBusy])
 
   const handleData = useCallback((data: string) => {
+    if (!isVisibleRef.current) {
+      pendingWritesRef.current.push(data)
+      return
+    }
     terminalRef.current?.write(data)
   }, [])
 
@@ -598,9 +603,15 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     }
   }, []) // No dependencies - initialize once
 
-  // Re-fit and focus when becoming visible
+  // Re-fit, flush buffered data, and focus when becoming visible
   useEffect(() => {
     if (isVisible && terminalRef.current && fitAddonRef.current) {
+      // Flush data that arrived while hidden
+      if (pendingWritesRef.current.length > 0) {
+        const pending = pendingWritesRef.current.join('')
+        pendingWritesRef.current = []
+        terminalRef.current.write(pending)
+      }
       fitAddonRef.current.fit()
       const cols = terminalRef.current.cols + plusCols
       const rows = terminalRef.current.rows
