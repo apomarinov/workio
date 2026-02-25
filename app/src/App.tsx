@@ -150,6 +150,11 @@ function AppContent() {
       const shell = await createShellForTerminal(terminalId)
       await refetch()
       setShell(terminalId, shell.id)
+      window.dispatchEvent(
+        new CustomEvent('shell-select', {
+          detail: { terminalId, shellId: shell.id },
+        }),
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create shell')
     }

@@ -633,7 +633,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             <DialogTitle>Keyboard Shortcuts</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-1.5 max-h-[75vh] overflow-y-auto pr-1">
             <ShortcutRow
               label="Command Palette"
               binding={palette}
@@ -959,7 +959,7 @@ function ShortcutRow({
           type="button"
           onClick={onRecord}
           className={cn(
-            'px-3 py-1.5 cursor-pointer text-sm font-mono rounded-md border transition-colors',
+            'h-7 px-2.5 cursor-pointer text-xs font-mono rounded-md border transition-colors inline-flex items-center',
             isRecording
               ? 'border-primary bg-primary/10 text-primary animate-pulse'
               : hasConflict
@@ -990,7 +990,7 @@ function ShortcutRow({
           <button
             type="button"
             onClick={onReset}
-            className="p-1.5 cursor-pointer text-muted-foreground hover:text-foreground rounded-md border border-border bg-zinc-800 hover:bg-zinc-700/70 transition-colors"
+            className="h-7 w-7 cursor-pointer inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-md border border-border bg-zinc-800 hover:bg-zinc-700/70 transition-colors"
             title="Reset to default"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -1000,7 +1000,7 @@ function ShortcutRow({
           <button
             type="button"
             onClick={onUnset}
-            className="p-1.5 cursor-pointer text-muted-foreground hover:text-foreground rounded-md border border-border bg-zinc-800 hover:bg-zinc-700/70 transition-colors"
+            className="h-7 w-7 cursor-pointer inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-md border border-border bg-zinc-800 hover:bg-zinc-700/70 transition-colors"
             title="Disable shortcut"
           >
             <X className="w-3.5 h-3.5" />
