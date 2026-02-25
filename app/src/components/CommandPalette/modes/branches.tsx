@@ -9,6 +9,7 @@ import {
   GitCommitHorizontal,
   GitMerge,
   Pencil,
+  RefreshCw,
   Trash2,
 } from 'lucide-react'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -22,7 +23,7 @@ import type {
 export function createBranchesMode(
   _data: AppData,
   level: PaletteLevel,
-  _actions: AppActions,
+  actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
   const { terminal, pr, branches, branchesLoading } = level
@@ -130,6 +131,30 @@ export function createBranchesMode(
 
   // Build groups
   const groups = []
+
+  // Actions group (fetch all)
+  const isLoading = !!level.loadingStates?.fetching
+  groups.push({
+    heading: 'Actions',
+    items: [
+      {
+        id: 'action:fetch-all',
+        label: 'Fetch All',
+        icon: (
+          <RefreshCw
+            className={`h-4 w-4 shrink-0 text-zinc-400 ${isLoading ? 'animate-spin' : ''}`}
+          />
+        ),
+        loading: false,
+        onSelect: () => {
+          if (!isLoading) {
+            actions.fetchAll(terminal.id)
+          }
+        },
+      },
+    ],
+  })
+
   if (localItems.length > 0) {
     groups.push({ heading: 'Local Branches', items: localItems })
   }

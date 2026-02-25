@@ -74,6 +74,7 @@ export type AppActions = {
   toggleFavoriteSession: (sessionId: string) => void
 
   // Branch actions
+  fetchAll: (terminalId: number) => Promise<void>
   loadBranches: (terminalId: number) => void
   checkoutBranch: (name: string, isRemote: boolean) => Promise<void>
   pullBranch: (name: string) => Promise<void>

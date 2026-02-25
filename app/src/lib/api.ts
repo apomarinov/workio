@@ -611,6 +611,19 @@ export async function getBranches(
   return res.json()
 }
 
+export async function fetchAll(
+  terminalId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/terminals/${terminalId}/fetch-all`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to fetch')
+  }
+  return res.json()
+}
+
 export async function checkoutBranch(
   terminalId: number,
   branch: string,

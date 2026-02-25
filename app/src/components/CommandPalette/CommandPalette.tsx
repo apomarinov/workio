@@ -14,6 +14,7 @@ import {
   createBranch,
   deleteBranch,
   editPR,
+  fetchAll,
   getBranches,
   getMoveTargets,
   killShell,
@@ -675,6 +676,50 @@ export function CommandPalette() {
       },
 
       // Branch actions
+      fetchAll: async (terminalId) => {
+        const terminal = terminals.find((t) => t.id === terminalId)
+        if (!terminal) return
+        api.updateLevel((l) => ({
+          ...l,
+          loadingStates: { ...l.loadingStates, fetching: true },
+        }))
+        try {
+          await fetchAll(terminalId)
+          toast.success('Fetched all remotes')
+          // Refetch branches to reflect any new remote branches
+          getBranches(terminalId)
+            .then((data) => {
+              setStack((prev) => {
+                const current = prev[prev.length - 1]
+                if (
+                  current.mode !== 'branches' &&
+                  current.mode !== 'branch-actions'
+                )
+                  return prev
+                const updates: Partial<PaletteLevel> = {
+                  branches: data,
+                  branchesLoading: false,
+                }
+                if (current.mode === 'branches') {
+                  const firstBranch = data.local[0] ?? data.remote[0]
+                  const prefix = data.local[0] ? 'local' : 'remote'
+                  updates.highlightedId = firstBranch
+                    ? `branch:${prefix}:${firstBranch.name}`
+                    : undefined
+                }
+                return [...prev.slice(0, -1), { ...current, ...updates }]
+              })
+            })
+            .catch(() => {})
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Failed to fetch')
+        } finally {
+          api.updateLevel((l) => ({
+            ...l,
+            loadingStates: { ...l.loadingStates, fetching: undefined },
+          }))
+        }
+      },
       loadBranches: (terminalId) => {
         getBranches(terminalId)
           .then((data) => {

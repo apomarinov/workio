@@ -982,6 +982,68 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
+  // Fetch all remotes
+  fastify.post<{ Params: TerminalParams }>(
+    '/api/terminals/:id/fetch-all',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      try {
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(
+            terminal.ssh_host,
+            'git fetch --all',
+            { cwd: terminal.cwd },
+          )
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: 'git fetch --all',
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['fetch', '--all'],
+              { cwd: expandPath(terminal.cwd), timeout: 30000 },
+              (err, stdout, stderr) => {
+                if (err) return reject(err)
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: 'git fetch --all',
+                  stdout,
+                  stderr,
+                })
+                resolve()
+              },
+            )
+          })
+        }
+
+        return { success: true }
+      } catch (err) {
+        return reply.status(500).send({
+          error: err instanceof Error ? err.message : 'Failed to fetch',
+        })
+      }
+    },
+  )
+
   // Checkout a branch
   fastify.post<{ Params: TerminalParams; Body: CheckoutBranchBody }>(
     '/api/terminals/:id/checkout',

@@ -528,7 +528,7 @@ export function ShellTabs({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-0" align="start" side="bottom">
-        <div className='p-1'>
+        <div className="p-1">
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
@@ -616,7 +616,7 @@ export function ShellTabs({
           ))
         )}
         <div className="mt-1 h-px bg-border" />
-        <div className='p-1'>
+        <div className="p-1">
           <label className="flex hover:bg-accent w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
             Wrap
             <Switch checked={wrap} onCheckedChange={(v) => setWrap(v)} />
@@ -884,11 +884,11 @@ export function ShellTabs({
         variant="danger"
         onConfirm={() => {
           for (const shell of terminal.shells) {
-            interruptShell(shell.id).catch(() => { })
+            interruptShell(shell.id).catch(() => {})
           }
           setTimeout(() => {
             for (const shell of terminal.shells) {
-              killShell(shell.id).catch(() => { })
+              killShell(shell.id).catch(() => {})
             }
           }, 1000)
           toast(`Killed processes in ${terminal.shells.length} shell(s)`)
@@ -952,9 +952,17 @@ export function ShellTabs({
       <ConfirmModal
         open={runTemplateTarget !== null}
         title={`Run "${runTemplateTarget?.name}"`}
-        message={<div>
-          This will <span className='mx-1 px-1.5 py-0.5 rounded-md border-[1px] border-red-400/80 text-red-400/80'>kill all</span> shells and create {`${runTemplateTarget?.entries.length ?? 0} new shell${(runTemplateTarget?.entries.length ?? 0) !== 1 ? 's' : ''}`}:
-        </div>}
+        message={
+          <div>
+            This will{' '}
+            <span className="mx-1 px-1.5 py-0.5 rounded-md border-[1px] border-red-400/80 text-red-400/80">
+              kill all
+            </span>{' '}
+            shells and create{' '}
+            {`${runTemplateTarget?.entries.length ?? 0} new shell${(runTemplateTarget?.entries.length ?? 0) !== 1 ? 's' : ''}`}
+            :
+          </div>
+        }
         confirmLabel="Run"
         onConfirm={confirmRunTemplate}
         onCancel={() => setRunTemplateTarget(null)}
