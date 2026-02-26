@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/modifiers'
 import {
   horizontalListSortingStrategy,
+  rectSortingStrategy,
   SortableContext,
   useSortable,
 } from '@dnd-kit/sortable'
@@ -633,7 +634,7 @@ export function ShellTabs({
               isMobile ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
             )}
           >
-            Tabs
+            Tab Bar
             <Switch
               checked={tabBar}
               onCheckedChange={(v) => setTabBar(v)}
@@ -648,7 +649,7 @@ export function ShellTabs({
                 : 'opacity-50 cursor-not-allowed',
             )}
           >
-            Top
+            Tab Bar on Top
             <Switch
               checked={tabsTop}
               onCheckedChange={(v) => setTabsTop(v)}
@@ -688,12 +689,18 @@ export function ShellTabs({
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
-              modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
+              modifiers={
+                wrap
+                  ? [restrictToParentElement]
+                  : [restrictToHorizontalAxis, restrictToParentElement]
+              }
               onDragEnd={handleDragEnd}
             >
               <SortableContext
                 items={shellIds}
-                strategy={horizontalListSortingStrategy}
+                strategy={
+                  wrap ? rectSortingStrategy : horizontalListSortingStrategy
+                }
               >
                 {sortedShells.map((shell, index) => {
                   const isMain = isMainShell(shell.id) ?? false
@@ -788,12 +795,18 @@ export function ShellTabs({
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
-              modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
+              modifiers={
+                wrap
+                  ? [restrictToParentElement]
+                  : [restrictToHorizontalAxis, restrictToParentElement]
+              }
               onDragEnd={handleDragEnd}
             >
               <SortableContext
                 items={shellIds}
-                strategy={horizontalListSortingStrategy}
+                strategy={
+                  wrap ? rectSortingStrategy : horizontalListSortingStrategy
+                }
               >
                 {sortedShells.map((shell, index) => {
                   const isMain = isMainShell(shell.id) ?? false

@@ -129,8 +129,11 @@ export function createOscParser(
           onCommandEvent({ type: 'prompt' })
           break
         case 'C':
-          if (payload) {
-            onCommandEvent({ type: 'command_start', command: payload })
+          {
+            const cmd = payload.trim()
+            if (cmd) {
+              onCommandEvent({ type: 'command_start', command: cmd })
+            }
           }
           break
         case 'D':
