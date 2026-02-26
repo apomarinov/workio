@@ -11,6 +11,7 @@ import {
   getSettings,
   getShellById,
   getTerminalById,
+  updateShell,
   updateTerminal,
 } from '../db'
 import {
@@ -65,6 +66,18 @@ export interface PtySession {
 
 // In-memory map of active PTY sessions, keyed by shellId
 const sessions = new Map<number, PtySession>()
+
+type ShellUpdates = { active_cmd?: string | null }
+
+function emitShellUpdate(
+  terminalId: number,
+  shellId: number,
+  updates: ShellUpdates,
+) {
+  if (updates.active_cmd === '') return
+  updateShell(shellId, updates)
+  getIO()?.emit('shell:updated', { terminalId, shellId, data: updates })
+}
 
 // Helper to find session(s) by terminalId (for terminal-level operations)
 function getSessionsForTerminal(terminalId: number): PtySession[] {
@@ -1082,7 +1095,7 @@ export async function createSession(
         case 'prompt':
           session.isIdle = true
           session.currentCommand = null
-          updateTerminal(terminalId, { active_cmd: null }).catch(() => {})
+          emitShellUpdate(terminalId, shellId, { active_cmd: null })
           // log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
           break
         case 'done_marker':
@@ -1095,9 +1108,9 @@ export async function createSession(
         case 'command_start':
           session.isIdle = false
           session.currentCommand = event.command || null
-          updateTerminal(terminalId, {
+          emitShellUpdate(terminalId, shellId, {
             active_cmd: event.command || null,
-          }).catch(() => {})
+          })
           // log.info(`[pty:${terminalId}] Command started: ${event.command}`)
           session.processPollTimeoutId = setTimeout(() => {
             session.processPollTimeoutId = null
@@ -1138,8 +1151,13 @@ export async function createSession(
     updateTerminal(terminalId, {
       pid: null,
       status: 'stopped',
-      active_cmd: null,
-    }).catch(() => {})
+    }).catch((err) =>
+      log.error(
+        { err },
+        `[pty] Failed to update terminal ${terminalId} on exit`,
+      ),
+    )
+    emitShellUpdate(terminalId, shellId, { active_cmd: null })
     session.onExit?.(exitCode)
   })
 
@@ -1155,8 +1173,8 @@ export async function createSession(
   startGlobalProcessPolling()
 
   // Write terminal/shell name files for dynamic zellij session naming (fire-and-forget)
-  writeTerminalNameFile(terminalId, terminalName).catch(() => {})
-  writeShellNameFile(shellId, shellRecord.name).catch(() => {})
+  writeTerminalNameFile(terminalId, terminalName)
+  writeShellNameFile(shellId, shellRecord.name)
 
   // wioname function to read current terminal name (for zellij session naming)
   const wionameFunc = `wioname() { cat "${WORKIO_TERMINALS_DIR}/${terminalId}" 2>/dev/null || echo "terminal-${terminalId}"; }`
@@ -1350,8 +1368,13 @@ export function destroySession(shellId: number): boolean {
   updateTerminal(session.terminalId, {
     pid: null,
     status: 'stopped',
-    active_cmd: null,
-  }).catch(() => {})
+  }).catch((err) =>
+    log.error(
+      { err },
+      `[pty] Failed to update terminal ${session.terminalId} on destroy`,
+    ),
+  )
+  emitShellUpdate(session.terminalId, shellId, { active_cmd: null })
 
   lastDirtyStatus.delete(session.terminalId)
   lastRemoteSyncStatus.delete(session.terminalId)
@@ -1367,13 +1390,18 @@ export function destroySessionsForTerminal(terminalId: number): boolean {
 
   for (const session of terminalSessions) {
     destroySessionInternal(session)
+    emitShellUpdate(terminalId, session.shell.id, { active_cmd: null })
   }
 
   updateTerminal(terminalId, {
     pid: null,
     status: 'stopped',
-    active_cmd: null,
-  }).catch(() => {})
+  }).catch((err) =>
+    log.error(
+      { err },
+      `[pty] Failed to update terminal ${terminalId} on destroy`,
+    ),
+  )
 
   lastDirtyStatus.delete(terminalId)
   lastRemoteSyncStatus.delete(terminalId)

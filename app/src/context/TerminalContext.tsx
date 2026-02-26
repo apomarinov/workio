@@ -20,7 +20,7 @@ import type {
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
-import type { Notification, Terminal } from '../types'
+import type { Notification, Shell, Terminal } from '../types'
 import { useNotifications } from './NotificationContext'
 
 interface TerminalContextValue {
@@ -222,6 +222,37 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         mutate(
           (prev) =>
             prev?.map((t) => (t.id === terminalId ? { ...t, ...data } : t)),
+          false,
+        )
+      },
+    )
+  }, [subscribe, mutate])
+
+  // Update shell state in-place when server emits changes
+  useEffect(() => {
+    return subscribe(
+      'shell:updated',
+      ({
+        terminalId,
+        shellId,
+        data,
+      }: {
+        terminalId: number
+        shellId: number
+        data: Partial<Shell>
+      }) => {
+        mutate(
+          (prev) =>
+            prev?.map((t) =>
+              t.id === terminalId
+                ? {
+                    ...t,
+                    shells: t.shells.map((s) =>
+                      s.id === shellId ? { ...s, ...data } : s,
+                    ),
+                  }
+                : t,
+            ),
           false,
         )
       },

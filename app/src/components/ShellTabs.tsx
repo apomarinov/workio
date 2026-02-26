@@ -187,9 +187,10 @@ function SortableShellPill({
       style={style}
       key={shell.id}
       type="button"
+      title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/pill flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
+        'group/pill flex max-w-[120px] min-w-[60px] items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
         isActive
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
@@ -201,7 +202,7 @@ function SortableShellPill({
       )}
     >
       {shellSession && <ShellSessionIcon session={shellSession} />}
-      <span className="truncate max-w-[80px] relative">
+      <span className="truncate relative text-center w-full">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
         </span>
@@ -287,9 +288,10 @@ function SortableShellTab({
       style={style}
       key={shell.id}
       type="button"
+      title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[150px] border-t-2',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[180px] border-t-2',
         hasActivity
           ? isActive
             ? 'border-green-500/80'
@@ -701,7 +703,10 @@ export function ShellTabs({
                           hasActivity={shellHasActivity(shell.id)}
                           isMain={isMain}
                           displayName={
-                            isMain ? (terminal.name ?? shell.name) : shell.name
+                            shell.active_cmd ??
+                            (isMain
+                              ? (terminal.name ?? shell.name)
+                              : shell.name)
                           }
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
@@ -798,7 +803,10 @@ export function ShellTabs({
                           hasActivity={shellHasActivity(shell.id)}
                           isMain={isMain}
                           displayName={
-                            isMain ? (terminal.name ?? shell.name) : shell.name
+                            shell.active_cmd ??
+                            (isMain
+                              ? (terminal.name ?? shell.name)
+                              : shell.name)
                           }
                           onSelect={() => onSelectShell(shell.id)}
                           onDelete={() => handleDeleteShell(shell.id)}
@@ -884,11 +892,15 @@ export function ShellTabs({
         variant="danger"
         onConfirm={() => {
           for (const shell of terminal.shells) {
-            interruptShell(shell.id).catch(() => {})
+            interruptShell(shell.id).catch(() =>
+              toast.error('Failed to interrupt shell'),
+            )
           }
           setTimeout(() => {
             for (const shell of terminal.shells) {
-              killShell(shell.id).catch(() => {})
+              killShell(shell.id).catch(() =>
+                toast.error('Failed to kill shell'),
+              )
             }
           }, 1000)
           toast(`Killed processes in ${terminal.shells.length} shell(s)`)

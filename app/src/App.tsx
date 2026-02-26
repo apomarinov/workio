@@ -224,7 +224,9 @@ function AppContent() {
       // 2. Interrupt main shell
       const mainShell = terminal.shells.find((s) => s.name === 'main')
       if (mainShell) {
-        await interruptShell(mainShell.id).catch(() => {})
+        await interruptShell(mainShell.id).catch(() =>
+          toast.error('Failed to interrupt shell'),
+        )
       }
 
       // 3. Wait for things to settle

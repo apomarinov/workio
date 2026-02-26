@@ -208,7 +208,9 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
 
   const handleCopyClick = useCallback(() => {
     if (pendingCopyRef.current) {
-      navigator.clipboard.writeText(pendingCopyRef.current).catch(() => {})
+      navigator.clipboard
+        .writeText(pendingCopyRef.current)
+        .catch(() => toast.error('Failed to copy to clipboard'))
     }
     pendingCopyRef.current = null
     setPendingCopy(null)

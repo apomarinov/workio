@@ -17,6 +17,7 @@ export interface Shell {
   id: number
   terminal_id: number
   name: string
+  active_cmd: string | null
   created_at: string
   isSuspended?: boolean
 }
@@ -29,7 +30,6 @@ export interface Terminal {
   ssh_host: string | null
   pid: number | null
   status: 'running' | 'stopped'
-  active_cmd: string | null
   git_branch: string | null
   git_repo: GitRepoStatus | null
   setup: SetupStatus | null

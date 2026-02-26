@@ -594,7 +594,6 @@ export async function updateTerminal(
     cwd?: string
     pid?: number | null
     status?: string
-    active_cmd?: string | null
     git_branch?: string | null
     git_repo?: object | null
     setup?: object | null
@@ -627,10 +626,6 @@ export async function updateTerminal(
   if (updates.status !== undefined) {
     setClauses.push(`status = $${paramIdx++}`)
     values.push(updates.status)
-  }
-  if (updates.active_cmd !== undefined) {
-    setClauses.push(`active_cmd = $${paramIdx++}`)
-    values.push(updates.active_cmd)
   }
   if (updates.git_branch !== undefined) {
     setClauses.push(`git_branch = $${paramIdx++}`)
@@ -753,6 +748,32 @@ export async function updateShellName(
     [name, id],
   )
   return rows[0]
+}
+
+export async function updateShell(
+  id: number,
+  updates: { active_cmd?: string | null },
+): Promise<void> {
+  try {
+    const setClauses: string[] = []
+    const values: (string | null)[] = []
+    let paramIdx = 1
+
+    if (updates.active_cmd !== undefined) {
+      setClauses.push(`active_cmd = $${paramIdx++}`)
+      values.push(updates.active_cmd)
+    }
+
+    if (setClauses.length === 0) return
+
+    values.push(String(id))
+    await pool.query(
+      `UPDATE shells SET ${setClauses.join(', ')} WHERE id = $${paramIdx}`,
+      values,
+    )
+  } catch (err) {
+    log.error({ err, shellId: id }, '[db] Failed to update shell')
+  }
 }
 
 // Settings queries

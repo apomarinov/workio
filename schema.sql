@@ -78,7 +78,6 @@ CREATE TABLE IF NOT EXISTS terminals (
     ssh_host VARCHAR(255),
     pid INTEGER,
     status VARCHAR(10) DEFAULT 'running',
-    active_cmd TEXT,
     git_branch VARCHAR(255),
     git_repo JSONB,
     setup JSONB,
@@ -92,6 +91,7 @@ CREATE TABLE IF NOT EXISTS shells (
     id SERIAL PRIMARY KEY,
     terminal_id INTEGER NOT NULL REFERENCES terminals(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL DEFAULT 'main',
+    active_cmd TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

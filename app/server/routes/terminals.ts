@@ -1076,7 +1076,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           // Prune stale worktrees before checkout
           await execSSHCommand(terminal.ssh_host, 'git worktree prune', {
             cwd: terminal.cwd,
-          }).catch(() => {})
+          }).catch((err) =>
+            log.error(
+              { err, terminalId: id },
+              '[git] Failed to prune worktrees',
+            ),
+          )
 
           const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
             cwd: terminal.cwd,
@@ -1118,7 +1123,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection and PR checks
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id)
 
         return { success: true, branch }
       } catch (err) {
@@ -1233,7 +1238,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id)
 
         return { success: true, branch }
       } catch (err) {
@@ -1313,7 +1318,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id)
 
         return { success: true, branch }
       } catch (err) {
@@ -1640,7 +1645,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         if (terminal.ssh_host) {
           await execSSHCommand(terminal.ssh_host, resetCmd, {
             cwd: terminal.cwd,
-          }).catch(() => {}) // swallow error on fresh repos
+          }).catch((err) =>
+            log.error(
+              { err, terminalId: id },
+              '[git] Failed to reset HEAD (may be fresh repo)',
+            ),
+          )
         } else {
           await new Promise<void>((resolve) => {
             execFile(
@@ -1800,8 +1810,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       // Refresh git state
-      detectGitBranch(id).catch(() => {})
-      checkAndEmitSingleGitDirty(id).catch(() => {})
+      detectGitBranch(id).catch((err) =>
+        log.error({ err, terminalId: id }, '[git] Failed to detect branch'),
+      )
+      checkAndEmitSingleGitDirty(id)
 
       return { success: true }
     } catch (err) {
@@ -2010,7 +2022,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         } else {
           await Promise.all(
             untracked.map((f) =>
-              fs.promises.unlink(path.join(cwdPath, f)).catch(() => {}),
+              fs.promises
+                .unlink(path.join(cwdPath, f))
+                .catch((err) =>
+                  log.error(
+                    { err, file: f },
+                    '[git] Failed to delete untracked file',
+                  ),
+                ),
             ),
           )
           logCommand({
@@ -2024,7 +2043,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       // Refresh dirty state
-      checkAndEmitSingleGitDirty(id).catch(() => {})
+      checkAndEmitSingleGitDirty(id)
 
       return { success: true }
     } catch (err) {
@@ -2111,7 +2130,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id)
 
         return { success: true, branch: currentBranch, onto: branch }
       } catch (err) {
@@ -2359,7 +2378,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           })
         }
 
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id)
         return { success: true, branch, newName }
       } catch (err) {
         const errorMessage =
@@ -2438,7 +2457,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // Refresh git branch detection
-        detectGitBranch(id).catch(() => {})
+        detectGitBranch(id)
 
         return { success: true, branch: name }
       } catch (err) {
@@ -2550,7 +2569,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const updated = await updateShellName(id, trimmedName)
       renameZellijSession(oldSessionName, newSessionName)
       updateSessionName(id, newSessionName)
-      writeShellNameFile(id, trimmedName).catch(() => {})
+      writeShellNameFile(id, trimmedName)
 
       return reply.send(updated)
     },

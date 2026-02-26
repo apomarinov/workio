@@ -710,7 +710,7 @@ export function CommandPalette() {
                 return [...prev.slice(0, -1), { ...current, ...updates }]
               })
             })
-            .catch(() => {})
+            .catch(() => toast.error('Failed to load branches'))
         } catch (err) {
           toast.error(err instanceof Error ? err.message : 'Failed to fetch')
         } finally {

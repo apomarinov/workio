@@ -1,5 +1,6 @@
 import { CornerDownLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { toast } from '@/components/ui/sonner'
 import { useSettings } from '@/hooks/useSettings'
 import {
   applyModifier,
@@ -80,7 +81,7 @@ export function MobileKeyboard({
         .then((text) => {
           if (text) sendToTerminal(terminalId, text)
         })
-        .catch(() => {})
+        .catch(() => toast.error('Failed to read clipboard'))
       resetModifiers()
       return
     }
