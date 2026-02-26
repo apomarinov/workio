@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
+  Activity,
   AlertTriangle,
   Ban,
   Bot,
@@ -194,14 +195,13 @@ function SortableShellPill({
         isActive
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
-        hasActivity
-          ? isActive
-            ? 'ring-1 ring-green-500/80'
-            : 'ring-1 ring-green-500/50 hover:ring-green-500/80'
-          : '',
       )}
     >
-      {shellSession && <ShellSessionIcon session={shellSession} />}
+      {shellSession ? (
+        <ShellSessionIcon session={shellSession} />
+      ) : hasActivity ? (
+        <Activity className="w-3 h-3 shrink-0 text-green-500" />
+      ) : null}
       <span className="truncate relative text-center w-full">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
@@ -304,7 +304,11 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
-      {shellSession && <ShellSessionIcon session={shellSession} />}
+      {shellSession ? (
+        <ShellSessionIcon session={shellSession} />
+      ) : hasActivity ? (
+        <Activity className="w-3 h-3 shrink-0 text-green-500" />
+      ) : null}
       <span className="truncate relative w-full text-center">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
