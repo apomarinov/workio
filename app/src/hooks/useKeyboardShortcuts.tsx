@@ -271,21 +271,14 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       alt: false,
       shift: false,
     }
-    let digitBuffer: string[] = []
-    let keyBuffer: string[] = []
-    const heldNonModKeys = new Set<string>()
     let active = false
+    let firedNonModifier = false
 
     function reset() {
       modifierBuffer = { meta: false, ctrl: false, alt: false, shift: false }
-      digitBuffer = []
-      keyBuffer = []
-      heldNonModKeys.clear()
       active = false
-      consumed = false
+      firedNonModifier = false
     }
-
-    let consumed = false // true after a shortcut fires; blocks until all modifiers released
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (disabledRef.current) return
@@ -300,6 +293,10 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       }
       // Non-modifier key while a modifier sequence is active
       if (active) {
+        // Skip key-repeat events; fire once per discrete keypress
+        if (e.repeat) return
+        firedNonModifier = true
+
         const h = handlersRef.current
         // On macOS, Alt+key produces special characters (e.g. Alt+A → å).
         // Use e.code to get the physical key when Alt is held.
@@ -308,255 +305,103 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
             ? e.code[3].toLowerCase()
             : e.key.toLowerCase()
 
-        // --- triggerWhenDetected shortcuts: fire on every discrete keypress,
-        //     bypass consumed gate so hold-modifier + tap-key works repeatedly.
-        //     Use e.repeat instead of heldNonModKeys because macOS swallows
-        //     keyup events while Cmd is held, making heldNonModKeys unreliable. ---
-        if (!e.repeat) {
-          const prevShellTWD =
-            prevShellBinding?.triggerWhenDetected ??
-            DEFAULT_KEYMAP.prevShell?.triggerWhenDetected
-          if (
-            prevShellTWD &&
-            h.prevShell &&
-            prevShellBinding?.key &&
-            modifiersMatchBinding(modifierBuffer, prevShellBinding) &&
-            key === prevShellBinding.key
-          ) {
-            e.preventDefault()
-            e.stopPropagation()
-            h.prevShell()
-            consumed = true
-            return
-          }
+        // Helper to match a key-based binding
+        const matchKey = (
+          binding: ShortcutBinding | null,
+        ): binding is ShortcutBinding =>
+          !!binding?.key &&
+          modifiersMatchBinding(modifierBuffer, binding) &&
+          key === binding.key
 
-          const nextShellTWD =
-            nextShellBinding?.triggerWhenDetected ??
-            DEFAULT_KEYMAP.nextShell?.triggerWhenDetected
-          if (
-            nextShellTWD &&
-            h.nextShell &&
-            nextShellBinding?.key &&
-            modifiersMatchBinding(modifierBuffer, nextShellBinding) &&
-            key === nextShellBinding.key
-          ) {
-            e.preventDefault()
-            e.stopPropagation()
-            h.nextShell()
-            consumed = true
-            return
-          }
-        }
-
-        // --- Regular shortcuts: use heldNonModKeys + consumed gate ---
-        if (heldNonModKeys.has(e.code) || consumed) return
-        heldNonModKeys.add(e.code)
-
-        keyBuffer.push(key)
-
-        // Check palette: modifiers + accumulated keys match binding
-        if (
-          h.palette &&
-          paletteBinding &&
-          paletteBinding.key &&
-          modifiersMatchBinding(modifierBuffer, paletteBinding) &&
-          keyBuffer.join('') === paletteBinding.key
-        ) {
+        if (h.palette && matchKey(paletteBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.palette(new KeyboardEvent('keydown'))
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check togglePip: modifiers + accumulated keys match binding
-        if (
-          h.togglePip &&
-          togglePipBinding &&
-          togglePipBinding.key &&
-          modifiersMatchBinding(modifierBuffer, togglePipBinding) &&
-          keyBuffer.join('') === togglePipBinding.key
-        ) {
+        if (h.togglePip && matchKey(togglePipBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.togglePip()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check itemActions: modifiers + accumulated keys match binding
-        if (
-          h.itemActions &&
-          itemActionsBinding &&
-          itemActionsBinding.key &&
-          modifiersMatchBinding(modifierBuffer, itemActionsBinding) &&
-          keyBuffer.join('') === itemActionsBinding.key
-        ) {
+        if (h.itemActions && matchKey(itemActionsBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.itemActions()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check collapseAll: modifiers + accumulated keys match binding
-        if (
-          h.collapseAll &&
-          collapseAllBinding &&
-          collapseAllBinding.key &&
-          modifiersMatchBinding(modifierBuffer, collapseAllBinding) &&
-          keyBuffer.join('') === collapseAllBinding.key
-        ) {
+        if (h.collapseAll && matchKey(collapseAllBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.collapseAll()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check settings: modifiers + accumulated keys match binding
-        if (
-          h.settings &&
-          settingsBinding &&
-          settingsBinding.key &&
-          modifiersMatchBinding(modifierBuffer, settingsBinding) &&
-          keyBuffer.join('') === settingsBinding.key
-        ) {
+        if (h.settings && matchKey(settingsBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.settings()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check commitAmend
-        if (
-          h.commitAmend &&
-          commitAmendBinding &&
-          commitAmendBinding.key &&
-          modifiersMatchBinding(modifierBuffer, commitAmendBinding) &&
-          keyBuffer.join('') === commitAmendBinding.key
-        ) {
+        if (h.commitAmend && matchKey(commitAmendBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.commitAmend()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check newShell (only when commit dialog is not open)
         if (
           h.newShell &&
-          newShellBinding &&
-          newShellBinding.key &&
-          modifiersMatchBinding(modifierBuffer, newShellBinding) &&
-          keyBuffer.join('') === newShellBinding.key &&
+          matchKey(newShellBinding) &&
           !commitDialogOpenRef.current
         ) {
           e.preventDefault()
           e.stopPropagation()
           h.newShell()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check closeShell
-        if (
-          h.closeShell &&
-          closeShellBinding &&
-          closeShellBinding.key &&
-          modifiersMatchBinding(modifierBuffer, closeShellBinding) &&
-          keyBuffer.join('') === closeShellBinding.key
-        ) {
+        if (h.closeShell && matchKey(closeShellBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.closeShell()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check commitNoVerify
-        if (
-          h.commitNoVerify &&
-          commitNoVerifyBinding &&
-          commitNoVerifyBinding.key &&
-          modifiersMatchBinding(modifierBuffer, commitNoVerifyBinding) &&
-          keyBuffer.join('') === commitNoVerifyBinding.key
-        ) {
+        if (h.commitNoVerify && matchKey(commitNoVerifyBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.commitNoVerify()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check shellTemplates
-        if (
-          h.shellTemplates &&
-          shellTemplatesBinding &&
-          shellTemplatesBinding.key &&
-          modifiersMatchBinding(modifierBuffer, shellTemplatesBinding) &&
-          keyBuffer.join('') === shellTemplatesBinding.key
-        ) {
+        if (h.shellTemplates && matchKey(shellTemplatesBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.shellTemplates()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check prevShell (non-triggerWhenDetected fallback)
-        if (
-          !(
-            prevShellBinding?.triggerWhenDetected ??
-            DEFAULT_KEYMAP.prevShell?.triggerWhenDetected
-          ) &&
-          h.prevShell &&
-          prevShellBinding &&
-          prevShellBinding.key &&
-          modifiersMatchBinding(modifierBuffer, prevShellBinding) &&
-          keyBuffer.join('') === prevShellBinding.key
-        ) {
+        if (h.prevShell && matchKey(prevShellBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.prevShell()
-          consumed = true
-          suppressModifiers()
           return
         }
 
-        // Check nextShell (non-triggerWhenDetected fallback)
-        if (
-          !(
-            nextShellBinding?.triggerWhenDetected ??
-            DEFAULT_KEYMAP.nextShell?.triggerWhenDetected
-          ) &&
-          h.nextShell &&
-          nextShellBinding &&
-          nextShellBinding.key &&
-          modifiersMatchBinding(modifierBuffer, nextShellBinding) &&
-          keyBuffer.join('') === nextShellBinding.key
-        ) {
+        if (h.nextShell && matchKey(nextShellBinding)) {
           e.preventDefault()
           e.stopPropagation()
           h.nextShell()
-          consumed = true
-          suppressModifiers()
           return
         }
 
         // Check goToTab / goToShell: modifiers match + physical digit key pressed
-        // Use e.code for digit detection (Shift+3 gives e.key='#' but e.code='Digit3')
         const digit =
           e.code >= 'Digit0' && e.code <= 'Digit9' ? e.code[5] : null
         if (digit) {
@@ -567,10 +412,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           ) {
             e.preventDefault()
             e.stopPropagation()
-            digitBuffer.push(digit)
-            h.goToTab(Number.parseInt(digitBuffer.join(''), 10))
-            consumed = true
-            suppressModifiers()
+            h.goToTab(Number.parseInt(digit, 10))
           } else if (
             h.goToShell &&
             goToShellBinding &&
@@ -578,10 +420,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
           ) {
             e.preventDefault()
             e.stopPropagation()
-            digitBuffer.push(digit)
-            h.goToShell(Number.parseInt(digitBuffer.join(''), 10))
-            consumed = true
-            suppressModifiers()
+            h.goToShell(Number.parseInt(digit, 10))
           }
         }
 
@@ -629,10 +468,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       }
     }
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (!MODIFIER_KEYS.has(e.key)) {
-        heldNonModKeys.delete(e.code)
-      }
+    const handleKeyUp = (_e: KeyboardEvent) => {
       if (!active) return
 
       // When all modifiers released, check for modifier-only goToLastTab
@@ -643,10 +479,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
         !heldState.shift
       ) {
         if (
-          !consumed &&
+          !firedNonModifier &&
           goToLastTabBinding &&
-          keyBuffer.length === 0 &&
-          digitBuffer.length === 0 &&
           modifiersMatchBinding(modifierBuffer, goToLastTabBinding) &&
           handlersRef.current.goToLastTab
         ) {
