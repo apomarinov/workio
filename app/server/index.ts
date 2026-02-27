@@ -55,9 +55,12 @@ import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import {
+  getBellSubscribedShellIds,
   getSession,
   getSessionByTerminalId,
   startGitDirtyPolling,
+  subscribeBell,
+  unsubscribeBell,
   writeToSession,
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
@@ -164,6 +167,23 @@ io.on('connection', (socket) => {
   emitCachedPRChecks(socket)
   refreshPRChecks()
   startGitDirtyPolling()
+
+  // Bell subscriptions
+  socket.emit('bell:subscriptions', getBellSubscribedShellIds())
+  socket.on(
+    'bell:subscribe',
+    (data: {
+      shellId: number
+      terminalId: number
+      command: string
+      terminalName: string
+    }) => {
+      subscribeBell(data)
+    },
+  )
+  socket.on('bell:unsubscribe', (data: { shellId: number }) => {
+    unsubscribeBell(data.shellId)
+  })
 
   socket.on('detect-branches', () => {
     detectAllTerminalBranches()

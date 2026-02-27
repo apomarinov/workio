@@ -67,6 +67,29 @@ export interface PtySession {
 // In-memory map of active PTY sessions, keyed by shellId
 const sessions = new Map<number, PtySession>()
 
+// Bell subscriptions: notify client when a command ends in a subscribed shell
+interface BellSubscription {
+  shellId: number
+  terminalId: number
+  command: string
+  terminalName: string
+}
+const bellSubscriptions = new Map<number, BellSubscription>()
+
+export function subscribeBell(sub: BellSubscription): void {
+  bellSubscriptions.set(sub.shellId, sub)
+  getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())
+}
+
+export function unsubscribeBell(shellId: number): void {
+  bellSubscriptions.delete(shellId)
+  getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())
+}
+
+export function getBellSubscribedShellIds(): number[] {
+  return [...bellSubscriptions.keys()]
+}
+
 type ShellUpdates = { active_cmd?: string | null }
 
 function emitShellUpdate(
@@ -1117,7 +1140,7 @@ export async function createSession(
             scanAndEmitProcessesForTerminal(terminalId)
           }, 1000)
           break
-        case 'command_end':
+        case 'command_end': {
           if (session.processPollTimeoutId) {
             clearTimeout(session.processPollTimeoutId)
             session.processPollTimeoutId = null
@@ -1130,7 +1153,23 @@ export async function createSession(
           setTimeout(() => {
             scanAndEmitProcessesForTerminal(terminalId)
           }, 1000)
+
+          // Bell notification
+          const bellSub = bellSubscriptions.get(shellId)
+          if (bellSub) {
+            bellSubscriptions.delete(shellId)
+            const command = session.currentCommand || bellSub.command
+            getIO()?.emit('bell:notify', {
+              shellId,
+              terminalId,
+              command,
+              terminalName: bellSub.terminalName,
+              exitCode: event.exitCode,
+            })
+            getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())
+          }
           break
+        }
       }
       // Forward event to callback
       session.onCommandEvent?.(event)
@@ -1145,6 +1184,7 @@ export async function createSession(
   // Handle PTY exit
   backend.onExit(({ exitCode }) => {
     sessions.delete(shellId)
+    bellSubscriptions.delete(shellId)
     lastDirtyStatus.delete(terminalId)
     lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()
@@ -1330,6 +1370,9 @@ function destroySessionInternal(session: PtySession): void {
   if (session.timeoutId) {
     clearTimeout(session.timeoutId)
   }
+
+  // Clean up bell subscription
+  bellSubscriptions.delete(session.shell.id)
 
   // Kill PTY process and all child processes
   try {

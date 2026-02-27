@@ -3,8 +3,6 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Bell,
-  BellRing,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -82,9 +80,6 @@ export const TerminalItem = memo(function TerminalItem({
     shellPorts,
     gitDirtyStatus,
     gitRemoteSyncStatus,
-    subscribeToBell,
-    unsubscribeFromBell,
-    isBellSubscribed,
   } = useProcessContext()
   const processes = useMemo(
     () => allProcesses.filter((p) => p.terminalId === terminal.id),
@@ -467,17 +462,7 @@ export const TerminalItem = memo(function TerminalItem({
                           : 'text-muted-foreground/60 hover:text-muted-foreground',
                       )}
                     >
-                      <span className="flex items-center gap-1">
-                        {processes.some(
-                          (p) =>
-                            p.pid > 0 &&
-                            p.terminalId !== undefined &&
-                            isBellSubscribed(p.terminalId, p.pid),
-                        ) && (
-                          <BellRing className="w-2.5 h-2.5 text-yellow-400" />
-                        )}
-                        Processes ({processes.length})
-                      </span>
+                      Processes ({processes.length})
                     </button>
                   )}
                   {hasPorts && (
@@ -625,13 +610,6 @@ export const TerminalItem = memo(function TerminalItem({
                                 </button>
                                 {!isCollapsed &&
                                   procs.map((process) => {
-                                    const subscribed =
-                                      process.pid > 0 &&
-                                      process.terminalId !== undefined &&
-                                      isBellSubscribed(
-                                        process.terminalId,
-                                        process.pid,
-                                      )
                                     return (
                                       <div
                                         key={`${process.pid}-${process.command}`}
@@ -642,43 +620,6 @@ export const TerminalItem = memo(function TerminalItem({
                                           {process.command}
                                         </span>
                                         <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
-                                          {process.pid > 0 && (
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                if (subscribed) {
-                                                  unsubscribeFromBell(
-                                                    terminal.id,
-                                                    process.pid,
-                                                  )
-                                                  toast(
-                                                    'Unsubscribed from process',
-                                                  )
-                                                } else {
-                                                  subscribeToBell(
-                                                    process,
-                                                    displayName,
-                                                  )
-                                                  toast(
-                                                    'Subscribed — will notify when done',
-                                                  )
-                                                }
-                                              }}
-                                              className={cn(
-                                                'transition-colors cursor-pointer',
-                                                subscribed
-                                                  ? 'text-yellow-400'
-                                                  : 'text-muted-foreground/60 hover:text-foreground/90 hidden group-hover/proc:text-muted-foreground/80 group-hover/proc:block',
-                                              )}
-                                            >
-                                              {subscribed ? (
-                                                <BellRing className="w-3 h-3" />
-                                              ) : (
-                                                <Bell className="w-3 h-3" />
-                                              )}
-                                            </button>
-                                          )}
                                           {process.isZellij && (
                                             <button
                                               type="button"

@@ -21,6 +21,8 @@ import {
   Activity,
   AlertTriangle,
   Ban,
+  Bell,
+  BellRing,
   Bot,
   CheckIcon,
   ChevronDown,
@@ -29,18 +31,9 @@ import {
   Play,
   Plus,
   TrashIcon,
-  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuGroup,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
 import {
   Popover,
   PopoverContent,
@@ -131,14 +124,123 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
   )
 }
 
+function ShellPillPopover({
+  shell,
+  isMain,
+  terminal,
+  onRename,
+  onDelete,
+}: {
+  shell: Shell
+  isMain: boolean
+  terminal: Terminal
+  onRename: () => void
+  onDelete: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const { subscribeToBell, unsubscribeFromBell, isBellSubscribed } =
+    useProcessContext()
+  const bellSubscribed = isBellSubscribed(shell.id)
+  const hasActiveCmd = !!shell.active_cmd
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+          }}
+          className="flex-shrink-0 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+        >
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-44 p-1" align="start" side="bottom">
+        {hasActiveCmd && (
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+            onClick={() => {
+              if (bellSubscribed) {
+                unsubscribeFromBell(shell.id)
+              } else {
+                subscribeToBell(
+                  shell.id,
+                  terminal.id,
+                  shell.active_cmd!,
+                  terminal.name ?? `terminal-${terminal.id}`,
+                )
+              }
+              setOpen(false)
+            }}
+          >
+            {bellSubscribed ? (
+              <BellRing className="w-3.5 h-3.5 text-yellow-400" />
+            ) : (
+              <Bell className="w-3.5 h-3.5" />
+            )}
+            Notify On End
+          </button>
+        )}
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('open-file-picker', {
+                detail: { terminal },
+              }),
+            )
+            setOpen(false)
+          }}
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
+          Select Files
+        </button>
+        {!isMain && (
+          <>
+            <div className="my-1 h-px bg-border" />
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+              onClick={() => {
+                onRename()
+                setOpen(false)
+              }}
+            >
+              <PencilIcon className="w-3.5 h-3.5" />
+              Rename
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive"
+              onClick={() => {
+                onDelete()
+                setOpen(false)
+              }}
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
+              Close
+            </button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function SortableShellPill({
   shell,
   isActive,
   hasActivity,
+  bellSubscribed,
   isMain,
   displayName,
   onSelect,
   onDelete,
+  onRename,
+  terminal,
   shortcutHint,
   shellSession,
   ref,
@@ -147,10 +249,13 @@ function SortableShellPill({
   shell: Shell
   isActive: boolean
   hasActivity: boolean
+  bellSubscribed: boolean
   isMain: boolean
   displayName: string
   onSelect: () => void
   onDelete: () => void
+  onRename: () => void
+  terminal: Terminal
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
   ref?: React.Ref<HTMLButtonElement>
@@ -181,8 +286,8 @@ function SortableShellPill({
           (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
             node
       }}
-      // Order matters: rest (from ContextMenuTrigger asChild) must come before
-      // listeners and style so dnd-kit's onPointerDown and transform aren't overridden.
+      // Order matters: rest must come before listeners and style so
+      // dnd-kit's onPointerDown and transform aren't overridden.
       {...attributes}
       {...rest}
       {...listeners}
@@ -192,7 +297,7 @@ function SortableShellPill({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/pill flex max-w-[120px] min-w-[60px] items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
+        'group/pill flex max-w-[150px] min-w-[60px] items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
         isActive
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
@@ -200,10 +305,12 @@ function SortableShellPill({
     >
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
+      ) : bellSubscribed ? (
+        <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
       ) : hasActivity ? (
         <Activity className="w-3 h-3 shrink-0 text-green-500" />
       ) : null}
-      <span className="truncate relative text-center w-full">
+      <span className="truncate relative w-full text-center">
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
         </span>
@@ -213,18 +320,13 @@ function SortableShellPill({
           </span>
         )}
       </span>
-      {!isMain && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-          className="flex-shrink-0 text-muted-foreground hover:text-destructive cursor-pointer"
-        >
-          <X className="w-3 h-3" />
-        </button>
-      )}
+      <ShellPillPopover
+        shell={shell}
+        isMain={isMain}
+        terminal={terminal}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
     </button>
   )
 }
@@ -233,10 +335,13 @@ function SortableShellTab({
   shell,
   isActive,
   hasActivity,
+  bellSubscribed,
   isMain,
   displayName,
   onSelect,
   onDelete,
+  onRename,
+  terminal,
   shortcutHint,
   shellSession,
   position = 'top',
@@ -246,10 +351,13 @@ function SortableShellTab({
   shell: Shell
   isActive: boolean
   hasActivity: boolean
+  bellSubscribed: boolean
   isMain: boolean
   displayName: string
   onSelect: () => void
   onDelete: () => void
+  onRename: () => void
+  terminal: Terminal
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
   position?: 'top' | 'bottom'
@@ -281,8 +389,8 @@ function SortableShellTab({
           (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
             node
       }}
-      // Order matters: rest (from ContextMenuTrigger asChild) must come before
-      // listeners and style so dnd-kit's onPointerDown and transform aren't overridden.
+      // Order matters: rest must come before listeners and style so
+      // dnd-kit's onPointerDown and transform aren't overridden.
       {...attributes}
       {...rest}
       {...listeners}
@@ -292,7 +400,7 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[180px] border-t-2',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[180px] border-t-1',
         hasActivity
           ? isActive
             ? 'border-green-500/80'
@@ -307,6 +415,8 @@ function SortableShellTab({
     >
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
+      ) : bellSubscribed ? (
+        <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
       ) : hasActivity ? (
         <Activity className="w-3 h-3 shrink-0 text-green-500" />
       ) : null}
@@ -320,18 +430,13 @@ function SortableShellTab({
           </span>
         )}
       </span>
-      {!isMain && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-          className="flex-shrink-0 text-muted-foreground hover:text-destructive cursor-pointer"
-        >
-          <X className="w-3 h-3" />
-        </button>
-      )}
+      <ShellPillPopover
+        shell={shell}
+        isMain={isMain}
+        terminal={terminal}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
     </button>
   )
 }
@@ -349,7 +454,7 @@ export function ShellTabs({
   children,
   rightExtra,
 }: ShellTabsProps) {
-  const { processes } = useProcessContext()
+  const { processes, isBellSubscribed } = useProcessContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -706,72 +811,31 @@ export function ShellTabs({
                   const isMain = isMainShell(shell.id) ?? false
                   const shortcutIndex = index + 1
                   return (
-                    <ContextMenu key={shell.id}>
-                      <ContextMenuTrigger asChild>
-                        <SortableShellPill
-                          shell={shell}
-                          isActive={shell.id === activeShellId}
-                          hasActivity={shellHasActivity(shell.id)}
-                          isMain={isMain}
-                          displayName={
-                            shell.active_cmd ??
-                            (isMain
-                              ? (terminal.name ?? shell.name)
-                              : shell.name)
-                          }
-                          onSelect={() => onSelectShell(shell.id)}
-                          onDelete={() => handleDeleteShell(shell.id)}
-                          shellSession={shellSessionMap.get(shell.id)}
-                          shortcutHint={
-                            showShortcuts && shortcutIndex <= 9 ? (
-                              <>
-                                {modifierIcons.goToShell('w-2.5 h-2.5')}
-                                {shortcutIndex}
-                              </>
-                            ) : undefined
-                          }
-                        />
-                      </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuGroup>
-                          <ContextMenuItem
-                            onClick={() =>
-                              window.dispatchEvent(
-                                new CustomEvent('open-file-picker', {
-                                  detail: { terminal },
-                                }),
-                              )
-                            }
-                          >
-                            <FolderOpen />
-                            Select Files
-                          </ContextMenuItem>
-                        </ContextMenuGroup>
-                        {!isMain && (
+                    <SortableShellPill
+                      key={shell.id}
+                      shell={shell}
+                      isActive={shell.id === activeShellId}
+                      hasActivity={shellHasActivity(shell.id)}
+                      bellSubscribed={isBellSubscribed(shell.id)}
+                      isMain={isMain}
+                      displayName={
+                        shell.active_cmd ??
+                        (isMain ? (terminal.name ?? shell.name) : shell.name)
+                      }
+                      onSelect={() => onSelectShell(shell.id)}
+                      onDelete={() => handleDeleteShell(shell.id)}
+                      onRename={() => setRenameShellTarget(shell)}
+                      terminal={terminal}
+                      shellSession={shellSessionMap.get(shell.id)}
+                      shortcutHint={
+                        showShortcuts && shortcutIndex <= 9 ? (
                           <>
-                            <ContextMenuSeparator />
-                            <ContextMenuGroup>
-                              <ContextMenuItem
-                                onClick={() => setRenameShellTarget(shell)}
-                              >
-                                <PencilIcon />
-                                Rename
-                              </ContextMenuItem>
-                            </ContextMenuGroup>
-                            <ContextMenuSeparator />
-                            <ContextMenuGroup>
-                              <ContextMenuItem
-                                variant="destructive"
-                                onClick={() => handleDeleteShell(shell.id)}
-                              >
-                                <TrashIcon />
-                                Close
-                              </ContextMenuItem>
-                            </ContextMenuGroup>
+                            {modifierIcons.goToShell('w-2.5 h-2.5')}
+                            {shortcutIndex}
                           </>
-                        )}
-                      </ContextMenuContent>
-                    </ContextMenu>
+                        ) : undefined
+                      }
+                    />
                   )
                 })}
               </SortableContext>
@@ -812,73 +876,32 @@ export function ShellTabs({
                   const isMain = isMainShell(shell.id) ?? false
                   const shortcutIndex = index + 1
                   return (
-                    <ContextMenu key={shell.id}>
-                      <ContextMenuTrigger asChild>
-                        <SortableShellTab
-                          shell={shell}
-                          isActive={shell.id === activeShellId}
-                          hasActivity={shellHasActivity(shell.id)}
-                          isMain={isMain}
-                          displayName={
-                            shell.active_cmd ??
-                            (isMain
-                              ? (terminal.name ?? shell.name)
-                              : shell.name)
-                          }
-                          onSelect={() => onSelectShell(shell.id)}
-                          onDelete={() => handleDeleteShell(shell.id)}
-                          shellSession={shellSessionMap.get(shell.id)}
-                          position={position}
-                          shortcutHint={
-                            showShortcuts && shortcutIndex <= 9 ? (
-                              <>
-                                {modifierIcons.goToShell('w-2.5 h-2.5')}
-                                {shortcutIndex}
-                              </>
-                            ) : undefined
-                          }
-                        />
-                      </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuGroup>
-                          <ContextMenuItem
-                            onClick={() =>
-                              window.dispatchEvent(
-                                new CustomEvent('open-file-picker', {
-                                  detail: { terminal },
-                                }),
-                              )
-                            }
-                          >
-                            <FolderOpen />
-                            Select Files
-                          </ContextMenuItem>
-                        </ContextMenuGroup>
-                        {!isMain && (
+                    <SortableShellTab
+                      key={shell.id}
+                      shell={shell}
+                      isActive={shell.id === activeShellId}
+                      hasActivity={shellHasActivity(shell.id)}
+                      bellSubscribed={isBellSubscribed(shell.id)}
+                      isMain={isMain}
+                      displayName={
+                        shell.active_cmd ??
+                        (isMain ? (terminal.name ?? shell.name) : shell.name)
+                      }
+                      onSelect={() => onSelectShell(shell.id)}
+                      onDelete={() => handleDeleteShell(shell.id)}
+                      onRename={() => setRenameShellTarget(shell)}
+                      terminal={terminal}
+                      shellSession={shellSessionMap.get(shell.id)}
+                      position={position}
+                      shortcutHint={
+                        showShortcuts && shortcutIndex <= 9 ? (
                           <>
-                            <ContextMenuSeparator />
-                            <ContextMenuGroup>
-                              <ContextMenuItem
-                                onClick={() => setRenameShellTarget(shell)}
-                              >
-                                <PencilIcon />
-                                Rename
-                              </ContextMenuItem>
-                            </ContextMenuGroup>
-                            <ContextMenuSeparator />
-                            <ContextMenuGroup>
-                              <ContextMenuItem
-                                variant="destructive"
-                                onClick={() => handleDeleteShell(shell.id)}
-                              >
-                                <TrashIcon />
-                                Close
-                              </ContextMenuItem>
-                            </ContextMenuGroup>
+                            {modifierIcons.goToShell('w-2.5 h-2.5')}
+                            {shortcutIndex}
                           </>
-                        )}
-                      </ContextMenuContent>
-                    </ContextMenu>
+                        ) : undefined
+                      }
+                    />
                   )
                 })}
               </SortableContext>
