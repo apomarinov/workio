@@ -330,9 +330,11 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
     // Resolve path against terminal cwd if terminal_id is provided
     let resolvedPath = pathOnly
+    let terminalCwd: string | null = null
     if (terminal_id != null) {
       const terminal = await getTerminalById(terminal_id)
       if (terminal) {
+        terminalCwd = terminal.cwd
         // Resolve relative paths against terminal's cwd
         if (!pathOnly.startsWith('/') && !pathOnly.startsWith('~')) {
           resolvedPath = `${terminal.cwd}/${pathOnly}`
@@ -354,8 +356,13 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         : resolvedPath,
     )
 
+    // Include terminal cwd so the IDE opens the correct workspace window
+    const args = terminalCwd
+      ? [terminalCwd, '--goto', targetPath]
+      : ['--goto', targetPath]
+
     return new Promise<void>((resolve) => {
-      execFile(cmd, ['--goto', targetPath], { timeout: 5000 }, (err) => {
+      execFile(cmd, args, { timeout: 5000 }, (err) => {
         if (err) {
           reply
             .status(500)
@@ -369,19 +376,38 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   })
 
   // Open directory in native file explorer (Finder on macOS, xdg-open on Linux)
-  fastify.post<{ Body: { path: string } }>(
+  fastify.post<{ Body: { path: string; terminal_id?: number } }>(
     '/api/open-in-explorer',
     async (request, reply) => {
-      const { path: rawPath } = request.body
+      const { path: rawPath, terminal_id } = request.body
       if (!rawPath) {
         return reply.status(400).send({ error: 'Path is required' })
       }
 
-      const targetPath = expandPath(rawPath)
+      // Strip :line:col suffix (not relevant for file explorer)
+      const pathOnly = rawPath.replace(/:\d+(?::\d+)?$/, '')
+
+      // Resolve relative paths against terminal cwd
+      let resolvedPath = pathOnly
+      if (terminal_id != null) {
+        const terminal = await getTerminalById(terminal_id)
+        if (
+          terminal &&
+          !pathOnly.startsWith('/') &&
+          !pathOnly.startsWith('~')
+        ) {
+          resolvedPath = `${terminal.cwd}/${pathOnly}`
+        }
+      }
+
+      const targetPath = expandPath(resolvedPath)
       const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
+      // Use -R on macOS to reveal files in Finder instead of opening them
+      const args =
+        process.platform === 'darwin' ? ['-R', targetPath] : [targetPath]
 
       return new Promise<void>((resolve) => {
-        execFile(cmd, [targetPath], (err) => {
+        execFile(cmd, args, (err) => {
           if (err) {
             reply.status(500).send({ error: 'Failed to open file explorer' })
           } else {

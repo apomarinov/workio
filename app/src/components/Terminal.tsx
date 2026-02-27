@@ -13,7 +13,7 @@ import { useTerminalContext } from '../context/TerminalContext'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
-import { openInIDE } from '../lib/api'
+import { openInExplorer, openInIDE } from '../lib/api'
 
 interface TerminalProps {
   terminalId: number
@@ -440,13 +440,25 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
               },
             },
             text: filePath,
-            activate: (_event, linkText) => {
-              const ide = settingsRef.current?.preferred_ide ?? 'cursor'
-              openInIDE(linkText, ide, terminalIdRef.current).catch((err) => {
-                toast.error(
-                  err instanceof Error ? err.message : 'Failed to open in IDE',
-                )
-              })
+            activate: (event, linkText) => {
+              if (event instanceof MouseEvent && event.metaKey) {
+                openInExplorer(linkText, terminalIdRef.current).catch((err) => {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : 'Failed to open in Finder',
+                  )
+                })
+              } else {
+                const ide = settingsRef.current?.preferred_ide ?? 'cursor'
+                openInIDE(linkText, ide, terminalIdRef.current).catch((err) => {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : 'Failed to open in IDE',
+                  )
+                })
+              }
             },
           })
         }

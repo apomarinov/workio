@@ -697,7 +697,10 @@ function AppContent() {
               <ShellTabs
                 terminal={t}
                 activeShellId={activeShellId}
-                onSelectShell={(shellId) => setShell(t.id, shellId)}
+                onSelectShell={(shellId) => {
+                  selectTerminal(t.id)
+                  setShell(t.id, shellId)
+                }}
                 onCreateShell={() => handleCreateShell(t.id)}
                 onDeleteShell={(shellId) => handleDeleteShell(t.id, shellId)}
                 onRenameShell={handleRenameShell}
@@ -748,7 +751,10 @@ function AppContent() {
                     <ShellTabs
                       terminal={t}
                       activeShellId={activeShellId}
-                      onSelectShell={(shellId) => setShell(t.id, shellId)}
+                      onSelectShell={(shellId) => {
+                        selectTerminal(t.id)
+                        setShell(t.id, shellId)
+                      }}
                       onCreateShell={() => handleCreateShell(t.id)}
                       onDeleteShell={(shellId) =>
                         handleDeleteShell(t.id, shellId)

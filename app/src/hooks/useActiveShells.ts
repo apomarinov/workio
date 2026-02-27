@@ -23,7 +23,13 @@ export function useActiveShells(
   const [raw, setRaw] = useState<Record<number, number>>(loadStored)
 
   // --- setShell: update state + persist + dispatch shell-select ---
+  // Track explicit shell selections so the restore effect doesn't override them
+  const explicitSelectRef = useRef<{
+    terminalId: number
+    shellId: number
+  } | null>(null)
   const setShell = (terminalId: number, shellId: number) => {
+    explicitSelectRef.current = { terminalId, shellId }
     setRaw((prev) => {
       const next = { ...prev, [terminalId]: shellId }
       persist(next)
@@ -58,28 +64,39 @@ export function useActiveShells(
       if (shellId) previousShellPerTerminal.current[prevTid] = shellId
     }
 
-    // Restore incoming terminal's previous shell
+    // Restore incoming terminal's previous shell (unless user explicitly selected one)
     if (newTid !== null && newTid !== prevTid) {
-      const prevShellId = previousShellPerTerminal.current[newTid]
-      if (prevShellId) {
-        const terminal = terminals.find((t) => t.id === newTid)
-        if (terminal?.shells.some((s) => s.id === prevShellId)) {
-          setShell(newTid, prevShellId)
-          window.dispatchEvent(
-            new CustomEvent('shell-select', {
-              detail: { terminalId: newTid, shellId: prevShellId },
-            }),
-          )
-        }
-      } else if (prevTid === null) {
-        // On refresh (prev=null, next=active), dispatch shell-select to sync sidebar
-        const shellId = activeShellsRef.current[newTid]
-        if (shellId) {
-          window.dispatchEvent(
-            new CustomEvent('shell-select', {
-              detail: { terminalId: newTid, shellId },
-            }),
-          )
+      const explicit = explicitSelectRef.current
+      if (explicit?.terminalId === newTid) {
+        // User clicked a specific shell — don't override, just sync sidebar
+        explicitSelectRef.current = null
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId: newTid, shellId: explicit.shellId },
+          }),
+        )
+      } else {
+        const prevShellId = previousShellPerTerminal.current[newTid]
+        if (prevShellId) {
+          const terminal = terminals.find((t) => t.id === newTid)
+          if (terminal?.shells.some((s) => s.id === prevShellId)) {
+            setShell(newTid, prevShellId)
+            window.dispatchEvent(
+              new CustomEvent('shell-select', {
+                detail: { terminalId: newTid, shellId: prevShellId },
+              }),
+            )
+          }
+        } else if (prevTid === null) {
+          // On refresh (prev=null, next=active), dispatch shell-select to sync sidebar
+          const shellId = activeShellsRef.current[newTid]
+          if (shellId) {
+            window.dispatchEvent(
+              new CustomEvent('shell-select', {
+                detail: { terminalId: newTid, shellId },
+              }),
+            )
+          }
         }
       }
     }

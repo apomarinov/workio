@@ -147,11 +147,17 @@ export async function openInIDE(
   if (!res.ok) throw new Error('Failed to open IDE')
 }
 
-export async function openInExplorer(path: string): Promise<void> {
+export async function openInExplorer(
+  path: string,
+  terminalId?: number,
+): Promise<void> {
   const res = await fetch(`${API_BASE}/open-in-explorer`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path }),
+    body: JSON.stringify({
+      path,
+      ...(terminalId != null && { terminal_id: terminalId }),
+    }),
   })
   if (!res.ok) throw new Error('Failed to open file explorer')
 }
