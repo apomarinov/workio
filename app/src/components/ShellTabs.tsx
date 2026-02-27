@@ -124,7 +124,7 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
   )
 }
 
-function ShellPillPopover({
+function ShellPopover({
   shell,
   isMain,
   terminal,
@@ -157,35 +157,37 @@ function ShellPillPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-44 p-1" align="start" side="bottom">
-        {hasActiveCmd && (
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
-            onClick={() => {
-              if (bellSubscribed) {
-                unsubscribeFromBell(shell.id)
-              } else {
-                subscribeToBell(
-                  shell.id,
-                  terminal.id,
-                  shell.active_cmd!,
-                  terminal.name ?? `terminal-${terminal.id}`,
-                )
-              }
-              setOpen(false)
-            }}
-          >
-            {bellSubscribed ? (
-              <BellRing className="w-3.5 h-3.5 text-yellow-400" />
-            ) : (
-              <Bell className="w-3.5 h-3.5" />
-            )}
-            Notify On End
-          </button>
-        )}
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+        <Button
+          align="left"
+          variant="ghost"
+          className="flex w-full items-center gap-2 rounded-sm !px-1.5 !h-8 font-normal text-sm hover:bg-accent cursor-pointer"
+          title="Get a notification when the current command ends"
+          disabled={!hasActiveCmd}
+          onClick={() => {
+            if (bellSubscribed) {
+              unsubscribeFromBell(shell.id)
+            } else {
+              subscribeToBell(
+                shell.id,
+                terminal.id,
+                shell.active_cmd!,
+                terminal.name ?? `terminal-${terminal.id}`,
+              )
+            }
+            setOpen(false)
+          }}
+        >
+          {bellSubscribed ? (
+            <BellRing className="w-3.5 h-3.5 text-yellow-400" />
+          ) : (
+            <Bell className="w-3.5 h-3.5" />
+          )}
+          Notify On End
+        </Button>
+        <Button
+          align="left"
+          variant="ghost"
+          className="flex w-full items-center gap-2 rounded-sm !px-1.5 !h-8 font-normal text-sm hover:bg-accent cursor-pointer"
           onClick={() => {
             window.dispatchEvent(
               new CustomEvent('open-file-picker', {
@@ -197,13 +199,14 @@ function ShellPillPopover({
         >
           <FolderOpen className="w-3.5 h-3.5" />
           Select Files
-        </button>
+        </Button>
         {!isMain && (
           <>
             <div className="my-1 h-px bg-border" />
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+            <Button
+              align="left"
+              variant="ghost"
+              className="flex w-full items-center gap-2 rounded-sm !px-1.5 !h-8 font-normal text-sm hover:bg-accent cursor-pointer"
               onClick={() => {
                 onRename()
                 setOpen(false)
@@ -211,10 +214,11 @@ function ShellPillPopover({
             >
               <PencilIcon className="w-3.5 h-3.5" />
               Rename
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive"
+            </Button>
+            <Button
+              align="left"
+              variant="ghost"
+              className="flex w-full items-center gap-2 rounded-sm !px-1.5 !h-8 font-normal text-sm cursor-pointer !text-destructive"
               onClick={() => {
                 onDelete()
                 setOpen(false)
@@ -222,7 +226,7 @@ function ShellPillPopover({
             >
               <TrashIcon className="w-3.5 h-3.5" />
               Close
-            </button>
+            </Button>
           </>
         )}
       </PopoverContent>
@@ -320,7 +324,7 @@ function SortableShellPill({
           </span>
         )}
       </span>
-      <ShellPillPopover
+      <ShellPopover
         shell={shell}
         isMain={isMain}
         terminal={terminal}
@@ -430,7 +434,7 @@ function SortableShellTab({
           </span>
         )}
       </span>
-      <ShellPillPopover
+      <ShellPopover
         shell={shell}
         isMain={isMain}
         terminal={terminal}

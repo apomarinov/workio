@@ -43,10 +43,12 @@ function Button({
   variant = 'default',
   size = 'default',
   asChild = false,
+  align = 'center',
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    align?: 'center' | 'left'
   }) {
   const Comp = asChild ? Slot : 'button'
 
@@ -58,6 +60,7 @@ function Button({
       className={cn(
         buttonVariants({ variant, size, className }),
         'cursor-pointer',
+        align === 'left' && 'justify-start',
       )}
       {...props}
     />
