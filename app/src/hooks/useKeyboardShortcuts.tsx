@@ -1,27 +1,15 @@
 import { ArrowBigUp, ChevronUp, Command, Option } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
-import { useDocumentPip } from '@/context/DocumentPipContext'
-import { DEFAULT_KEYMAP, type Keymap, type ShortcutBinding } from '../types'
+import type { Options } from 'react-hotkeys-hook'
+import { useHotkeys } from 'react-hotkeys-hook'
+import {
+  bindingToHotkeyString,
+  DEFAULT_KEYMAP,
+  type Keymap,
+  type ShortcutBinding,
+} from '../types'
 import { useSettings } from './useSettings'
-
-type ModifierBuffer = {
-  meta: boolean
-  ctrl: boolean
-  alt: boolean
-  shift: boolean
-}
-
-function modifiersMatchBinding(
-  buf: ModifierBuffer,
-  binding: ShortcutBinding,
-): boolean {
-  if (buf.meta !== !!binding.metaKey) return false
-  if (buf.ctrl !== !!binding.ctrlKey) return false
-  if (buf.alt !== !!binding.altKey) return false
-  if (buf.shift !== !!binding.shiftKey) return false
-  return true
-}
 
 // --- Module-level modifier tracking ---
 
@@ -69,13 +57,6 @@ function handleModBlur() {
   suppressHeld = false
   if (heldState.meta || heldState.ctrl || heldState.alt || heldState.shift) {
     heldState = { meta: false, ctrl: false, alt: false, shift: false }
-    emitHeld()
-  }
-}
-
-function suppressModifiers() {
-  if (!suppressHeld) {
-    suppressHeld = true
     emitHeld()
   }
 }
@@ -158,12 +139,11 @@ export function useModifiersHeld() {
   }
 }
 
-// --- useKeyboardShortcuts: registers handlers, no store subscription ---
+// --- useKeyboardShortcuts: registers handlers via react-hotkeys-hook ---
 
 interface KeymapHandlers {
   palette?: (e: KeyboardEvent) => void
   goToTab?: (index: number) => void
-  goToLastTab?: () => void
   goToShell?: (index: number) => void
   prevShell?: () => void
   nextShell?: () => void
@@ -178,11 +158,22 @@ interface KeymapHandlers {
   shellTemplates?: () => void
 }
 
-const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
+function resolveBinding(
+  keymap: Keymap | undefined,
+  name: keyof Keymap,
+): ShortcutBinding | null {
+  if (!keymap) return DEFAULT_KEYMAP[name]
+  return keymap[name] === null ? null : (keymap[name] ?? DEFAULT_KEYMAP[name])
+}
+
+const HOTKEY_OPTS: Options = {
+  enableOnFormTags: true,
+  eventListenerOptions: { capture: true },
+  preventDefault: true,
+}
 
 export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const { settings } = useSettings()
-  const pip = useDocumentPip()
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
   const disabledRef = useRef(false)
@@ -203,322 +194,220 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     }
   }, [])
 
-  const paletteBinding =
-    settings?.keymap?.palette === null
-      ? null
-      : (settings?.keymap?.palette ?? DEFAULT_KEYMAP.palette)
-  const goToTabBinding =
-    settings?.keymap?.goToTab === null
-      ? null
-      : (settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab)
-  const goToLastTabBinding =
-    settings?.keymap?.goToLastTab === null
-      ? null
-      : (settings?.keymap?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab)
-  const goToShellBinding =
-    settings?.keymap?.goToShell === null
-      ? null
-      : (settings?.keymap?.goToShell ?? DEFAULT_KEYMAP.goToShell)
-  const prevShellBinding =
-    settings?.keymap?.prevShell === null
-      ? null
-      : (settings?.keymap?.prevShell ?? DEFAULT_KEYMAP.prevShell)
-  const nextShellBinding =
-    settings?.keymap?.nextShell === null
-      ? null
-      : (settings?.keymap?.nextShell ?? DEFAULT_KEYMAP.nextShell)
-  const togglePipBinding =
-    settings?.keymap?.togglePip === null
-      ? null
-      : (settings?.keymap?.togglePip ?? DEFAULT_KEYMAP.togglePip)
-  const itemActionsBinding =
-    settings?.keymap?.itemActions === null
-      ? null
-      : (settings?.keymap?.itemActions ?? DEFAULT_KEYMAP.itemActions)
-  const collapseAllBinding =
-    settings?.keymap?.collapseAll === null
-      ? null
-      : (settings?.keymap?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
-  const settingsBinding =
-    settings?.keymap?.settings === null
-      ? null
-      : (settings?.keymap?.settings ?? DEFAULT_KEYMAP.settings)
-  const newShellBinding =
-    settings?.keymap?.newShell === null
-      ? null
-      : (settings?.keymap?.newShell ?? DEFAULT_KEYMAP.newShell)
-  const closeShellBinding =
-    settings?.keymap?.closeShell === null
-      ? null
-      : (settings?.keymap?.closeShell ?? DEFAULT_KEYMAP.closeShell)
-  const commitAmendBinding =
-    settings?.keymap?.commitAmend === null
-      ? null
-      : (settings?.keymap?.commitAmend ?? DEFAULT_KEYMAP.commitAmend)
-  const commitNoVerifyBinding =
-    settings?.keymap?.commitNoVerify === null
-      ? null
-      : (settings?.keymap?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
-  const shellTemplatesBinding =
-    settings?.keymap?.shellTemplates === null
-      ? null
-      : (settings?.keymap?.shellTemplates ?? DEFAULT_KEYMAP.shellTemplates)
+  const keymap = settings?.keymap
+  const paletteBinding = resolveBinding(keymap, 'palette')
+  const goToTabBinding = resolveBinding(keymap, 'goToTab')
+  const goToShellBinding = resolveBinding(keymap, 'goToShell')
+  const prevShellBinding = resolveBinding(keymap, 'prevShell')
+  const nextShellBinding = resolveBinding(keymap, 'nextShell')
+  const togglePipBinding = resolveBinding(keymap, 'togglePip')
+  const itemActionsBinding = resolveBinding(keymap, 'itemActions')
+  const collapseAllBinding = resolveBinding(keymap, 'collapseAll')
+  const settingsBinding = resolveBinding(keymap, 'settings')
+  const newShellBinding = resolveBinding(keymap, 'newShell')
+  const closeShellBinding = resolveBinding(keymap, 'closeShell')
+  const commitAmendBinding = resolveBinding(keymap, 'commitAmend')
+  const commitNoVerifyBinding = resolveBinding(keymap, 'commitNoVerify')
+  const shellTemplatesBinding = resolveBinding(keymap, 'shellTemplates')
 
-  useEffect(() => {
-    let modifierBuffer: ModifierBuffer = {
-      meta: false,
-      ctrl: false,
-      alt: false,
-      shift: false,
-    }
-    let active = false
-    let firedNonModifier = false
+  // --- Standard key-based shortcuts (one useHotkeys per shortcut) ---
 
-    function reset() {
-      modifierBuffer = { meta: false, ctrl: false, alt: false, shift: false }
-      active = false
-      firedNonModifier = false
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
+  // Palette: special handling for bare-key binding (no modifiers = skip form elements)
+  useHotkeys(
+    paletteBinding?.key ? bindingToHotkeyString(paletteBinding) : '',
+    (e) => {
       if (disabledRef.current) return
-
-      if (MODIFIER_KEYS.has(e.key)) {
-        const mod = KEY_TO_MOD[e.key]
-        if (mod && !modifierBuffer[mod]) {
-          modifierBuffer = { ...modifierBuffer, [mod]: true }
-          active = true
-        }
-        return
-      }
-      // Non-modifier key while a modifier sequence is active
-      if (active) {
-        // Skip key-repeat events; fire once per discrete keypress
-        if (e.repeat) return
-        firedNonModifier = true
-
-        const h = handlersRef.current
-        // On macOS, Alt+key produces special characters (e.g. Alt+A → å).
-        // Use e.code to get the physical key when Alt is held.
-        const key =
-          modifierBuffer.alt && e.code.startsWith('Key')
-            ? e.code[3].toLowerCase()
-            : e.key.toLowerCase()
-
-        // Helper to match a key-based binding
-        const matchKey = (
-          binding: ShortcutBinding | null,
-        ): binding is ShortcutBinding =>
-          !!binding?.key &&
-          modifiersMatchBinding(modifierBuffer, binding) &&
-          key === binding.key
-
-        if (h.palette && matchKey(paletteBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.palette(new KeyboardEvent('keydown'))
-          return
-        }
-
-        if (h.togglePip && matchKey(togglePipBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.togglePip()
-          return
-        }
-
-        if (h.itemActions && matchKey(itemActionsBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.itemActions()
-          return
-        }
-
-        if (h.collapseAll && matchKey(collapseAllBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.collapseAll()
-          return
-        }
-
-        if (h.settings && matchKey(settingsBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.settings()
-          return
-        }
-
-        if (h.commitAmend && matchKey(commitAmendBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.commitAmend()
-          return
-        }
-
-        if (
-          h.newShell &&
-          matchKey(newShellBinding) &&
-          !commitDialogOpenRef.current
-        ) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.newShell()
-          return
-        }
-
-        if (h.closeShell && matchKey(closeShellBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.closeShell()
-          return
-        }
-
-        if (h.commitNoVerify && matchKey(commitNoVerifyBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.commitNoVerify()
-          return
-        }
-
-        if (h.shellTemplates && matchKey(shellTemplatesBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.shellTemplates()
-          return
-        }
-
-        if (h.prevShell && matchKey(prevShellBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.prevShell()
-          return
-        }
-
-        if (h.nextShell && matchKey(nextShellBinding)) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.nextShell()
-          return
-        }
-
-        // Check goToTab / goToShell: modifiers match + physical digit key pressed
-        const digit =
-          e.code >= 'Digit0' && e.code <= 'Digit9' ? e.code[5] : null
-        if (digit) {
-          if (
-            h.goToTab &&
-            goToTabBinding &&
-            modifiersMatchBinding(modifierBuffer, goToTabBinding)
-          ) {
-            e.preventDefault()
-            e.stopPropagation()
-            h.goToTab(Number.parseInt(digit, 10))
-          } else if (
-            h.goToShell &&
-            goToShellBinding &&
-            modifiersMatchBinding(modifierBuffer, goToShellBinding)
-          ) {
-            e.preventDefault()
-            e.stopPropagation()
-            h.goToShell(Number.parseInt(digit, 10))
-          }
-        }
-
-        return
-      }
-
-      // Plain key with no modifiers held: check for modifier-free palette binding
-      const h = handlersRef.current
       if (
-        h.palette &&
         paletteBinding &&
-        paletteBinding.key &&
         !paletteBinding.metaKey &&
         !paletteBinding.ctrlKey &&
         !paletteBinding.altKey &&
-        !paletteBinding.shiftKey &&
-        e.key.toLowerCase() === paletteBinding.key
+        !paletteBinding.shiftKey
       ) {
         const el = e.target as HTMLElement
         const tag = el?.tagName
         if (
-          tag !== 'INPUT' &&
-          tag !== 'SELECT' &&
-          tag !== 'TEXTAREA' &&
-          !el?.isContentEditable
-        ) {
-          e.preventDefault()
-          e.stopPropagation()
-          h.palette(new KeyboardEvent('keydown'))
+          tag === 'INPUT' ||
+          tag === 'SELECT' ||
+          tag === 'TEXTAREA' ||
+          el?.isContentEditable
+        )
           return
-        }
       }
+      e.stopPropagation()
+      handlersRef.current.palette?.(e)
+    },
+    HOTKEY_OPTS,
+  )
 
-      // Tab focuses the terminal when it's not already focused
-      if (e.key === 'Tab') {
-        const xtermTextarea = document.querySelector(
-          '.xterm-helper-textarea',
-        ) as HTMLTextAreaElement | null
-        if (!xtermTextarea) return
-        if (document.activeElement === xtermTextarea) return
-        const tag = document.activeElement?.tagName
-        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
-        e.preventDefault()
-        xtermTextarea.focus()
-      }
-    }
+  useHotkeys(
+    prevShellBinding?.key ? bindingToHotkeyString(prevShellBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.prevShell?.()
+    },
+    HOTKEY_OPTS,
+  )
 
-    const handleKeyUp = (_e: KeyboardEvent) => {
-      if (!active) return
+  useHotkeys(
+    nextShellBinding?.key ? bindingToHotkeyString(nextShellBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.nextShell?.()
+    },
+    HOTKEY_OPTS,
+  )
 
-      // When all modifiers released, check for modifier-only goToLastTab
+  useHotkeys(
+    togglePipBinding?.key ? bindingToHotkeyString(togglePipBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.togglePip?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    itemActionsBinding?.key ? bindingToHotkeyString(itemActionsBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.itemActions?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    collapseAllBinding?.key ? bindingToHotkeyString(collapseAllBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.collapseAll?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    settingsBinding?.key ? bindingToHotkeyString(settingsBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.settings?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  // newShell: suppressed when commit dialog is open (shares default binding with commitNoVerify)
+  useHotkeys(
+    newShellBinding?.key ? bindingToHotkeyString(newShellBinding) : '',
+    (e) => {
+      if (disabledRef.current || commitDialogOpenRef.current) return
+      e.stopPropagation()
+      handlersRef.current.newShell?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    closeShellBinding?.key ? bindingToHotkeyString(closeShellBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.closeShell?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    commitAmendBinding?.key ? bindingToHotkeyString(commitAmendBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.commitAmend?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    commitNoVerifyBinding?.key
+      ? bindingToHotkeyString(commitNoVerifyBinding)
+      : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.commitNoVerify?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    shellTemplatesBinding?.key
+      ? bindingToHotkeyString(shellTemplatesBinding)
+      : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.shellTemplates?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  // --- Digit shortcuts (goToTab / goToShell) ---
+  // Custom listener because these match any digit key with specific modifier combination
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (disabledRef.current) return
+      if (e.code < 'Digit0' || e.code > 'Digit9') return
+      const digit = Number.parseInt(e.code[5], 10)
+
+      const modMatch = (binding: ShortcutBinding) =>
+        e.metaKey === !!binding.metaKey &&
+        e.ctrlKey === !!binding.ctrlKey &&
+        e.altKey === !!binding.altKey &&
+        e.shiftKey === !!binding.shiftKey
+
       if (
-        !heldState.meta &&
-        !heldState.ctrl &&
-        !heldState.alt &&
-        !heldState.shift
+        goToTabBinding &&
+        modMatch(goToTabBinding) &&
+        handlersRef.current.goToTab
       ) {
-        if (
-          !firedNonModifier &&
-          goToLastTabBinding &&
-          modifiersMatchBinding(modifierBuffer, goToLastTabBinding) &&
-          handlersRef.current.goToLastTab
-        ) {
-          handlersRef.current.goToLastTab()
-          suppressModifiers()
-        }
-        reset()
+        e.preventDefault()
+        e.stopPropagation()
+        handlersRef.current.goToTab(digit)
+      } else if (
+        goToShellBinding &&
+        modMatch(goToShellBinding) &&
+        handlersRef.current.goToShell
+      ) {
+        e.preventDefault()
+        e.stopPropagation()
+        handlersRef.current.goToShell(digit)
       }
-    }
-
-    const handleBlur = () => {
-      reset()
     }
 
     window.addEventListener('keydown', handleKeyDown, true)
-    window.addEventListener('keyup', handleKeyUp)
-    window.addEventListener('blur', handleBlur)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true)
-      window.removeEventListener('keyup', handleKeyUp)
-      window.removeEventListener('blur', handleBlur)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [goToTabBinding, goToShellBinding])
+
+  // --- Tab key: focus terminal when pressed outside form elements ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const xtermTextarea = document.querySelector(
+        '.xterm-helper-textarea',
+      ) as HTMLTextAreaElement | null
+      if (!xtermTextarea) return
+      if (document.activeElement === xtermTextarea) return
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
+      e.preventDefault()
+      xtermTextarea.focus()
     }
-  }, [
-    paletteBinding,
-    goToTabBinding,
-    goToLastTabBinding,
-    goToShellBinding,
-    prevShellBinding,
-    nextShellBinding,
-    togglePipBinding,
-    itemActionsBinding,
-    collapseAllBinding,
-    settingsBinding,
-    newShellBinding,
-    closeShellBinding,
-    commitAmendBinding,
-    commitNoVerifyBinding,
-    shellTemplatesBinding,
-    pip.window,
-  ])
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [])
 }

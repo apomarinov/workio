@@ -291,7 +291,6 @@ export interface ShortcutBinding {
 export interface Keymap {
   palette: ShortcutBinding | null
   goToTab: ShortcutBinding | null
-  goToLastTab: ShortcutBinding | null
   goToShell: ShortcutBinding | null
   prevShell: ShortcutBinding | null
   nextShell: ShortcutBinding | null
@@ -309,19 +308,81 @@ export interface Keymap {
 export const DEFAULT_KEYMAP: Keymap = {
   palette: { metaKey: true, key: 'k' },
   goToTab: { metaKey: true },
-  goToLastTab: { metaKey: true, shiftKey: true },
   goToShell: { altKey: true },
-  prevShell: { altKey: true, key: '[' },
-  nextShell: { altKey: true, key: ']' },
+  prevShell: { altKey: true, key: 'bracketleft' },
+  nextShell: { altKey: true, key: 'bracketright' },
   togglePip: { metaKey: true, key: 'p' },
   itemActions: { metaKey: true, key: 'i' },
   collapseAll: { metaKey: true, key: 'arrowup' },
-  settings: { metaKey: true, key: ',' },
+  settings: { metaKey: true, key: 'comma' },
   newShell: { altKey: true, key: 'n' },
   closeShell: { altKey: true, key: 'w' },
   commitAmend: { altKey: true, key: 'a' },
   commitNoVerify: { altKey: true, key: 'n' },
   shellTemplates: { shiftKey: true, altKey: true, key: 'k' },
+}
+
+// Map event.code-based key names to display characters
+export const CODE_TO_DISPLAY: Record<string, string> = {
+  bracketleft: '[',
+  bracketright: ']',
+  comma: ',',
+  period: '.',
+  slash: '/',
+  backslash: '\\',
+  semicolon: ';',
+  quote: "'",
+  backquote: '`',
+  minus: '-',
+  equal: '=',
+}
+
+// Map old char-based key values to new code-based names (for migration)
+const CHAR_TO_CODE: Record<string, string> = {
+  '[': 'bracketleft',
+  ']': 'bracketright',
+  ',': 'comma',
+  '.': 'period',
+  '/': 'slash',
+  '\\': 'backslash',
+  ';': 'semicolon',
+  "'": 'quote',
+  '`': 'backquote',
+  '-': 'minus',
+  '=': 'equal',
+}
+
+// Convert event.code to our normalized key name (lowercase, no prefix)
+export function mapEventCode(code: string): string {
+  // KeyA → a, KeyZ → z
+  if (code.startsWith('Key')) return code.slice(3).toLowerCase()
+  // Digit0 → 0
+  if (code.startsWith('Digit')) return code.slice(5)
+  // BracketLeft → bracketleft, ArrowUp → arrowup, Comma → comma
+  return code.toLowerCase()
+}
+
+// Convert a ShortcutBinding to a react-hotkeys-hook hotkey string
+export function bindingToHotkeyString(b: ShortcutBinding): string {
+  const parts: string[] = []
+  if (b.ctrlKey) parts.push('ctrl')
+  if (b.altKey) parts.push('alt')
+  if (b.shiftKey) parts.push('shift')
+  if (b.metaKey) parts.push('meta')
+  if (b.key) parts.push(b.key)
+  return parts.join('+')
+}
+
+// Migrate old char-based keymap values to code-based names
+export function migrateKeymap(keymap: Keymap): Keymap {
+  const result = { ...keymap }
+  for (const name of Object.keys(result) as (keyof Keymap)[]) {
+    const binding = result[name]
+    if (binding?.key && CHAR_TO_CODE[binding.key]) {
+      result[name] = { ...binding, key: CHAR_TO_CODE[binding.key] }
+    }
+  }
+  return result
 }
 
 export interface RepoWebhookStatus {

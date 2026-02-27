@@ -65,12 +65,14 @@
 
 ## Keyboard Shortcuts
 
+Uses `react-hotkeys-hook` (v5) for key detection. Key names in `DEFAULT_KEYMAP` use `event.code`-based names (e.g. `bracketleft` not `[`, `comma` not `,`). The `bindingToHotkeyString()` utility converts bindings to react-hotkeys-hook format. `CODE_TO_DISPLAY` maps code names back to display characters for the UI.
+
 To add a new shortcut:
 
-1. **`src/types.ts`** — Add entry to `Keymap` interface and `DEFAULT_KEYMAP` with the default binding. Digit-based shortcuts (like `goToTab`) use modifier-only bindings (e.g. `{ altKey: true }`); key-based shortcuts include `key` (e.g. `{ metaKey: true, key: '[' }`).
-2. **`src/hooks/useKeyboardShortcuts.tsx`** — Add handler to `KeymapHandlers` interface, resolve the binding from settings (same pattern as existing ones), add detection logic in `handleKeyDown` (key-match for regular shortcuts, digit-match for index-based), and add to the `useEffect` dependency array.
+1. **`src/types.ts`** — Add entry to `Keymap` interface and `DEFAULT_KEYMAP` with the default binding. Digit-based shortcuts (like `goToTab`) use modifier-only bindings (e.g. `{ altKey: true }`); key-based shortcuts include `key` using `event.code`-based name (e.g. `{ altKey: true, key: 'bracketleft' }`). If the key has a non-obvious display form, add it to `CODE_TO_DISPLAY`.
+2. **`src/hooks/useKeyboardShortcuts.tsx`** — Add handler to `KeymapHandlers` interface, resolve the binding via `resolveBinding()`, add a `useHotkeys()` call using `bindingToHotkeyString()` with `HOTKEY_OPTS` (capture phase, enableOnFormTags, preventDefault). Check `disabledRef.current` at the start of the callback. Call `e.stopPropagation()` before invoking the handler.
 3. **`src/App.tsx`** — Add handler implementation in the `useKeyboardShortcuts({...})` call. **Use refs** (`activeTerminalRef`, `activeShellsRef`, `terminalsRef`) instead of direct state — the handler closures are stale since they're stored in a ref inside the hook.
-4. **`src/components/KeymapModal.tsx`** — Wire up in all places: `ShortcutName` union, `useState`, `useEffect` sync from settings, `finalize` in recording, `handleSave`, `handleReset`, `handleDiscardChanges`, `hasUnsavedChanges`, `findDuplicates`, and add a `<ShortcutRow>` in the UI.
+4. **`src/components/KeymapModal.tsx`** — Add a `<ShortcutRow>` using the `bindings` state object and `setBinding(name, value)` helper. Recording uses `mapEventCode(e.code)` for code-based key names.
 5. If the shortcut changes state that the sidebar also tracks (e.g. active shell), **dispatch a custom event** (e.g. `shell-select`) so sidebar components stay in sync.
 
 ## Database access

@@ -23,7 +23,13 @@ import {
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
-import { DEFAULT_KEYMAP, type ShortcutBinding } from '../types'
+import {
+  CODE_TO_DISPLAY,
+  DEFAULT_KEYMAP,
+  type Keymap,
+  mapEventCode,
+  type ShortcutBinding,
+} from '../types'
 import { ConfirmModal } from './ConfirmModal'
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
@@ -32,6 +38,17 @@ const MOD_MAP: Record<string, 'meta' | 'ctrl' | 'alt' | 'shift'> = {
   Control: 'ctrl',
   Alt: 'alt',
   Shift: 'shift',
+}
+
+// Convert e.code to a display-friendly key name for the recording preview.
+// On macOS, Alt+key produces special chars in e.key (e.g. Dead, ˜, å),
+// so we derive the display from e.code which always gives the physical key.
+function codeToPreviewKey(code: string): string {
+  if (code.startsWith('Key')) return code.slice(3) // KeyA → A
+  if (code.startsWith('Digit')) return code.slice(5) // Digit1 → 1
+  if (code.startsWith('Arrow')) return code // ArrowUp → ArrowUp (renderKey handles icons)
+  const normalized = code.toLowerCase()
+  return CODE_TO_DISPLAY[normalized] ?? code
 }
 
 // Apple convention: Control → Option → Shift → Command, then non-modifiers
@@ -63,6 +80,9 @@ function formatKeyDisplay(key: string): ReactNode {
   if (key === 'arrowdown') return <ArrowDown className={cls} />
   if (key === 'arrowleft') return <ArrowLeft className={cls} />
   if (key === 'arrowright') return <ArrowRight className={cls} />
+  // Map code-based names to display characters
+  const display = CODE_TO_DISPLAY[key]
+  if (display) return <span>{display.toUpperCase()}</span>
   return <span>{key.toUpperCase()}</span>
 }
 
@@ -103,22 +123,7 @@ function bindingsConflict(
   )
 }
 
-type ShortcutName =
-  | 'palette'
-  | 'goToTab'
-  | 'goToLastTab'
-  | 'goToShell'
-  | 'prevShell'
-  | 'nextShell'
-  | 'togglePip'
-  | 'itemActions'
-  | 'collapseAll'
-  | 'settings'
-  | 'newShell'
-  | 'closeShell'
-  | 'commitAmend'
-  | 'commitNoVerify'
-  | 'shellTemplates'
+type ShortcutName = keyof Keymap
 
 // Pairs that intentionally share a binding (context-dependent shortcuts)
 const ALLOWED_DUPLICATE_PAIRS = new Set([
@@ -170,50 +175,15 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
     }
   }, [open])
 
-  const [palette, setPalette] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.palette,
-  )
-  const [goToTab, setGoToTab] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.goToTab,
-  )
-  const [goToLastTab, setGoToLastTab] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.goToLastTab,
-  )
-  const [goToShell, setGoToShell] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.goToShell,
-  )
-  const [prevShell, setPrevShell] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.prevShell,
-  )
-  const [nextShell, setNextShell] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.nextShell,
-  )
-  const [togglePip, setTogglePip] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.togglePip,
-  )
-  const [itemActions, setItemActions] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.itemActions,
-  )
-  const [collapseAll, setCollapseAll] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.collapseAll,
-  )
-  const [settingsShortcut, setSettingsShortcut] =
-    useState<ShortcutBinding | null>(DEFAULT_KEYMAP.settings)
-  const [newShell, setNewShell] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.newShell,
-  )
-  const [closeShell, setCloseShell] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.closeShell,
-  )
-  const [commitAmend, setCommitAmend] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.commitAmend,
-  )
-  const [commitNoVerify, setCommitNoVerify] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.commitNoVerify,
-  )
-  const [shellTemplates, setShellTemplates] = useState<ShortcutBinding | null>(
-    DEFAULT_KEYMAP.shellTemplates,
-  )
+  // Single state object for all bindings
+  const [bindings, setBindings] = useState<
+    Record<ShortcutName, ShortcutBinding | null>
+  >({ ...DEFAULT_KEYMAP })
+
+  const setBinding = (name: ShortcutName, value: ShortcutBinding | null) => {
+    setBindings((prev) => ({ ...prev, [name]: value }))
+  }
+
   const [recording, setRecording] = useState<ShortcutName | null>(null)
   const [recordingKeys, setRecordingKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -222,59 +192,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   // Check if current state differs from saved settings
   const hasUnsavedChanges = useMemo(() => {
     const saved = settings?.keymap
-    const savedPalette = saved?.palette ?? DEFAULT_KEYMAP.palette
-    const savedGoToTab = saved?.goToTab ?? DEFAULT_KEYMAP.goToTab
-    const savedGoToLastTab = saved?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab
-    const savedGoToShell = saved?.goToShell ?? DEFAULT_KEYMAP.goToShell
-    const savedPrevShell = saved?.prevShell ?? DEFAULT_KEYMAP.prevShell
-    const savedNextShell = saved?.nextShell ?? DEFAULT_KEYMAP.nextShell
-    const savedTogglePip = saved?.togglePip ?? DEFAULT_KEYMAP.togglePip
-    const savedItemActions = saved?.itemActions ?? DEFAULT_KEYMAP.itemActions
-    const savedCollapseAll = saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll
-    const savedSettings = saved?.settings ?? DEFAULT_KEYMAP.settings
-    const savedNewShell = saved?.newShell ?? DEFAULT_KEYMAP.newShell
-    const savedCloseShell = saved?.closeShell ?? DEFAULT_KEYMAP.closeShell
-    const savedCommitAmend = saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend
-    const savedCommitNoVerify =
-      saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify
-    const savedShellTemplates =
-      saved?.shellTemplates ?? DEFAULT_KEYMAP.shellTemplates
-
-    return (
-      !bindingsEqual(palette, savedPalette) ||
-      !bindingsEqual(goToTab, savedGoToTab) ||
-      !bindingsEqual(goToLastTab, savedGoToLastTab) ||
-      !bindingsEqual(goToShell, savedGoToShell) ||
-      !bindingsEqual(prevShell, savedPrevShell) ||
-      !bindingsEqual(nextShell, savedNextShell) ||
-      !bindingsEqual(togglePip, savedTogglePip) ||
-      !bindingsEqual(itemActions, savedItemActions) ||
-      !bindingsEqual(collapseAll, savedCollapseAll) ||
-      !bindingsEqual(settingsShortcut, savedSettings) ||
-      !bindingsEqual(newShell, savedNewShell) ||
-      !bindingsEqual(closeShell, savedCloseShell) ||
-      !bindingsEqual(commitAmend, savedCommitAmend) ||
-      !bindingsEqual(commitNoVerify, savedCommitNoVerify) ||
-      !bindingsEqual(shellTemplates, savedShellTemplates)
-    )
-  }, [
-    settings?.keymap,
-    palette,
-    goToTab,
-    goToLastTab,
-    goToShell,
-    prevShell,
-    nextShell,
-    togglePip,
-    itemActions,
-    collapseAll,
-    settingsShortcut,
-    newShell,
-    closeShell,
-    commitAmend,
-    commitNoVerify,
-    shellTemplates,
-  ])
+    for (const name of Object.keys(DEFAULT_KEYMAP) as ShortcutName[]) {
+      const savedBinding = saved?.[name] ?? DEFAULT_KEYMAP[name]
+      if (!bindingsEqual(bindings[name], savedBinding)) return true
+    }
+    return false
+  }, [settings?.keymap, bindings])
 
   const handleClose = (newOpen: boolean) => {
     if (!newOpen && hasUnsavedChanges) {
@@ -286,157 +209,51 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
 
   const handleDiscardChanges = () => {
     setShowConfirmClose(false)
-    // Reset to saved values
     const saved = settings?.keymap
-    setPalette(saved?.palette ?? DEFAULT_KEYMAP.palette)
-    setGoToTab(saved?.goToTab ?? DEFAULT_KEYMAP.goToTab)
-    setGoToLastTab(saved?.goToLastTab ?? DEFAULT_KEYMAP.goToLastTab)
-    setGoToShell(saved?.goToShell ?? DEFAULT_KEYMAP.goToShell)
-    setPrevShell(saved?.prevShell ?? DEFAULT_KEYMAP.prevShell)
-    setNextShell(saved?.nextShell ?? DEFAULT_KEYMAP.nextShell)
-    setTogglePip(saved?.togglePip ?? DEFAULT_KEYMAP.togglePip)
-    setItemActions(saved?.itemActions ?? DEFAULT_KEYMAP.itemActions)
-    setCollapseAll(saved?.collapseAll ?? DEFAULT_KEYMAP.collapseAll)
-    setSettingsShortcut(saved?.settings ?? DEFAULT_KEYMAP.settings)
-    setNewShell(saved?.newShell ?? DEFAULT_KEYMAP.newShell)
-    setCloseShell(saved?.closeShell ?? DEFAULT_KEYMAP.closeShell)
-    setCommitAmend(saved?.commitAmend ?? DEFAULT_KEYMAP.commitAmend)
-    setCommitNoVerify(saved?.commitNoVerify ?? DEFAULT_KEYMAP.commitNoVerify)
-    setShellTemplates(saved?.shellTemplates ?? DEFAULT_KEYMAP.shellTemplates)
+    const restored = {} as Record<ShortcutName, ShortcutBinding | null>
+    for (const name of Object.keys(DEFAULT_KEYMAP) as ShortcutName[]) {
+      restored[name] = saved?.[name] ?? DEFAULT_KEYMAP[name]
+    }
+    setBindings(restored)
     onOpenChange(false)
   }
 
+  // Sync from settings when they load/change
   useEffect(() => {
     if (settings?.keymap) {
-      setPalette(settings.keymap.palette)
-      setGoToTab(settings.keymap.goToTab)
-      if (settings.keymap.goToLastTab !== undefined) {
-        setGoToLastTab(settings.keymap.goToLastTab)
+      const updated = {} as Record<ShortcutName, ShortcutBinding | null>
+      for (const name of Object.keys(DEFAULT_KEYMAP) as ShortcutName[]) {
+        updated[name] =
+          settings.keymap[name] !== undefined
+            ? settings.keymap[name]
+            : DEFAULT_KEYMAP[name]
       }
-      if (settings.keymap.goToShell !== undefined) {
-        setGoToShell(settings.keymap.goToShell)
-      }
-      if (settings.keymap.prevShell !== undefined) {
-        setPrevShell(settings.keymap.prevShell)
-      }
-      if (settings.keymap.nextShell !== undefined) {
-        setNextShell(settings.keymap.nextShell)
-      }
-      if (settings.keymap.togglePip !== undefined) {
-        setTogglePip(settings.keymap.togglePip)
-      }
-      if (settings.keymap.itemActions !== undefined) {
-        setItemActions(settings.keymap.itemActions)
-      }
-      if (settings.keymap.collapseAll !== undefined) {
-        setCollapseAll(settings.keymap.collapseAll)
-      }
-      if (settings.keymap.settings !== undefined) {
-        setSettingsShortcut(settings.keymap.settings)
-      }
-      if (settings.keymap.newShell !== undefined) {
-        setNewShell(settings.keymap.newShell)
-      }
-      if (settings.keymap.closeShell !== undefined) {
-        setCloseShell(settings.keymap.closeShell)
-      }
-      if (settings.keymap.commitAmend !== undefined) {
-        setCommitAmend(settings.keymap.commitAmend)
-      }
-      if (settings.keymap.commitNoVerify !== undefined) {
-        setCommitNoVerify(settings.keymap.commitNoVerify)
-      }
-      if (settings.keymap.shellTemplates !== undefined) {
-        setShellTemplates(settings.keymap.shellTemplates)
-      }
+      setBindings(updated)
     }
   }, [settings?.keymap])
 
+  // Recording effect
   useEffect(() => {
     if (!recording) return
     setRecordingKeys([])
 
     const heldMods = new Set<string>()
-    const heldNonModKeys = new Set<string>()
     let modifierBuffer = { meta: false, ctrl: false, alt: false, shift: false }
     const keyBuffer: string[] = []
     let active = false
 
     function finalize() {
+      if (!recording) return
       const binding: ShortcutBinding = {}
       if (modifierBuffer.meta) binding.metaKey = true
       if (modifierBuffer.ctrl) binding.ctrlKey = true
       if (modifierBuffer.alt) binding.altKey = true
       if (modifierBuffer.shift) binding.shiftKey = true
 
-      if (recording === 'palette') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setPalette(binding)
-      } else if (recording === 'goToTab') {
-        setGoToTab(binding)
-      } else if (recording === 'goToLastTab') {
-        setGoToLastTab(binding)
-      } else if (recording === 'goToShell') {
-        setGoToShell(binding)
-      } else if (recording === 'prevShell') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setPrevShell(binding)
-      } else if (recording === 'nextShell') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setNextShell(binding)
-      } else if (recording === 'togglePip') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setTogglePip(binding)
-      } else if (recording === 'itemActions') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setItemActions(binding)
-      } else if (recording === 'collapseAll') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setCollapseAll(binding)
-      } else if (recording === 'settings') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setSettingsShortcut(binding)
-      } else if (recording === 'newShell') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setNewShell(binding)
-      } else if (recording === 'closeShell') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setCloseShell(binding)
-      } else if (recording === 'commitAmend') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setCommitAmend(binding)
-      } else if (recording === 'commitNoVerify') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setCommitNoVerify(binding)
-      } else if (recording === 'shellTemplates') {
-        if (keyBuffer.length > 0) {
-          binding.key = keyBuffer.join('')
-        }
-        setShellTemplates(binding)
+      if (keyBuffer.length > 0) {
+        binding.key = keyBuffer.join('')
       }
-
+      setBinding(recording, binding)
       setRecording(null)
     }
 
@@ -465,29 +282,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
 
       // Non-modifier key with no modifiers held: record immediately
       if (!active) {
-        setRecordingKeys([e.key])
-        if (recording === 'palette') {
-          setPalette({ key: e.key.toLowerCase() })
-        } else if (recording === 'goToTab') {
-          setGoToTab({})
-        } else if (recording === 'goToLastTab') {
-          setGoToLastTab({})
-        } else if (recording === 'togglePip') {
-          setTogglePip({ key: e.key.toLowerCase() })
-        } else if (recording === 'itemActions') {
-          setItemActions({ key: e.key.toLowerCase() })
-        } else if (recording === 'collapseAll') {
-          setCollapseAll({ key: e.key.toLowerCase() })
-        } else if (recording === 'settings') {
-          setSettingsShortcut({ key: e.key.toLowerCase() })
-        } else if (recording === 'newShell') {
-          setNewShell({ key: e.key.toLowerCase() })
-        } else if (recording === 'closeShell') {
-          setCloseShell({ key: e.key.toLowerCase() })
-        } else if (recording === 'commitAmend') {
-          setCommitAmend({ key: e.key.toLowerCase() })
-        } else if (recording === 'commitNoVerify') {
-          setCommitNoVerify({ key: e.key.toLowerCase() })
+        setRecordingKeys([codeToPreviewKey(e.code)])
+        // Modifier-only shortcuts (goToTab, goToShell) get empty binding on bare key
+        if (!DEFAULT_KEYMAP[recording]?.key) {
+          setBinding(recording, {})
+        } else {
+          setBinding(recording, { key: mapEventCode(e.code) })
         }
         setRecording(null)
         return
@@ -499,19 +299,16 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
         return
       }
 
-      // Non-modifier key while modifiers are held: buffer if not already held
-      if (heldNonModKeys.has(e.key)) return
-      heldNonModKeys.add(e.key)
-      keyBuffer.push(e.key.toLowerCase())
-      setRecordingKeys((prev) => [...prev, e.key])
+      // Non-modifier key while modifiers are held: finalize immediately
+      // (multi-key bindings like Alt+IAB can't be matched, so only accept one key)
+      keyBuffer.push(mapEventCode(e.code))
+      setRecordingKeys((prev) => [...prev, codeToPreviewKey(e.code)])
+      finalize()
     }
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (MODIFIER_KEYS.has(e.key)) {
-        heldMods.delete(e.key)
-      } else {
-        heldNonModKeys.delete(e.key)
-      }
+      if (!MODIFIER_KEYS.has(e.key)) return
+      heldMods.delete(e.key)
       setRecordingKeys((prev) => prev.filter((k) => k !== e.key))
       if (active && heldMods.size === 0) {
         finalize()
@@ -537,25 +334,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await updateSettings({
-        keymap: {
-          palette,
-          goToTab,
-          goToLastTab,
-          goToShell,
-          prevShell,
-          nextShell,
-          togglePip,
-          itemActions,
-          collapseAll,
-          settings: settingsShortcut,
-          newShell,
-          closeShell,
-          commitAmend,
-          commitNoVerify,
-          shellTemplates,
-        },
-      })
+      await updateSettings({ keymap: bindings as Keymap })
       toast.success('Keyboard shortcuts saved')
       onOpenChange(false)
     } catch (err) {
@@ -568,62 +347,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
   }
 
   const handleReset = () => {
-    setPalette(DEFAULT_KEYMAP.palette)
-    setGoToTab(DEFAULT_KEYMAP.goToTab)
-    setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)
-    setGoToShell(DEFAULT_KEYMAP.goToShell)
-    setPrevShell(DEFAULT_KEYMAP.prevShell)
-    setNextShell(DEFAULT_KEYMAP.nextShell)
-    setTogglePip(DEFAULT_KEYMAP.togglePip)
-    setItemActions(DEFAULT_KEYMAP.itemActions)
-    setCollapseAll(DEFAULT_KEYMAP.collapseAll)
-    setSettingsShortcut(DEFAULT_KEYMAP.settings)
-    setNewShell(DEFAULT_KEYMAP.newShell)
-    setCloseShell(DEFAULT_KEYMAP.closeShell)
-    setCommitAmend(DEFAULT_KEYMAP.commitAmend)
-    setCommitNoVerify(DEFAULT_KEYMAP.commitNoVerify)
-    setShellTemplates(DEFAULT_KEYMAP.shellTemplates)
+    setBindings({ ...DEFAULT_KEYMAP })
     setRecording(null)
   }
 
-  const hasConflict = bindingsConflict(palette, goToTab)
-  const duplicates = useMemo(
-    () =>
-      findDuplicates({
-        palette,
-        goToTab,
-        goToLastTab,
-        goToShell,
-        prevShell,
-        nextShell,
-        togglePip,
-        itemActions,
-        collapseAll,
-        settings: settingsShortcut,
-        newShell,
-        closeShell,
-        commitAmend,
-        commitNoVerify,
-        shellTemplates,
-      }),
-    [
-      palette,
-      goToTab,
-      goToLastTab,
-      goToShell,
-      prevShell,
-      nextShell,
-      togglePip,
-      itemActions,
-      collapseAll,
-      settingsShortcut,
-      newShell,
-      closeShell,
-      commitAmend,
-      commitNoVerify,
-      shellTemplates,
-    ],
-  )
+  const hasConflict = bindingsConflict(bindings.palette, bindings.goToTab)
+  const duplicates = useMemo(() => findDuplicates(bindings), [bindings])
 
   return (
     <>
@@ -636,45 +365,34 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           <div className="space-y-1.5 max-h-[75vh] overflow-y-auto pr-1">
             <ShortcutRow
               label="Command Palette"
-              binding={palette}
+              binding={bindings.palette}
               isRecording={recording === 'palette'}
               recordingKeys={recording === 'palette' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'palette' ? null : 'palette')
               }
-              onReset={() => setPalette(DEFAULT_KEYMAP.palette)}
-              onUnset={() => setPalette(null)}
+              onReset={() => setBinding('palette', DEFAULT_KEYMAP.palette)}
+              onUnset={() => setBinding('palette', null)}
               defaultBinding={DEFAULT_KEYMAP.palette}
-              display={formatBinding(palette)}
+              display={formatBinding(bindings.palette)}
               hasConflict={hasConflict || duplicates.has('palette')}
             />
             <ShortcutRow
               label="Go to project"
-              binding={goToTab}
+              binding={bindings.goToTab}
               isRecording={recording === 'goToTab'}
               recordingKeys={recording === 'goToTab' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'goToTab' ? null : 'goToTab')
               }
-              onReset={() => setGoToTab(DEFAULT_KEYMAP.goToTab)}
-              onUnset={() => setGoToTab(null)}
+              onReset={() => setBinding('goToTab', DEFAULT_KEYMAP.goToTab)}
+              onUnset={() => setBinding('goToTab', null)}
               defaultBinding={DEFAULT_KEYMAP.goToTab}
-              display={formatBinding(goToTab, goToTab ? '1 - 99' : undefined)}
+              display={formatBinding(
+                bindings.goToTab,
+                bindings.goToTab ? '1 - 99' : undefined,
+              )}
               hasConflict={duplicates.has('goToTab')}
-            />
-            <ShortcutRow
-              label="Go to last project"
-              binding={goToLastTab}
-              isRecording={recording === 'goToLastTab'}
-              recordingKeys={recording === 'goToLastTab' ? recordingKeys : []}
-              onRecord={() =>
-                setRecording(recording === 'goToLastTab' ? null : 'goToLastTab')
-              }
-              onReset={() => setGoToLastTab(DEFAULT_KEYMAP.goToLastTab)}
-              onUnset={() => setGoToLastTab(null)}
-              defaultBinding={DEFAULT_KEYMAP.goToLastTab}
-              display={formatBinding(goToLastTab)}
-              hasConflict={duplicates.has('goToLastTab')}
             />
             <div className="pt-2 border-t border-zinc-700">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -683,75 +401,77 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             </div>
             <ShortcutRow
               label="New Shell"
-              binding={newShell}
+              binding={bindings.newShell}
               isRecording={recording === 'newShell'}
               recordingKeys={recording === 'newShell' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'newShell' ? null : 'newShell')
               }
-              onReset={() => setNewShell(DEFAULT_KEYMAP.newShell)}
-              onUnset={() => setNewShell(null)}
+              onReset={() => setBinding('newShell', DEFAULT_KEYMAP.newShell)}
+              onUnset={() => setBinding('newShell', null)}
               hasConflict={duplicates.has('newShell')}
               defaultBinding={DEFAULT_KEYMAP.newShell}
-              display={formatBinding(newShell)}
+              display={formatBinding(bindings.newShell)}
             />
             <ShortcutRow
               label="Close Shell"
-              binding={closeShell}
+              binding={bindings.closeShell}
               isRecording={recording === 'closeShell'}
               recordingKeys={recording === 'closeShell' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'closeShell' ? null : 'closeShell')
               }
-              onReset={() => setCloseShell(DEFAULT_KEYMAP.closeShell)}
-              onUnset={() => setCloseShell(null)}
+              onReset={() =>
+                setBinding('closeShell', DEFAULT_KEYMAP.closeShell)
+              }
+              onUnset={() => setBinding('closeShell', null)}
               hasConflict={duplicates.has('closeShell')}
               defaultBinding={DEFAULT_KEYMAP.closeShell}
-              display={formatBinding(closeShell)}
+              display={formatBinding(bindings.closeShell)}
             />
             <ShortcutRow
               label="Go to shell"
-              binding={goToShell}
+              binding={bindings.goToShell}
               isRecording={recording === 'goToShell'}
               recordingKeys={recording === 'goToShell' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'goToShell' ? null : 'goToShell')
               }
-              onReset={() => setGoToShell(DEFAULT_KEYMAP.goToShell)}
-              onUnset={() => setGoToShell(null)}
+              onReset={() => setBinding('goToShell', DEFAULT_KEYMAP.goToShell)}
+              onUnset={() => setBinding('goToShell', null)}
               defaultBinding={DEFAULT_KEYMAP.goToShell}
               display={formatBinding(
-                goToShell,
-                goToShell ? '1 - 9' : undefined,
+                bindings.goToShell,
+                bindings.goToShell ? '1 - 9' : undefined,
               )}
               hasConflict={duplicates.has('goToShell')}
             />
             <ShortcutRow
               label="Previous shell"
-              binding={prevShell}
+              binding={bindings.prevShell}
               isRecording={recording === 'prevShell'}
               recordingKeys={recording === 'prevShell' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'prevShell' ? null : 'prevShell')
               }
-              onReset={() => setPrevShell(DEFAULT_KEYMAP.prevShell)}
-              onUnset={() => setPrevShell(null)}
+              onReset={() => setBinding('prevShell', DEFAULT_KEYMAP.prevShell)}
+              onUnset={() => setBinding('prevShell', null)}
               defaultBinding={DEFAULT_KEYMAP.prevShell}
-              display={formatBinding(prevShell)}
+              display={formatBinding(bindings.prevShell)}
               hasConflict={duplicates.has('prevShell')}
             />
             <ShortcutRow
               label="Next shell"
-              binding={nextShell}
+              binding={bindings.nextShell}
               isRecording={recording === 'nextShell'}
               recordingKeys={recording === 'nextShell' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'nextShell' ? null : 'nextShell')
               }
-              onReset={() => setNextShell(DEFAULT_KEYMAP.nextShell)}
-              onUnset={() => setNextShell(null)}
+              onReset={() => setBinding('nextShell', DEFAULT_KEYMAP.nextShell)}
+              onUnset={() => setBinding('nextShell', null)}
               defaultBinding={DEFAULT_KEYMAP.nextShell}
-              display={formatBinding(nextShell)}
+              display={formatBinding(bindings.nextShell)}
               hasConflict={duplicates.has('nextShell')}
             />
 
@@ -762,63 +482,67 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             </div>
             <ShortcutRow
               label="Toggle PiP Window"
-              binding={togglePip}
+              binding={bindings.togglePip}
               isRecording={recording === 'togglePip'}
               recordingKeys={recording === 'togglePip' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'togglePip' ? null : 'togglePip')
               }
-              onReset={() => setTogglePip(DEFAULT_KEYMAP.togglePip)}
-              onUnset={() => setTogglePip(null)}
+              onReset={() => setBinding('togglePip', DEFAULT_KEYMAP.togglePip)}
+              onUnset={() => setBinding('togglePip', null)}
               defaultBinding={DEFAULT_KEYMAP.togglePip}
-              display={formatBinding(togglePip)}
+              display={formatBinding(bindings.togglePip)}
               hasConflict={duplicates.has('togglePip')}
             />
             <ShortcutRow
               label="Project Actions"
-              binding={itemActions}
+              binding={bindings.itemActions}
               isRecording={recording === 'itemActions'}
               recordingKeys={recording === 'itemActions' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'itemActions' ? null : 'itemActions')
               }
-              onReset={() => setItemActions(DEFAULT_KEYMAP.itemActions)}
-              onUnset={() => setItemActions(null)}
+              onReset={() =>
+                setBinding('itemActions', DEFAULT_KEYMAP.itemActions)
+              }
+              onUnset={() => setBinding('itemActions', null)}
               defaultBinding={DEFAULT_KEYMAP.itemActions}
-              display={formatBinding(itemActions)}
+              display={formatBinding(bindings.itemActions)}
               hasConflict={duplicates.has('itemActions')}
             />
             <ShortcutRow
               label="Collapse All"
-              binding={collapseAll}
+              binding={bindings.collapseAll}
               isRecording={recording === 'collapseAll'}
               recordingKeys={recording === 'collapseAll' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'collapseAll' ? null : 'collapseAll')
               }
-              onReset={() => setCollapseAll(DEFAULT_KEYMAP.collapseAll)}
-              onUnset={() => setCollapseAll(null)}
+              onReset={() =>
+                setBinding('collapseAll', DEFAULT_KEYMAP.collapseAll)
+              }
+              onUnset={() => setBinding('collapseAll', null)}
               defaultBinding={DEFAULT_KEYMAP.collapseAll}
-              display={formatBinding(collapseAll)}
+              display={formatBinding(bindings.collapseAll)}
               hasConflict={duplicates.has('collapseAll')}
             />
             <ShortcutRow
               label="Settings"
-              binding={settingsShortcut}
+              binding={bindings.settings}
               isRecording={recording === 'settings'}
               recordingKeys={recording === 'settings' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'settings' ? null : 'settings')
               }
-              onReset={() => setSettingsShortcut(DEFAULT_KEYMAP.settings)}
-              onUnset={() => setSettingsShortcut(null)}
+              onReset={() => setBinding('settings', DEFAULT_KEYMAP.settings)}
+              onUnset={() => setBinding('settings', null)}
               hasConflict={duplicates.has('settings')}
               defaultBinding={DEFAULT_KEYMAP.settings}
-              display={formatBinding(settingsShortcut)}
+              display={formatBinding(bindings.settings)}
             />
             <ShortcutRow
               label="Shell Templates"
-              binding={shellTemplates}
+              binding={bindings.shellTemplates}
               isRecording={recording === 'shellTemplates'}
               recordingKeys={
                 recording === 'shellTemplates' ? recordingKeys : []
@@ -828,11 +552,13 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
                   recording === 'shellTemplates' ? null : 'shellTemplates',
                 )
               }
-              onReset={() => setShellTemplates(DEFAULT_KEYMAP.shellTemplates)}
-              onUnset={() => setShellTemplates(null)}
+              onReset={() =>
+                setBinding('shellTemplates', DEFAULT_KEYMAP.shellTemplates)
+              }
+              onUnset={() => setBinding('shellTemplates', null)}
               hasConflict={duplicates.has('shellTemplates')}
               defaultBinding={DEFAULT_KEYMAP.shellTemplates}
-              display={formatBinding(shellTemplates)}
+              display={formatBinding(bindings.shellTemplates)}
             />
 
             <div className="pt-2 border-t border-zinc-700">
@@ -842,21 +568,23 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             </div>
             <ShortcutRow
               label="Toggle Amend"
-              binding={commitAmend}
+              binding={bindings.commitAmend}
               isRecording={recording === 'commitAmend'}
               recordingKeys={recording === 'commitAmend' ? recordingKeys : []}
               onRecord={() =>
                 setRecording(recording === 'commitAmend' ? null : 'commitAmend')
               }
-              onReset={() => setCommitAmend(DEFAULT_KEYMAP.commitAmend)}
-              onUnset={() => setCommitAmend(null)}
+              onReset={() =>
+                setBinding('commitAmend', DEFAULT_KEYMAP.commitAmend)
+              }
+              onUnset={() => setBinding('commitAmend', null)}
               hasConflict={duplicates.has('commitAmend')}
               defaultBinding={DEFAULT_KEYMAP.commitAmend}
-              display={formatBinding(commitAmend)}
+              display={formatBinding(bindings.commitAmend)}
             />
             <ShortcutRow
               label="Toggle No Verify"
-              binding={commitNoVerify}
+              binding={bindings.commitNoVerify}
               isRecording={recording === 'commitNoVerify'}
               recordingKeys={
                 recording === 'commitNoVerify' ? recordingKeys : []
@@ -866,11 +594,13 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
                   recording === 'commitNoVerify' ? null : 'commitNoVerify',
                 )
               }
-              onReset={() => setCommitNoVerify(DEFAULT_KEYMAP.commitNoVerify)}
-              onUnset={() => setCommitNoVerify(null)}
+              onReset={() =>
+                setBinding('commitNoVerify', DEFAULT_KEYMAP.commitNoVerify)
+              }
+              onUnset={() => setBinding('commitNoVerify', null)}
               hasConflict={duplicates.has('commitNoVerify')}
               defaultBinding={DEFAULT_KEYMAP.commitNoVerify}
-              display={formatBinding(commitNoVerify)}
+              display={formatBinding(bindings.commitNoVerify)}
             />
           </div>
 

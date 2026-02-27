@@ -66,7 +66,6 @@ function AppContent() {
     loading,
     activeTerminal,
     selectTerminal,
-    selectPreviousTerminal,
     refetch,
   } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
@@ -345,10 +344,6 @@ function AppContent() {
           new CustomEvent('reveal-terminal', { detail: { id: terminal.id } }),
         )
       }
-    },
-    goToLastTab: () => {
-      selectPreviousTerminal()
-      clearSession()
     },
     goToShell: (index) => {
       const t = activeTerminalRef.current

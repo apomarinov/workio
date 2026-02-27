@@ -1,11 +1,20 @@
 import useSWR from 'swr'
 import * as api from '../lib/api'
-import type { Settings } from '../types'
+import { migrateKeymap, type Settings } from '../types'
+
+async function fetchSettings(): Promise<Settings> {
+  const settings = await api.getSettings()
+  // Migrate old char-based key values (e.g. '[') to code-based names (e.g. 'bracketleft')
+  if (settings.keymap) {
+    settings.keymap = migrateKeymap(settings.keymap)
+  }
+  return settings
+}
 
 export function useSettings() {
   const { data, error, isLoading, mutate } = useSWR<Settings>(
     '/api/settings',
-    api.getSettings,
+    fetchSettings,
     { refreshInterval: 5 * 60 * 1000 }, // Refresh every 5 minutes
   )
 
