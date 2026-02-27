@@ -575,6 +575,11 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     terminal.onData((data) => {
       if (isBusyRef.current) return
       sendInputRef.current(data)
+      // xterm captures keydown events internally so they don't bubble to window.
+      // Dispatch a custom event so the user-activity tracker in App.tsx picks it up.
+      if (!isMobile) {
+        window.dispatchEvent(new Event('terminal-activity'))
+      }
     })
 
     // Handle resize (debounced via rAF to avoid hammering during drag/layout)

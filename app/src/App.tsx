@@ -586,11 +586,13 @@ function AppContent() {
     }
     window.addEventListener('mousemove', handler)
     window.addEventListener('keydown', handler)
+    window.addEventListener('terminal-activity', handler)
     // Emit once on mount so the server knows we're here
     emit('user:active')
     return () => {
       window.removeEventListener('mousemove', handler)
       window.removeEventListener('keydown', handler)
+      window.removeEventListener('terminal-activity', handler)
     }
   }, [emit])
 
