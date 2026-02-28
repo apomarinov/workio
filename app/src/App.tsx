@@ -1,5 +1,4 @@
 import {
-  ChevronLeft,
   Keyboard,
   KeyboardOff,
   LayoutGrid,

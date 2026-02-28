@@ -69,6 +69,13 @@ function stampProcessStartTimes(processes: ActiveProcess[]) {
   }
 }
 
+// Commands to run after shell integration injection completes (first prompt)
+const pendingCommands = new Map<number, string>()
+
+export function setPendingCommand(shellId: number, command: string) {
+  pendingCommands.set(shellId, command)
+}
+
 export interface PtySession {
   pty: TerminalBackend
   buffer: string[]
@@ -1147,12 +1154,20 @@ export async function createSession(
     (event) => {
       // Update session state and database
       switch (event.type) {
-        case 'prompt':
+        case 'prompt': {
           session.isIdle = true
           session.currentCommand = null
           emitShellUpdate(terminalId, shellId, { active_cmd: null })
           // log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
+          const pending = pendingCommands.get(shellId)
+          if (pending) {
+            pendingCommands.delete(shellId)
+            setTimeout(() => {
+              session.pty.write(`${pending}\n`)
+            }, 200)
+          }
           break
+        }
         case 'done_marker':
           if (session.onDoneMarker) {
             const cb = session.onDoneMarker
@@ -1319,9 +1334,9 @@ export async function createSession(
     // Check if integration script exists before the timeout
     const scriptExists = integrationScript
       ? await fs.promises
-          .access(integrationScript)
-          .then(() => true)
-          .catch(() => false)
+        .access(integrationScript)
+        .then(() => true)
+        .catch(() => false)
       : false
 
     setTimeout(() => {

@@ -12,6 +12,7 @@ import {
   checkoutBranch,
   closePR,
   createBranch,
+  createShellForTerminal,
   deleteBranch,
   editPR,
   fetchAll,
@@ -137,6 +138,7 @@ export function CommandPalette() {
     createTerminal,
     updateTerminal,
     deleteTerminal,
+    refetch,
   } = useTerminalContext()
   const {
     sessions,
@@ -1134,6 +1136,20 @@ export function CommandPalette() {
             await killShell(shellId)
             setResumeConfirm(null)
             doResumeSession(session.terminal_id!, session.session_id, shellId)
+          }}
+          secondaryAction={{
+            label: 'Resume in a New Shell',
+            onAction: async () => {
+              const { session } = resumeConfirm
+              const shell = await createShellForTerminal(session.terminal_id!)
+              await refetch()
+              setResumeConfirm(null)
+              doResumeSession(
+                session.terminal_id!,
+                session.session_id,
+                shell.id,
+              )
+            },
           }}
           onCancel={() => setResumeConfirm(null)}
         />

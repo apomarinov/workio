@@ -15,7 +15,6 @@ import {
   Bell,
   BellOff,
   ChevronDown,
-  ChevronRight,
   ChevronsDownUp,
   Ellipsis,
   EyeOff,

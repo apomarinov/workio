@@ -58,6 +58,7 @@ import {
   getBellSubscribedShellIds,
   getSession,
   getSessionByTerminalId,
+  setPendingCommand,
   startGitDirtyPolling,
   subscribeBell,
   unsubscribeBell,
@@ -215,10 +216,19 @@ io.on('connection', (socket) => {
       const fullCommand = `${cmd} --resume ${sessionId}`
 
       // Use the target shell if provided and valid, otherwise fall back to main shell
-      const ptySession =
-        (targetShellId && getSession(targetShellId)) ||
-        getSessionByTerminalId(terminalId)
-      if (!ptySession) return
+      const ptySession = targetShellId
+        ? getSession(targetShellId)
+        : getSessionByTerminalId(terminalId)
+
+      // If the PTY session doesn't exist yet (e.g. newly created shell),
+      // queue the command to run after shell integration injection
+      if (!ptySession) {
+        if (targetShellId) {
+          setPendingCommand(targetShellId, fullCommand)
+        }
+        return
+      }
+
       const shellId = ptySession.shell.id
       const zellijName =
         ptySession.sessionName || terminal?.name || `terminal-${terminalId}`

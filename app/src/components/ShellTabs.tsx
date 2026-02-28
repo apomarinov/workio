@@ -543,7 +543,7 @@ export function ShellTabs({
   rightExtra,
 }: ShellTabsProps) {
   const { processes, isBellSubscribed } = useProcessContext()
-  const { shellClients: shellClientsMap } = useTerminalContext()
+  const { shellClients: shellClientsMap, refetch } = useTerminalContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -629,11 +629,12 @@ export function ShellTabs({
   const isMainShell = (shellId: number) =>
     terminal.shells.find((s) => s.id === shellId)?.name === 'main'
 
-  const handleDeleteShell = (shellId: number) => {
+  const handleDeleteShell = async (shellId: number) => {
     if (isMobile || shellHasActivity(shellId)) {
       setDeleteShellId(shellId)
     } else {
-      onDeleteShell(shellId)
+      await onDeleteShell(shellId)
+      refetch()
     }
   }
 
@@ -1047,9 +1048,10 @@ export function ShellTabs({
         message={`Are you sure you want to delete "${deleteShellName}"? This will terminate any running processes in this shell.`}
         confirmLabel="Delete"
         variant="danger"
-        onConfirm={() => {
+        onConfirm={async () => {
           if (deleteShellId !== null) {
-            onDeleteShell(deleteShellId)
+            await onDeleteShell(deleteShellId)
+            await refetch()
             setDeleteShellId(null)
           }
         }}
