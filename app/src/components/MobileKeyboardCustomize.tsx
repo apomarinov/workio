@@ -153,14 +153,14 @@ export function MobileKeyboardCustomize({
                       return (
                         <div
                           key={`${row.id}-${actionId}-${i}`}
-                          className="flex-shrink-0 px-2 py-1 min-w-8 text-center rounded bg-zinc-700/60 text-xs text-zinc-300"
+                          className="flex-shrink-0 px-2.5 py-2 min-w-8 text-center rounded bg-zinc-700/60 text-xs text-zinc-300"
                         >
                           {action?.label ?? actionId}
                         </div>
                       )
                     })}
                   </div>
-                  <div className="flex gap-1 flex-shrink-0">
+                  <div className="flex gap-2 flex-shrink-0">
                     <button
                       type="button"
                       onClick={() => moveRow(index, -1)}

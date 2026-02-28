@@ -1,5 +1,6 @@
 import { CommandInput } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 
 type Props = {
   breadcrumbs: string[]
@@ -16,11 +17,13 @@ export function PaletteHeader({
   onBack,
   onSearchChange,
 }: Props) {
+  const isMobile = useIsMobile()
+
   if (breadcrumbs.length === 0) {
     return (
       <CommandInput
         placeholder={placeholder}
-        autoFocus
+        autoFocus={!isMobile}
         onValueChange={onSearchChange}
       />
     )
@@ -62,7 +65,7 @@ export function PaletteHeader({
       <CommandInput
         wrapperCls="border-none px-0 min-w-0 flex-1"
         placeholder={placeholder}
-        autoFocus
+        autoFocus={!isMobile}
         className="border-0 px-0 focus-visible:ring-0"
         onValueChange={onSearchChange}
       />

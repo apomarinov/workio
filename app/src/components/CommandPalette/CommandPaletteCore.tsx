@@ -7,6 +7,7 @@ import {
   CommandGroup,
   CommandList,
 } from '@/components/ui/command'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 
 // Simple fuzzy filter: requires all search characters to appear in order
 function fuzzyFilter(
@@ -69,6 +70,7 @@ export function CommandPaletteCore({
   onBreadcrumbClick,
   onSearchChange,
 }: Props) {
+  const isMobile = useIsMobile()
   const mode = modes[currentModeId]
 
   // Compute derived values (hooks must be called unconditionally)
@@ -143,6 +145,7 @@ export function CommandPaletteCore({
           )}
           onKeyDownCapture={handleKeyDown}
           onEscapeKeyDown={handleEscapeKeyDown}
+          onOpenAutoFocus={isMobile ? (e) => e.preventDefault() : undefined}
         >
           <DialogPrimitive.Title className="sr-only">
             Command Palette

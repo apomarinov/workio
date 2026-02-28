@@ -6,12 +6,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { restrictToParentElement } from '@dnd-kit/modifiers'
 import {
-  restrictToHorizontalAxis,
-  restrictToParentElement,
-} from '@dnd-kit/modifiers'
-import {
-  horizontalListSortingStrategy,
+  rectSortingStrategy,
   SortableContext,
   useSortable,
 } from '@dnd-kit/sortable'
@@ -59,7 +56,7 @@ function SortableChip({
       {...listeners}
       type="button"
       onClick={onRemove}
-      className="px-2 py-0.5 rounded bg-blue-600/80 text-white text-xs font-medium touch-manipulation"
+      className="px-2.5 py-2 min-w-10 rounded bg-blue-600/80 text-white text-xs font-medium touch-manipulation"
     >
       {label}
     </button>
@@ -73,7 +70,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   nav: 'Navigation',
   symbol: 'Symbols',
   function: 'Function Keys',
-  custom: 'Custom',
+  custom: 'Custom Actions',
 }
 
 const CATEGORY_ORDER = [
@@ -231,7 +228,7 @@ export function MobileKeyboardNewGroup({
 
           {/* Selected actions preview */}
           <div className="flex-shrink-0 px-4 pb-2">
-            <div className="flex items-center gap-1 min-h-[32px] px-2 py-1 rounded-lg bg-zinc-800/60 border border-zinc-700/50">
+            <div className="flex flex-wrap items-center gap-1 min-h-[32px] px-2 py-1 rounded-lg bg-zinc-800/60 border border-zinc-700/50">
               {selected.length === 0 ? (
                 <span className="text-xs text-muted-foreground/50">
                   Tap actions below (max 8)
@@ -240,15 +237,12 @@ export function MobileKeyboardNewGroup({
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
-                  modifiers={[
-                    restrictToHorizontalAxis,
-                    restrictToParentElement,
-                  ]}
+                  modifiers={[restrictToParentElement]}
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
                     items={selected}
-                    strategy={horizontalListSortingStrategy}
+                    strategy={rectSortingStrategy}
                   >
                     {selected.map((actionId) => {
                       const action = actionsMap[actionId]
@@ -318,7 +312,7 @@ export function MobileKeyboardNewGroup({
                           type="button"
                           onClick={() => toggleAction(action.id)}
                           className={cn(
-                            'px-2.5 py-2 min-w-8 rounded text-xs font-medium transition-colors',
+                            'px-2.5 py-2 min-w-10 rounded text-xs font-medium transition-colors',
                             isSelected
                               ? 'bg-blue-600 text-white'
                               : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
@@ -351,12 +345,6 @@ export function MobileKeyboardNewGroup({
                       </div>
                     )
                   })}
-                  {group.category === 'custom' &&
-                    group.actions.length === 0 && (
-                      <span className="text-xs text-muted-foreground/50">
-                        No custom actions yet
-                      </span>
-                    )}
                 </div>
               </div>
             ))}
