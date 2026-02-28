@@ -9,6 +9,7 @@ function Toaster({ ...props }: ToasterProps) {
       theme="dark"
       position="top-right"
       className="toaster group"
+      style={{ top: 'env(safe-area-inset-top, 0px)' }}
       icons={{
         success: <CircleCheck className="w-4 h-4 text-emerald-400" />,
         error: <CircleAlert className="w-4 h-4 text-red-400" />,

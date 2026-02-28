@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Minus, Pencil, Plus, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
@@ -32,11 +32,15 @@ export function MobileKeyboardCustomize({
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const actionsMap = buildActionsMap(customActions)
 
-  // Reset local state when dialog opens
-  const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen) {
+  // Sync local state when dialog opens (programmatic open doesn't fire onOpenChange)
+  useEffect(() => {
+    if (open) {
       setLocalRows(rows)
-    } else {
+    }
+  }, [open, rows])
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
       onClose()
     }
   }

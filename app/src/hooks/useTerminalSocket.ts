@@ -33,6 +33,7 @@ export function useTerminalSocket({
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const reconnectAttemptRef = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initializedRef = useRef(false)
   const isConnectingRef = useRef(false)
   const mountedRef = useRef(true)
@@ -70,6 +71,10 @@ export function useTerminalSocket({
   }, [])
 
   const cleanup = useCallback(() => {
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current)
+      connectTimeoutRef.current = null
+    }
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
       reconnectTimeoutRef.current = null
@@ -121,6 +126,26 @@ export function useTerminalSocket({
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
+      // Timeout: if we don't reach 'connected' within 10s, force retry
+      connectTimeoutRef.current = setTimeout(() => {
+        if (!mountedRef.current || !isConnectingRef.current) return
+        console.warn('[ws] Connection timeout, forcing retry')
+        cleanup()
+        setStatus('disconnected')
+        if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
+          const delay =
+            RECONNECT_DELAYS[
+              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+            ]
+          reconnectAttemptRef.current++
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (mountedRef.current) connect()
+          }, delay)
+        } else {
+          setStatus('error')
+        }
+      }, 10_000)
+
       ws.onopen = () => {
         if (!mountedRef.current || wsRef.current !== ws) return
         reconnectAttemptRef.current = 0
@@ -140,6 +165,10 @@ export function useTerminalSocket({
           const message = JSON.parse(event.data)
           switch (message.type) {
             case 'ready':
+              if (connectTimeoutRef.current) {
+                clearTimeout(connectTimeoutRef.current)
+                connectTimeoutRef.current = null
+              }
               isConnectingRef.current = false
               initializedRef.current = true
               setStatus('connected')
@@ -165,6 +194,10 @@ export function useTerminalSocket({
         if (!mountedRef.current) return
         if (wsRef.current !== ws) return
 
+        if (connectTimeoutRef.current) {
+          clearTimeout(connectTimeoutRef.current)
+          connectTimeoutRef.current = null
+        }
         wsRef.current = null
         isConnectingRef.current = false
         initializedRef.current = false

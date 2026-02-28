@@ -179,7 +179,7 @@ export function PushNotificationModal({
             the PWA on iPhone, Android, and desktop browsers.
           </p>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {isSubscribed ? (
               <Button
                 variant="outline"
