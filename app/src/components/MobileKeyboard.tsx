@@ -16,6 +16,7 @@ import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 
 interface MobileKeyboardProps {
   terminalId: number
+  currentRepo: string | undefined
   mode: 'hidden' | 'input' | 'actions'
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
 }
@@ -30,6 +31,7 @@ function sendToTerminal(terminalId: number, text: string) {
 
 export function MobileKeyboard({
   terminalId,
+  currentRepo,
   mode,
   inputRef,
 }: MobileKeyboardProps) {
@@ -43,7 +45,11 @@ export function MobileKeyboard({
 
   const rows: MobileKeyboardRow[] =
     settings?.mobile_keyboard_rows ?? DEFAULT_KEYBOARD_ROWS
-  const allActions = buildActionsMap(settings?.custom_terminal_actions)
+  const allCustomActions = settings?.custom_terminal_actions ?? []
+  const filteredCustomActions = allCustomActions.filter(
+    (ca) => !ca.repo || ca.repo === currentRepo,
+  )
+  const allActions = buildActionsMap(filteredCustomActions)
 
   const resetModifiers = () => setActiveModifiers(DEFAULT_MODIFIERS)
 
@@ -311,7 +317,7 @@ export function MobileKeyboard({
       <MobileKeyboardCustomize
         open={customizeOpen}
         rows={rows}
-        customActions={settings?.custom_terminal_actions ?? []}
+        customActions={allCustomActions}
         onSave={handleSaveCustomize}
         onCustomActionCreated={handleCustomActionCreated}
         onCustomActionUpdated={handleCustomActionUpdated}

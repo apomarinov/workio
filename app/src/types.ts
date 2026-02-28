@@ -476,6 +476,7 @@ export interface CustomTerminalAction {
   id: string // e.g. "custom-1708901234-abc123"
   label: string // user-defined display label
   command: string // text to send to terminal (+ \r appended on send)
+  repo?: string // optional git repo (e.g. "owner/repo") to target a specific terminal
 }
 
 export interface PushSubscriptionRecord {

@@ -70,7 +70,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   nav: 'Navigation',
   symbol: 'Symbols',
   function: 'Function Keys',
-  custom: 'Custom Actions',
+  custom: 'Custom Commands',
 }
 
 const CATEGORY_ORDER = [
@@ -184,7 +184,28 @@ export function MobileKeyboardNewGroup({
     label: ca.label,
     sequence: ca.command,
     category: 'custom' as const,
+    repo: ca.repo,
   }))
+
+  // Group custom actions by repo
+  const customByRepo: {
+    repo: string | undefined
+    actions: typeof customTerminalActions
+  }[] = []
+  for (const ca of customTerminalActions) {
+    let group = customByRepo.find((g) => g.repo === ca.repo)
+    if (!group) {
+      group = { repo: ca.repo, actions: [] }
+      customByRepo.push(group)
+    }
+    group.actions.push(ca)
+  }
+  // Sort: no-repo first, then alphabetical by repo
+  customByRepo.sort((a, b) => {
+    if (!a.repo && b.repo) return -1
+    if (a.repo && !b.repo) return 1
+    return (a.repo ?? '').localeCompare(b.repo ?? '')
+  })
 
   // Group actions by category
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -291,24 +312,80 @@ export function MobileKeyboardNewGroup({
                     </button>
                   )}
                 </div>
-                <div
-                  className={cn(
-                    'flex flex-wrap gap-1',
-                    group.category === 'custom' && 'gap-3',
-                  )}
-                >
-                  {group.actions.map((action) => {
-                    const isSelected = selected.includes(action.id)
-                    const customAction =
-                      group.category === 'custom'
-                        ? customActions.find((ca) => ca.id === action.id)
-                        : undefined
-                    return (
-                      <div
-                        key={action.id}
-                        className="flex items-center gap-0.5"
-                      >
+                {group.category === 'custom' ? (
+                  <div className="space-y-2">
+                    {customByRepo.map((repoGroup) => (
+                      <div key={repoGroup.repo ?? '_general'}>
+                        {customByRepo.length > 1 && (
+                          <div className="text-[10px] font-medium text-muted-foreground/50 mb-1">
+                            {repoGroup.repo
+                              ? repoGroup.repo.split('/').pop()
+                              : 'General'}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-3">
+                          {repoGroup.actions.map((action) => {
+                            const isSelected = selected.includes(action.id)
+                            const customAction = customActions.find(
+                              (ca) => ca.id === action.id,
+                            )
+                            return (
+                              <div
+                                key={action.id}
+                                className="flex items-center gap-0.5"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => toggleAction(action.id)}
+                                  className={cn(
+                                    'px-2.5 py-2 min-w-10 rounded text-xs font-medium transition-colors',
+                                    isSelected
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
+                                    selected.length >= 8 &&
+                                    !isSelected &&
+                                    'opacity-40',
+                                  )}
+                                >
+                                  {action.label}
+                                </button>
+                                {customAction && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingAction(customAction)
+                                        setCustomActionOpen(true)
+                                      }}
+                                      className="text-muted-foreground hover:text-foreground p-0.5"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setDeletingAction(customAction)
+                                      }
+                                      className="text-red-400 hover:text-red-300 p-0.5"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {group.actions.map((action) => {
+                      const isSelected = selected.includes(action.id)
+                      return (
                         <button
+                          key={action.id}
                           type="button"
                           onClick={() => toggleAction(action.id)}
                           className={cn(
@@ -321,31 +398,10 @@ export function MobileKeyboardNewGroup({
                         >
                           {action.label}
                         </button>
-                        {customAction && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingAction(customAction)
-                                setCustomActionOpen(true)
-                              }}
-                              className="text-muted-foreground hover:text-foreground p-0.5"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeletingAction(customAction)}
-                              className="text-red-400 hover:text-red-300 p-0.5"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </div>

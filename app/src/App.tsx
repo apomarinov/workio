@@ -824,6 +824,7 @@ function AppContent() {
                   )}
                   <MobileKeyboard
                     terminalId={t.id}
+                    currentRepo={t.git_repo?.repo}
                     mode={mobileKeyboardMode}
                     inputRef={mobileInputRef}
                   />
