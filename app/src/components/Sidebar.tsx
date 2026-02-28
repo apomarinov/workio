@@ -14,7 +14,6 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
   Bell,
   BellOff,
-  Bot,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
@@ -25,13 +24,11 @@ import {
   GitMerge,
   GitPullRequest,
   GitPullRequestArrow,
-  LayoutList,
   Loader2,
   PictureInPicture2,
   Plus,
   Search,
   Settings,
-  Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -64,12 +61,9 @@ import { NotificationList } from './NotificationList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
-import { SessionItem } from './SessionItem'
 import { SettingsModal } from './SettingsModal'
 import { SortableTerminalItem } from './SortableTerminalItem'
 import { useWebhookWarning } from './WebhooksModal'
-
-type GroupingMode = 'all' | 'sessions'
 
 interface SidebarProps {
   width?: number
@@ -102,11 +96,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
     string | null
   >(null)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [groupingOpen, setGroupingOpen] = useState(false)
-  const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>(
-    'sidebar-grouping',
-    'all',
-  )
   const [expandedSessionGroups, setExpandedSessionGroups] = useLocalStorage<
     string[]
   >('sidebar-expanded-session-groups', [])
@@ -630,46 +619,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-40 p-1 space-y-1" align="end">
-                <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
-                  <PopoverTrigger asChild>
-                    <button className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer">
-                      <LayoutList className="w-4 h-4" />
-                      Grouping
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-40 p-1 space-y-1"
-                    side="right"
-                    align="start"
-                  >
-                    <button
-                      onClick={() => {
-                        setGroupingMode('all')
-                        setGroupingOpen(false)
-                      }}
-                      className={cn(
-                        'flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer',
-                        groupingMode === 'all' && 'bg-accent',
-                      )}
-                    >
-                      <TerminalIcon className="w-4 h-4" />
-                      Projects
-                    </button>
-                    <button
-                      onClick={() => {
-                        setGroupingMode('sessions')
-                        setGroupingOpen(false)
-                      }}
-                      className={cn(
-                        'flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer',
-                        groupingMode === 'sessions' && 'bg-accent',
-                      )}
-                    >
-                      <Bot className="w-4 h-4" />
-                      Claude
-                    </button>
-                  </PopoverContent>
-                </Popover>
                 {hasAnythingExpanded && (
                   <button
                     onClick={collapseAll}
@@ -719,44 +668,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
           </div>
         ) : (
           <div className="flex items-center gap-1">
-            <Popover open={groupingOpen} onOpenChange={setGroupingOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  title="Grouping"
-                >
-                  <LayoutList className="w-4 h-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-40 p-1 space-y-1" align="start">
-                <button
-                  onClick={() => {
-                    setGroupingMode('all')
-                    setGroupingOpen(false)
-                  }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'all' ? 'bg-accent' : ''
-                  }`}
-                >
-                  <TerminalIcon className="w-4 h-4" />
-                  Projects
-                </button>
-                <button
-                  onClick={() => {
-                    setGroupingMode('sessions')
-                    setGroupingOpen(false)
-                  }}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer ${
-                    groupingMode === 'sessions' ? 'bg-accent' : ''
-                  }`}
-                >
-                  <Bot className="w-4 h-4" />
-                  Claude
-                </button>
-              </PopoverContent>
-            </Popover>
             {hasAnythingExpanded && (
               <Button
                 variant="ghost"
@@ -835,266 +746,245 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-0 space-y-1 @container/sidebar">
-        {groupingMode === 'sessions' ? (
-          sessions.map((session) => (
-            <SessionItem
-              key={session.session_id}
-              session={session}
-              showGitBranch
-            />
-          ))
-        ) : (
+        {terminals.length > 0 && (
           <>
-            {terminals.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setTerminalsSectionCollapsed(!terminalsSectionCollapsed)
-                  }
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 hover:text-muted-foreground transition-colors w-full"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'w-3 h-3 transition-transform',
-                      terminalsSectionCollapsed && '-rotate-90',
-                    )}
-                  />
-                  Projects
-                </button>
-                {!terminalsSectionCollapsed && (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    modifiers={[
-                      restrictToVerticalAxis,
-                      restrictToParentElement,
-                    ]}
-                    onDragEnd={handleDragEnd}
-                  >
-                    {Array.from(repoGroupedTerminals.repoGroups.entries()).map(
-                      ([repo, repoTerminals]) => {
-                        const isCollapsed = collapsedProjectReposSet.has(repo)
-                        const repoName = repo.split('/')[1] || repo
-                        return (
-                          <div key={repo}>
-                            <button
-                              type="button"
-                              onClick={() => toggleProjectRepo(repo)}
-                              className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
-                            >
-                              <ChevronDown
-                                className={cn(
-                                  'w-3 h-3 flex-shrink-0 transition-transform',
-                                  isCollapsed && '-rotate-90',
-                                )}
-                              />
-                              <Github className="w-3 h-3" />
-                              <span className="truncate">{repoName}</span>
-                            </button>
-                            {!isCollapsed && (
-                              <SortableContext
-                                items={repoTerminals.map((t) => t.id)}
-                                strategy={verticalListSortingStrategy}
-                              >
-                                {repoTerminals.map((terminal) => (
-                                  <SortableTerminalItem
-                                    key={terminal.id}
-                                    terminal={terminal}
-                                    sessions={
-                                      sessionsForTerminal.get(terminal.id) || []
-                                    }
-                                    sessionsExpanded={expandedTerminalSessionsSet.has(
-                                      terminal.id,
-                                    )}
-                                    onToggleTerminalSessions={
-                                      toggleTerminalSessions
-                                    }
-                                    shortcutIndex={terminalShortcutMap.get(
-                                      terminal.id,
-                                    )}
-                                  />
-                                ))}
-                              </SortableContext>
-                            )}
-                          </div>
-                        )
-                      },
-                    )}
-                    {repoGroupedTerminals.ungrouped.length > 0 && (
-                      <SortableContext
-                        items={repoGroupedTerminals.ungrouped.map((t) => t.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {repoGroupedTerminals.ungrouped.map((terminal) => (
-                          <SortableTerminalItem
-                            key={terminal.id}
-                            terminal={terminal}
-                            sessions={
-                              sessionsForTerminal.get(terminal.id) || []
-                            }
-                            sessionsExpanded={expandedTerminalSessionsSet.has(
-                              terminal.id,
-                            )}
-                            onToggleTerminalSessions={toggleTerminalSessions}
-                            shortcutIndex={terminalShortcutMap.get(terminal.id)}
-                          />
-                        ))}
-                      </SortableContext>
-                    )}
-                  </DndContext>
+            <button
+              type="button"
+              onClick={() =>
+                setTerminalsSectionCollapsed(!terminalsSectionCollapsed)
+              }
+              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 hover:text-muted-foreground transition-colors w-full"
+            >
+              <ChevronDown
+                className={cn(
+                  'w-3 h-3 transition-transform',
+                  terminalsSectionCollapsed && '-rotate-90',
                 )}
-              </>
-            )}
-
-            {/* GitHub PR status */}
-            {githubPRs.length > 0 && terminals.length > 0 && (
-              <>
-                <div
-                  className={cn(
-                    'border-t border-sidebar-border my-2',
-                    terminals.length === 0 &&
-                      orphanSessionGroups.size === 0 &&
-                      'border-none',
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setGithubSectionCollapsed(!githubSectionCollapsed)
-                  }
-                  className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'w-3 h-3 transition-transform',
-                      githubSectionCollapsed && '-rotate-90',
-                    )}
-                  />
-                  Pull requests
-                </button>
-                {!githubSectionCollapsed &&
-                  Array.from(githubPRsByRepo.keys()).map((repo) => {
-                    const repoPRs = githubPRsByRepo.get(repo) ?? []
+              />
+              Projects
+            </button>
+            {!terminalsSectionCollapsed && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                onDragEnd={handleDragEnd}
+              >
+                {Array.from(repoGroupedTerminals.repoGroups.entries()).map(
+                  ([repo, repoTerminals]) => {
+                    const isCollapsed = collapsedProjectReposSet.has(repo)
                     const repoName = repo.split('/')[1] || repo
-                    const isCollapsed = collapsedGitHubReposSet.has(repo)
-                    const hiddenPRsForRepo = (
-                      settings?.hidden_prs ?? []
-                    ).filter((h) => h.repo === repo)
-                    const hiddenAuthorsForRepo = (
-                      settings?.hide_gh_authors ?? []
-                    ).filter((h) => h.repo === repo)
-                    const silencedAuthorsForRepo = (
-                      settings?.silence_gh_authors ?? []
-                    ).filter((h) => h.repo === repo)
-                    const collapsedAuthorsForRepo = (
-                      settings?.collapse_gh_authors ?? []
-                    ).filter((h) => h.repo === repo)
-                    const hasHiddenItems =
-                      hiddenPRsForRepo.length > 0 ||
-                      hiddenAuthorsForRepo.length > 0 ||
-                      silencedAuthorsForRepo.length > 0 ||
-                      collapsedAuthorsForRepo.length > 0
                     return (
                       <div key={repo}>
-                        <div className="group/repo-header flex items-center">
-                          <button
-                            type="button"
-                            onClick={() => toggleGitHubRepo(repo)}
-                            className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
-                          >
-                            <ChevronDown
-                              className={cn(
-                                'w-3 h-3 flex-shrink-0 transition-transform',
-                                isCollapsed && '-rotate-90',
-                              )}
-                            />
-                            <Github className="w-3 h-3" />
-                            <span className="truncate">{repoName}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.open(
-                                `https://github.com/${repo}/pulls?q=is%3Aopen+is%3Apr+author%3A%40me`,
-                                '_blank',
-                              )
-                            }
-                            className="mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
-                            title="View my PRs"
-                          >
-                            <GitPullRequest className="w-3 h-3" />
-                          </button>
-                          {hasHiddenItems && (
-                            <button
-                              type="button"
-                              onClick={() => setHiddenPRsModalRepo(repo)}
-                              className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
-                              title="Manage hidden items"
-                            >
-                              <BellOff className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleProjectRepo(repo)}
+                          className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
+                        >
+                          <ChevronDown
+                            className={cn(
+                              'w-3 h-3 flex-shrink-0 transition-transform',
+                              isCollapsed && '-rotate-90',
+                            )}
+                          />
+                          <Github className="w-3 h-3" />
+                          <span className="truncate">{repoName}</span>
+                        </button>
                         {!isCollapsed && (
-                          <>
-                            {repoPRs.map((pr) => (
-                              <PRStatusGroup
-                                key={`${pr.repo}:${pr.prNumber}`}
-                                pr={pr}
-                                expanded={expandedGitHubPRsSet.has(pr.branch)}
-                                onToggle={() => toggleGitHubPR(pr)}
-                                hasNewActivity={pr.hasUnreadNotifications}
-                                isActive={
-                                  activePR?.prNumber === pr.prNumber &&
-                                  activePR?.repo === pr.repo
+                          <SortableContext
+                            items={repoTerminals.map((t) => t.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {repoTerminals.map((terminal) => (
+                              <SortableTerminalItem
+                                key={terminal.id}
+                                terminal={terminal}
+                                sessions={
+                                  sessionsForTerminal.get(terminal.id) || []
                                 }
+                                sessionsExpanded={expandedTerminalSessionsSet.has(
+                                  terminal.id,
+                                )}
+                                onToggleTerminalSessions={
+                                  toggleTerminalSessions
+                                }
+                                shortcutIndex={terminalShortcutMap.get(
+                                  terminal.id,
+                                )}
                               />
                             ))}
-                            {(mergedPRsByRepo.get(repo) ?? [])
-                              .slice(0, 3)
-                              .map((pr) => (
-                                <a
-                                  key={pr.prNumber}
-                                  href={pr.prUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
-                                >
-                                  {pr.state === 'MERGED' ? (
-                                    <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
-                                  ) : (
-                                    <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-xs truncate block">
-                                      {pr.prTitle}
-                                    </span>
-                                    <div className="flex gap-1 items-center">
-                                      <GitBranch className="w-2.5 h-2.5" />
-                                      <span className="text-[11px] text-muted-foreground/50 truncate">
-                                        {pr.branch}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </a>
-                              ))}
-                            <InvolvedPRsList
-                              prs={involvedPRsByRepo.get(repo) ?? []}
-                            />
-                            <OlderMergedPRsList
-                              olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(
-                                3,
-                              )}
-                            />
-                          </>
+                          </SortableContext>
                         )}
                       </div>
                     )
-                  })}
-              </>
+                  },
+                )}
+                {repoGroupedTerminals.ungrouped.length > 0 && (
+                  <SortableContext
+                    items={repoGroupedTerminals.ungrouped.map((t) => t.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {repoGroupedTerminals.ungrouped.map((terminal) => (
+                      <SortableTerminalItem
+                        key={terminal.id}
+                        terminal={terminal}
+                        sessions={sessionsForTerminal.get(terminal.id) || []}
+                        sessionsExpanded={expandedTerminalSessionsSet.has(
+                          terminal.id,
+                        )}
+                        onToggleTerminalSessions={toggleTerminalSessions}
+                        shortcutIndex={terminalShortcutMap.get(terminal.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                )}
+              </DndContext>
             )}
+          </>
+        )}
+
+        {/* GitHub PR status */}
+        {githubPRs.length > 0 && terminals.length > 0 && (
+          <>
+            <div
+              className={cn(
+                'border-t border-sidebar-border my-2',
+                terminals.length === 0 &&
+                  orphanSessionGroups.size === 0 &&
+                  'border-none',
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setGithubSectionCollapsed(!githubSectionCollapsed)}
+              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
+            >
+              <ChevronDown
+                className={cn(
+                  'w-3 h-3 transition-transform',
+                  githubSectionCollapsed && '-rotate-90',
+                )}
+              />
+              Pull requests
+            </button>
+            {!githubSectionCollapsed &&
+              Array.from(githubPRsByRepo.keys()).map((repo) => {
+                const repoPRs = githubPRsByRepo.get(repo) ?? []
+                const repoName = repo.split('/')[1] || repo
+                const isCollapsed = collapsedGitHubReposSet.has(repo)
+                const hiddenPRsForRepo = (settings?.hidden_prs ?? []).filter(
+                  (h) => h.repo === repo,
+                )
+                const hiddenAuthorsForRepo = (
+                  settings?.hide_gh_authors ?? []
+                ).filter((h) => h.repo === repo)
+                const silencedAuthorsForRepo = (
+                  settings?.silence_gh_authors ?? []
+                ).filter((h) => h.repo === repo)
+                const collapsedAuthorsForRepo = (
+                  settings?.collapse_gh_authors ?? []
+                ).filter((h) => h.repo === repo)
+                const hasHiddenItems =
+                  hiddenPRsForRepo.length > 0 ||
+                  hiddenAuthorsForRepo.length > 0 ||
+                  silencedAuthorsForRepo.length > 0 ||
+                  collapsedAuthorsForRepo.length > 0
+                return (
+                  <div key={repo}>
+                    <div className="group/repo-header flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleGitHubRepo(repo)}
+                        className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            'w-3 h-3 flex-shrink-0 transition-transform',
+                            isCollapsed && '-rotate-90',
+                          )}
+                        />
+                        <Github className="w-3 h-3" />
+                        <span className="truncate">{repoName}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://github.com/${repo}/pulls?q=is%3Aopen+is%3Apr+author%3A%40me`,
+                            '_blank',
+                          )
+                        }
+                        className="mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                        title="View my PRs"
+                      >
+                        <GitPullRequest className="w-3 h-3" />
+                      </button>
+                      {hasHiddenItems && (
+                        <button
+                          type="button"
+                          onClick={() => setHiddenPRsModalRepo(repo)}
+                          className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                          title="Manage hidden items"
+                        >
+                          <BellOff className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    {!isCollapsed && (
+                      <>
+                        {repoPRs.map((pr) => (
+                          <PRStatusGroup
+                            key={`${pr.repo}:${pr.prNumber}`}
+                            pr={pr}
+                            expanded={expandedGitHubPRsSet.has(pr.branch)}
+                            onToggle={() => toggleGitHubPR(pr)}
+                            hasNewActivity={pr.hasUnreadNotifications}
+                            isActive={
+                              activePR?.prNumber === pr.prNumber &&
+                              activePR?.repo === pr.repo
+                            }
+                          />
+                        ))}
+                        {(mergedPRsByRepo.get(repo) ?? [])
+                          .slice(0, 3)
+                          .map((pr) => (
+                            <a
+                              key={pr.prNumber}
+                              href={pr.prUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                            >
+                              {pr.state === 'MERGED' ? (
+                                <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                              ) : (
+                                <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs truncate block">
+                                  {pr.prTitle}
+                                </span>
+                                <div className="flex gap-1 items-center">
+                                  <GitBranch className="w-2.5 h-2.5" />
+                                  <span className="text-[11px] text-muted-foreground/50 truncate">
+                                    {pr.branch}
+                                  </span>
+                                </div>
+                              </div>
+                            </a>
+                          ))}
+                        <InvolvedPRsList
+                          prs={involvedPRsByRepo.get(repo) ?? []}
+                        />
+                        <OlderMergedPRsList
+                          olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(3)}
+                        />
+                      </>
+                    )}
+                  </div>
+                )
+              })}
           </>
         )}
 

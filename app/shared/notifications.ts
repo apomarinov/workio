@@ -128,13 +128,13 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
   permission_needed: {
     emoji: '⚠️',
     titleTemplate: 'Permission Required',
-    bodyTemplate: '"{terminalName|Terminal}" needs permissions',
+    bodyTemplate: '"{terminalName|Claude}" needs permissions',
     audio: 'permission',
   },
   stop: {
     emoji: '✅',
     titleTemplate: 'Done',
-    bodyTemplate: '"{terminalName|Terminal}" has finished',
+    bodyTemplate: '"{terminalName|Claude}" has finished',
     audio: 'done',
   },
   bell_notify: {
