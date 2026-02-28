@@ -173,6 +173,7 @@ function ShellPopover({
                 shell.active_cmd!,
                 terminal.name ?? `terminal-${terminal.id}`,
               )
+              toast.info('You will be notified when this command ends')
             }
             setOpen(false)
           }}
@@ -947,7 +948,7 @@ export function ShellTabs({
               )
             }
           }, 1000)
-          toast(`Killed processes in ${terminal.shells.length} shell(s)`)
+          toast.success(`Killed processes in ${terminal.shells.length} shell(s)`)
           setKillAllConfirm(false)
         }}
         onCancel={() => setKillAllConfirm(false)}

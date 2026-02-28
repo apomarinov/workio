@@ -642,7 +642,7 @@ export const TerminalItem = memo(function TerminalItem({
                                                 emit('kill-process', {
                                                   pid: process.pid,
                                                 })
-                                                toast('Process killed')
+                                                toast.success('Process killed')
                                               }}
                                               className="hidden group-hover/proc:block text-muted-foreground/60 group-hover/proc:text-muted-foreground/80 hover:text-red-400/90 transition-colors cursor-pointer"
                                             >
