@@ -156,6 +156,7 @@ interface KeymapHandlers {
   commitAmend?: () => void
   commitNoVerify?: () => void
   shellTemplates?: () => void
+  customCommands?: () => void
 }
 
 function resolveBinding(
@@ -209,6 +210,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const commitAmendBinding = resolveBinding(keymap, 'commitAmend')
   const commitNoVerifyBinding = resolveBinding(keymap, 'commitNoVerify')
   const shellTemplatesBinding = resolveBinding(keymap, 'shellTemplates')
+  const customCommandsBinding = resolveBinding(keymap, 'customCommands')
 
   // --- Standard key-based shortcuts (one useHotkeys per shortcut) ---
 
@@ -351,6 +353,18 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       if (disabledRef.current) return
       e.stopPropagation()
       handlersRef.current.shellTemplates?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    customCommandsBinding?.key
+      ? bindingToHotkeyString(customCommandsBinding)
+      : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.customCommands?.()
     },
     HOTKEY_OPTS,
   )

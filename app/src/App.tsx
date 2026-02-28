@@ -5,6 +5,7 @@ import {
   Plus,
   Settings,
   SidebarOpen,
+  SquareTerminal,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
@@ -447,6 +448,15 @@ function AppContent() {
         }),
       )
     },
+    customCommands: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      window.dispatchEvent(
+        new CustomEvent('open-custom-commands', {
+          detail: { terminalId: t.id },
+        }),
+      )
+    },
   })
 
   // Example: Change favicon based on session status
@@ -762,6 +772,19 @@ function AppContent() {
                           )}
                           {mobileKeyboardMode === 'input' && (
                             <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  window.dispatchEvent(
+                                    new CustomEvent('open-custom-commands', {
+                                      detail: { terminalId: t.id },
+                                    }),
+                                  )
+                                }
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <SquareTerminal className="w-4 h-4" />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setMobileKeyboardMode('actions')}

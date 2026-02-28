@@ -171,7 +171,7 @@ export function MobileKeyboard({
                     onPointerDown={(e) => e.preventDefault()}
                     onPointerUp={() => handleActionTap(actionId)}
                     className={cn(
-                      'px-2 py-1.5 min-w-10 rounded-md text-base font-medium flex-shrink-0 select-none',
+                      'px-2 py-1.5 min-w-10 max-w-[220px] truncate rounded-md text-base font-medium flex-shrink-0 select-none',
                       isActive
                         ? 'bg-blue-600 text-white'
                         : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',

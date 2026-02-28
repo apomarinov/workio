@@ -129,6 +129,8 @@ type ShortcutName = keyof Keymap
 const ALLOWED_DUPLICATE_PAIRS = new Set([
   'commitNoVerify:newShell',
   'newShell:commitNoVerify',
+  'commitAmend:customCommands',
+  'customCommands:commitAmend',
 ])
 
 function findDuplicates(
@@ -559,6 +561,26 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               hasConflict={duplicates.has('shellTemplates')}
               defaultBinding={DEFAULT_KEYMAP.shellTemplates}
               display={formatBinding(bindings.shellTemplates)}
+            />
+            <ShortcutRow
+              label="Custom Commands"
+              binding={bindings.customCommands}
+              isRecording={recording === 'customCommands'}
+              recordingKeys={
+                recording === 'customCommands' ? recordingKeys : []
+              }
+              onRecord={() =>
+                setRecording(
+                  recording === 'customCommands' ? null : 'customCommands',
+                )
+              }
+              onReset={() =>
+                setBinding('customCommands', DEFAULT_KEYMAP.customCommands)
+              }
+              onUnset={() => setBinding('customCommands', null)}
+              hasConflict={duplicates.has('customCommands')}
+              defaultBinding={DEFAULT_KEYMAP.customCommands}
+              display={formatBinding(bindings.customCommands)}
             />
 
             <div className="pt-2 border-t border-zinc-700">

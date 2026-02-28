@@ -212,6 +212,24 @@ export function CommandPalette() {
       )
   }, [terminals])
 
+  // Listen for open-custom-commands event (dispatched from keyboard shortcut)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number }>) => {
+      const terminal = terminals.find((t) => t.id === e.detail.terminalId)
+      setStack([
+        initialLevel,
+        { mode: 'custom-commands', title: 'Custom Commands', terminal },
+      ])
+      setOpen(true)
+    }
+    window.addEventListener('open-custom-commands', handler as EventListener)
+    return () =>
+      window.removeEventListener(
+        'open-custom-commands',
+        handler as EventListener,
+      )
+  }, [terminals])
+
   // Listen for open-file-picker event (dispatched from shell tab context menu)
   useEffect(() => {
     const handler = (e: CustomEvent<{ terminal: Terminal }>) => {
@@ -436,6 +454,7 @@ export function CommandPalette() {
       shellPorts,
       shellTemplates: settings?.shell_templates ?? [],
       starredBranches: settings?.starred_branches ?? {},
+      customActions: settings?.custom_terminal_actions ?? [],
     }),
     [
       terminals,
@@ -453,6 +472,7 @@ export function CommandPalette() {
       shellPorts,
       settings?.shell_templates,
       settings?.starred_branches,
+      settings?.custom_terminal_actions,
     ],
   )
 
@@ -981,6 +1001,15 @@ export function CommandPalette() {
             }),
           )
         }, 150)
+      },
+
+      // Terminal paste
+      sendToTerminal: (terminalId, text) => {
+        window.dispatchEvent(
+          new CustomEvent('terminal-paste', {
+            detail: { terminalId, text },
+          }),
+        )
       },
 
       // Cleanup actions

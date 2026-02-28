@@ -343,8 +343,8 @@ export function MobileKeyboardNewGroup({
                                       ? 'bg-blue-600 text-white'
                                       : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
                                     selected.length >= 8 &&
-                                    !isSelected &&
-                                    'opacity-40',
+                                      !isSelected &&
+                                      'opacity-40',
                                   )}
                                 >
                                   {action.label}

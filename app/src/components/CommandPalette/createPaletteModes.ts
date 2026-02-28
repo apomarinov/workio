@@ -5,6 +5,7 @@ import type {
   PRCheckStatus,
 } from '../../../shared/types'
 import type {
+  CustomTerminalAction,
   MoveTarget,
   PreferredIDE,
   SessionSearchMatch,
@@ -15,6 +16,7 @@ import type {
 import { createActionsMode } from './modes/actions'
 import { createBranchClaudeSessionsMode } from './modes/branch-claude-sessions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
+import { createCustomCommandsMode } from './modes/custom-commands'
 import { createFavoriteSessionsMode } from './modes/favorite-sessions'
 import { createMoveToProjectMode } from './modes/move-to-project'
 import { createPRActionsMode } from './modes/pr-actions'
@@ -42,6 +44,7 @@ export type AppData = {
   shellPorts: Record<number, number[]>
   shellTemplates: ShellTemplate[]
   starredBranches: Record<string, string[]>
+  customActions: CustomTerminalAction[]
 }
 
 // Actions that modes can trigger
@@ -98,6 +101,9 @@ export type AppActions = {
   selectShell: (terminalId: number, shellId: number) => void
   runTemplate: (template: ShellTemplate) => void
 
+  // Terminal paste
+  sendToTerminal: (terminalId: number, text: string) => void
+
   // Cleanup actions
   openCleanupModal: () => void
 
@@ -136,6 +142,7 @@ export function createPaletteModes(
     'session-search': createSessionSearchMode(data, level, actions, api),
     'favorite-sessions': createFavoriteSessionsMode(data, level, actions, api),
     'shell-templates': createShellTemplatesMode(data, level, actions, api),
+    'custom-commands': createCustomCommandsMode(data, level, actions, api),
   }
 }
 
