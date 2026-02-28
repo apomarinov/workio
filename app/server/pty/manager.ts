@@ -1334,9 +1334,9 @@ export async function createSession(
     // Check if integration script exists before the timeout
     const scriptExists = integrationScript
       ? await fs.promises
-        .access(integrationScript)
-        .then(() => true)
-        .catch(() => false)
+          .access(integrationScript)
+          .then(() => true)
+          .catch(() => false)
       : false
 
     setTimeout(() => {

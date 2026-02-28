@@ -217,10 +217,12 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     if (pendingCopyRef.current) {
       navigator.clipboard
         .writeText(pendingCopyRef.current)
+        .then(() => toast.success('Copied to clipboard'))
         .catch(() => toast.error('Failed to copy to clipboard'))
     }
     pendingCopyRef.current = null
     setPendingCopy(null)
+    terminalRef.current?.clearSelection()
   }, [])
 
   // Initialize xterm.js - only once
@@ -352,18 +354,102 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       )
     }
 
-    // Touch scrolling — xterm.js has no native touch scroll support.
-    // Translate touch gestures into scrollLines() / arrow key sequences.
+    // Touch scrolling & long-press selection — xterm.js has no native
+    // touch scroll or touch-selection support.  We translate swipe gestures
+    // into scrollLines() / arrow-key sequences, and detect a long-press
+    // (~400 ms hold without movement) to select the word under the finger.
+    // After the long-press fires, subsequent touchmove extends the selection
+    // instead of scrolling, and touchend copies the selected text.
     if (scrollTarget) {
       let lastTouchY: number | null = null
+      let touchStartX: number | null = null
+      let touchStartY: number | null = null
       let touchAccum = 0
+      let longPressTimer: ReturnType<typeof setTimeout> | null = null
+      let isSelecting = false
+      let selectionAnchorCol = 0
+      let selectionAnchorRow = 0
+
+      function getCellFromTouch(touch: Touch, term: XTerm): [number, number] {
+        const rect = scrollTarget!.getBoundingClientRect()
+        const cellWidth = rect.width / term.cols
+        const cellHeight = rect.height / term.rows
+        const col = Math.max(
+          0,
+          Math.min(
+            term.cols - 1,
+            Math.floor((touch.clientX - rect.left) / cellWidth),
+          ),
+        )
+        const row = Math.max(
+          0,
+          Math.min(
+            term.rows - 1,
+            Math.floor((touch.clientY - rect.top) / cellHeight),
+          ),
+        )
+        return [col, row]
+      }
+
+      function selectWordAt(
+        term: XTerm,
+        col: number,
+        viewportRow: number,
+      ): { start: number; length: number } {
+        const bufferRow = viewportRow + term.buffer.active.viewportY
+        const line = term.buffer.active.getLine(bufferRow)
+        if (!line) {
+          term.select(col, bufferRow, 1)
+          return { start: col, length: 1 }
+        }
+        const text = line.translateToString(true)
+        const isWord = (c: string) => /\w/.test(c)
+        let start = col
+        let end = col
+
+        if (col < text.length && isWord(text[col])) {
+          while (start > 0 && isWord(text[start - 1])) start--
+          while (end < text.length - 1 && isWord(text[end + 1])) end++
+        }
+
+        const length = Math.max(1, end - start + 1)
+        term.select(start, bufferRow, length)
+        return { start, length }
+      }
 
       scrollTarget.addEventListener(
         'touchstart',
         (e: TouchEvent) => {
           if (e.touches.length === 1) {
-            lastTouchY = e.touches[0].clientY
+            const touch = e.touches[0]
+            lastTouchY = touch.clientY
+            touchStartX = touch.clientX
+            touchStartY = touch.clientY
             touchAccum = 0
+            isSelecting = false
+
+            // Clear any existing selection / copy button on new touch
+            if (terminalRef.current?.hasSelection()) {
+              terminalRef.current.clearSelection()
+            }
+            if (pendingCopyRef.current) {
+              pendingCopyRef.current = null
+              setPendingCopy(null)
+            }
+
+            // Start long-press timer for text selection
+            longPressTimer = setTimeout(() => {
+              const term = terminalRef.current
+              if (!term) return
+
+              isSelecting = true
+              const [col, row] = getCellFromTouch(touch, term)
+              const { start } = selectWordAt(term, col, row)
+              selectionAnchorCol = start
+              selectionAnchorRow = row + term.buffer.active.viewportY
+
+              if (navigator.vibrate) navigator.vibrate(10)
+            }, 400)
           }
         },
         { passive: true },
@@ -375,15 +461,49 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
           if (e.touches.length !== 1 || lastTouchY === null) return
           if (!terminalRef.current) return
 
+          const touch = e.touches[0]
+
+          // If long-press fired → extend selection instead of scrolling
+          if (isSelecting) {
+            e.preventDefault()
+            const term = terminalRef.current
+            const [col, viewportRow] = getCellFromTouch(touch, term)
+            const bufferRow = viewportRow + term.buffer.active.viewportY
+
+            const anchorOff =
+              selectionAnchorRow * term.cols + selectionAnchorCol
+            const curOff = bufferRow * term.cols + col
+
+            if (curOff >= anchorOff) {
+              term.select(
+                selectionAnchorCol,
+                selectionAnchorRow,
+                curOff - anchorOff + 1,
+              )
+            } else {
+              term.select(col, bufferRow, anchorOff - curOff + 1)
+            }
+            return
+          }
+
+          // Cancel long-press if finger moved >10 px
+          if (longPressTimer) {
+            const dx = Math.abs(touch.clientX - (touchStartX ?? 0))
+            const dy = Math.abs(touch.clientY - (touchStartY ?? 0))
+            if (dx > 10 || dy > 10) {
+              clearTimeout(longPressTimer)
+              longPressTimer = null
+            }
+          }
+
           // Prevent Safari pull-to-refresh / page scroll
           e.preventDefault()
 
           const term = terminalRef.current
-          const touch = e.touches[0]
           const deltaY = lastTouchY - touch.clientY
           lastTouchY = touch.clientY
 
-          const cellHeight = scrollTarget.clientHeight / term.rows || 16
+          const cellHeight = scrollTarget!.clientHeight / term.rows || 16
           touchAccum += deltaY
 
           const lines = Math.trunc(touchAccum / cellHeight)
@@ -406,8 +526,26 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       scrollTarget.addEventListener(
         'touchend',
         () => {
+          if (longPressTimer) {
+            clearTimeout(longPressTimer)
+            longPressTimer = null
+          }
           lastTouchY = null
+          touchStartX = null
+          touchStartY = null
           touchAccum = 0
+
+          // Show copy button so the user can tap it (a clear user gesture
+          // that iOS trusts for clipboard access).
+          if (isSelecting && terminalRef.current?.hasSelection()) {
+            const text = terminalRef.current.getSelection()
+            if (text) {
+              pendingCopyRef.current = text
+              setPendingCopy(text)
+            }
+          }
+
+          isSelecting = false
         },
         { passive: true },
       )
@@ -841,22 +979,13 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
           </div>
         )}
       </div>
-      {pendingCopy !== null && false && (
+      {pendingCopy !== null && (
         <button
-          ref={copyBtnRef}
           type="button"
           onClick={handleCopyClick}
-          className="fixed z-[9999] px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-medium rounded-md shadow-lg cursor-pointer select-none"
-          style={{
-            left: cursorRef.current.x,
-            top: cursorRef.current.y,
-            transform: 'translate(-50%, -50%)',
-          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] px-4 py-2 bg-blue-600 active:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-lg select-none"
         >
-          Copy to clipboard{' '}
-          <kbd className="ml-1 px-1 py-0.5 bg-blue-700/50 rounded text-[10px]">
-            esc
-          </kbd>
+          Copy
         </button>
       )}
     </div>
