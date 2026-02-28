@@ -152,8 +152,52 @@ export function DirectoryBrowser({
   }, [])
 
   const handleSelectEntry = useCallback(
-    (fullPath: string, metaKey: boolean) => {
+    (
+      fullPath: string,
+      metaKey: boolean,
+      shiftKey: boolean,
+      columnEntries: DirEntry[],
+      columnPath: string,
+    ) => {
       setSelectedPaths((prev) => {
+        if (shiftKey && prev.size > 0) {
+          const columnPaths = columnEntries.map((e) =>
+            columnPath === '/' ? `/${e.name}` : `${columnPath}/${e.name}`,
+          )
+          const selectedIndices = columnPaths
+            .map((p, i) => (prev.has(p) ? i : -1))
+            .filter((i) => i !== -1)
+
+          if (selectedIndices.length === 0) {
+            return new Set([fullPath])
+          }
+
+          const clickedIndex = columnPaths.indexOf(fullPath)
+          if (clickedIndex === -1) return prev
+
+          const minSelected = Math.min(...selectedIndices)
+          const maxSelected = Math.max(...selectedIndices)
+
+          let rangeStart: number
+          let rangeEnd: number
+          if (clickedIndex >= maxSelected) {
+            rangeStart = minSelected
+            rangeEnd = clickedIndex
+          } else if (clickedIndex <= minSelected) {
+            rangeStart = clickedIndex
+            rangeEnd = maxSelected
+          } else {
+            rangeStart = minSelected
+            rangeEnd = clickedIndex
+          }
+
+          const next = new Set(prev)
+          for (let i = rangeStart; i <= rangeEnd; i++) {
+            next.add(columnPaths[i])
+          }
+          return next
+        }
+
         if (metaKey) {
           const next = new Set(prev)
           if (next.has(fullPath)) next.delete(fullPath)
@@ -383,7 +427,13 @@ function ColumnView({
   onSelectColumn: (colIndex: number) => void
   fileMode?: boolean
   selectedPaths?: Set<string>
-  onSelectEntry?: (fullPath: string, metaKey: boolean) => void
+  onSelectEntry?: (
+    fullPath: string,
+    metaKey: boolean,
+    shiftKey: boolean,
+    columnEntries: DirEntry[],
+    columnPath: string,
+  ) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [columnWidths, setColumnWidths] = useState<number[]>([])
@@ -468,7 +518,13 @@ function BrowserColumn({
   onClickBackground: () => void
   fileMode?: boolean
   selectedPaths?: Set<string>
-  onSelectEntry?: (fullPath: string, metaKey: boolean) => void
+  onSelectEntry?: (
+    fullPath: string,
+    metaKey: boolean,
+    shiftKey: boolean,
+    columnEntries: DirEntry[],
+    columnPath: string,
+  ) => void
 }) {
   const [entries, setEntries] = useState<DirEntry[]>(initialEntries ?? [])
   const [page, setPage] = useState(0)
@@ -614,25 +670,41 @@ function BrowserColumn({
           <div
             key={entry.name}
             className={cn(
-              'flex items-center gap-2 px-3 py-1.5 text-sm',
+              'flex items-center gap-2 px-3 py-1.5 text-sm select-none',
               entry.isDir
                 ? 'cursor-pointer hover:bg-accent/50'
                 : fileMode
                   ? 'cursor-pointer hover:bg-accent/50'
                   : 'cursor-default text-muted-foreground',
               entry.isDir && selectedDir === entry.name && 'bg-accent',
-              isSelected && 'bg-accent',
+              isSelected && 'bg-blue-500/50 hover:bg-blue-500/60',
               entry.name.startsWith('.') && 'opacity-50',
             )}
             onClick={(e) => {
               if (entry.isDir) {
-                if (fileMode && (e.metaKey || e.ctrlKey) && onSelectEntry) {
-                  onSelectEntry(fullPath, true)
+                if (
+                  fileMode &&
+                  (e.metaKey || e.ctrlKey || e.shiftKey) &&
+                  onSelectEntry
+                ) {
+                  onSelectEntry(
+                    fullPath,
+                    e.metaKey || e.ctrlKey,
+                    e.shiftKey,
+                    entries,
+                    path,
+                  )
                   return
                 }
                 onSelectDir(entry.name)
               } else if (fileMode && onSelectEntry) {
-                onSelectEntry(fullPath, e.metaKey || e.ctrlKey)
+                onSelectEntry(
+                  fullPath,
+                  e.metaKey || e.ctrlKey,
+                  e.shiftKey,
+                  entries,
+                  path,
+                )
               }
             }}
           >
