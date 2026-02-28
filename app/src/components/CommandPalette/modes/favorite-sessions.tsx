@@ -1,6 +1,7 @@
-import { AlertTriangle, Bot, Check, GitBranch } from 'lucide-react'
+import { AlertTriangle, Bot, Check, GitBranch, HeartOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppActions, AppData } from '../createPaletteModes'
+import { ItemActions } from '../ItemActions'
 import type {
   PaletteAPI,
   PaletteGroup,
@@ -65,7 +66,7 @@ function SessionIcon({ status }: { status: string }) {
 export function createFavoriteSessionsMode(
   data: AppData,
   _level: PaletteLevel,
-  _actions: AppActions,
+  actions: AppActions,
   api: PaletteAPI,
 ): PaletteMode {
   const { sessions, terminals } = data
@@ -120,6 +121,16 @@ export function createFavoriteSessionsMode(
         </>
       ),
       icon: <SessionIcon status={s.status} />,
+      rightSlot: (
+        <ItemActions
+          actions={[
+            {
+              icon: <HeartOff className="h-3.5 w-3.5 text-zinc-500" />,
+              onClick: () => actions.toggleFavoriteSession(s.session_id),
+            },
+          ]}
+        />
+      ),
       keywords: [
         s.name ?? '',
         s.latest_user_message ?? '',

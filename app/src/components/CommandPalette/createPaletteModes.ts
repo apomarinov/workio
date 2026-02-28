@@ -41,6 +41,7 @@ export type AppData = {
   processes: ActiveProcess[]
   shellPorts: Record<number, number[]>
   shellTemplates: ShellTemplate[]
+  starredBranches: Record<string, string[]>
 }
 
 // Actions that modes can trigger
@@ -89,6 +90,9 @@ export type AppActions = {
   requestCommit: (terminalId: number) => void
   requestCreateBranch: (terminalId: number, fromBranch: string) => void
   requestRenameBranch: (terminalId: number, branch: string) => void
+
+  // Star actions
+  toggleStarBranch: (repo: string, branchName: string) => void
 
   // Shell actions
   selectShell: (terminalId: number, shellId: number) => void

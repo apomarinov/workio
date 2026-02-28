@@ -153,7 +153,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       () => {
         const audio = new Audio('/audio/bell.mp3')
         audio.volume = 0.8
-        audio.play().catch(() => { })
+        audio.play().catch(() => {})
       },
     )
   }, [subscribe])

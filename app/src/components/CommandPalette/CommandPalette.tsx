@@ -429,6 +429,7 @@ export function CommandPalette() {
       processes,
       shellPorts,
       shellTemplates: settings?.shell_templates ?? [],
+      starredBranches: settings?.starred_branches ?? {},
     }),
     [
       terminals,
@@ -445,6 +446,7 @@ export function CommandPalette() {
       processes,
       shellPorts,
       settings?.shell_templates,
+      settings?.starred_branches,
     ],
   )
 
@@ -671,6 +673,26 @@ export function CommandPalette() {
         } catch (err) {
           toast.error(
             err instanceof Error ? err.message : 'Failed to toggle favorite',
+          )
+        }
+      },
+
+      // Star actions
+      toggleStarBranch: async (repo, branchName) => {
+        try {
+          const current = settings?.starred_branches ?? {}
+          const branches = current[repo] ?? []
+          const starred = { ...current }
+          if (branches.includes(branchName)) {
+            starred[repo] = branches.filter((b) => b !== branchName)
+            if (starred[repo].length === 0) delete starred[repo]
+          } else {
+            starred[repo] = [...branches, branchName]
+          }
+          await updateSettings({ starred_branches: starred })
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to toggle star',
           )
         }
       },

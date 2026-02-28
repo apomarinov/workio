@@ -10,9 +10,11 @@ import {
   GitMerge,
   Pencil,
   RefreshCw,
+  Star,
   Trash2,
 } from 'lucide-react'
 import type { AppActions, AppData } from '../createPaletteModes'
+import { ItemActions } from '../ItemActions'
 import type {
   PaletteAPI,
   PaletteItem,
@@ -21,7 +23,7 @@ import type {
 } from '../types'
 
 export function createBranchesMode(
-  _data: AppData,
+  data: AppData,
   level: PaletteLevel,
   actions: AppActions,
   api: PaletteAPI,
@@ -56,43 +58,72 @@ export function createBranchesMode(
     }
   }
 
+  // Starred branches for this repo
+  const repo = terminal.git_repo?.repo ?? ''
+  const starredSet = new Set(data.starredBranches[repo] ?? [])
+
+  // Starred first, then the rest in original API order
+  const sortedLocal = [
+    ...branches.local.filter((b) => starredSet.has(b.name)),
+    ...branches.local.filter((b) => !starredSet.has(b.name)),
+  ]
+
   // Build local branch items
-  const localItems: PaletteItem[] = branches.local.map((branch) => ({
-    id: `branch:local:${branch.name}`,
-    label: branch.name,
-    icon: <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />,
-    rightSlot: branch.current && (
-      <Check className="h-4 w-4 shrink-0 text-green-500" />
-    ),
-    onSelect: () => {
-      api.push({
-        mode: 'branch-actions',
-        title: branch.name,
-        terminal,
-        pr,
-        branches,
-        branch: {
-          name: branch.name,
-          isRemote: false,
-          isCurrent: branch.current,
-        },
-      })
-    },
-    onNavigate: () => {
-      api.push({
-        mode: 'branch-actions',
-        title: branch.name,
-        terminal,
-        pr,
-        branches,
-        branch: {
-          name: branch.name,
-          isRemote: false,
-          isCurrent: branch.current,
-        },
-      })
-    },
-  }))
+  const localItems: PaletteItem[] = sortedLocal.map((branch) => {
+    const isStarred = starredSet.has(branch.name)
+    return {
+      id: `branch:local:${branch.name}`,
+      label: branch.name,
+      icon: <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />,
+      rightSlot: (
+        <div className="flex items-center gap-1">
+          {branch.current && (
+            <Check className="h-4 w-4 shrink-0 text-green-500" />
+          )}
+          <ItemActions
+            actions={[
+              {
+                icon: (
+                  <Star
+                    className={`h-3.5 w-3.5 ${isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-zinc-500'}`}
+                  />
+                ),
+                onClick: () => actions.toggleStarBranch(repo, branch.name),
+              },
+            ]}
+          />
+        </div>
+      ),
+      onSelect: () => {
+        api.push({
+          mode: 'branch-actions',
+          title: branch.name,
+          terminal,
+          pr,
+          branches,
+          branch: {
+            name: branch.name,
+            isRemote: false,
+            isCurrent: branch.current,
+          },
+        })
+      },
+      onNavigate: () => {
+        api.push({
+          mode: 'branch-actions',
+          title: branch.name,
+          terminal,
+          pr,
+          branches,
+          branch: {
+            name: branch.name,
+            isRemote: false,
+            isCurrent: branch.current,
+          },
+        })
+      },
+    }
+  })
 
   // Build remote branch items
   const remoteItems: PaletteItem[] = branches.remote.map((branch) => ({
