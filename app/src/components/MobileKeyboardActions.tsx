@@ -32,7 +32,7 @@ export function MobileKeyboardActions({
                 onPointerDown={(e) => e.preventDefault()}
                 onPointerUp={() => onActionTap(actionId)}
                 className={cn(
-                  'flex-1 min-w-0 py-2.5 rounded-md text-xs font-medium transition-colors select-none',
+                  'flex-1 min-w-0 py-1.5 rounded-md text-base font-medium transition-colors select-none',
                   isActive
                     ? 'bg-blue-600 text-white'
                     : 'bg-zinc-700/80 text-zinc-200 active:bg-zinc-600',

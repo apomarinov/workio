@@ -1,5 +1,5 @@
-import { CornerDownLeft } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowUpFromLine, CornerDownLeft } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useSettings } from '@/hooks/useSettings'
 import {
@@ -35,9 +35,11 @@ export function MobileKeyboard({
 }: MobileKeyboardProps) {
   const { settings, updateSettings } = useSettings()
   const [inputValue, setInputValue] = useState('')
+  const [directInput, setDirectInput] = useState(false)
   const [activeModifiers, setActiveModifiers] =
     useState<Modifiers>(DEFAULT_MODIFIERS)
   const [customizeOpen, setCustomizeOpen] = useState(false)
+  const composingRef = useRef(false)
 
   const rows: MobileKeyboardRow[] =
     settings?.mobile_keyboard_rows ?? DEFAULT_KEYBOARD_ROWS
@@ -59,7 +61,6 @@ export function MobileKeyboard({
     // as part of a paste blob (which would insert a newline instead of submitting)
     setTimeout(() => sendToTerminal(terminalId, '\r'), 10)
     setInputValue('')
-    if (inputRef?.current) inputRef.current.style.height = 'auto'
     resetModifiers()
   }
 
@@ -164,7 +165,7 @@ export function MobileKeyboard({
                     onPointerDown={(e) => e.preventDefault()}
                     onPointerUp={() => handleActionTap(actionId)}
                     className={cn(
-                      'px-3 py-2.5 min-w-10 rounded-md text-xs font-medium flex-shrink-0 select-none',
+                      'px-2 py-1.5 min-w-10 rounded-md text-base font-medium flex-shrink-0 select-none',
                       isActive
                         ? 'bg-blue-600 text-white'
                         : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',
@@ -190,6 +191,19 @@ export function MobileKeyboard({
             rows={1}
             value={inputValue}
             onChange={(e) => {
+              if (directInput) {
+                if (composingRef.current) return
+                const val = e.target.value
+                if (val) {
+                  let text = ''
+                  for (const char of val) {
+                    text += applyModifier(char, activeModifiers)
+                  }
+                  sendToTerminal(terminalId, text)
+                }
+                setInputValue('')
+                return
+              }
               setInputValue(e.target.value)
               // Auto-resize: reset then clamp to 5 lines
               const el = e.target
@@ -199,15 +213,78 @@ export function MobileKeyboard({
               el.style.height = `${Math.min(el.scrollHeight, lineHeight * 5)}px`
             }}
             onKeyDown={(e) => {
+              if (directInput) {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  sendToTerminal(terminalId, '\r')
+                  return
+                }
+                if (e.key === 'Backspace') {
+                  e.preventDefault()
+                  sendToTerminal(terminalId, '\x7f')
+                  return
+                }
+                return
+              }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 handleSubmit()
               }
             }}
-            placeholder="Type here..."
-            className="flex-1 min-w-0 px-3 h-10 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border border-zinc-700/50 focus:border-blue-500/50 resize-none leading-5 overflow-y-auto"
+            onCompositionStart={() => {
+              composingRef.current = true
+            }}
+            onCompositionEnd={(e) => {
+              composingRef.current = false
+              if (directInput) {
+                const val = (e.target as HTMLTextAreaElement).value
+                if (val) {
+                  let text = ''
+                  for (const char of val) {
+                    text += applyModifier(char, activeModifiers)
+                  }
+                  sendToTerminal(terminalId, text)
+                }
+                setInputValue('')
+              }
+            }}
+            onPaste={(e) => {
+              if (directInput) {
+                e.preventDefault()
+                const text = e.clipboardData.getData('text')
+                if (text) sendToTerminal(terminalId, text)
+              }
+            }}
+            placeholder={directInput ? 'Direct input...' : 'Type here...'}
+            className={cn(
+              'flex-1 min-w-0 px-3 !h-10 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border resize-none leading-5 overflow-y-auto',
+              directInput
+                ? 'border-blue-500/70 focus:border-blue-500'
+                : 'border-zinc-700/50 focus:border-blue-500/50',
+            )}
           />
           {isInput && (
+            <button
+              type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onPointerUp={() => {
+                setDirectInput((prev) => !prev)
+                if (!directInput) {
+                  setInputValue('')
+                }
+                inputRef?.current?.focus()
+              }}
+              className={cn(
+                'flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg',
+                directInput
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',
+              )}
+            >
+              <ArrowUpFromLine className="w-4 h-4" />
+            </button>
+          )}
+          {isInput && !directInput && (
             <button
               type="button"
               onPointerDown={(e) => e.preventDefault()}
