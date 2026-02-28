@@ -78,29 +78,37 @@ function parseUserAgent(ua: string): { device: string; browser: string } {
   return { device, browser }
 }
 
-// Track parsed user agent per WebSocket
-const wsClientUA = new WeakMap<WebSocket, { device: string; browser: string }>()
+// Per-WebSocket metadata (set once at connection time)
+interface WsClientInfo {
+  ip: string
+  device: string
+  browser: string
+  cols: number
+  rows: number
+}
 
-// Track which shell each WebSocket is connected to
-const wsShellMap = new WeakMap<WebSocket, number>()
+const wsInfo = new WeakMap<WebSocket, WsClientInfo>()
 
-// Track client IP per WebSocket (set at connection time from the HTTP upgrade request)
-const wsClientIP = new WeakMap<WebSocket, string>()
+// Per-shell state: all connected clients, keyed by IP for dedup
+interface ShellState {
+  // IP → WebSocket (one connection per device per shell)
+  devices: Map<string, WebSocket>
+  // All connected clients (same WebSocket refs as in devices.values())
+  clients: Set<WebSocket>
+  // The primary client controls PTY dimensions
+  primary: WebSocket | null
+}
 
-// Composite key (IP + device + browser) used for per-device dedup
-const wsDeviceKey = new WeakMap<WebSocket, string>()
+const shells = new Map<number, ShellState>()
 
-// One connection per device (IP+UA) per shell — rejects duplicates
-const shellDeviceConnection = new Map<number, Map<string, WebSocket>>()
-
-// Track all connected clients per shell for broadcasting output
-const shellClients = new Map<number, Set<WebSocket>>()
-
-// The primary client controls PTY dimensions — first to connect, promoted on disconnect
-const shellPrimaryClient = new Map<number, WebSocket>()
-
-// Each client's last known dimensions (for promoting a new primary)
-const wsClientSize = new WeakMap<WebSocket, { cols: number; rows: number }>()
+function getOrCreateShell(shellId: number): ShellState {
+  let state = shells.get(shellId)
+  if (!state) {
+    state = { devices: new Map(), clients: new Set(), primary: null }
+    shells.set(shellId, state)
+  }
+  return state
+}
 
 // Debounce resize events to prevent shell redraw spam during drag
 const resizeTimers = new Map<number, ReturnType<typeof setTimeout>>()
@@ -125,9 +133,9 @@ function createBroadcastBatcher(shellId: number): (data: string) => void {
     timer = null
     if (pending) {
       const msg: ServerMessage = { type: 'output', data: pending }
-      const clients = shellClients.get(shellId)
-      if (clients) {
-        for (const client of clients) {
+      const state = shells.get(shellId)
+      if (state) {
+        for (const client of state.clients) {
           sendMessage(client, msg)
         }
       }
@@ -145,23 +153,23 @@ function createBroadcastBatcher(shellId: number): (data: string) => void {
 
 // Broadcast exit to all connected clients for a shell
 function broadcastExit(shellId: number, code: number): void {
-  const clients = shellClients.get(shellId)
-  if (clients) {
-    for (const client of clients) {
+  const state = shells.get(shellId)
+  if (state) {
+    for (const client of state.clients) {
       sendMessage(client, { type: 'exit', code })
     }
   }
 }
 
 function broadcastShellClients(shellId: number): void {
-  const deviceMap = shellDeviceConnection.get(shellId)
+  const state = shells.get(shellId)
   const clients: ShellClient[] = []
-  if (deviceMap) {
-    for (const [, ws] of deviceMap) {
+  if (state) {
+    for (const ws of state.clients) {
       if (ws.readyState !== WebSocket.OPEN) continue
-      const ua = wsClientUA.get(ws) ?? { device: 'Unknown', browser: 'Unknown' }
-      const ip = wsClientIP.get(ws) ?? 'unknown'
-      clients.push({ device: ua.device, browser: ua.browser, ip })
+      const info = wsInfo.get(ws)
+      if (!info) continue
+      clients.push({ device: info.device, browser: info.browser, ip: info.ip })
     }
   }
   const io = getIO()
@@ -177,10 +185,14 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
       : undefined) ??
     request.socket.remoteAddress ??
     'unknown'
-  wsClientIP.set(ws, clientIP)
-  wsClientUA.set(ws, parseUserAgent(request.headers['user-agent'] ?? ''))
-  const deviceKey = clientIP
-  wsDeviceKey.set(ws, deviceKey)
+  const ua = parseUserAgent(request.headers['user-agent'] ?? '')
+  wsInfo.set(ws, {
+    ip: clientIP,
+    device: ua.device,
+    browser: ua.browser,
+    cols: 0,
+    rows: 0,
+  })
 
   let shellId: number | null = null
 
@@ -196,18 +208,16 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     switch (message.type) {
       case 'init': {
         shellId = message.shellId
-        wsShellMap.set(ws, shellId)
+        const state = getOrCreateShell(shellId)
 
-        // Reject duplicate connection from the same device (IP+UA) for the same shell
-        const existingDeviceWs = shellDeviceConnection
-          .get(shellId)
-          ?.get(deviceKey)
+        // Reject duplicate connection from the same device (IP) for the same shell
+        const existingDeviceWs = state.devices.get(clientIP)
         if (
           existingDeviceWs &&
           existingDeviceWs.readyState === WebSocket.OPEN
         ) {
           log.info(
-            `[ws] Rejecting duplicate connection for shell=${shellId} from device=${deviceKey}`,
+            `[ws] Rejecting duplicate connection for shell=${shellId} from device=${clientIP}`,
           )
           sendMessage(ws, {
             type: 'error',
@@ -218,13 +228,11 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           return
         }
 
-        // Register this connection as the device's connection for this shell
-        let deviceMap = shellDeviceConnection.get(shellId)
-        if (!deviceMap) {
-          deviceMap = new Map()
-          shellDeviceConnection.set(shellId, deviceMap)
-        }
-        deviceMap.set(deviceKey, ws)
+        // Register this connection
+        state.devices.set(clientIP, ws)
+        const info = wsInfo.get(ws)!
+        info.cols = message.cols
+        info.rows = message.rows
 
         // Check if session already exists (reconnection)
         const existingSession = getSession(shellId)
@@ -232,27 +240,21 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           // Clear timeout since client reconnected
           clearSessionTimeout(shellId)
 
-          // Add this client to the shell's client set
-          let clients = shellClients.get(shellId)
-          if (!clients) {
-            // First client reconnecting — create the set and re-attach
-            // with broadcast callbacks
-            clients = new Set()
-            shellClients.set(shellId, clients)
+          // Re-attach broadcast callbacks if this is the first client reconnecting
+          if (state.clients.size === 0) {
             const sid = shellId
             const batchOutput = createBroadcastBatcher(sid)
             attachSession(sid, batchOutput, (code) => {
               broadcastExit(sid, code)
             })
           }
-          clients.add(ws)
-          wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
+          state.clients.add(ws)
           log.info(
-            `[ws] Client connected to shell=${shellId} (reconnect), clients=${clients.size}`,
+            `[ws] Client connected to shell=${shellId} (reconnect), clients=${state.clients.size}`,
           )
 
           // Latest client becomes primary (controls PTY dimensions)
-          shellPrimaryClient.set(shellId, ws)
+          state.primary = ws
 
           // Replay buffer to this client only
           const buffer = getSessionBuffer(shellId)
@@ -269,12 +271,10 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           return
         }
 
-        // Create new session — set up broadcast client set first
+        // Create new session
         const sid = shellId
-        const clients = new Set<WebSocket>([ws])
-        shellClients.set(sid, clients)
-        shellPrimaryClient.set(sid, ws)
-        wsClientSize.set(ws, { cols: message.cols, rows: message.rows })
+        state.clients.add(ws)
+        state.primary = ws
 
         log.info(
           `[ws] Client connected to shell=${sid} (new session), clients=1`,
@@ -355,11 +355,17 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           return
         }
         const { cols, rows } = message
+        const state = shells.get(shellId)
+
         // Always track this client's latest dimensions
-        wsClientSize.set(ws, { cols, rows })
+        const info = wsInfo.get(ws)
+        if (info) {
+          info.cols = cols
+          info.rows = rows
+        }
 
         // Only the primary client can resize the PTY
-        if (shellPrimaryClient.get(shellId) !== ws) {
+        if (!state || state.primary !== ws) {
           break
         }
 
@@ -383,45 +389,37 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
 
   ws.on('close', () => {
     if (shellId !== null) {
+      const state = shells.get(shellId)
+      if (!state) return
+
       // Clean up device tracking — only remove if this ws is still the registered one
-      const deviceMap = shellDeviceConnection.get(shellId)
-      if (deviceMap) {
-        if (deviceMap.get(deviceKey) === ws) {
-          deviceMap.delete(deviceKey)
-        }
-        if (deviceMap.size === 0) {
-          shellDeviceConnection.delete(shellId)
-        }
+      if (state.devices.get(clientIP) === ws) {
+        state.devices.delete(clientIP)
       }
 
       // Remove this client from the shell's set
-      const clients = shellClients.get(shellId)
-      if (clients) {
-        clients.delete(ws)
-        log.info(
-          `[ws] Client disconnected from shell=${shellId}, clients=${clients.size}`,
-        )
-        if (clients.size === 0) {
-          // No clients left — clean up and start timeout
-          shellClients.delete(shellId)
-          shellPrimaryClient.delete(shellId)
-          log.info(
-            `[ws] No clients left for shell=${shellId}, starting timeout`,
-          )
-          startSessionTimeout(shellId)
-          broadcastShellClients(shellId)
-        } else {
-          if (shellPrimaryClient.get(shellId) === ws) {
-            // Primary disconnected — promote next client and resize PTY
-            const next = clients.values().next().value as WebSocket
-            shellPrimaryClient.set(shellId, next)
-            const size = wsClientSize.get(next)
-            if (size) {
-              resizeSession(shellId, size.cols, size.rows)
-            }
+      state.clients.delete(ws)
+      log.info(
+        `[ws] Client disconnected from shell=${shellId}, clients=${state.clients.size}`,
+      )
+
+      if (state.clients.size === 0) {
+        // No clients left — clean up and start timeout
+        shells.delete(shellId)
+        log.info(`[ws] No clients left for shell=${shellId}, starting timeout`)
+        startSessionTimeout(shellId)
+        broadcastShellClients(shellId)
+      } else {
+        if (state.primary === ws) {
+          // Primary disconnected — promote next client and resize PTY
+          const next = state.clients.values().next().value as WebSocket
+          state.primary = next
+          const nextInfo = wsInfo.get(next)
+          if (nextInfo) {
+            resizeSession(shellId, nextInfo.cols, nextInfo.rows)
           }
-          broadcastShellClients(shellId)
         }
+        broadcastShellClients(shellId)
       }
     }
   })
