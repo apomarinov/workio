@@ -872,7 +872,7 @@ export function ShellTabs({
         )}
         {children && <div className="flex-shrink-0">{children}</div>}
         {/* Shell items — responsive */}
-        <div className="flex-1 min-w-0 @container/inner pb-1">
+        <div className={cn("flex-1 min-w-0 @container/inner", position === 'top' && 'pb-1')}>
           {/* <400px: pills (hidden on mobile) */}
           <div
             className={cn(

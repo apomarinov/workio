@@ -360,6 +360,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     // (~400 ms hold without movement) to select the word under the finger.
     // After the long-press fires, subsequent touchmove extends the selection
     // instead of scrolling, and touchend copies the selected text.
+    let momentumRafId: number | null = null
     if (scrollTarget) {
       let lastTouchY: number | null = null
       let touchStartX: number | null = null
@@ -369,6 +370,13 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       let isSelecting = false
       let selectionAnchorCol = 0
       let selectionAnchorRow = 0
+
+      // Inertia / momentum scrolling state
+      let lastTouchTime = 0
+      let touchVelocity = 0
+      const SCROLL_MULTIPLIER = 3.5
+      const FRICTION = 0.92
+      const MIN_VELOCITY = 0.5 // px/ms threshold to stop momentum
 
       function getCellFromTouch(touch: Touch, term: XTerm): [number, number] {
         const rect = scrollTarget!.getBoundingClientRect()
@@ -427,6 +435,14 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
             touchStartY = touch.clientY
             touchAccum = 0
             isSelecting = false
+            touchVelocity = 0
+            lastTouchTime = performance.now()
+
+            // Cancel any ongoing momentum animation
+            if (momentumRafId !== null) {
+              cancelAnimationFrame(momentumRafId)
+              momentumRafId = null
+            }
 
             // Clear any existing selection / copy button on new touch
             if (terminalRef.current?.hasSelection()) {
@@ -499,12 +515,27 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
           // Prevent Safari pull-to-refresh / page scroll
           e.preventDefault()
 
+          // Cancel any ongoing momentum animation
+          if (momentumRafId !== null) {
+            cancelAnimationFrame(momentumRafId)
+            momentumRafId = null
+          }
+
           const term = terminalRef.current
+          const now = performance.now()
           const deltaY = lastTouchY - touch.clientY
           lastTouchY = touch.clientY
 
+          // Track velocity (px/ms) with exponential smoothing
+          const dt = now - lastTouchTime
+          if (dt > 0) {
+            const instantVelocity = deltaY / dt
+            touchVelocity = touchVelocity * 0.3 + instantVelocity * 0.7
+          }
+          lastTouchTime = now
+
           const cellHeight = scrollTarget!.clientHeight / term.rows || 16
-          touchAccum += deltaY
+          touchAccum += deltaY * SCROLL_MULTIPLIER
 
           const lines = Math.trunc(touchAccum / cellHeight)
           if (lines === 0) return
@@ -534,6 +565,49 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
           touchStartX = null
           touchStartY = null
           touchAccum = 0
+
+          // Start momentum scrolling if velocity is high enough and not selecting
+          const term = terminalRef.current
+          if (
+            !isSelecting &&
+            term &&
+            Math.abs(touchVelocity) > MIN_VELOCITY / 1000
+          ) {
+            const cellHeight = scrollTarget!.clientHeight / term.rows || 16
+            let velocity = touchVelocity * SCROLL_MULTIPLIER // px/ms
+            let accumPx = 0
+            let lastFrame = performance.now()
+
+            const momentumStep = () => {
+              const now = performance.now()
+              const dt = now - lastFrame
+              lastFrame = now
+
+              velocity *= FRICTION
+              accumPx += velocity * dt
+
+              const lines = Math.trunc(accumPx / cellHeight)
+              if (lines !== 0) {
+                accumPx -= lines * cellHeight
+                if (term.buffer.active.type === 'alternate') {
+                  const arrow = lines > 0 ? '\x1b[B' : '\x1b[A'
+                  const count = Math.abs(lines)
+                  for (let i = 0; i < count; i++) {
+                    sendInputRef.current(arrow)
+                  }
+                } else {
+                  term.scrollLines(lines)
+                }
+              }
+
+              if (Math.abs(velocity * 1000) > MIN_VELOCITY) {
+                momentumRafId = requestAnimationFrame(momentumStep)
+              } else {
+                momentumRafId = null
+              }
+            }
+            momentumRafId = requestAnimationFrame(momentumStep)
+          }
 
           // Show copy button so the user can tap it (a clear user gesture
           // that iOS trusts for clipboard access).
@@ -744,6 +818,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
 
     return () => {
       if (resizeRafId !== null) cancelAnimationFrame(resizeRafId)
+      if (momentumRafId !== null) cancelAnimationFrame(momentumRafId)
       resizeObserver.disconnect()
       terminal.dispose()
       terminalRef.current = null
