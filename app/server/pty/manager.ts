@@ -89,6 +89,10 @@ export interface PtySession {
 // In-memory map of active PTY sessions, keyed by shellId
 const sessions = new Map<number, PtySession>()
 
+// Bell debounce: track last bell time per shell to avoid spamming
+const lastBellTime = new Map<number, number>()
+const BELL_DEBOUNCE_MS = 10_000
+
 // Bell subscriptions: notify client when a command ends in a subscribed shell
 interface BellSubscription {
   shellId: number
@@ -1200,6 +1204,14 @@ export async function createSession(
       // Forward event to callback
       session.onCommandEvent?.(event)
     },
+    // Bell detection: debounce per shell and emit to client
+    () => {
+      const now = Date.now()
+      const last = lastBellTime.get(shellId) ?? 0
+      if (now - last < BELL_DEBOUNCE_MS) return
+      lastBellTime.set(shellId, now)
+      getIO()?.emit('pty:bell', { shellId, terminalId })
+    },
   )
 
   // Handle PTY data through OSC parser
@@ -1211,6 +1223,7 @@ export async function createSession(
   backend.onExit(({ exitCode }) => {
     sessions.delete(shellId)
     bellSubscriptions.delete(shellId)
+    lastBellTime.delete(shellId)
     lastDirtyStatus.delete(terminalId)
     lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()

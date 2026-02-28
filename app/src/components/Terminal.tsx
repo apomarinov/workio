@@ -567,22 +567,6 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       setDimensions({ cols, rows })
     })
 
-    // Play a short beep and bounce dock icon on bell (\x07), debounced to 5s
-    let lastBellTime = 0
-    terminal.onBell(() => {
-      if (!sessionLiveRef.current) return
-      const now = Date.now()
-      // Ignore bells during shell prompt init after switching terminals
-      if (now - sessionLiveAtRef.current < 2000) return
-      if (now - lastBellTime < 10000) return
-      lastBellTime = now
-      const audioElement = new Audio('/audio/bell.mp3')
-      audioElement.volume = 0.5
-      audioElement.play().catch(() => {
-        console.error(`Failed to play audio`)
-      })
-    })
-
     // Handle input - use ref to avoid stale closure
     terminal.onData((data) => {
       if (isBusyRef.current) return

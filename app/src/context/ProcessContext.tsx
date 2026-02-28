@@ -146,6 +146,18 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe])
 
+  // Play bell sound when server detects \x07 in PTY output
+  useEffect(() => {
+    return subscribe<{ shellId: number; terminalId: number }>(
+      'pty:bell',
+      () => {
+        const audio = new Audio('/audio/bell.mp3')
+        audio.volume = 0.8
+        audio.play().catch(() => { })
+      },
+    )
+  }, [subscribe])
+
   // Sync bell subscriptions from server
   useEffect(() => {
     return subscribe<number[]>('bell:subscriptions', (shellIds) => {

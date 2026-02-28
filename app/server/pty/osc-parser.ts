@@ -13,6 +13,9 @@ export type CommandEventCallback = (event: CommandEvent) => void
 const ESC = '\x1b'
 const BEL = '\x07'
 const ST = '\x1b\\' // String Terminator
+// Matches OSC sequences terminated by BEL (e.g. ESC]0;title\x07)
+// biome-ignore lint/suspicious/noControlCharactersInRegex: terminal escape sequences
+const oscBelRegex = /\x1b\][^\x07]*\x07/g
 
 /**
  * Creates an OSC parser that wraps a data callback.
@@ -22,6 +25,7 @@ const ST = '\x1b\\' // String Terminator
 export function createOscParser(
   onData: (data: string) => void,
   onCommandEvent: CommandEventCallback,
+  onBell?: () => void,
 ): (data: string) => void {
   // Buffer for incomplete escape sequences
   let buffer = ''
@@ -151,6 +155,15 @@ export function createOscParser(
       }
 
       pos = endPos
+    }
+
+    // Detect bare bell characters (not OSC terminators)
+    if (onBell && data.includes(BEL)) {
+      // Strip all ESC]...\x07 sequences, then check for remaining \x07
+      const stripped = data.replace(oscBelRegex, '')
+      if (stripped.includes(BEL)) {
+        onBell()
+      }
     }
 
     // Pass through all data (including OSC sequences - xterm.js handles them fine)
