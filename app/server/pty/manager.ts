@@ -45,6 +45,28 @@ const LONG_TIMEOUT = 900_000 // 15 min for setup/teardown operations
 
 const COMMAND_IGNORE_LIST: string[] = []
 
+// Track when processes were first seen: key = "terminalId:shellId:command" → timestamp ms
+const processFirstSeen = new Map<string, number>()
+
+function stampProcessStartTimes(processes: ActiveProcess[]) {
+  const currentKeys = new Set<string>()
+  const now = Date.now()
+  for (const proc of processes) {
+    const key = `${proc.terminalId}:${proc.shellId}:${proc.command}`
+    currentKeys.add(key)
+    if (!processFirstSeen.has(key)) {
+      processFirstSeen.set(key, now)
+    }
+    proc.startedAt = processFirstSeen.get(key)
+  }
+  // Clean up stale entries
+  for (const key of processFirstSeen.keys()) {
+    if (!currentKeys.has(key)) {
+      processFirstSeen.delete(key)
+    }
+  }
+}
+
 export interface PtySession {
   pty: TerminalBackend
   buffer: string[]
@@ -313,6 +335,8 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
     }),
   )
 
+  stampProcessStartTimes(allProcesses)
+
   const terminalPorts: Record<number, number[]> = {}
   if (allPorts.length > 0) {
     terminalPorts[terminalId] = [...new Set(allPorts)].sort((a, b) => a - b)
@@ -389,6 +413,8 @@ async function scanAndEmitAllProcesses() {
   } catch (err) {
     log.error({ err }, '[pty] Failed to detect zellij sessions')
   }
+
+  stampProcessStartTimes(allProcesses)
 
   getIO()?.emit('processes', {
     processes: allProcesses,

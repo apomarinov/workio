@@ -151,12 +151,12 @@ function ShellPopover({
           onClick={(e) => {
             e.stopPropagation()
           }}
-          className="flex-shrink-0 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          className="flex-shrink-0 p-1 relative text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
         >
-          <ChevronDown className="w-3 h-3" />
+          <ChevronDown className="w-3 h-3  absolute -top-0.5 left-0" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-44 p-1" align="start" side="bottom">
+      <PopoverContent className="w-fit p-1" align="start" side="bottom">
         <Button
           align="left"
           variant="ghost"
@@ -183,7 +183,7 @@ function ShellPopover({
           ) : (
             <Bell className="w-3.5 h-3.5" />
           )}
-          Notify On End
+          {bellSubscribed ? "Don't notify me" : 'Notify me when done'}
         </Button>
         <Button
           align="left"
@@ -948,7 +948,9 @@ export function ShellTabs({
               )
             }
           }, 1000)
-          toast.success(`Killed processes in ${terminal.shells.length} shell(s)`)
+          toast.success(
+            `Killed processes in ${terminal.shells.length} shell(s)`,
+          )
           setKillAllConfirm(false)
         }}
         onCancel={() => setKillAllConfirm(false)}

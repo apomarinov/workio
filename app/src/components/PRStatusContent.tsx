@@ -42,6 +42,7 @@ import {
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
+import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import type {
   PRCheckStatus,
@@ -62,16 +63,6 @@ import {
 } from './dialogs'
 import { RefreshIcon } from './icons'
 import { MarkdownContent } from './MarkdownContent'
-
-function formatTimeAgo(dateString: string): string {
-  const diffMs = Date.now() - new Date(dateString).getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
-  return `${Math.floor(diffHr / 24)}d ago`
-}
 
 const REACTIONS = [
   { content: '+1', emoji: '👍' },

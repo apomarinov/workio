@@ -6,6 +6,7 @@ export interface ActiveProcess {
   shellId?: number
   source?: 'direct' | 'zellij'
   isZellij?: boolean
+  startedAt?: number
 }
 
 export interface ProcessesPayload {

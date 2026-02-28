@@ -36,6 +36,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSocket } from '@/hooks/useSocket'
 import { cancelWorkspace } from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
+import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { useProcessContext } from '../context/ProcessContext'
 import { useTerminalContext } from '../context/TerminalContext'
@@ -606,7 +607,10 @@ export const TerminalItem = memo(function TerminalItem({
                                       isCollapsed && '-rotate-90',
                                     )}
                                   />
-                                  {sh.name} ({procs.length})
+                                  {sh.name === 'main'
+                                    ? (terminal.name ?? sh.name)
+                                    : sh.name}{' '}
+                                  ({procs.length})
                                 </button>
                                 {!isCollapsed &&
                                   procs.map((process) => {
@@ -620,6 +624,11 @@ export const TerminalItem = memo(function TerminalItem({
                                           {process.command}
                                         </span>
                                         <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
+                                          {process.startedAt && (
+                                            <span className="text-[10px] text-muted-foreground/40 group-hover/proc:hidden">
+                                              {formatTimeAgo(process.startedAt)}
+                                            </span>
+                                          )}
                                           {process.isZellij && (
                                             <button
                                               type="button"
