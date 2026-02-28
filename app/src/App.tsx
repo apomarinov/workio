@@ -637,7 +637,11 @@ function AppContent() {
               </div>
             }
           >
-            <SessionChat />
+            <SessionChat
+              onOpenSidebar={
+                isMobile ? () => setMobileSidebarOpen(true) : undefined
+              }
+            />
           </Suspense>
         </div>
       ) : terminals.length === 0 ? (

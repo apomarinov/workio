@@ -1,4 +1,11 @@
-import { AlertTriangle, Folder, Loader2, MoreVertical } from 'lucide-react'
+import {
+  AlertTriangle,
+  Folder,
+  Loader2,
+  MoreVertical,
+  PanelLeft,
+  SidebarOpen,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSessionContext } from '../context/SessionContext'
 import { useSessionMessages } from '../hooks/useSessionMessages'
@@ -13,11 +20,13 @@ export function SessionChat({
   hideHeader,
   hideAvatars,
   isMaximizedInPip,
+  onOpenSidebar,
 }: {
   sessionId?: string | null
   hideHeader?: boolean
   hideAvatars?: boolean
   isMaximizedInPip?: boolean
+  onOpenSidebar?: () => void
 } = {}) {
   const { activeSessionId, sessions } = useSessionContext()
   const resolvedSessionId = sessionIdProp ?? activeSessionId
@@ -145,6 +154,16 @@ export function SessionChat({
         {/* Header */}
         {!hideHeader && (
           <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
+            {onOpenSidebar && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground flex-shrink-0"
+                onClick={onOpenSidebar}
+              >
+                <SidebarOpen className="w-4 h-4" />
+              </Button>
+            )}
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-medium text-zinc-100 truncate">
                 {session?.name || 'Untitled'}
