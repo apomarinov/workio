@@ -396,9 +396,13 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
-      const xtermTextarea = document.querySelector(
-        '.xterm-helper-textarea',
-      ) as HTMLTextAreaElement | null
+      let xtermTextarea: HTMLTextAreaElement | null = null
+      for (const ta of document.querySelectorAll('.xterm-helper-textarea')) {
+        if (!ta.closest('.invisible')) {
+          xtermTextarea = ta as HTMLTextAreaElement
+          break
+        }
+      }
       if (!xtermTextarea) return
       if (document.activeElement === xtermTextarea) return
       const tag = document.activeElement?.tagName
