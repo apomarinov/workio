@@ -58,6 +58,10 @@ const TYPE_TO_PUSH: Record<
     title: '✅ Workspace Deleted',
     body: `${d.name || 'Workspace'} deleted`,
   }),
+  workspace_repo_failed: (d) => ({
+    title: '❌ Repo Init Failed',
+    body: `${d.name || 'Workspace'} repo init failed`,
+  }),
 }
 
 export async function emitNotification(

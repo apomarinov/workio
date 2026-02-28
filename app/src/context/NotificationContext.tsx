@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react'
 import { NotificationPrompt } from '../components/NotificationPrompt'
+import { useSettings } from '../hooks/useSettings'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
 
@@ -40,6 +41,8 @@ export function NotificationProvider({
     return Notification.permission
   })
   const [promptOpen, setPromptOpen] = useState(false)
+  const { settings } = useSettings()
+  const hasPushSubscriptions = (settings?.push_subscriptions?.length ?? 0) > 0
 
   useEffect(() => {
     if (permission === 'unsupported') return
@@ -87,6 +90,10 @@ export function NotificationProvider({
         })
       }
 
+      // Skip OS notification when push subscriptions exist — the server
+      // handles it via sendPushNotification() to avoid duplicate banners.
+      if (hasPushSubscriptions) return
+
       // Use service worker notification so clicks are handled by sw.ts
       // notificationclick handler (focus/open PWA + post NOTIFICATION_CLICK)
       navigator.serviceWorker?.ready.then(async (reg) => {
@@ -104,7 +111,7 @@ export function NotificationProvider({
         })
       })
     },
-    [permission],
+    [permission, hasPushSubscriptions],
   )
 
   return (

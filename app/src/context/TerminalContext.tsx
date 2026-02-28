@@ -445,6 +445,26 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           break
         }
 
+        case 'review_requested':
+          sendNotificationRef.current('👀 Review Requested', {
+            body: data.author
+              ? `${data.author} wants your review on ${prTitle}`
+              : prTitle,
+            audio: 'pr-activity',
+            data: { url: prUrl },
+          })
+          break
+
+        case 'pr_mentioned':
+          sendNotificationRef.current('💬 Mentioned', {
+            body: data.author
+              ? `${data.author} mentioned you in ${prTitle}`
+              : prTitle,
+            audio: 'pr-activity',
+            data: { url: prUrl },
+          })
+          break
+
         // Workspace notifications (state updates handled by terminal:workspace handler)
         case 'workspace_deleted':
           sendNotificationRef.current(`✅ ${data.name} deleted`, {
