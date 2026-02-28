@@ -15,52 +15,68 @@ const TYPE_TO_PUSH: Record<
     body: `${d.prTitle}`,
   }),
   check_failed: (d) => ({
-    title: '❌ Check Failed',
-    body: `${d.checkName || 'CI'} - ${d.prTitle}`,
+    title: `❌ ${d.checkName || 'Check failed'}`,
+    body: `${d.prTitle}`,
   }),
   checks_passed: (d) => ({
-    title: '✅ All Checks Passed',
+    title: '✅ All checks passed',
     body: `${d.prTitle}`,
   }),
   changes_requested: (d) => ({
-    title: '🔄 Changes Requested',
-    body: `${d.reviewer} on ${d.prTitle}`,
+    title: `🔄 ${d.reviewer || 'Changes requested'}`,
+    body: `${d.prTitle}`,
   }),
   pr_approved: (d) => ({
-    title: '✅ Approved',
-    body: `${d.approver ? `${d.approver} approved ${d.prTitle}` : `${d.prTitle}`}`,
+    title: `✅ ${d.approver || 'Approved'}`,
+    body: `${d.prTitle}`,
   }),
-  new_comment: (d) => ({
-    title: `💬 ${d.author || 'Someone'}`,
-    body: `${d.body || d.prTitle}`,
-  }),
-  new_review: (d) => ({
-    title: `👁️ ${d.author || 'Someone'}`,
-    body: `${d.body || d.prTitle}`,
-  }),
+  new_comment: (d) => {
+    const prTitle = String(d.prTitle || '')
+    const truncatedTitle =
+      prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
+    return {
+      title: `💬 ${d.author || 'Someone'}`,
+      body: d.body ? `${truncatedTitle}\n${d.body}` : truncatedTitle,
+    }
+  },
+  new_review: (d) => {
+    const emoji =
+      d.state === 'APPROVED'
+        ? '✅'
+        : d.state === 'CHANGES_REQUESTED'
+          ? '🔄'
+          : '💬'
+    const prTitle = String(d.prTitle || '')
+    const truncatedTitle =
+      prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
+    return {
+      title: `${emoji} ${d.author || 'Someone'}`,
+      body: d.body ? `${truncatedTitle}\n${d.body}` : truncatedTitle,
+    }
+  },
   review_requested: (d) => ({
-    title: '👀 Review Requested',
-    body: `${d.author} wants your review on ${d.prTitle}`,
+    title: `👀 ${d.author || 'Review requested'}`,
+    body: `wants your review on ${d.prTitle}`,
   }),
   pr_mentioned: (d) => ({
-    title: '💬 Mentioned',
-    body: `${d.author} mentioned you in ${d.prTitle}`,
+    title: `💬 ${d.author || 'Mentioned'}`,
+    body: `mentioned you in ${d.prTitle}`,
   }),
   workspace_ready: (d) => ({
-    title: '✅ Workspace Ready',
-    body: `${d.name || 'Workspace'} is ready`,
+    title: `✅ ${d.name || 'Workspace'}`,
+    body: 'Ready',
   }),
   workspace_failed: (d) => ({
-    title: '❌ Workspace Failed',
-    body: `${d.name || 'Workspace'} failed`,
+    title: `❌ ${d.name || 'Workspace'}`,
+    body: 'Failed',
   }),
   workspace_deleted: (d) => ({
-    title: '✅ Workspace Deleted',
-    body: `${d.name || 'Workspace'} deleted`,
+    title: `✅ ${d.name || 'Workspace'}`,
+    body: 'Deleted',
   }),
   workspace_repo_failed: (d) => ({
-    title: '❌ Repo Init Failed',
-    body: `${d.name || 'Workspace'} repo init failed`,
+    title: `❌ ${d.name || 'Workspace'}`,
+    body: 'Repo init failed',
   }),
 }
 

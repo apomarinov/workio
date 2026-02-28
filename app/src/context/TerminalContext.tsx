@@ -182,7 +182,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   // Derive activeTerminalId: prefer stored ID if it still exists
   const activeTerminalId =
     storedTerminalId.current !== null &&
-    terminals.some((t) => t.id === storedTerminalId.current)
+      terminals.some((t) => t.id === storedTerminalId.current)
       ? storedTerminalId.current
       : _activeTerminalId
 
@@ -246,11 +246,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             prev?.map((t) =>
               t.id === terminalId
                 ? {
-                    ...t,
-                    shells: t.shells.map((s) =>
-                      s.id === shellId ? { ...s, ...data } : s,
-                    ),
-                  }
+                  ...t,
+                  shells: t.shells.map((s) =>
+                    s.id === shellId ? { ...s, ...data } : s,
+                  ),
+                }
                 : t,
             ),
           false,
@@ -366,26 +366,30 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           break
 
         case 'check_failed':
-          sendNotificationRef.current('❌ Check failed', {
-            body: data.checkName ? `${data.checkName} - ${prTitle}` : prTitle,
-            audio: 'error',
-            data: { url: data.checkUrl || prUrl },
-          })
+          sendNotificationRef.current(
+            `❌ ${data.checkName || 'Check Failed'}`,
+            {
+              body: prTitle,
+              audio: 'error',
+              data: { url: data.checkUrl || prUrl },
+            },
+          )
           break
 
         case 'changes_requested':
-          sendNotificationRef.current('🔄 Changes requested', {
-            body: data.reviewer ? `${data.reviewer} on ${prTitle}` : prTitle,
-            audio: 'error',
-            data: { url: prUrl },
-          })
+          sendNotificationRef.current(
+            `🔄 ${data.reviewer || 'Changes requested'}`,
+            {
+              body: prTitle,
+              audio: 'error',
+              data: { url: prUrl },
+            },
+          )
           break
 
         case 'pr_approved':
-          sendNotificationRef.current('✅ Approved', {
-            body: data.approver
-              ? `${data.approver} approved ${prTitle}`
-              : prTitle,
+          sendNotificationRef.current(`✅ ${data.approver || 'Approved'}`, {
+            body: prTitle,
             audio: 'pr-activity',
             data: { url: prUrl },
           })
@@ -399,8 +403,12 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             commentKey,
             setTimeout(() => {
               notifDebounceRef.current.delete(commentKey)
+              const truncatedTitle =
+                prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
               sendNotificationRef.current(`💬 ${data.author || 'Someone'}`, {
-                body: data.body || prTitle,
+                body: data.body
+                  ? `${truncatedTitle}\n${data.body}`
+                  : truncatedTitle,
                 audio: 'pr-activity',
                 data: { url: data.commentUrl || prUrl },
               })
@@ -419,12 +427,6 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
               : data.state === 'CHANGES_REQUESTED'
                 ? '🔄'
                 : '💬'
-          const action =
-            data.state === 'APPROVED'
-              ? 'approved'
-              : data.state === 'CHANGES_REQUESTED'
-                ? 'requested changes'
-                : 'reviewed'
           const reviewUrl = data.reviewId
             ? `${prUrl}#pullrequestreview-${data.reviewId}`
             : prUrl
@@ -432,10 +434,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             reviewKey,
             setTimeout(() => {
               notifDebounceRef.current.delete(reviewKey)
+              const truncatedTitle =
+                prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
               sendNotificationRef.current(
-                `${emoji} ${data.author || 'Someone'} ${action}`,
+                `${emoji} ${data.author || 'Someone'}`,
                 {
-                  body: data.body || prTitle,
+                  body: data.body
+                    ? `${truncatedTitle}\n${data.body}`
+                    : truncatedTitle,
                   audio: 'pr-activity',
                   data: { url: reviewUrl },
                 },
@@ -446,20 +452,19 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         }
 
         case 'review_requested':
-          sendNotificationRef.current('👀 Review Requested', {
-            body: data.author
-              ? `${data.author} wants your review on ${prTitle}`
-              : prTitle,
-            audio: 'pr-activity',
-            data: { url: prUrl },
-          })
+          sendNotificationRef.current(
+            `👀 ${data.author || 'Review requested'}`,
+            {
+              body: `wants your review on ${prTitle}`,
+              audio: 'pr-activity',
+              data: { url: prUrl },
+            },
+          )
           break
 
         case 'pr_mentioned':
-          sendNotificationRef.current('💬 Mentioned', {
-            body: data.author
-              ? `${data.author} mentioned you in ${prTitle}`
-              : prTitle,
+          sendNotificationRef.current(`💬 ${data.author || 'Mentioned'}`, {
+            body: `mentioned you in ${prTitle}`,
             audio: 'pr-activity',
             data: { url: prUrl },
           })
@@ -467,25 +472,29 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
         // Workspace notifications (state updates handled by terminal:workspace handler)
         case 'workspace_deleted':
-          sendNotificationRef.current(`✅ ${data.name} deleted`, {
+          sendNotificationRef.current(`✅ ${data.name}`, {
+            body: 'Deleted',
             audio: 'pr-activity',
           })
           break
 
         case 'workspace_ready':
-          sendNotificationRef.current(`✅ ${data.name} is ready`, {
+          sendNotificationRef.current(`✅ ${data.name}`, {
+            body: 'Ready',
             audio: 'pr-activity',
           })
           break
 
         case 'workspace_failed':
-          sendNotificationRef.current(`❌ ${data.name} failed`, {
+          sendNotificationRef.current(`❌ ${data.name}`, {
+            body: 'Failed',
             audio: 'error',
           })
           break
 
         case 'workspace_repo_failed':
-          sendNotificationRef.current(`❌ ${data.name} repo init failed`, {
+          sendNotificationRef.current(`❌ ${data.name}`, {
+            body: 'Repo init failed',
             audio: 'error',
           })
           break

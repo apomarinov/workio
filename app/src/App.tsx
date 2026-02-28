@@ -494,17 +494,11 @@ function AppContent() {
   // Subscribe to hook events for notifications
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
-      const session = sessions.find((t) => t.session_id === data.session_id)
       const terminal = terminals.find(
         (t) => t.id === data.terminal_id || t.cwd === data.project_path,
       )
       const terminalName =
-        session?.latest_agent_message ||
-        terminal?.name ||
-        terminal?.cwd ||
-        data.project_path ||
-        'Claude'
-      let title = session?.latest_user_message || session?.name
+        terminal?.name || terminal?.cwd || data.project_path || 'Terminal'
 
       const notiData = {
         type:
@@ -515,18 +509,14 @@ function AppContent() {
       }
 
       if (data.status === 'permission_needed') {
-        title ||= 'Permission Required'
-
-        sendNotification(`⚠️ ${title}`, {
+        sendNotification(`⚠️ Permission Required`, {
           body: `"${terminalName}" needs permissions`,
           audio: 'permission',
           data: notiData,
           tag: data.session_id ? `session:${data.session_id}` : undefined,
         })
       } else if (data.hook_type === 'Stop') {
-        title ||= 'Done'
-
-        sendNotification(`✅ ${title}`, {
+        sendNotification(`✅ Done`, {
           body: `"${terminalName}" has finished`,
           audio: 'done',
           data: notiData,
@@ -534,7 +524,7 @@ function AppContent() {
         })
       }
     })
-  }, [subscribe, sendNotification, terminals, sessions])
+  }, [subscribe, sendNotification, terminals])
 
   // Handle push notification clicks from service worker
   useEffect(() => {
