@@ -51,7 +51,7 @@ export function MobileKeyboardCustomAction({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md p-0 top-[10%] translate-y-0">
+      <DialogContent className="sm:max-w-md p-0 top-[10%] translate-y-0">
         <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 pt-4 pb-2 space-y-0">
           <button
             type="button"

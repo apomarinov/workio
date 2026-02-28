@@ -49,7 +49,7 @@ export function MobileKeyboardCustomize({
     const target = index + direction
     if (target < 0 || target >= localRows.length) return
     const next = [...localRows]
-    ;[next[index], next[target]] = [next[target], next[index]]
+      ;[next[index], next[target]] = [next[target], next[index]]
     setLocalRows(next)
   }
 
@@ -79,7 +79,7 @@ export function MobileKeyboardCustomize({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0">
           <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 pt-4 pb-2 space-y-0">
             <button
               type="button"
