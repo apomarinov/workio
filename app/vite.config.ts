@@ -112,16 +112,19 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: `${serverScheme}://localhost:${serverPort}`,
           secure: false,
+          xfwd: true,
         },
         '/ws': {
           target: `${wsScheme}://localhost:${serverPort}`,
           ws: true,
           secure: false,
+          xfwd: true,
         },
         '/socket.io': {
           target: `${serverScheme}://localhost:${serverPort}`,
           ws: true,
           secure: false,
+          xfwd: true,
         },
       },
     },

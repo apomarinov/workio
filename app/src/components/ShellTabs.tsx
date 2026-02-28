@@ -27,9 +27,14 @@ import {
   CheckIcon,
   ChevronDown,
   FolderOpen,
+  Globe,
+  Laptop,
+  Monitor,
   PencilIcon,
   Play,
   Plus,
+  Smartphone,
+  Tablet,
   TrashIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -43,12 +48,14 @@ import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
+import { useTerminalContext } from '@/context/TerminalContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import type { ShellClient } from '../../shared/types'
 import type {
   SessionWithProject,
   Shell,
@@ -235,6 +242,72 @@ function ShellPopover({
   )
 }
 
+function DeviceIcon({
+  device,
+  className,
+}: {
+  device: string
+  className?: string
+}) {
+  switch (device) {
+    case 'iPhone':
+    case 'Android':
+      return <Smartphone className={className} />
+    case 'iPad':
+      return <Tablet className={className} />
+    case 'Mac':
+      return <Laptop className={className} />
+    case 'Windows':
+    case 'Linux':
+      return <Monitor className={className} />
+    default:
+      return <Globe className={className} />
+  }
+}
+
+function MultiClientIndicator({ clients }: { clients: ShellClient[] }) {
+  if (clients.length <= 1) return null
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-0.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer shrink-0"
+        >
+          <Monitor className="w-3 h-3" />
+          <span className="text-[10px] font-medium">{clients.length}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-fit p-2"
+        align="start"
+        side="bottom"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-xs font-medium text-muted-foreground mb-1.5">
+          Connected Devices
+        </div>
+        <div className="space-y-1.5">
+          {clients.map((client) => (
+            <div key={client.ip} className="flex items-center gap-2 text-xs">
+              <DeviceIcon
+                device={client.device}
+                className="w-3.5 h-3.5 text-muted-foreground shrink-0"
+              />
+              <span>{client.device}</span>
+              <span className="text-muted-foreground">{client.browser}</span>
+              <span className="text-muted-foreground/60 ml-auto font-mono">
+                {client.ip}
+              </span>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function SortableShellPill({
   shell,
   isActive,
@@ -248,6 +321,7 @@ function SortableShellPill({
   terminal,
   shortcutHint,
   shellSession,
+  shellClients,
   ref,
   ...rest
 }: {
@@ -263,6 +337,7 @@ function SortableShellPill({
   terminal: Terminal
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
+  shellClients?: ShellClient[]
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -308,6 +383,9 @@ function SortableShellPill({
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
       )}
     >
+      {shellClients && shellClients.length > 1 && (
+        <MultiClientIndicator clients={shellClients} />
+      )}
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
@@ -349,6 +427,7 @@ function SortableShellTab({
   terminal,
   shortcutHint,
   shellSession,
+  shellClients,
   position = 'top',
   ref,
   ...rest
@@ -365,6 +444,7 @@ function SortableShellTab({
   terminal: Terminal
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
+  shellClients?: ShellClient[]
   position?: 'top' | 'bottom'
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
@@ -418,6 +498,9 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
+      {shellClients && shellClients.length > 1 && (
+        <MultiClientIndicator clients={shellClients} />
+      )}
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
@@ -460,6 +543,7 @@ export function ShellTabs({
   rightExtra,
 }: ShellTabsProps) {
   const { processes, isBellSubscribed } = useProcessContext()
+  const { shellClients: shellClientsMap } = useTerminalContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -832,6 +916,7 @@ export function ShellTabs({
                       onRename={() => setRenameShellTarget(shell)}
                       terminal={terminal}
                       shellSession={shellSessionMap.get(shell.id)}
+                      shellClients={shellClientsMap?.get(shell.id)}
                       shortcutHint={
                         showShortcuts && shortcutIndex <= 9 ? (
                           <>
@@ -897,6 +982,7 @@ export function ShellTabs({
                       onRename={() => setRenameShellTarget(shell)}
                       terminal={terminal}
                       shellSession={shellSessionMap.get(shell.id)}
+                      shellClients={shellClientsMap?.get(shell.id)}
                       position={position}
                       shortcutHint={
                         showShortcuts && shortcutIndex <= 9 ? (

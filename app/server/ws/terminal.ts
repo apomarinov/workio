@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
+import type { ShellClient } from '../../shared/types'
 import { setPermissionNeededSessionDone } from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
@@ -59,13 +60,37 @@ interface ReadyMessage {
 
 type ServerMessage = OutputMessage | ExitMessage | ErrorMessage | ReadyMessage
 
+function parseUserAgent(ua: string): { device: string; browser: string } {
+  let device = 'Unknown'
+  if (/iPhone/i.test(ua)) device = 'iPhone'
+  else if (/iPad/i.test(ua)) device = 'iPad'
+  else if (/Android/i.test(ua)) device = 'Android'
+  else if (/Macintosh/i.test(ua)) device = 'Mac'
+  else if (/Windows/i.test(ua)) device = 'Windows'
+  else if (/Linux/i.test(ua)) device = 'Linux'
+
+  let browser = 'Unknown'
+  if (/Edg\//i.test(ua)) browser = 'Edge'
+  else if (/Chrome\//i.test(ua)) browser = 'Chrome'
+  else if (/Safari\//i.test(ua)) browser = 'Safari'
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox'
+
+  return { device, browser }
+}
+
+// Track parsed user agent per WebSocket
+const wsClientUA = new WeakMap<WebSocket, { device: string; browser: string }>()
+
 // Track which shell each WebSocket is connected to
 const wsShellMap = new WeakMap<WebSocket, number>()
 
 // Track client IP per WebSocket (set at connection time from the HTTP upgrade request)
 const wsClientIP = new WeakMap<WebSocket, string>()
 
-// One connection per device (IP) per shell — rejects duplicates
+// Composite key (IP + device + browser) used for per-device dedup
+const wsDeviceKey = new WeakMap<WebSocket, string>()
+
+// One connection per device (IP+UA) per shell — rejects duplicates
 const shellDeviceConnection = new Map<number, Map<string, WebSocket>>()
 
 // Track all connected clients per shell for broadcasting output
@@ -128,6 +153,21 @@ function broadcastExit(shellId: number, code: number): void {
   }
 }
 
+function broadcastShellClients(shellId: number): void {
+  const deviceMap = shellDeviceConnection.get(shellId)
+  const clients: ShellClient[] = []
+  if (deviceMap) {
+    for (const [, ws] of deviceMap) {
+      if (ws.readyState !== WebSocket.OPEN) continue
+      const ua = wsClientUA.get(ws) ?? { device: 'Unknown', browser: 'Unknown' }
+      const ip = wsClientIP.get(ws) ?? 'unknown'
+      clients.push({ device: ua.device, browser: ua.browser, ip })
+    }
+  }
+  const io = getIO()
+  io?.emit('shell:clients', { shellId, clients })
+}
+
 wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
   // Extract client IP from the upgrade request
   const forwarded = request.headers['x-forwarded-for']
@@ -138,6 +178,9 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     request.socket.remoteAddress ??
     'unknown'
   wsClientIP.set(ws, clientIP)
+  wsClientUA.set(ws, parseUserAgent(request.headers['user-agent'] ?? ''))
+  const deviceKey = clientIP
+  wsDeviceKey.set(ws, deviceKey)
 
   let shellId: number | null = null
 
@@ -155,16 +198,16 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         shellId = message.shellId
         wsShellMap.set(ws, shellId)
 
-        // Reject duplicate connection from the same device (IP) for the same shell
+        // Reject duplicate connection from the same device (IP+UA) for the same shell
         const existingDeviceWs = shellDeviceConnection
           .get(shellId)
-          ?.get(clientIP)
+          ?.get(deviceKey)
         if (
           existingDeviceWs &&
           existingDeviceWs.readyState === WebSocket.OPEN
         ) {
           log.info(
-            `[ws] Rejecting duplicate connection for shell=${shellId} from IP=${clientIP}`,
+            `[ws] Rejecting duplicate connection for shell=${shellId} from device=${deviceKey}`,
           )
           sendMessage(ws, {
             type: 'error',
@@ -181,7 +224,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           deviceMap = new Map()
           shellDeviceConnection.set(shellId, deviceMap)
         }
-        deviceMap.set(clientIP, ws)
+        deviceMap.set(deviceKey, ws)
 
         // Check if session already exists (reconnection)
         const existingSession = getSession(shellId)
@@ -219,6 +262,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
 
           // Send ready message
           sendMessage(ws, { type: 'ready' })
+          broadcastShellClients(shellId)
 
           // Resize PTY to the new primary's dimensions
           resizeSession(shellId, message.cols, message.rows)
@@ -257,6 +301,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
 
         // Send ready message
         sendMessage(ws, { type: 'ready' })
+        broadcastShellClients(sid)
         break
       }
 
@@ -341,8 +386,8 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
       // Clean up device tracking — only remove if this ws is still the registered one
       const deviceMap = shellDeviceConnection.get(shellId)
       if (deviceMap) {
-        if (deviceMap.get(clientIP) === ws) {
-          deviceMap.delete(clientIP)
+        if (deviceMap.get(deviceKey) === ws) {
+          deviceMap.delete(deviceKey)
         }
         if (deviceMap.size === 0) {
           shellDeviceConnection.delete(shellId)
@@ -364,14 +409,18 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
             `[ws] No clients left for shell=${shellId}, starting timeout`,
           )
           startSessionTimeout(shellId)
-        } else if (shellPrimaryClient.get(shellId) === ws) {
-          // Primary disconnected — promote next client and resize PTY
-          const next = clients.values().next().value as WebSocket
-          shellPrimaryClient.set(shellId, next)
-          const size = wsClientSize.get(next)
-          if (size) {
-            resizeSession(shellId, size.cols, size.rows)
+          broadcastShellClients(shellId)
+        } else {
+          if (shellPrimaryClient.get(shellId) === ws) {
+            // Primary disconnected — promote next client and resize PTY
+            const next = clients.values().next().value as WebSocket
+            shellPrimaryClient.set(shellId, next)
+            const size = wsClientSize.get(next)
+            if (size) {
+              resizeSession(shellId, size.cols, size.rows)
+            }
           }
+          broadcastShellClients(shellId)
         }
       }
     }

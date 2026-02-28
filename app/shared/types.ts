@@ -175,6 +175,17 @@ export interface UnreadPRNotification {
   items: { commentId?: number; reviewId?: number }[]
 }
 
+export interface ShellClient {
+  device: string
+  browser: string
+  ip: string
+}
+
+export interface ShellClientsPayload {
+  shellId: number
+  clients: ShellClient[]
+}
+
 // GitHub webhook events we subscribe to
 export const WEBHOOK_EVENTS = [
   'pull_request',

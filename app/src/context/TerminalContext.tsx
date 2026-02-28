@@ -16,6 +16,8 @@ import type {
   PRCheckStatus,
   PRChecksPayload,
   PRReaction,
+  ShellClient,
+  ShellClientsPayload,
   WorkspacePayload,
 } from '../../shared/types'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -85,6 +87,7 @@ interface TerminalContextValue {
     content: string,
     remove: boolean,
   ) => Promise<void>
+  shellClients: Map<number, ShellClient[]>
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -904,6 +907,25 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [repos])
 
+  // Multi-client device tracking per shell
+  const [shellClients, setShellClients] = useState<Map<number, ShellClient[]>>(
+    () => new Map(),
+  )
+
+  useEffect(() => {
+    return subscribe<ShellClientsPayload>('shell:clients', (data) => {
+      setShellClients((prev) => {
+        const next = new Map(prev)
+        if (data.clients.length === 0) {
+          next.delete(data.shellId)
+        } else {
+          next.set(data.shellId, data.clients)
+        }
+        return next
+      })
+    })
+  }, [subscribe])
+
   const selectTerminal = useCallback((id: number) => {
     storedTerminalId.current = id
     setActiveTerminalId((prev) => {
@@ -1015,6 +1037,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRNotificationsRead,
       deleteAllNotifications,
       reactToPR,
+      shellClients,
     }),
     [
       enrichedTerminals,
@@ -1044,6 +1067,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRNotificationsRead,
       deleteAllNotifications,
       reactToPR,
+      shellClients,
     ],
   )
 
