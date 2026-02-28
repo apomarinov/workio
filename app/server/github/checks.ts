@@ -186,6 +186,7 @@ number
 title
 body
 headRefName
+baseRefName
 url
 createdAt
 updatedAt
@@ -304,6 +305,7 @@ interface GraphQLOpenPR {
   title: string
   body: string
   headRefName: string
+  baseRefName: string
   url: string
   createdAt: string
   updatedAt: string
@@ -687,6 +689,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
     prUrl: pr.url,
     prBody: pr.body || '',
     branch: pr.headRefName,
+    baseBranch: pr.baseRefName || '',
     repo: repoKey,
     state: 'OPEN',
     reviewDecision,
@@ -760,6 +763,7 @@ async function fetchPRsViaRESTAndGraphQL(
       title: string
       html_url: string
       head: { ref: string }
+      base?: { ref: string }
       merged_at: string | null
       created_at: string
       updated_at: string
@@ -900,6 +904,7 @@ async function fetchPRsViaRESTAndGraphQL(
         prUrl: pr.html_url,
         prBody: '',
         branch,
+        baseBranch: pr.base?.ref || '',
         repo: repoKey,
         state: pr.merged_at ? 'MERGED' : 'CLOSED',
         reviewDecision: '',
@@ -2367,6 +2372,7 @@ interface WebhookPayload {
     title: string
     body?: string
     head?: { ref: string }
+    base?: { ref: string }
     html_url: string
     state: string
     merged?: boolean
@@ -2422,6 +2428,7 @@ function patchPullRequest(repo: string, payload: WebhookPayload): boolean {
       prUrl: prData.html_url,
       prBody: prData.body || '',
       branch: prData.head?.ref || '',
+      baseBranch: prData.base?.ref || '',
       repo,
       state: 'OPEN',
       reviewDecision: '',

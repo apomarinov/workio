@@ -783,8 +783,12 @@ export async function getHeadMessage(
 
 export async function getChangedFiles(
   terminalId: number,
+  base?: string,
 ): Promise<{ files: ChangedFile[] }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/changed-files`)
+  const params = base ? `?base=${encodeURIComponent(base)}` : ''
+  const res = await fetch(
+    `${API_BASE}/terminals/${terminalId}/changed-files${params}`,
+  )
   if (!res.ok) {
     const data = await res.json()
     throw new Error(data.error || 'Failed to get changed files')
@@ -796,10 +800,13 @@ export async function getFileDiff(
   terminalId: number,
   filePath: string,
   fullFile?: boolean,
+  base?: string,
 ): Promise<{ diff: string }> {
   const context = fullFile ? '99999' : '5'
+  const params = new URLSearchParams({ path: filePath, context })
+  if (base) params.set('base', base)
   const res = await fetch(
-    `${API_BASE}/terminals/${terminalId}/file-diff?path=${encodeURIComponent(filePath)}&context=${context}`,
+    `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
   )
   if (!res.ok) {
     const data = await res.json()

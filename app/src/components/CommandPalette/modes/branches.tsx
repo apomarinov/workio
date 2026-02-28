@@ -303,14 +303,13 @@ export function createBranchActionsMode(
 
   // Push and Force Push (local branches only)
   if (!branch.isRemote) {
-    const canPush = !isDirty && !isLoading
+    const canPush = !isLoading
 
     items.push({
       id: 'action:push',
       label: 'Push',
       icon: <ArrowUp className="h-4 w-4 shrink-0 text-zinc-400" />,
       disabled: !canPush,
-      disabledReason: isDirty ? 'uncommitted changes' : undefined,
       loading:
         loadingStates.pushing?.branch === branch.name &&
         !loadingStates.pushing.force,
@@ -326,7 +325,6 @@ export function createBranchActionsMode(
       label: 'Force Push',
       icon: <ArrowUp className="h-4 w-4 shrink-0 text-red-400" />,
       disabled: !canPush,
-      disabledReason: isDirty ? 'uncommitted changes' : undefined,
       loading:
         loadingStates.pushing?.branch === branch.name &&
         loadingStates.pushing.force,

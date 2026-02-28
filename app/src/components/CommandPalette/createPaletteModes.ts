@@ -102,6 +102,7 @@ export type AppActions = {
   openCleanupModal: () => void
 
   // PR actions
+  openDiffViewer: (pr: PRCheckStatus, terminalId: number) => void
   openMergeModal: (pr: PRCheckStatus) => void
   openCloseModal: (pr: PRCheckStatus) => void
   openEditPRModal: (pr: PRCheckStatus) => void

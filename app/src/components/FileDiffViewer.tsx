@@ -127,12 +127,14 @@ interface FileDiffViewerProps {
   terminalId: number
   filePath: string | null
   preferredIde: 'cursor' | 'vscode'
+  base?: string
 }
 
 export function FileDiffViewer({
   terminalId,
   filePath,
   preferredIde,
+  base,
 }: FileDiffViewerProps) {
   const [showFullFile, setShowFullFile] = useState(false)
   const [wordWrap, setWordWrap] = useState(true)
@@ -144,7 +146,9 @@ export function FileDiffViewer({
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const swrKey =
-    filePath != null ? ['file-diff', terminalId, filePath, showFullFile] : null
+    filePath != null
+      ? ['file-diff', terminalId, filePath, showFullFile, base ?? null]
+      : null
 
   const {
     data: parsed,
@@ -152,11 +156,12 @@ export function FileDiffViewer({
     error,
   } = useSWR(
     swrKey,
-    async ([, tid, fp, full]) => {
+    async ([, tid, fp, full, b]) => {
       const { diff } = await getFileDiff(
         tid as number,
         fp as string,
         full as boolean,
+        (b as string) ?? undefined,
       )
       return parseDiff(diff)
     },

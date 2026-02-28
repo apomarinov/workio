@@ -1409,7 +1409,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   )
 
   // Get changed files with per-file stats
-  fastify.get<{ Params: TerminalParams }>(
+  fastify.get<{ Params: TerminalParams; Querystring: { base?: string } }>(
     '/api/terminals/:id/changed-files',
     async (request, reply) => {
       const id = parseInt(request.params.id, 10)
@@ -1428,6 +1428,44 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+        const base = request.query.base
+
+        // When base is provided, diff between two refs (for PR view)
+        if (base && !terminal.ssh_host) {
+          // Extract branch names from "origin/base...origin/head" format for fetching
+          const parts = base.split('...')
+          const refs = parts.map((p) => p.replace(/^origin\//, ''))
+          await new Promise<void>((resolve) => {
+            execFile(
+              'git',
+              ['fetch', 'origin', ...refs],
+              { cwd, timeout: 30000 },
+              () => resolve(),
+            )
+          })
+
+          const [numstatOut, nameStatusOut] = await Promise.all([
+            new Promise<string>((resolve) => {
+              execFile(
+                'git',
+                ['diff', '--numstat', base],
+                { cwd, timeout: 10000 },
+                (_err, stdout) => resolve(stdout || ''),
+              )
+            }),
+            new Promise<string>((resolve) => {
+              execFile(
+                'git',
+                ['diff', '--name-status', base],
+                { cwd, timeout: 10000 },
+                (_err, stdout) => resolve(stdout || ''),
+              )
+            }),
+          ])
+
+          const files = parseChangedFiles(numstatOut, nameStatusOut, '', '')
+          return { files }
+        }
 
         if (terminal.ssh_host) {
           const [
@@ -1547,7 +1585,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   // Get diff for a single file
   fastify.get<{
     Params: TerminalParams
-    Querystring: { path: string; context?: string }
+    Querystring: { path: string; context?: string; base?: string }
   }>('/api/terminals/:id/file-diff', async (request, reply) => {
     const id = parseInt(request.params.id, 10)
     if (Number.isNaN(id)) {
@@ -1569,9 +1607,23 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     const context = request.query.context || '5'
+    const base = request.query.base
     const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
 
     try {
+      // When base is provided, diff between two refs (for PR view)
+      if (base && !terminal.ssh_host) {
+        const diff = await new Promise<string>((resolve) => {
+          execFile(
+            'git',
+            ['diff', `-U${context}`, base, '--', filePath],
+            { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
+            (_err, stdout) => resolve(stdout || ''),
+          )
+        })
+        return { diff }
+      }
+
       if (terminal.ssh_host) {
         // SSH: try tracked file diff first, then untracked
         const escapedPath = filePath.replace(/'/g, "'\\''")

@@ -105,6 +105,10 @@ export function CommandPalette() {
   } | null>(null)
   const [createBranchLoading, setCreateBranchLoading] = useState(false)
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false)
+  const [diffViewerTarget, setDiffViewerTarget] = useState<{
+    pr: PRCheckStatus
+    terminalId: number
+  } | null>(null)
   const [resumeConfirm, setResumeConfirm] = useState<{
     session: SessionWithProject
     shellId: number
@@ -894,6 +898,10 @@ export function CommandPalette() {
       },
 
       // PR actions
+      openDiffViewer: (pr, terminalId) => {
+        closePalette()
+        setTimeout(() => setDiffViewerTarget({ pr, terminalId }), 150)
+      },
       openMergeModal: (pr) => {
         setMergeModal(pr)
       },
@@ -1333,6 +1341,15 @@ export function CommandPalette() {
           open={commitTerminalId != null}
           terminalId={commitTerminalId}
           onClose={() => setCommitTerminalId(null)}
+        />
+      )}
+
+      {diffViewerTarget && (
+        <CommitDialog
+          open={!!diffViewerTarget}
+          terminalId={diffViewerTarget.terminalId}
+          pr={diffViewerTarget.pr}
+          onClose={() => setDiffViewerTarget(null)}
         />
       )}
 

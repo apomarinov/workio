@@ -3,6 +3,7 @@ import {
   CornerDownLeft,
   ExternalLink,
   EyeOff,
+  FileDiff,
   GitBranch,
   GitMerge,
   Pencil,
@@ -62,6 +63,20 @@ export function createPRActionsMode(
       api.close()
     },
   })
+
+  // View Changes (only for open PRs with a base branch and a matching terminal)
+  const matchingTerminal =
+    terminal ?? terminals.find((t) => t.git_repo?.repo === pr.repo)
+  if (isOpen && pr.baseBranch && matchingTerminal) {
+    items.push({
+      id: 'action:view-changes',
+      label: 'View Changes',
+      icon: <FileDiff className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => {
+        actions.openDiffViewer(pr, matchingTerminal.id)
+      },
+    })
+  }
 
   // Checkout (only if no terminal is selected in the stack)
   // Check if there are any terminals from the same repo
