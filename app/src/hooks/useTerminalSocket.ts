@@ -1,6 +1,12 @@
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+type ConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'error'
+  | 'already_open'
 
 interface UseTerminalSocketOptions {
   shellId: number | null
@@ -18,7 +24,7 @@ interface UseTerminalSocketReturn {
   reconnect: () => void
 }
 
-const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000] // Exponential backoff
+const RECONNECT_DELAYS = [200, 500, 1000, 2000, 4000, 8000, 16000] // Exponential backoff
 const MAX_RECONNECT_ATTEMPTS = 10
 
 export function useTerminalSocket({
@@ -37,6 +43,7 @@ export function useTerminalSocket({
   const initializedRef = useRef(false)
   const isConnectingRef = useRef(false)
   const mountedRef = useRef(true)
+  const alreadyOpenRef = useRef(false)
 
   // Store current values in refs
   const shellIdRef = useRef<number | null>(shellId)
@@ -97,6 +104,7 @@ export function useTerminalSocket({
     }
     isConnectingRef.current = false
     initializedRef.current = false
+    alreadyOpenRef.current = false
   }, [])
 
   const connect = useCallback(() => {
@@ -135,7 +143,7 @@ export function useTerminalSocket({
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -181,8 +189,23 @@ export function useTerminalSocket({
               onExitRef.current?.(message.code)
               break
             case 'error':
-              console.error('[ws] Server error:', message.message)
-              setStatus('error')
+              if (message.code === 'already_connected') {
+                alreadyOpenRef.current = true
+                setStatus('already_open')
+                if (connectTimeoutRef.current) {
+                  clearTimeout(connectTimeoutRef.current)
+                  connectTimeoutRef.current = null
+                }
+                if (reconnectTimeoutRef.current) {
+                  clearTimeout(reconnectTimeoutRef.current)
+                  reconnectTimeoutRef.current = null
+                }
+                isConnectingRef.current = false
+                // Server will close the WS; no need to call ws.close()
+              } else {
+                console.error('[ws] Server error:', message.message)
+                setStatus('error')
+              }
               break
           }
         } catch (err) {
@@ -201,13 +224,17 @@ export function useTerminalSocket({
         wsRef.current = null
         isConnectingRef.current = false
         initializedRef.current = false
+
+        // Don't reconnect or change status if rejected as duplicate
+        if (alreadyOpenRef.current) return
+
         setStatus('disconnected')
 
         // Schedule reconnect with exponential backoff
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
 
@@ -251,7 +278,8 @@ export function useTerminalSocket({
         document.visibilityState === 'visible' &&
         shellIdRef.current !== null &&
         !wsRef.current &&
-        !isConnectingRef.current
+        !isConnectingRef.current &&
+        !alreadyOpenRef.current
       ) {
         reconnectAttemptRef.current = 0
         connect()

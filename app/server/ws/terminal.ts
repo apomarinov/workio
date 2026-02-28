@@ -50,6 +50,7 @@ interface ExitMessage {
 interface ErrorMessage {
   type: 'error'
   message: string
+  code?: string
 }
 
 interface ReadyMessage {
@@ -60,6 +61,12 @@ type ServerMessage = OutputMessage | ExitMessage | ErrorMessage | ReadyMessage
 
 // Track which shell each WebSocket is connected to
 const wsShellMap = new WeakMap<WebSocket, number>()
+
+// Track client IP per WebSocket (set at connection time from the HTTP upgrade request)
+const wsClientIP = new WeakMap<WebSocket, string>()
+
+// One connection per device (IP) per shell — rejects duplicates
+const shellDeviceConnection = new Map<number, Map<string, WebSocket>>()
 
 // Track all connected clients per shell for broadcasting output
 const shellClients = new Map<number, Set<WebSocket>>()
@@ -121,7 +128,17 @@ function broadcastExit(shellId: number, code: number): void {
   }
 }
 
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
+  // Extract client IP from the upgrade request
+  const forwarded = request.headers['x-forwarded-for']
+  const clientIP =
+    (typeof forwarded === 'string'
+      ? forwarded.split(',')[0].trim()
+      : undefined) ??
+    request.socket.remoteAddress ??
+    'unknown'
+  wsClientIP.set(ws, clientIP)
+
   let shellId: number | null = null
 
   ws.on('message', async (rawData) => {
@@ -137,6 +154,34 @@ wss.on('connection', (ws: WebSocket) => {
       case 'init': {
         shellId = message.shellId
         wsShellMap.set(ws, shellId)
+
+        // Reject duplicate connection from the same device (IP) for the same shell
+        const existingDeviceWs = shellDeviceConnection
+          .get(shellId)
+          ?.get(clientIP)
+        if (
+          existingDeviceWs &&
+          existingDeviceWs.readyState === WebSocket.OPEN
+        ) {
+          log.info(
+            `[ws] Rejecting duplicate connection for shell=${shellId} from IP=${clientIP}`,
+          )
+          sendMessage(ws, {
+            type: 'error',
+            code: 'already_connected',
+            message: 'This shell is already open on your device',
+          })
+          ws.close()
+          return
+        }
+
+        // Register this connection as the device's connection for this shell
+        let deviceMap = shellDeviceConnection.get(shellId)
+        if (!deviceMap) {
+          deviceMap = new Map()
+          shellDeviceConnection.set(shellId, deviceMap)
+        }
+        deviceMap.set(clientIP, ws)
 
         // Check if session already exists (reconnection)
         const existingSession = getSession(shellId)
@@ -293,6 +338,17 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('close', () => {
     if (shellId !== null) {
+      // Clean up device tracking — only remove if this ws is still the registered one
+      const deviceMap = shellDeviceConnection.get(shellId)
+      if (deviceMap) {
+        if (deviceMap.get(clientIP) === ws) {
+          deviceMap.delete(clientIP)
+        }
+        if (deviceMap.size === 0) {
+          shellDeviceConnection.delete(shellId)
+        }
+      }
+
       // Remove this client from the shell's set
       const clients = shellClients.get(shellId)
       if (clients) {

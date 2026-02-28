@@ -4,7 +4,14 @@ import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { ALargeSmall, ChevronDown, ChevronUp, WholeWord, X } from 'lucide-react'
+import {
+  ALargeSmall,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  WholeWord,
+  X,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
@@ -709,7 +716,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
         !isVisible && 'invisible',
       )}
     >
-      {showStatus && status !== 'connected' && (
+      {showStatus && status !== 'connected' && status !== 'already_open' && (
         <div className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-200 flex items-center gap-2">
           <span
             className={cn(
@@ -724,6 +731,14 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
           {status === 'connecting' && 'Connecting...'}
           {status === 'disconnected' && 'Disconnected - Reconnecting...'}
           {status === 'error' && 'Connection error'}
+        </div>
+      )}
+      {status === 'already_open' && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1a1a1a]">
+          <div className="flex flex-col items-center gap-3 text-zinc-400">
+            <Info className="w-8 h-8 text-zinc-500" />
+            <p className="text-sm">This shell is already open on your device</p>
+          </div>
         </div>
       )}
       <div className="relative flex-1 min-h-0 overflow-hidden">
