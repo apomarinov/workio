@@ -5,12 +5,11 @@ import {
   useEffect,
   useState,
 } from 'react'
+import type { AudioType } from '../../shared/notifications'
 import { NotificationPrompt } from '../components/NotificationPrompt'
 import { useSettings } from '../hooks/useSettings'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
-
-type AudioType = 'permission' | 'done' | 'pr-activity' | 'error'
 
 const audioFiles: Record<AudioType, string> = {
   permission: '/audio/permissions.mp3',

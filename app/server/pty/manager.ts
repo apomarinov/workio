@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as pty from 'node-pty'
+import { resolveNotification } from '../../shared/notifications'
 import type { ActiveProcess } from '../../shared/types'
 import type { Shell } from '../../src/types'
 import {
@@ -1190,7 +1191,6 @@ export async function createSession(
           if (bellSub) {
             bellSubscriptions.delete(shellId)
             const command = session.currentCommand || bellSub.command
-            const icon = event.exitCode === 0 ? '✅' : '❌'
             getIO()?.emit('bell:notify', {
               shellId,
               terminalId,
@@ -1198,9 +1198,14 @@ export async function createSession(
               terminalName: bellSub.terminalName,
               exitCode: event.exitCode,
             })
+            const resolved = resolveNotification('bell_notify', {
+              command,
+              terminalName: bellSub.terminalName,
+              exitCode: event.exitCode,
+            })
             sendPushNotification({
-              title: `${icon} ${command}`,
-              body: bellSub.terminalName,
+              title: `${resolved.emoji} ${resolved.title}`,
+              body: resolved.body,
               tag: `bell:${shellId}`,
             })
             getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())

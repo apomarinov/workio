@@ -26,6 +26,7 @@ const SessionChat = lazy(() =>
   import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
 )
 
+import { resolveNotification } from '../shared/notifications'
 import { MobileKeyboard } from './components/MobileKeyboard'
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
@@ -500,26 +501,20 @@ function AppContent() {
       const terminalName =
         terminal?.name || terminal?.cwd || data.project_path || 'Terminal'
 
-      const notiData = {
-        type:
-          data.status === 'permission_needed' ? 'permission_needed' : 'stop',
-        terminalId: terminal?.id ?? data.terminal_id,
-        shellId: data.shell_id,
-        sessionId: data.session_id,
-      }
+      const notiType =
+        data.status === 'permission_needed' ? 'permission_needed' : 'stop'
 
-      if (data.status === 'permission_needed') {
-        sendNotification(`⚠️ Permission Required`, {
-          body: `"${terminalName}" needs permissions`,
-          audio: 'permission',
-          data: notiData,
-          tag: data.session_id ? `session:${data.session_id}` : undefined,
-        })
-      } else if (data.hook_type === 'Stop') {
-        sendNotification(`✅ Done`, {
-          body: `"${terminalName}" has finished`,
-          audio: 'done',
-          data: notiData,
+      if (data.status === 'permission_needed' || data.hook_type === 'Stop') {
+        const resolved = resolveNotification(notiType, { terminalName })
+        sendNotification(`${resolved.emoji} ${resolved.title}`, {
+          body: resolved.body,
+          audio: resolved.audio,
+          data: {
+            type: notiType,
+            terminalId: terminal?.id ?? data.terminal_id,
+            shellId: data.shell_id,
+            sessionId: data.session_id,
+          },
           tag: data.session_id ? `session:${data.session_id}` : undefined,
         })
       }

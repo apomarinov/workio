@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react'
 import {
   AtSign,
   Check,
@@ -16,7 +17,24 @@ import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { cn } from '@/lib/utils'
 import type { Notification } from '@/types'
+import {
+  NOTIFICATION_REGISTRY,
+  resolveTemplate,
+} from '../../shared/notifications'
 import { RefreshIcon } from './icons'
+
+const ICON_MAP: Record<string, LucideIcon | typeof RefreshIcon> = {
+  GitMerge,
+  GitPullRequestArrow,
+  CircleCheck,
+  CircleX,
+  RefreshIcon,
+  Check,
+  MessageSquare,
+  Eye,
+  AtSign,
+  Terminal,
+}
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString)
@@ -36,98 +54,48 @@ function formatRelativeTime(dateString: string): string {
 }
 
 function getNotificationIcon(type: string) {
-  switch (type) {
-    case 'pr_merged':
-      return <GitMerge className="w-4 h-4 text-purple-400" />
-    case 'pr_closed':
-      return <GitPullRequestArrow className="w-4 h-4 text-red-400" />
-    case 'checks_passed':
-      return <CircleCheck className="w-4 h-4 text-green-500" />
-    case 'check_failed':
-      return <CircleX className="w-4 h-4 text-red-400" />
-    case 'changes_requested':
-      return <RefreshIcon className="w-4 h-4 text-orange-400" />
-    case 'pr_approved':
-      return <Check className="w-4 h-4 text-green-500" />
-    case 'new_comment':
-      return <MessageSquare className="w-4 h-4 text-muted-foreground" />
-    case 'new_review':
-      return <Eye className="w-4 h-4 text-blue-500" />
-    case 'review_requested':
-      return <Eye className="w-4 h-4 text-blue-400" />
-    case 'pr_mentioned':
-      return <AtSign className="w-4 h-4 text-yellow-400" />
-    // Workspace notifications
-    case 'workspace_ready':
-    case 'workspace_deleted':
-      return <Terminal className="w-4 h-4 text-green-500" />
-    case 'workspace_failed':
-    case 'workspace_repo_failed':
-      return <Terminal className="w-4 h-4 text-red-500" />
-    default:
-      return <MessageSquare className="w-4 h-4 text-muted-foreground" />
+  const def = NOTIFICATION_REGISTRY[type]
+  if (def?.icon) {
+    const IconComp = ICON_MAP[def.icon]
+    if (IconComp) {
+      return <IconComp className={cn('w-4 h-4', def.iconColor)} />
+    }
   }
+  return <MessageSquare className="w-4 h-4 text-muted-foreground" />
 }
 
+// PR types where in-app list shows body as title and title as subtitle
+const SWAP_TITLE_TYPES = new Set([
+  'pr_merged',
+  'pr_closed',
+  'pr_approved',
+  'changes_requested',
+  'new_comment',
+  'new_review',
+])
+
 function getNotificationTitle(notification: Notification): string {
-  const { type, data } = notification
-  switch (type) {
-    case 'pr_merged':
-      return data.prTitle ? `Merged ${data.prTitle}` : 'PR Merged'
-    case 'pr_closed':
-      return data.prTitle ? `Closed ${data.prTitle}` : 'PR Closed'
-    case 'checks_passed':
-      return 'All checks passed'
-    case 'check_failed':
-      return data.checkName ? `${data.checkName} Failed` : 'Check failed'
-    case 'changes_requested':
-      return data.reviewer
-        ? `${data.reviewer} requested changes`
-        : 'Changes requested'
-    case 'pr_approved':
-      return data.approver ? `${data.approver} approved` : 'PR approved'
-    case 'new_comment':
-      return data.author ? `${data.author}` : 'New comment'
-    case 'new_review':
-      return data.author ? `${data.author} left a review` : 'New review'
-    case 'review_requested':
-      return data.author
-        ? `${data.author} requested your review`
-        : 'Review requested'
-    case 'pr_mentioned':
-      return data.author ? `${data.author} mentioned you` : 'You were mentioned'
-    // Workspace notifications
-    case 'workspace_ready':
-      return `${data.name || 'Workspace'} is ready`
-    case 'workspace_deleted':
-      return `${data.name || 'Workspace'} deleted`
-    case 'workspace_failed':
-      return `${data.name || 'Workspace'} failed`
-    case 'workspace_repo_failed':
-      return `${data.name || 'Workspace'} repo init failed`
-    default:
-      return type
-  }
+  const def = NOTIFICATION_REGISTRY[notification.type]
+  if (!def) return notification.type
+  const template = SWAP_TITLE_TYPES.has(notification.type)
+    ? def.bodyTemplate
+    : def.titleTemplate
+  return resolveTemplate(
+    template,
+    notification.data as unknown as Record<string, unknown>,
+  )
 }
 
 function getNotificationSubtitle(notification: Notification): string {
-  const { type, data, repo } = notification
-  switch (type) {
-    case 'pr_merged':
-    case 'pr_closed':
-      return repo
-    case 'checks_passed':
-    case 'check_failed':
-    case 'changes_requested':
-    case 'pr_approved':
-    case 'new_comment':
-    case 'new_review':
-    case 'review_requested':
-    case 'pr_mentioned':
-      return data.prTitle || repo
-    default:
-      return ''
-  }
+  const def = NOTIFICATION_REGISTRY[notification.type]
+  if (!def) return ''
+  const template = SWAP_TITLE_TYPES.has(notification.type)
+    ? def.titleTemplate
+    : def.bodyTemplate
+  return resolveTemplate(
+    template,
+    notification.data as unknown as Record<string, unknown>,
+  )
 }
 
 function getNotificationUrl(notification: Notification): string | undefined {
@@ -142,7 +110,6 @@ function getNotificationUrl(notification: Notification): string | undefined {
       return data.checkUrl || data.prUrl
     case 'changes_requested':
     case 'pr_approved':
-      // For reviews, construct review URL if we have reviewId
       if (data.reviewId && data.prUrl) {
         return `${data.prUrl}#pullrequestreview-${data.reviewId}`
       }

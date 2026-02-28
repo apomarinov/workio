@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { resolveNotification } from '../../shared/notifications'
 import type {
   ActiveProcess,
   GitDirtyPayload,
@@ -174,10 +175,10 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       terminalName: string
       exitCode: number
     }>('bell:notify', (data) => {
-      const icon = data.exitCode === 0 ? '\u2705' : '\u274C'
-      sendNotification(`${icon} ${data.command}`, {
-        body: data.terminalName,
-        audio: 'done',
+      const resolved = resolveNotification('bell_notify', data)
+      sendNotification(`${resolved.emoji} ${resolved.title}`, {
+        body: resolved.body,
+        audio: resolved.audio,
       })
     })
   }, [subscribe, sendNotification])

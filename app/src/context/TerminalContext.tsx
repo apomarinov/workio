@@ -9,6 +9,7 @@ import {
 } from 'react'
 import useSWR from 'swr'
 import { toast } from '@/components/ui/sonner'
+import { resolveNotification } from '../../shared/notifications'
 import type {
   InvolvedPRSummary,
   MergedPRSummary,
@@ -182,7 +183,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   // Derive activeTerminalId: prefer stored ID if it still exists
   const activeTerminalId =
     storedTerminalId.current !== null &&
-      terminals.some((t) => t.id === storedTerminalId.current)
+    terminals.some((t) => t.id === storedTerminalId.current)
       ? storedTerminalId.current
       : _activeTerminalId
 
@@ -246,11 +247,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
             prev?.map((t) =>
               t.id === terminalId
                 ? {
-                  ...t,
-                  shells: t.shells.map((s) =>
-                    s.id === shellId ? { ...s, ...data } : s,
-                  ),
-                }
+                    ...t,
+                    shells: t.shells.map((s) =>
+                      s.id === shellId ? { ...s, ...data } : s,
+                    ),
+                  }
                 : t,
             ),
           false,
@@ -337,167 +338,69 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return subscribe<Notification>('notifications:new', (notification) => {
       const { type, data } = notification
-      const prTitle = data.prTitle || ''
       const prUrl = data.prUrl || ''
+      const notiData = data as unknown as Record<string, unknown>
 
-      switch (type) {
-        case 'pr_merged':
-          sendNotificationRef.current('✅ Merged', {
-            body: prTitle,
-            audio: 'pr-activity',
-            data: { url: prUrl },
-          })
-          break
+      // Compute URL (client concern)
+      let url: string | undefined = prUrl || undefined
+      if (type === 'check_failed') url = data.checkUrl || prUrl
+      else if (type === 'new_comment' || type === 'pr_mentioned')
+        url = data.commentUrl || prUrl
+      else if (
+        (type === 'new_review' ||
+          type === 'changes_requested' ||
+          type === 'pr_approved') &&
+        data.reviewId &&
+        prUrl
+      )
+        url = `${prUrl}#pullrequestreview-${data.reviewId}`
 
-        case 'pr_closed':
-          sendNotificationRef.current('🚫 Closed', {
-            body: prTitle,
-            audio: 'pr-activity',
-            data: { url: prUrl },
-          })
-          break
+      const sendOsNotif = (overrideBody?: string) => {
+        const resolved = resolveNotification(type, notiData)
+        const title = `${resolved.emoji} ${resolved.title}`
+        const body = overrideBody ?? resolved.body
+        sendNotificationRef.current(title, {
+          body,
+          audio: resolved.audio,
+          data: url ? { url } : undefined,
+        })
+      }
 
-        case 'checks_passed':
-          sendNotificationRef.current('✅ All checks passed', {
-            body: prTitle,
-            audio: 'done',
-            data: { url: prUrl },
-          })
-          break
-
-        case 'check_failed':
-          sendNotificationRef.current(
-            `❌ ${data.checkName || 'Check Failed'}`,
-            {
-              body: prTitle,
-              audio: 'error',
-              data: { url: data.checkUrl || prUrl },
-            },
-          )
-          break
-
-        case 'changes_requested':
-          sendNotificationRef.current(
-            `🔄 ${data.reviewer || 'Changes requested'}`,
-            {
-              body: prTitle,
-              audio: 'error',
-              data: { url: prUrl },
-            },
-          )
-          break
-
-        case 'pr_approved':
-          sendNotificationRef.current(`✅ ${data.approver || 'Approved'}`, {
-            body: prTitle,
-            audio: 'pr-activity',
-            data: { url: prUrl },
-          })
-          break
-
-        case 'new_comment': {
-          const commentKey = `comment:${prUrl}`
-          const existingComment = notifDebounceRef.current.get(commentKey)
-          if (existingComment) clearTimeout(existingComment)
-          notifDebounceRef.current.set(
-            commentKey,
-            setTimeout(() => {
-              notifDebounceRef.current.delete(commentKey)
-              const truncatedTitle =
-                prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
-              sendNotificationRef.current(`💬 ${data.author || 'Someone'}`, {
-                body: data.body
-                  ? `${truncatedTitle}\n${data.body}`
-                  : truncatedTitle,
-                audio: 'pr-activity',
-                data: { url: data.commentUrl || prUrl },
-              })
-            }, 2000),
-          )
-          break
-        }
-
-        case 'new_review': {
-          const reviewKey = `review:${prUrl}`
-          const existingReview = notifDebounceRef.current.get(reviewKey)
-          if (existingReview) clearTimeout(existingReview)
-          const emoji =
-            data.state === 'APPROVED'
-              ? '✅'
-              : data.state === 'CHANGES_REQUESTED'
-                ? '🔄'
-                : '💬'
-          const reviewUrl = data.reviewId
-            ? `${prUrl}#pullrequestreview-${data.reviewId}`
-            : prUrl
-          notifDebounceRef.current.set(
-            reviewKey,
-            setTimeout(() => {
-              notifDebounceRef.current.delete(reviewKey)
-              const truncatedTitle =
-                prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
-              sendNotificationRef.current(
-                `${emoji} ${data.author || 'Someone'}`,
-                {
-                  body: data.body
-                    ? `${truncatedTitle}\n${data.body}`
-                    : truncatedTitle,
-                  audio: 'pr-activity',
-                  data: { url: reviewUrl },
-                },
-              )
-            }, 2000),
-          )
-          break
-        }
-
-        case 'review_requested':
-          sendNotificationRef.current(
-            `👀 ${data.author || 'Review requested'}`,
-            {
-              body: `wants your review on ${prTitle}`,
-              audio: 'pr-activity',
-              data: { url: prUrl },
-            },
-          )
-          break
-
-        case 'pr_mentioned':
-          sendNotificationRef.current(`💬 ${data.author || 'Mentioned'}`, {
-            body: `mentioned you in ${prTitle}`,
-            audio: 'pr-activity',
-            data: { url: prUrl },
-          })
-          break
-
-        // Workspace notifications (state updates handled by terminal:workspace handler)
-        case 'workspace_deleted':
-          sendNotificationRef.current(`✅ ${data.name}`, {
-            body: 'Deleted',
-            audio: 'pr-activity',
-          })
-          break
-
-        case 'workspace_ready':
-          sendNotificationRef.current(`✅ ${data.name}`, {
-            body: 'Ready',
-            audio: 'pr-activity',
-          })
-          break
-
-        case 'workspace_failed':
-          sendNotificationRef.current(`❌ ${data.name}`, {
-            body: 'Failed',
-            audio: 'error',
-          })
-          break
-
-        case 'workspace_repo_failed':
-          sendNotificationRef.current(`❌ ${data.name}`, {
-            body: 'Repo init failed',
-            audio: 'error',
-          })
-          break
+      // Debounce comments and reviews
+      if (type === 'new_comment') {
+        const commentKey = `comment:${prUrl}`
+        const existing = notifDebounceRef.current.get(commentKey)
+        if (existing) clearTimeout(existing)
+        notifDebounceRef.current.set(
+          commentKey,
+          setTimeout(() => {
+            notifDebounceRef.current.delete(commentKey)
+            const prTitle = data.prTitle || ''
+            const truncatedTitle =
+              prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
+            sendOsNotif(
+              data.body ? `${truncatedTitle}\n${data.body}` : truncatedTitle,
+            )
+          }, 2000),
+        )
+      } else if (type === 'new_review') {
+        const reviewKey = `review:${prUrl}`
+        const existing = notifDebounceRef.current.get(reviewKey)
+        if (existing) clearTimeout(existing)
+        notifDebounceRef.current.set(
+          reviewKey,
+          setTimeout(() => {
+            notifDebounceRef.current.delete(reviewKey)
+            const prTitle = data.prTitle || ''
+            const truncatedTitle =
+              prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
+            sendOsNotif(
+              data.body ? `${truncatedTitle}\n${data.body}` : truncatedTitle,
+            )
+          }, 2000),
+        )
+      } else {
+        sendOsNotif()
       }
     })
   }, [subscribe])

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
+import { resolveNotification } from '../shared/notifications'
 import { getMessagesByIds, getTerminalById, updateSessionData } from './db'
 import { log } from './logger'
 import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
@@ -107,9 +108,12 @@ export async function initPgListener(
           const terminal = payload.terminal_id
             ? await getTerminalById(payload.terminal_id)
             : null
+          const resolved = resolveNotification('permission_needed', {
+            terminalName: terminal?.name || 'Claude',
+          })
           sendPushNotification({
-            title: '⚠️ Permission Required',
-            body: `"${terminal?.name || 'Terminal'}" needs permissions`,
+            title: `${resolved.emoji} ${resolved.title}`,
+            body: resolved.body,
             tag: payload.session_id
               ? `session:${payload.session_id}`
               : undefined,
@@ -127,9 +131,12 @@ export async function initPgListener(
           const terminal = payload.terminal_id
             ? await getTerminalById(payload.terminal_id)
             : null
+          const resolved = resolveNotification('stop', {
+            terminalName: terminal?.name || 'Claude',
+          })
           sendPushNotification({
-            title: '✅ Done',
-            body: `"${terminal?.name || 'Terminal'}" has finished`,
+            title: `${resolved.emoji} ${resolved.title}`,
+            body: resolved.body,
             tag: payload.session_id
               ? `session:${payload.session_id}`
               : undefined,
