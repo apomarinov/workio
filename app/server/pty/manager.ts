@@ -23,6 +23,7 @@ import {
 } from '../github/checks'
 import { getIO } from '../io'
 import { log } from '../logger'
+import { sendPushNotification } from '../push'
 import { validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
@@ -1189,12 +1190,18 @@ export async function createSession(
           if (bellSub) {
             bellSubscriptions.delete(shellId)
             const command = session.currentCommand || bellSub.command
+            const icon = event.exitCode === 0 ? '✅' : '❌'
             getIO()?.emit('bell:notify', {
               shellId,
               terminalId,
               command,
               terminalName: bellSub.terminalName,
               exitCode: event.exitCode,
+            })
+            sendPushNotification({
+              title: `${icon} ${command}`,
+              body: bellSub.terminalName,
+              tag: `bell:${shellId}`,
             })
             getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())
           }
