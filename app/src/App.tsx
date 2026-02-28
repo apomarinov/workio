@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Plus,
   Settings,
+  SidebarOpen,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
@@ -128,7 +129,7 @@ function AppContent() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [mobileKeyboardMode, setMobileKeyboardMode] = useState<
     'hidden' | 'input' | 'actions'
-  >('hidden')
+  >('input')
   const mobileInputRef = useRef<HTMLTextAreaElement>(null)
 
   // Mark active shells so the context can track suspension timestamps
@@ -816,7 +817,7 @@ function AppContent() {
                         onClick={() => setMobileSidebarOpen(true)}
                         className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer mr-1"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <SidebarOpen className="w-4 h-4" />
                       </button>
                     </ShellTabs>
                   )}
