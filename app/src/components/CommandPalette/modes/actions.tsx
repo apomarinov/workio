@@ -152,6 +152,22 @@ export function createActionsMode(
       })
     }
 
+    // Create Pull Request (git repo + branch + no PR + not main/master)
+    if (
+      terminal.git_repo &&
+      terminal.git_branch &&
+      !pr &&
+      terminal.git_branch !== 'main' &&
+      terminal.git_branch !== 'master'
+    ) {
+      items.push({
+        id: 'action:create-pr',
+        label: 'Create Pull Request',
+        icon: <GitPullRequest className="h-4 w-4 shrink-0 text-zinc-400" />,
+        onSelect: () => actions.openCreatePRModal(terminal),
+      })
+    }
+
     // Add Workspace (git repos only)
     if (terminal.git_repo) {
       items.push({

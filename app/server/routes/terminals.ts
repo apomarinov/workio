@@ -1432,17 +1432,24 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
         // When base is provided, diff between two refs (for PR view)
         if (base && !terminal.ssh_host) {
-          // Extract branch names from "origin/base...origin/head" format for fetching
+          // Extract branch names from "origin/base...origin/head" or "hash^..hash" format for fetching
           const parts = base.split('...')
-          const refs = parts.map((p) => p.replace(/^origin\//, ''))
-          await new Promise<void>((resolve) => {
-            execFile(
-              'git',
-              ['fetch', 'origin', ...refs],
-              { cwd, timeout: 30000 },
-              () => resolve(),
+          const refs = parts
+            .map((p) => p.replace(/^origin\//, '').replace(/\^$/, ''))
+            .filter((r) => !/^[0-9a-f]{6,}$/i.test(r)) // skip commit hashes
+          if (refs.length > 0) {
+            const refspecs = refs.map(
+              (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
             )
-          })
+            await new Promise<void>((resolve) => {
+              execFile(
+                'git',
+                ['fetch', 'origin', ...refspecs],
+                { cwd, timeout: 30000 },
+                () => resolve(),
+              )
+            })
+          }
 
           const [numstatOut, nameStatusOut] = await Promise.all([
             new Promise<string>((resolve) => {
@@ -2737,4 +2744,179 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       return { success: true }
     },
   )
+
+  // Check for merge conflicts between two branches
+  fastify.get<{
+    Params: TerminalParams
+    Querystring: { head: string; base: string }
+  }>('/api/terminals/:id/branch-conflicts', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
+
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
+
+    const { head, base } = request.query
+    if (!head || !base) {
+      return reply.status(400).send({ error: 'head and base are required' })
+    }
+
+    try {
+      const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+      // Fetch latest refs first (use explicit refspecs to create remote tracking refs)
+      if (!terminal.ssh_host) {
+        const refspecs = [head, base].map(
+          (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
+        )
+        await new Promise<void>((resolve) => {
+          execFile(
+            'git',
+            ['fetch', 'origin', ...refspecs],
+            { cwd, timeout: 30000 },
+            () => resolve(),
+          )
+        })
+      }
+
+      const hasConflicts = await new Promise<boolean>((resolve) => {
+        if (terminal.ssh_host) {
+          execSSHCommand(
+            terminal.ssh_host,
+            `git merge-tree --write-tree --no-messages origin/${base} origin/${head}`,
+            { cwd: terminal.cwd },
+          )
+            .then(() => resolve(false))
+            .catch(() => resolve(true))
+        } else {
+          execFile(
+            'git',
+            [
+              'merge-tree',
+              '--write-tree',
+              '--no-messages',
+              `origin/${base}`,
+              `origin/${head}`,
+            ],
+            { cwd, timeout: 15000 },
+            (err) => {
+              resolve(!!err)
+            },
+          )
+        }
+      })
+
+      return { hasConflicts }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to check conflicts'
+      return reply.status(400).send({ error: errorMessage })
+    }
+  })
+
+  // Get commits between two branches
+  fastify.get<{
+    Params: TerminalParams
+    Querystring: { head: string; base: string }
+  }>('/api/terminals/:id/commits', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
+
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
+
+    const { head, base } = request.query
+    if (!head || !base) {
+      return reply.status(400).send({ error: 'head and base are required' })
+    }
+
+    try {
+      const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+      // Fetch latest refs first (use explicit refspecs to create remote tracking refs)
+      if (!terminal.ssh_host) {
+        const refspecs = [head, base].map(
+          (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
+        )
+        await new Promise<void>((resolve) => {
+          execFile(
+            'git',
+            ['fetch', 'origin', ...refspecs],
+            { cwd, timeout: 30000 },
+            () => resolve(),
+          )
+        })
+      }
+
+      // Verify that the head ref exists on remote
+      const headExists = await new Promise<boolean>((resolve) => {
+        if (terminal.ssh_host) {
+          execSSHCommand(
+            terminal.ssh_host,
+            `git rev-parse --verify origin/${head}`,
+            { cwd: terminal.cwd },
+          )
+            .then(() => resolve(true))
+            .catch(() => resolve(false))
+        } else {
+          execFile(
+            'git',
+            ['rev-parse', '--verify', `origin/${head}`],
+            { cwd, timeout: 5000 },
+            (err) => resolve(!err),
+          )
+        }
+      })
+
+      if (!headExists) {
+        return { commits: [], noRemote: true }
+      }
+
+      const gitArgs = [
+        'log',
+        '--format=%H|%s|%an|%aI',
+        `origin/${base}..origin/${head}`,
+      ]
+
+      let stdout: string
+      if (terminal.ssh_host) {
+        const result = await execSSHCommand(
+          terminal.ssh_host,
+          `git ${gitArgs.join(' ')}`,
+          { cwd: terminal.cwd },
+        )
+        stdout = result.stdout
+      } else {
+        stdout = await new Promise<string>((resolve, reject) => {
+          execFile('git', gitArgs, { cwd, timeout: 15000 }, (err, out) => {
+            if (err) reject(err)
+            else resolve(out)
+          })
+        })
+      }
+
+      const commits = stdout
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [hash, message, author, date] = line.split('|')
+          return { hash, message, author, date }
+        })
+
+      return { commits, noRemote: false }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to get commits'
+      return reply.status(400).send({ error: errorMessage })
+    }
+  })
 }

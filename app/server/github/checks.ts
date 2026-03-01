@@ -1720,6 +1720,62 @@ export function editPR(
   })
 }
 
+export function createPR(
+  owner: string,
+  repo: string,
+  head: string,
+  base: string,
+  title: string,
+  body: string,
+  draft: boolean,
+): Promise<{ ok: boolean; prNumber?: number; error?: string }> {
+  const prId = `${owner}/${repo}`
+  const cmd = `gh api --method POST repos/${owner}/${repo}/pulls -f head=... -f base=... -f title=... -f body=... -F draft=...`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        '--method',
+        'POST',
+        `repos/${owner}/${repo}/pulls`,
+        '-f',
+        `head=${head}`,
+        '-f',
+        `base=${base}`,
+        '-f',
+        `title=${title}`,
+        '-f',
+        `body=${body}`,
+        '-F',
+        `draft=${draft}`,
+      ],
+      { timeout: 30000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        try {
+          const data = JSON.parse(stdout)
+          invalidateChecksCache()
+          resolve({ ok: true, prNumber: data.number })
+        } catch {
+          resolve({ ok: false, error: 'Failed to parse response' })
+        }
+      },
+    )
+  })
+}
+
 export function rerunFailedCheck(
   owner: string,
   repo: string,

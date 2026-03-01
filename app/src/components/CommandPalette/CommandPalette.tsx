@@ -9,6 +9,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
 import {
+  type BranchesResponse,
   checkoutBranch,
   closePR,
   createBranch,
@@ -39,6 +40,11 @@ import type {
 
 const CommitDialog = lazy(() =>
   import('../CommitDialog').then((m) => ({ default: m.CommitDialog })),
+)
+const CreatePRDialog = lazy(() =>
+  import('../dialogs/CreatePRDialog').then((m) => ({
+    default: m.CreatePRDialog,
+  })),
 )
 
 import { CleanupSessionsModal } from '../CleanupSessionsModal'
@@ -106,6 +112,10 @@ export function CommandPalette() {
   } | null>(null)
   const [createBranchLoading, setCreateBranchLoading] = useState(false)
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false)
+  const [createPRTarget, setCreatePRTarget] = useState<{
+    terminal: Terminal
+    branches: BranchesResponse
+  } | null>(null)
   const [diffViewerTarget, setDiffViewerTarget] = useState<{
     pr: PRCheckStatus
     terminalId: number
@@ -920,6 +930,17 @@ export function CommandPalette() {
       },
 
       // PR actions
+      openCreatePRModal: async (terminal) => {
+        closePalette()
+        try {
+          const data = await getBranches(terminal.id)
+          setCreatePRTarget({ terminal, branches: data })
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to fetch branches',
+          )
+        }
+      },
       openDiffViewer: (pr, terminalId) => {
         closePalette()
         setTimeout(() => setDiffViewerTarget({ pr, terminalId }), 150)
@@ -1450,6 +1471,15 @@ export function CommandPalette() {
             setFilePickerTerminal(null)
           }}
           sshHost={filePickerTerminal.ssh_host ?? undefined}
+        />
+      )}
+
+      {createPRTarget && (
+        <CreatePRDialog
+          open={!!createPRTarget}
+          terminal={createPRTarget.terminal}
+          branches={createPRTarget.branches}
+          onClose={() => setCreatePRTarget(null)}
         />
       )}
 

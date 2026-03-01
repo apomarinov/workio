@@ -781,6 +781,66 @@ export async function getHeadMessage(
   return res.json()
 }
 
+export async function createPR(
+  owner: string,
+  repo: string,
+  head: string,
+  base: string,
+  title: string,
+  body: string,
+  draft: boolean,
+): Promise<{ prNumber: number }> {
+  const res = await fetch(`${API_BASE}/github/${owner}/${repo}/pr/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ head, base, title, body, draft }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to create PR')
+  }
+  return res.json()
+}
+
+export interface PRCommit {
+  hash: string
+  message: string
+  author: string
+  date: string
+}
+
+export async function checkBranchConflicts(
+  terminalId: number,
+  head: string,
+  base: string,
+): Promise<{ hasConflicts: boolean }> {
+  const params = new URLSearchParams({ head, base })
+  const res = await fetch(
+    `${API_BASE}/terminals/${terminalId}/branch-conflicts?${params.toString()}`,
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to check conflicts')
+  }
+  return res.json()
+}
+
+export async function getCommitsBetween(
+  terminalId: number,
+  base: string,
+  head: string,
+): Promise<{ commits: PRCommit[]; noRemote?: boolean }> {
+  const params = new URLSearchParams({ head, base })
+  const res = await fetch(
+    `${API_BASE}/terminals/${terminalId}/commits?${params.toString()}`,
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to get commits')
+  }
+  return res.json()
+}
+
 export async function getChangedFiles(
   terminalId: number,
   base?: string,

@@ -24,6 +24,7 @@ import {
   addReaction,
   applyWebhookAndRefresh,
   closePR,
+  createPR,
   detectAllTerminalBranches,
   editPR,
   emitCachedPRChecks,
@@ -468,6 +469,44 @@ fastify.post<{
     return reply.status(500).send({ error: result.error })
   }
   return { ok: true }
+})
+
+// Create PR
+fastify.post<{
+  Params: { owner: string; repo: string }
+  Body: {
+    head: string
+    base: string
+    title: string
+    body: string
+    draft: boolean
+  }
+}>('/api/github/:owner/:repo/pr/create', async (request, reply) => {
+  const { owner, repo } = request.params
+  const { head, base, title, body, draft } = request.body
+  if (!head || !base || !title) {
+    return reply
+      .status(400)
+      .send({ error: 'head, base, and title are required' })
+  }
+  const result = await createPR(
+    owner,
+    repo,
+    head,
+    base,
+    title,
+    body ?? '',
+    draft ?? false,
+  )
+  if (!result.ok) {
+    return reply.status(500).send({ error: result.error })
+  }
+  await refreshPRChecks(true, {
+    repo: `${owner}/${repo}`,
+    prNumber: result.prNumber!,
+    until: (pr) => !!pr,
+  })
+  return { ok: true, prNumber: result.prNumber }
 })
 
 // Add PR comment
