@@ -55,7 +55,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [preferredIDE, setPreferredIDE] = useState<PreferredIDE>('cursor')
   const [saving, setSaving] = useState(false)
-  const [showCustomizeKeyboard, setShowCustomizeKeyboard] = useState(false)
+  const [showCustomizeKeyboard, setShowCustomizeKeyboard] = useState<
+    'new-action' | boolean
+  >(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
   const [showWebhooksModal, setShowWebhooksModal] = useState(false)
   const [showPushModal, setShowPushModal] = useState(false)
@@ -64,6 +66,17 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     missingCount,
     orphanedCount,
   } = useWebhookWarning()
+
+  // Open settings + customize keyboard when triggered from command palette
+  useEffect(() => {
+    const handler = () => {
+      onOpenChange(true)
+      setShowCustomizeKeyboard('new-action')
+    }
+    window.addEventListener('open-create-custom-action', handler)
+    return () =>
+      window.removeEventListener('open-create-custom-action', handler)
+  }, [onOpenChange])
 
   useEffect(() => {
     if (settings) {

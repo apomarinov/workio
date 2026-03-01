@@ -84,7 +84,7 @@ const CATEGORY_ORDER = [
 ]
 
 interface MobileKeyboardNewGroupProps {
-  open: boolean
+  open: boolean | 'new-action'
   title?: string
   initialActions?: string[]
   customActions: CustomTerminalAction[]
@@ -219,7 +219,7 @@ export function MobileKeyboardNewGroup({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
+      <Dialog open={!!open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md max-h-[70vh] flex flex-col p-0">
           <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 pt-4 pb-2 space-y-0">
             <button
@@ -297,7 +297,14 @@ export function MobileKeyboardNewGroup({
           {/* All actions grouped by category */}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 space-y-3">
             {grouped.map((group) => (
-              <div key={group.category}>
+              <div
+                key={group.category}
+                className={cn(
+                  group.category === 'custom' &&
+                    open === 'new-action' &&
+                    'border-1 px-2 py-1 pt-2 border-blue-500 rounded-md animate-pulse',
+                )}
+              >
                 <div className="flex items-center gap-2 mb-1">
                   <div className="text-xs font-medium text-muted-foreground/70">
                     {group.label}

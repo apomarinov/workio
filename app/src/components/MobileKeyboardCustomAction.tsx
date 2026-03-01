@@ -3,6 +3,13 @@ import { useEffect, useState } from 'react'
 import { useTerminalContext } from '@/context/TerminalContext'
 import type { CustomTerminalAction } from '../types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
 
 interface MobileKeyboardCustomActionProps {
   open: boolean
@@ -119,24 +126,28 @@ export function MobileKeyboardCustomAction({
               <label className="text-xs font-medium text-muted-foreground/70 mb-1 block">
                 Git Repo (optional)
               </label>
-              <select
-                value={repo}
-                onChange={(e) => setRepo(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-zinc-800 text-white text-base outline-none border border-zinc-700/50 focus:border-blue-500/50"
+              <Select
+                value={repo || undefined}
+                onValueChange={(v) => setRepo(v === '__none__' ? '' : v)}
               >
-                <option value="">Any terminal</option>
-                {repos.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Any Repo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Any Repo</SelectItem>
+                  {repos.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           <p className="text-xs text-muted-foreground/50">
             The command will be sent to the terminal with Enter appended.
             {repos.length > 0 &&
-              ' Optionally pick a repo to always target that terminal.'}
+              ' Optionally pick a repo to show that command only for projects in that repo.'}
           </p>
         </div>
       </DialogContent>

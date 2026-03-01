@@ -58,7 +58,7 @@ export type PaletteMode = {
   placeholder: string
   items: PaletteItem[] // flat list when no groups
   groups?: PaletteGroup[] // optional grouping
-  emptyMessage?: string
+  emptyMessage?: ReactNode
   loading?: boolean
   shouldFilter?: boolean // when false, cmdk skips client-side filtering (for server-filtered modes)
   footer?: (highlighted: PaletteItem | null) => ReactNode

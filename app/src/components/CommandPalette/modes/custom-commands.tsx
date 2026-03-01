@@ -22,8 +22,21 @@ export function createCustomCommandsMode(
       id: 'custom-commands',
       placeholder: 'Search commands...',
       items: [],
-      emptyMessage:
-        'No custom commands. Create them from the mobile keyboard settings.',
+      emptyMessage: (
+        <div className="flex flex-col items-center gap-2">
+          <span>No custom commands yet.</span>
+          <button
+            type="button"
+            className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+            onClick={() => {
+              api.close()
+              window.dispatchEvent(new CustomEvent('open-create-custom-action'))
+            }}
+          >
+            Create one
+          </button>
+        </div>
+      ),
     }
   }
 

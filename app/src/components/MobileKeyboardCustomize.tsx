@@ -7,7 +7,7 @@ import { MobileKeyboardNewGroup } from './MobileKeyboardNewGroup'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
 interface MobileKeyboardCustomizeProps {
-  open: boolean
+  open: boolean | 'new-action'
   rows: MobileKeyboardRow[]
   customActions: CustomTerminalAction[]
   onSave: (rows: MobileKeyboardRow[]) => void
@@ -28,7 +28,9 @@ export function MobileKeyboardCustomize({
   onClose,
 }: MobileKeyboardCustomizeProps) {
   const [localRows, setLocalRows] = useState<MobileKeyboardRow[]>(rows)
-  const [newGroupOpen, setNewGroupOpen] = useState(false)
+  const [newGroupOpen, setNewGroupOpen] = useState<'new-action' | boolean>(
+    false,
+  )
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const actionsMap = buildActionsMap(customActions)
 
@@ -36,6 +38,9 @@ export function MobileKeyboardCustomize({
   useEffect(() => {
     if (open) {
       setLocalRows(rows)
+      if (open === 'new-action') {
+        setNewGroupOpen('new-action')
+      }
     }
   }, [open, rows])
 
@@ -78,7 +83,7 @@ export function MobileKeyboardCustomize({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
+      <Dialog open={!!open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0">
           <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 pt-4 pb-2 space-y-0">
             <button
