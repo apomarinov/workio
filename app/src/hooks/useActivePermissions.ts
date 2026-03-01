@@ -26,11 +26,5 @@ export function useActivePermissions() {
     })
   }, [subscribe, mutate])
 
-  const permissions = data ?? []
-
-  useEffect(() => {
-    console.log('[permissions] active:', permissions)
-  }, [permissions])
-
-  return permissions
+  return data ?? []
 }

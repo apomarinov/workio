@@ -73,7 +73,6 @@ function AppContent() {
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe, emit } = useSocket()
   const { sendNotification } = useNotifications()
-  useActivePermissions()
   const { clearSession } = useSessionContext()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
   const [createModalOpen, setCreateModalOpen] = useState(false)

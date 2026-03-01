@@ -28,11 +28,11 @@ export function useSocket() {
     }
 
     const handleConnect = () => {
-      console.log('[Socket] Connected:', s.id)
+      // console.log('[Socket] Connected:', s.id)
     }
 
     const handleDisconnect = (reason: string) => {
-      console.log('[Socket] Disconnected:', reason)
+      // console.log('[Socket] Disconnected:', reason)
     }
 
     s.on('connect', handleConnect)

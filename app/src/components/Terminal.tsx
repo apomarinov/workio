@@ -686,17 +686,6 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       },
     })
 
-    // Try to load WebGL addon for better performance
-    try {
-      const webglAddon = new WebglAddon()
-      webglAddon.onContextLoss(() => {
-        webglAddon.dispose()
-      })
-      terminal.loadAddon(webglAddon)
-    } catch {
-      // WebGL not available, canvas renderer will be used
-    }
-
     // OSC 52 clipboard handler — intercept copy sequences from programs like zellij
     // Skip during buffer replay (before 'ready' message) to avoid stale clipboard popups
     terminal.parser.registerOscHandler(52, (data: string) => {
@@ -825,6 +814,27 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       fitAddonRef.current = null
     }
   }, []) // No dependencies - initialize once
+
+  // Load WebGL addon only for visible terminals, dispose when hidden
+  useEffect(() => {
+    const terminal = terminalRef.current
+    if (!terminal) return
+    if (!isVisible) return
+    let webglAddon: WebglAddon | null = null
+    try {
+      webglAddon = new WebglAddon()
+      webglAddon.onContextLoss(() => {
+        webglAddon?.dispose()
+        webglAddon = null
+      })
+      terminal.loadAddon(webglAddon)
+    } catch {
+      // WebGL not available, canvas renderer will be used
+    }
+    return () => {
+      webglAddon?.dispose()
+    }
+  }, [isVisible])
 
   // Re-fit, flush buffered data, and focus when becoming visible
   useEffect(() => {
