@@ -73,6 +73,28 @@ export function FinderIcon({ className }: { className?: string }) {
   )
 }
 
+export function ClaudeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 17 12"
+      fill="currentColor"
+      className={className}
+      shapeRendering="crispEdges"
+    >
+      <rect x="2" y="0" width="13" height="2" />
+      <rect x="2" y="2" width="2" height="3" />
+      <rect x="6" y="2" width="5" height="3" />
+      <rect x="13" y="2" width="2" height="3" />
+      <rect x="0" y="5" width="17" height="3" />
+      <rect x="2" y="8" width="13" height="2" />
+      <rect x="3" y="10" width="1" height="2" />
+      <rect x="5" y="10" width="1" height="2" />
+      <rect x="11" y="10" width="1" height="2" />
+      <rect x="13" y="10" width="1" height="2" />
+    </svg>
+  )
+}
+
 export function RefreshIcon({ className }: { className?: string }) {
   return <RefreshCcw className={cn('rotate-[-30deg]', className)} />
 }

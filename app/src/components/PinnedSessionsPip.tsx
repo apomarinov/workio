@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ArrowLeft,
-  Bot,
   CheckIcon,
   Eye,
   Minimize2,
@@ -19,6 +18,7 @@ import {
   useState,
 } from 'react'
 import { createPortal, flushSync } from 'react-dom'
+import { ClaudeIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -152,7 +152,7 @@ function PipChatItem({
               )}
             </>
           ) : (
-            <Bot className="w-3.5 h-3.5 text-gray-400" />
+            <ClaudeIcon className="w-3.5 h-3.5 text-gray-400" />
           )}
         </div>
         <div className="flex-1 min-w-0">

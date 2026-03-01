@@ -1,7 +1,6 @@
 import {
   ArrowDown,
   ArrowUp,
-  Bot,
   Check,
   CornerDownLeft,
   GitBranch,
@@ -13,6 +12,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react'
+import { ClaudeIcon } from '@/components/icons'
 import type { AppActions, AppData } from '../createPaletteModes'
 import { ItemActions } from '../ItemActions'
 import type {
@@ -415,7 +415,7 @@ export function createBranchActionsMode(
       items.push({
         id: 'action:claude-sessions',
         label: `Claude Sessions (${count})`,
-        icon: <Bot className="h-4 w-4 shrink-0 text-zinc-400" />,
+        icon: <ClaudeIcon className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => {
           api.push({
             mode: 'branch-claude-sessions',

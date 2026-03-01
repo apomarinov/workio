@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  Bot,
   Check,
   CornerDownLeft,
   GitBranch,
@@ -13,9 +12,9 @@ import {
   Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { TerminalIcon2 } from '@/components/icons'
+import { ClaudeIcon, TerminalIcon2 } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
-import { cn } from '@/lib/utils'
+import { cn, sessionStatusColor } from '@/lib/utils'
 import type { PRCheckStatus } from '../../../../shared/types'
 import { PRTabButton } from '../../PRStatusContent'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -26,15 +25,6 @@ import type {
   PaletteLevel,
   PaletteMode,
 } from '../types'
-
-const sessionStatusColor: Record<string, string> = {
-  started: 'text-green-500',
-  active: 'text-[#D97757]',
-  done: 'text-gray-500',
-  ended: 'text-gray-500',
-  permission_needed: 'text-[#D97757]',
-  idle: 'text-gray-400',
-}
 
 function SessionIcon({ status }: { status: string }) {
   if (status === 'done')
@@ -74,7 +64,7 @@ function SessionIcon({ status }: { status: string }) {
       </>
     )
   return (
-    <Bot
+    <ClaudeIcon
       className={cn(
         'h-4 w-4 shrink-0',
         sessionStatusColor[status] ?? 'text-gray-400',

@@ -1,5 +1,6 @@
-import { Bot, ChevronDown, User } from 'lucide-react'
+import { ChevronDown, User } from 'lucide-react'
 import { useState } from 'react'
+import { ClaudeIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionMessage } from '../types'
@@ -57,7 +58,7 @@ export function MessageBubble({ message, hideAvatars }: MessageBubbleProps) {
       <div className="flex gap-2 justify-start">
         {!hideAvatars && (
           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-700/50 flex items-center justify-center">
-            <Bot className="w-3.5 h-3.5 text-zinc-400" />
+            <ClaudeIcon className="w-3.5 h-3.5 text-zinc-400" />
           </div>
         )}
         <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-zinc-800/50 border border-zinc-700/50 rounded-bl-sm">
@@ -74,7 +75,7 @@ export function MessageBubble({ message, hideAvatars }: MessageBubbleProps) {
     <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && !hideAvatars && (
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#D97757]/20 flex items-center justify-center">
-          <Bot className="w-3.5 h-3.5 text-[#D97757]" />
+          <ClaudeIcon className="w-3.5 h-3.5 text-[#D97757]" />
         </div>
       )}
       <div

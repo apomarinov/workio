@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  Bot,
   CheckIcon,
   ChevronDown,
   Folder,
@@ -9,13 +8,14 @@ import {
   PinOff,
 } from 'lucide-react'
 import { memo, useEffect, useState } from 'react'
+import { ClaudeIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { cn } from '@/lib/utils'
+import { cn, sessionStatusColor } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
@@ -99,14 +99,7 @@ export const SessionItem = memo(function SessionItem({
       window.removeEventListener('flash-session', handleFlash as EventListener)
   }, [session.session_id])
 
-  const statusColor = {
-    started: 'text-green-500',
-    active: 'text-[#D97757]',
-    done: 'text-gray-500',
-    ended: 'text-gray-500',
-    permission_needed: 'text-[#D97757]',
-    idle: 'text-gray-400',
-  }[session.status]
+  const statusColor = sessionStatusColor[session.status]
 
   const handleOpenActions = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -187,7 +180,7 @@ export const SessionItem = memo(function SessionItem({
           {!['active', 'permission_needed', 'done'].includes(
             session.status,
           ) && (
-            <Bot
+            <ClaudeIcon
               className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
               aria-label={session.status}
             />

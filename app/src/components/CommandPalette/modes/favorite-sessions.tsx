@@ -1,5 +1,6 @@
-import { AlertTriangle, Bot, Check, GitBranch, HeartOff } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { AlertTriangle, Check, GitBranch, HeartOff } from 'lucide-react'
+import { ClaudeIcon } from '@/components/icons'
+import { cn, sessionStatusColor } from '@/lib/utils'
 import type { AppActions, AppData } from '../createPaletteModes'
 import { ItemActions } from '../ItemActions'
 import type {
@@ -8,15 +9,6 @@ import type {
   PaletteLevel,
   PaletteMode,
 } from '../types'
-
-const sessionStatusColor: Record<string, string> = {
-  started: 'text-green-500',
-  active: 'text-[#D97757]',
-  done: 'text-gray-500',
-  ended: 'text-gray-500',
-  permission_needed: 'text-[#D97757]',
-  idle: 'text-gray-400',
-}
 
 function SessionIcon({ status }: { status: string }) {
   if (status === 'done')
@@ -54,7 +46,7 @@ function SessionIcon({ status }: { status: string }) {
       </>
     )
   return (
-    <Bot
+    <ClaudeIcon
       className={cn(
         'h-4 w-4 shrink-0',
         sessionStatusColor[status] ?? 'text-gray-400',

@@ -1,6 +1,7 @@
-import { Bot, Check, GitBranch } from 'lucide-react'
+import { Check, GitBranch } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { ClaudeIcon } from '@/components/icons'
+import { cn, sessionStatusColor } from '@/lib/utils'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
   PaletteAPI,
@@ -9,20 +10,11 @@ import type {
   PaletteMode,
 } from '../types'
 
-const sessionStatusColor: Record<string, string> = {
-  started: 'text-green-500',
-  active: 'text-[#D97757]',
-  done: 'text-gray-500',
-  ended: 'text-gray-500',
-  permission_needed: 'text-[#D97757]',
-  idle: 'text-gray-400',
-}
-
 function SessionSearchIcon({ status }: { status: string }) {
   if (status === 'done')
     return <Check className="h-4 w-4 shrink-0 text-green-500/70" />
   return (
-    <Bot
+    <ClaudeIcon
       className={cn(
         'h-4 w-4 shrink-0',
         sessionStatusColor[status] ?? 'text-gray-400',

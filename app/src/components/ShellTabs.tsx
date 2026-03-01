@@ -23,7 +23,6 @@ import {
   Ban,
   Bell,
   BellRing,
-  Bot,
   CheckIcon,
   ChevronDown,
   FolderOpen,
@@ -38,6 +37,7 @@ import {
   TrashIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { ClaudeIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -54,7 +54,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, sessionStatusColor } from '@/lib/utils'
 import type { ShellClient } from '../../shared/types'
 import type {
   SessionWithProject,
@@ -77,14 +77,6 @@ interface ShellTabsProps {
   className?: string
   children?: React.ReactNode
   rightExtra?: React.ReactNode
-}
-
-const sessionStatusColor: Record<string, string> = {
-  started: 'text-green-500/80',
-  active: 'text-[#D97757]',
-  done: 'text-gray-500',
-  permission_needed: 'text-[#D97757]',
-  idle: 'text-gray-400',
 }
 
 function ShellSessionIcon({ session }: { session: SessionWithProject }) {
@@ -124,7 +116,7 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
       </>
     )
   return (
-    <Bot
+    <ClaudeIcon
       className={cn(s, sessionStatusColor[session.status] ?? 'text-gray-400')}
     />
   )
