@@ -398,7 +398,7 @@ export async function scanAndStorePermissionPrompt(
   shellId: number,
 ): Promise<void> {
   try {
-    const buffer = getSessionBuffer(shellId)
+    const buffer = await getSessionBuffer(shellId)
     if (buffer.length === 0) return
 
     const parsed = scanBufferForPermissionPrompt(buffer)

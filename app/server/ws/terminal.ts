@@ -257,7 +257,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           state.primary = ws
 
           // Replay buffer to this client only
-          const buffer = getSessionBuffer(shellId)
+          const buffer = await getSessionBuffer(shellId)
           for (const data of buffer) {
             sendMessage(ws, { type: 'output', data })
           }

@@ -56,6 +56,7 @@ import { setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import {
+  destroyAllSessions,
   getBellSubscribedShellIds,
   getSession,
   getSessionByTerminalId,
@@ -882,10 +883,12 @@ function stopDaemon() {
 
 process.on('exit', stopDaemon)
 process.on('SIGTERM', () => {
+  destroyAllSessions()
   stopDaemon()
   process.exit(0)
 })
 process.on('SIGINT', () => {
+  destroyAllSessions()
   stopDaemon()
   process.exit(0)
 })

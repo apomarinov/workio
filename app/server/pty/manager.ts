@@ -3,14 +3,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import * as pty from 'node-pty'
 import { resolveNotification } from '../../shared/notifications'
 import type { ActiveProcess } from '../../shared/types'
-import type { Shell } from '../../src/types'
 import {
   getAllTerminals,
-  getSettings,
-  getShellById,
   getTerminalById,
   updateShell,
   updateTerminal,
@@ -18,18 +14,14 @@ import {
 import {
   getGhUsername,
   refreshPRChecks,
-  startChecksPolling,
-  trackTerminal,
   untrackTerminal,
 } from '../github/checks'
 import { getIO } from '../io'
 import { log } from '../logger'
 import { sendPushNotification } from '../push'
-import { validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
-import { createSSHSession, type TerminalBackend } from '../ssh/ssh-pty-adapter'
 import { emitWorkspace } from '../workspace/setup'
-import { type CommandEvent, createOscParser } from './osc-parser'
+import type { CommandEvent } from './osc-parser'
 import {
   getActiveZellijSessionNames,
   getChildPids,
@@ -38,16 +30,75 @@ import {
   getSystemListeningPorts,
   getZellijSessionProcesses,
 } from './process-tree'
+import {
+  getAllWorkers,
+  getWorkersForTerminal,
+  destroySession as proxyDestroySession,
+  destroySessionsForTerminal as proxyDestroySessionsForTerminal,
+  setCommandEventHandler,
+  type WorkerHandle,
+} from './session-proxy'
+
+// ── Re-export session proxy functions ───────────────────────────────
+
+export {
+  attachSession,
+  cancelWaitForMarker,
+  clearSessionTimeout,
+  createSession,
+  destroyAllSessions,
+  getSession,
+  getSessionBuffer,
+  getSessionByTerminalId,
+  hasActiveSession,
+  hasActiveSessionForTerminal,
+  interruptSession,
+  killShellChildren,
+  resizeSession,
+  startSessionTimeout,
+  updateSessionName,
+  waitForMarker,
+  waitForSession,
+  writeToSession,
+} from './session-proxy'
+
+// setPendingCommand needs local tracking for shells that don't have
+// a worker yet (newly created shell, PTY not spawned).
+// The proxy sends via IPC if the worker exists; otherwise we store here
+// and the worker's prompt handler will pick it up after init.
+import {
+  hasActiveSession as proxyHasActiveSession,
+  setPendingCommand as proxySetPendingCommand,
+} from './session-proxy'
+
+const pendingCommands = new Map<number, string>()
+
+export function setPendingCommand(shellId: number, command: string) {
+  if (proxyHasActiveSession(shellId)) {
+    proxySetPendingCommand(shellId, command)
+  } else {
+    pendingCommands.set(shellId, command)
+  }
+}
+
+/**
+ * Called by session-proxy after worker is ready to flush any
+ * locally-queued pending command.
+ */
+export function flushPendingCommand(shellId: number): string | undefined {
+  const cmd = pendingCommands.get(shellId)
+  if (cmd) {
+    pendingCommands.delete(shellId)
+  }
+  return cmd
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const MAX_BUFFER_LINES = 5000
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
-const LONG_TIMEOUT = 900_000 // 15 min for setup/teardown operations
-
 const COMMAND_IGNORE_LIST: string[] = []
 
-// Track when processes were first seen: key = "terminalId:shellId:command" → timestamp ms
+// ── Process start time tracking ─────────────────────────────────────
+
 const processFirstSeen = new Map<string, number>()
 
 function stampProcessStartTimes(processes: ActiveProcess[]) {
@@ -61,7 +112,6 @@ function stampProcessStartTimes(processes: ActiveProcess[]) {
     }
     proc.startedAt = processFirstSeen.get(key)
   }
-  // Clean up stale entries
   for (const key of processFirstSeen.keys()) {
     if (!currentKeys.has(key)) {
       processFirstSeen.delete(key)
@@ -69,40 +119,8 @@ function stampProcessStartTimes(processes: ActiveProcess[]) {
   }
 }
 
-// Commands to run after shell integration injection completes (first prompt)
-const pendingCommands = new Map<number, string>()
+// ── Bell subscriptions ──────────────────────────────────────────────
 
-export function setPendingCommand(shellId: number, command: string) {
-  pendingCommands.set(shellId, command)
-}
-
-export interface PtySession {
-  pty: TerminalBackend
-  buffer: string[]
-  timeoutId: NodeJS.Timeout | null
-  shell: Shell
-  terminalId: number
-  sessionName: string // Zellij session name for process detection
-  cols: number
-  rows: number
-  onData: ((data: string) => void) | null
-  onExit: ((code: number) => void) | null
-  onCommandEvent: ((event: CommandEvent) => void) | null
-  currentCommand: string | null
-  isIdle: boolean
-  lastActiveProcesses: string // For change detection
-  onDoneMarker: ((exitCode: number) => void) | null
-  processPollTimeoutId: NodeJS.Timeout | null
-}
-
-// In-memory map of active PTY sessions, keyed by shellId
-const sessions = new Map<number, PtySession>()
-
-// Bell debounce: track last bell time per shell to avoid spamming
-const lastBellTime = new Map<number, number>()
-const BELL_DEBOUNCE_MS = 10_000
-
-// Bell subscriptions: notify client when a command ends in a subscribed shell
 interface BellSubscription {
   shellId: number
   terminalId: number
@@ -125,6 +143,8 @@ export function getBellSubscribedShellIds(): number[] {
   return [...bellSubscriptions.keys()]
 }
 
+// ── Shell update helper ─────────────────────────────────────────────
+
 type ShellUpdates = { active_cmd?: string | null }
 
 function emitShellUpdate(
@@ -137,129 +157,23 @@ function emitShellUpdate(
   getIO()?.emit('shell:updated', { terminalId, shellId, data: updates })
 }
 
-// Helper to find session(s) by terminalId (for terminal-level operations)
-function getSessionsForTerminal(terminalId: number): PtySession[] {
-  const result: PtySession[] = []
-  for (const session of sessions.values()) {
-    if (session.terminalId === terminalId) result.push(session)
-  }
-  return result
-}
+// ── Global process polling ──────────────────────────────────────────
 
-// Returns the "main" shell session for a terminal
-function getMainSessionForTerminal(terminalId: number): PtySession | undefined {
-  for (const session of sessions.values()) {
-    if (session.terminalId === terminalId && session.shell.name === 'main') {
-      return session
-    }
-  }
-  // Fallback: return any session for this terminal
-  for (const session of sessions.values()) {
-    if (session.terminalId === terminalId) return session
-  }
-  return undefined
-}
-
-// Global process polling
 let globalProcessPollingId: NodeJS.Timeout | null = null
 
-// Git dirty status polling
-let gitDirtyPollingId: NodeJS.Timeout | null = null
-const lastDirtyStatus = new Map<
-  number,
-  { added: number; removed: number; untracked: number }
->()
-const lastRemoteSyncStatus = new Map<
-  number,
-  { behind: number; ahead: number; noRemote: boolean }
->()
+// Process polling timer per-terminal (debounced after command events)
+const processPollTimeoutIds = new Map<number, NodeJS.Timeout>()
 
-// Terminal name file helpers for dynamic zellij session naming
-const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
-const WORKIO_SHELLS_DIR = path.join(os.homedir(), '.workio', 'shells')
-const WORKIO_INTEGRATION_DIR = path.join(
-  os.homedir(),
-  '.workio',
-  'shell-integration',
-)
-
-/**
- * Copies shell integration scripts from the source tree into ~/.workio/shell-integration/
- * so shells can source a stable path instead of the build output directory.
- * Called once on server start.
- */
-export async function writeShellIntegrationScripts(): Promise<void> {
-  const srcDir = path.join(__dirname, 'shell-integration')
-  await fs.promises.mkdir(WORKIO_INTEGRATION_DIR, { recursive: true })
-  const files = ['bash.sh', 'zsh.sh', 'ssh-inline.sh']
-  await Promise.all(
-    files.map(async (file) => {
-      const content = await fs.promises.readFile(
-        path.join(srcDir, file),
-        'utf-8',
-      )
-      await fs.promises.writeFile(
-        path.join(WORKIO_INTEGRATION_DIR, file),
-        content,
-        { mode: 0o644 },
-      )
-    }),
-  )
-  log.info(
-    `[pty] Shell integration scripts written to ${WORKIO_INTEGRATION_DIR}`,
-  )
-}
-
-export async function writeTerminalNameFile(
-  terminalId: number,
-  name: string,
-): Promise<void> {
-  try {
-    await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
-    await fs.promises.writeFile(
-      path.join(WORKIO_TERMINALS_DIR, String(terminalId)),
-      name,
-    )
-  } catch (err) {
-    log.error(
-      { err },
-      `[pty] Failed to write terminal name file for ${terminalId}`,
-    )
-  }
-}
-
-export async function writeShellNameFile(
-  shellId: number,
-  name: string,
-): Promise<void> {
-  try {
-    await fs.promises.mkdir(WORKIO_SHELLS_DIR, { recursive: true })
-    await fs.promises.writeFile(
-      path.join(WORKIO_SHELLS_DIR, String(shellId)),
-      name,
-    )
-  } catch (err) {
-    log.error({ err }, `[pty] Failed to write shell name file for ${shellId}`)
-  }
-}
-
-export function renameZellijSession(oldName: string, newName: string): void {
-  execFile(
-    'zellij',
-    ['--session', oldName, 'action', 'rename-session', newName],
-    { timeout: 5000 },
-    (err) => {
-      if (!err) {
-        log.info(`[pty] Renamed zellij session ${oldName} to ${newName}`)
-      }
-      // Session might not exist or not be running, that's ok - silently ignore errors
-    },
-  )
+interface ProcessScanSession {
+  currentCommand: string | null
+  pty: { pid: number }
+  sessionName: string
+  shell: { id: number; name: string }
 }
 
 async function getProcessesForTerminal(
   terminalId: number,
-  session: PtySession,
+  session: ProcessScanSession,
 ): Promise<ActiveProcess[]> {
   const processes: ActiveProcess[] = []
 
@@ -268,7 +182,6 @@ async function getProcessesForTerminal(
       session.currentCommand &&
       !COMMAND_IGNORE_LIST.includes(session.currentCommand)
     ) {
-      // Find actual child process PID for direct (OSC-detected) processes
       let directPid = 0
       const shellPid = session.pty.pid
       if (shellPid > 0) {
@@ -298,34 +211,25 @@ async function getProcessesForTerminal(
         pid: directPid,
         name: session.currentCommand.split(' ')[0] || '',
         command: session.currentCommand,
-        terminalId: terminalId,
+        terminalId,
         shellId: session.shell.id,
         source: 'direct',
       })
     }
 
-    // Check Zellij session - try session name first, then current terminal name from DB
-    // This handles the case where zellij was restarted after a terminal rename
     let zellijProcs = await getZellijSessionProcesses(
       session.sessionName,
       terminalId,
     )
     if (zellijProcs.length === 0) {
-      // Try current terminal name from DB (in case zellij restarted with new name)
       const terminal = await getTerminalById(terminalId)
       const currentName = terminal?.name || `terminal-${terminalId}`
-      // For main shell, the session name is the terminal name
-      // For other shells, it's terminalName-shellName
       const expectedName =
         session.shell.name === 'main'
           ? currentName
           : `${currentName}-${session.shell.name}`
       if (expectedName !== session.sessionName) {
         zellijProcs = await getZellijSessionProcesses(expectedName, terminalId)
-        // Update session name if we found processes with the new name
-        if (zellijProcs.length > 0) {
-          session.sessionName = expectedName
-        }
       }
     }
     for (const p of zellijProcs.filter((p) => !p.isIdle)) {
@@ -346,20 +250,19 @@ async function getProcessesForTerminal(
 }
 
 async function getPortsForTerminal(
-  session: PtySession,
+  session: ProcessScanSession,
   systemPorts: Map<number, number[]>,
 ): Promise<number[]> {
-  const shellPid = session.pty.pid
   return await getListeningPortsForTerminal(
-    shellPid,
+    session.pty.pid,
     session.sessionName,
     systemPorts,
   )
 }
 
 async function scanAndEmitProcessesForTerminal(terminalId: number) {
-  const terminalSessions = getSessionsForTerminal(terminalId)
-  if (terminalSessions.length === 0) return
+  const handles = getWorkersForTerminal(terminalId)
+  if (handles.length === 0) return
 
   const allProcesses: ActiveProcess[] = []
   const systemPorts = await getSystemListeningPorts()
@@ -367,7 +270,13 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const shellPorts: Record<number, number[]> = {}
 
   await Promise.all(
-    terminalSessions.map(async (session) => {
+    handles.map(async (h) => {
+      const session: ProcessScanSession = {
+        currentCommand: h.currentCommand,
+        pty: { pid: h.ptyPid },
+        sessionName: h.sessionName,
+        shell: h.shell,
+      }
       const [procs, ports] = await Promise.all([
         getProcessesForTerminal(terminalId, session),
         getPortsForTerminal(session, systemPorts),
@@ -375,7 +284,7 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
       allProcesses.push(...procs)
       allPorts.push(...ports)
       if (ports.length > 0) {
-        shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+        shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
       }
     }),
   )
@@ -395,50 +304,55 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
 }
 
 async function scanAndEmitAllProcesses() {
+  const workers = getAllWorkers()
   const allProcesses: ActiveProcess[] = []
   const systemPorts = await getSystemListeningPorts()
   const terminalPorts: Record<number, number[]> = {}
   const shellPorts: Record<number, number[]> = {}
 
   await Promise.all(
-    [...sessions.values()].map(async (session) => {
+    [...workers.values()].map(async (h) => {
+      const session: ProcessScanSession = {
+        currentCommand: h.currentCommand,
+        pty: { pid: h.ptyPid },
+        sessionName: h.sessionName,
+        shell: h.shell,
+      }
       const [procs, ports] = await Promise.all([
-        getProcessesForTerminal(session.terminalId, session),
+        getProcessesForTerminal(h.terminalId, session),
         getPortsForTerminal(session, systemPorts),
       ])
       allProcesses.push(...procs)
 
       if (ports.length > 0) {
-        const existing = terminalPorts[session.terminalId] || []
-        terminalPorts[session.terminalId] = [
+        const existing = terminalPorts[h.terminalId] || []
+        terminalPorts[h.terminalId] = [
           ...new Set([...existing, ...ports]),
         ].sort((a, b) => a - b)
-        shellPorts[session.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+        shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
       }
     }),
   )
 
-  // Check for active zellij sessions matching each shell's session name
+  // Check for active zellij sessions
   try {
     const zellijSessions = await getActiveZellijSessionNames()
     if (zellijSessions.size > 0) {
-      // Check active sessions first
       const sessionTerminalIds = new Set<number>()
-      for (const [_shellId, session] of sessions) {
-        sessionTerminalIds.add(session.terminalId)
-        if (zellijSessions.has(session.sessionName)) {
+      for (const h of workers.values()) {
+        sessionTerminalIds.add(h.terminalId)
+        if (zellijSessions.has(h.sessionName)) {
           allProcesses.push({
             pid: 0,
             name: 'zellij',
             command: 'zellij',
-            terminalId: session.terminalId,
-            shellId: session.shell.id,
+            terminalId: h.terminalId,
+            shellId: h.shell.id,
             source: 'zellij',
             isZellij: true,
           })
         }
       }
-      // Also check terminals without active sessions (zellij might still be running)
       const terminals = await getAllTerminals()
       for (const terminal of terminals) {
         if (sessionTerminalIds.has(terminal.id)) continue
@@ -474,11 +388,23 @@ function startGlobalProcessPolling() {
 }
 
 function stopGlobalProcessPolling() {
-  if (globalProcessPollingId && sessions.size === 0) {
+  if (globalProcessPollingId && getAllWorkers().size === 0) {
     clearInterval(globalProcessPollingId)
     globalProcessPollingId = null
   }
 }
+
+// ── Git dirty status polling ────────────────────────────────────────
+
+let gitDirtyPollingId: NodeJS.Timeout | null = null
+const lastDirtyStatus = new Map<
+  number,
+  { added: number; removed: number; untracked: number }
+>()
+const lastRemoteSyncStatus = new Map<
+  number,
+  { behind: number; ahead: number; noRemote: boolean }
+>()
 
 function parseDiffNumstat(stdout: string): { added: number; removed: number } {
   let added = 0
@@ -536,7 +462,6 @@ async function checkGitDirty(
       removed: number
       untracked: number
     }>((resolve) => {
-      // Run diff, untracked count, and untracked lines in parallel
       let diff = { added: 0, removed: 0 }
       let untracked = 0
       let untrackedLines = 0
@@ -550,14 +475,12 @@ async function checkGitDirty(
           })
       }
 
-      // Get diff stats
       execFile(
         'git',
         ['diff', '--numstat', 'HEAD'],
         { cwd, timeout: 5000 },
         (err, stdout) => {
           if (err) {
-            // No HEAD yet (fresh repo) — fall back to diff without HEAD
             execFile(
               'git',
               ['diff', '--numstat'],
@@ -574,7 +497,6 @@ async function checkGitDirty(
         },
       )
 
-      // Get untracked file count
       execFile(
         'git',
         ['ls-files', '--others', '--exclude-standard'],
@@ -585,7 +507,6 @@ async function checkGitDirty(
         },
       )
 
-      // Get untracked file line count
       execFile(
         'sh',
         [
@@ -612,7 +533,6 @@ async function checkGitRemoteSync(
   const noRemote = { behind: 0, ahead: 0, noRemote: true }
   try {
     if (sshHost) {
-      // Try @{u} first, fall back to origin/<branch>
       const [behindResult, aheadResult] = await Promise.all([
         execSSHCommand(
           sshHost,
@@ -639,17 +559,14 @@ async function checkGitRemoteSync(
       ahead: number
       noRemote: boolean
     }>((resolve) => {
-      // First get the remote ref (upstream or origin/<branch>)
       execFile(
         'git',
         ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
         { cwd, timeout: 5000 },
         (upstreamErr, upstreamRef) => {
           if (!upstreamErr && upstreamRef.trim()) {
-            // Has upstream, use it
             countRemoteSync(cwd, upstreamRef.trim(), resolve, noRemote)
           } else {
-            // No upstream, try origin/<branch>
             execFile(
               'git',
               ['rev-parse', '--abbrev-ref', 'HEAD'],
@@ -660,7 +577,6 @@ async function checkGitRemoteSync(
                   return
                 }
                 const remoteBranch = `origin/${branch.trim()}`
-                // Check if origin/<branch> exists
                 execFile(
                   'git',
                   ['rev-parse', '--verify', remoteBranch],
@@ -747,10 +663,8 @@ async function scanAndEmitGitDirty() {
   try {
     const terminals = await getAllTerminals()
     for (const terminal of terminals) {
-      // Skip terminals that aren't in a git repo
       if (!terminal.git_branch) continue
-      // Skip SSH terminals that don't have an active session
-      if (terminal.ssh_host && getSessionsForTerminal(terminal.id).length === 0)
+      if (terminal.ssh_host && getWorkersForTerminal(terminal.id).length === 0)
         continue
       checks.push(
         (async () => {
@@ -762,7 +676,6 @@ async function scanAndEmitGitDirty() {
             currentStatus[terminal.id] = stat
             currentSyncStatus[terminal.id] = syncStat
 
-            // Also detect branch changes
             let branch: string | null = null
             if (terminal.ssh_host) {
               const result = await execSSHCommand(
@@ -793,7 +706,6 @@ async function scanAndEmitGitDirty() {
               })
             }
 
-            // Only update if branch changed
             if (branch && branch !== terminal.git_branch) {
               await updateTerminal(terminal.id, { git_branch: branch })
               getIO()?.emit('terminal:updated', {
@@ -817,19 +729,16 @@ async function scanAndEmitGitDirty() {
 
   await Promise.all(checks)
 
-  // Update dirty status cache
   lastDirtyStatus.clear()
   for (const [id, stat] of Object.entries(currentStatus)) {
     lastDirtyStatus.set(Number(id), stat)
   }
 
-  // Update remote sync cache
   lastRemoteSyncStatus.clear()
   for (const [id, stat] of Object.entries(currentSyncStatus)) {
     lastRemoteSyncStatus.set(Number(id), stat)
   }
 
-  // Always emit — the payload is small and clients may have reconnected
   getIO()?.emit('git:dirty-status', { dirtyStatus: currentStatus })
   getIO()?.emit('git:remote-sync', { syncStatus: currentSyncStatus })
 }
@@ -844,7 +753,6 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
     ])
 
-    // Check if dirty status changed
     const prevDirty = lastDirtyStatus.get(terminalId)
     const dirtyChanged =
       !prevDirty ||
@@ -864,7 +772,6 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       getIO()?.emit('git:dirty-status', { dirtyStatus })
     }
 
-    // Check if remote sync status changed
     const prevSync = lastRemoteSyncStatus.get(terminalId)
     const syncChanged =
       !prevSync ||
@@ -894,11 +801,12 @@ export function startGitDirtyPolling() {
   gitDirtyPollingId = setInterval(scanAndEmitGitDirty, 10000)
 }
 
+// ── Git branch detection ────────────────────────────────────────────
+
 async function detectRepoSlug(
   cwd: string,
   sshHost: string | null,
 ): Promise<string | null> {
-  // Try to get owner/repo from remote origin URL
   let remoteUrl: string | null = null
   if (sshHost) {
     const result = await execSSHCommand(
@@ -922,14 +830,12 @@ async function detectRepoSlug(
   }
 
   if (remoteUrl) {
-    // Parse owner/repo from SSH or HTTPS URLs
     const match = remoteUrl.match(
       /(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/,
     )
     if (match) return match[1]
   }
 
-  // Fallback: gh-username/folder-name
   const ghUser = getGhUsername()
   const folderName = cwd.split('/').filter(Boolean).pop()
   if (ghUser && folderName) return `${ghUser}/${folderName}`
@@ -962,7 +868,6 @@ export async function detectGitBranch(
           { cwd: terminal.cwd },
           (err, stdout) => {
             if (!err && stdout?.trim()) return resolve(stdout.trim())
-            // Fallback for repos with no commits (git init)
             execFile(
               'git',
               ['symbolic-ref', '--short', 'HEAD'],
@@ -987,7 +892,6 @@ export async function detectGitBranch(
         refreshPRChecks()
       }
 
-      // Auto-set git_repo when a branch is detected on a local terminal
       if (!terminal.git_repo) {
         try {
           const repo = await detectRepoSlug(terminal.cwd, terminal.ssh_host)
@@ -1009,631 +913,191 @@ export async function detectGitBranch(
   }
 }
 
-export function getSession(shellId: number): PtySession | undefined {
-  return sessions.get(shellId)
+// ── File helpers ────────────────────────────────────────────────────
+
+const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
+const WORKIO_SHELLS_DIR = path.join(os.homedir(), '.workio', 'shells')
+const WORKIO_INTEGRATION_DIR = path.join(
+  os.homedir(),
+  '.workio',
+  'shell-integration',
+)
+
+export async function writeShellIntegrationScripts(): Promise<void> {
+  const srcDir = path.join(__dirname, 'shell-integration')
+  await fs.promises.mkdir(WORKIO_INTEGRATION_DIR, { recursive: true })
+  const files = ['bash.sh', 'zsh.sh', 'ssh-inline.sh']
+  await Promise.all(
+    files.map(async (file) => {
+      const content = await fs.promises.readFile(
+        path.join(srcDir, file),
+        'utf-8',
+      )
+      await fs.promises.writeFile(
+        path.join(WORKIO_INTEGRATION_DIR, file),
+        content,
+        { mode: 0o644 },
+      )
+    }),
+  )
+  log.info(
+    `[pty] Shell integration scripts written to ${WORKIO_INTEGRATION_DIR}`,
+  )
 }
 
-export function getSessionByTerminalId(
+export async function writeTerminalNameFile(
   terminalId: number,
-): PtySession | undefined {
-  return getMainSessionForTerminal(terminalId)
+  name: string,
+): Promise<void> {
+  try {
+    await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
+    await fs.promises.writeFile(
+      path.join(WORKIO_TERMINALS_DIR, String(terminalId)),
+      name,
+    )
+  } catch (err) {
+    log.error(
+      { err },
+      `[pty] Failed to write terminal name file for ${terminalId}`,
+    )
+  }
 }
 
-export async function createSession(
+export async function writeShellNameFile(
   shellId: number,
-  cols: number,
-  rows: number,
-  onData: (data: string) => void,
-  onExit: (code: number) => void,
-  onCommandEvent?: (event: CommandEvent) => void,
-): Promise<PtySession | null> {
-  // Check if session already exists
-  const existing = sessions.get(shellId)
-  if (existing) {
-    // Clear any pending timeout
-    if (existing.timeoutId) {
-      clearTimeout(existing.timeoutId)
-      existing.timeoutId = null
-    }
-    return existing
-  }
-
-  // Get shell from database to find terminal
-  const shellRecord = await getShellById(shellId)
-  if (!shellRecord) {
-    log.error(`[pty] Shell not found: ${shellId}`)
-    return null
-  }
-
-  const terminalId = shellRecord.terminal_id
-
-  // Get terminal from database
-  const terminal = await getTerminalById(terminalId)
-  if (!terminal) {
-    log.error(`[pty] Terminal not found: ${terminalId}`)
-    return null
-  }
-
-  // Compute session name for zellij (used for process detection)
-  const terminalName = terminal.name || `terminal-${terminalId}`
-
-  let backend: TerminalBackend
-
-  if (terminal.ssh_host) {
-    // --- SSH terminal ---
-    const result = validateSSHHost(terminal.ssh_host)
-    if (!result.valid) {
-      log.error(`[pty] SSH validation failed: ${result.error}`)
-      return null
-    }
-
-    log.info(
-      `[pty] Connecting via SSH: ${terminal.ssh_host} → ${result.config.hostname}`,
+  name: string,
+): Promise<void> {
+  try {
+    await fs.promises.mkdir(WORKIO_SHELLS_DIR, { recursive: true })
+    await fs.promises.writeFile(
+      path.join(WORKIO_SHELLS_DIR, String(shellId)),
+      name,
     )
-
-    try {
-      backend = await createSSHSession(result.config, cols, rows)
-    } catch (err) {
-      log.error({ err }, '[pty] Failed to create SSH session')
-      return null
-    }
-  } else {
-    // --- Local terminal ---
-    // Validate cwd exists
-    try {
-      await fs.promises.access(terminal.cwd)
-    } catch {
-      log.error(`[pty] Working directory does not exist: ${terminal.cwd}`)
-      return null
-    }
-
-    // Get shell - use terminal's shell, default from settings, or fallback to SHELL env
-    const settings = await getSettings()
-    let shell = terminal.shell || settings.default_shell
-
-    // Helper to check if a path exists
-    const exists = async (p: string) => {
-      try {
-        await fs.promises.access(p)
-        return true
-      } catch {
-        return false
-      }
-    }
-
-    // Fallback to environment shell if specified shell doesn't exist
-    if (!(await exists(shell))) {
-      const envShell = process.env.SHELL
-      if (envShell && (await exists(envShell))) {
-        log.warn(`[pty] Shell ${shell} not found, falling back to ${envShell}`)
-        shell = envShell
-      } else {
-        // Last resort fallback
-        const fallbacks = ['/bin/zsh', '/bin/bash', '/bin/sh']
-        let found: string | undefined
-        for (const s of fallbacks) {
-          if (await exists(s)) {
-            found = s
-            break
-          }
-        }
-        if (found) {
-          log.warn(`[pty] Shell ${shell} not found, falling back to ${found}`)
-          shell = found
-        } else {
-          log.error('[pty] No valid shell found')
-          return null
-        }
-      }
-    }
-
-    log.info(`[pty] Spawning shell: ${shell} in ${terminal.cwd}`)
-
-    try {
-      backend = pty.spawn(shell, [], {
-        name: 'xterm-256color',
-        cols,
-        rows,
-        cwd: terminal.cwd,
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          WORKIO_TERMINAL_ID: String(terminalId),
-          WORKIO_SHELL_ID: String(shellId),
-        } as Record<string, string>,
-      })
-    } catch (err) {
-      log.error({ err }, '[pty] Failed to spawn shell')
-      return null
-    }
+  } catch (err) {
+    log.error({ err }, `[pty] Failed to write shell name file for ${shellId}`)
   }
+}
 
-  const session: PtySession = {
-    pty: backend,
-    buffer: [],
-    timeoutId: null,
-    shell: shellRecord,
-    terminalId,
-    sessionName:
-      shellRecord.name === 'main'
-        ? terminalName
-        : `${terminalName}-${shellRecord.name}`,
-    cols,
-    rows,
-    onData,
-    onExit,
-    onCommandEvent: onCommandEvent || null,
-    currentCommand: null,
-    isIdle: true,
-    lastActiveProcesses: '',
-    onDoneMarker: null,
-    processPollTimeoutId: null,
-  }
-
-  // Create OSC parser to intercept command events
-  const oscParser = createOscParser(
-    (data) => {
-      // Add to buffer
-      session.buffer.push(data)
-      // Trim buffer if too large
-      if (session.buffer.length > MAX_BUFFER_LINES) {
-        session.buffer = session.buffer.slice(-MAX_BUFFER_LINES)
+export function renameZellijSession(oldName: string, newName: string): void {
+  execFile(
+    'zellij',
+    ['--session', oldName, 'action', 'rename-session', newName],
+    { timeout: 5000 },
+    (err) => {
+      if (!err) {
+        log.info(`[pty] Renamed zellij session ${oldName} to ${newName}`)
       }
-      // Call current callback (may have been updated on reconnect)
-      session.onData?.(data)
-    },
-    (event) => {
-      // Update session state and database
-      switch (event.type) {
-        case 'prompt': {
-          session.isIdle = true
-          session.currentCommand = null
-          emitShellUpdate(terminalId, shellId, { active_cmd: null })
-          // log.info(`[pty:${terminalId}] Shell idle (waiting for input)`)
-          const pending = pendingCommands.get(shellId)
-          if (pending) {
-            pendingCommands.delete(shellId)
-            setTimeout(() => {
-              session.pty.write(`${pending}\n`)
-            }, 200)
-          }
-          break
-        }
-        case 'done_marker':
-          if (session.onDoneMarker) {
-            const cb = session.onDoneMarker
-            session.onDoneMarker = null
-            cb(event.exitCode ?? 0)
-          }
-          break
-        case 'command_start':
-          session.isIdle = false
-          session.currentCommand = event.command || null
-          emitShellUpdate(terminalId, shellId, {
-            active_cmd: event.command || null,
-          })
-          // log.info(`[pty:${terminalId}] Command started: ${event.command}`)
-          session.processPollTimeoutId = setTimeout(() => {
-            session.processPollTimeoutId = null
-            scanAndEmitProcessesForTerminal(terminalId)
-          }, 1000)
-          break
-        case 'command_end': {
-          if (session.processPollTimeoutId) {
-            clearTimeout(session.processPollTimeoutId)
-            session.processPollTimeoutId = null
-          }
-          // log.info(
-          //   `[pty:${terminalId}] Command finished (exit code: ${event.exitCode})`,
-          // )
-          detectGitBranch(terminalId)
-          checkAndEmitSingleGitDirty(terminalId)
-          setTimeout(() => {
-            scanAndEmitProcessesForTerminal(terminalId)
-          }, 1000)
-
-          // Bell notification
-          const bellSub = bellSubscriptions.get(shellId)
-          if (bellSub) {
-            bellSubscriptions.delete(shellId)
-            const command = session.currentCommand || bellSub.command
-            getIO()?.emit('bell:notify', {
-              shellId,
-              terminalId,
-              command,
-              terminalName: bellSub.terminalName,
-              exitCode: event.exitCode,
-            })
-            const resolved = resolveNotification('bell_notify', {
-              command,
-              terminalName: bellSub.terminalName,
-              exitCode: event.exitCode,
-            })
-            sendPushNotification({
-              title: `${resolved.emoji} ${resolved.title}`,
-              body: resolved.body,
-              tag: `bell:${shellId}`,
-            })
-            getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())
-          }
-          break
-        }
-      }
-      // Forward event to callback
-      session.onCommandEvent?.(event)
-    },
-    // Bell detection: debounce per shell and emit to client
-    () => {
-      const now = Date.now()
-      const last = lastBellTime.get(shellId) ?? 0
-      if (now - last < BELL_DEBOUNCE_MS) return
-      lastBellTime.set(shellId, now)
-      getIO()?.emit('pty:bell', { shellId, terminalId })
     },
   )
+}
 
-  // Handle PTY data through OSC parser
-  backend.onData((data) => {
-    oscParser(data)
-  })
+// ── Wrapped destroy with cleanup ────────────────────────────────────
 
-  // Handle PTY exit
-  backend.onExit(({ exitCode }) => {
-    sessions.delete(shellId)
+export function destroySession(shellId: number): boolean {
+  const result = proxyDestroySession(shellId)
+  if (result) {
     bellSubscriptions.delete(shellId)
-    lastBellTime.delete(shellId)
+    stopGlobalProcessPolling()
+  }
+  return result
+}
+
+export function destroySessionsForTerminal(terminalId: number): boolean {
+  // Get the shell IDs before destroying so we can clean up bell subs
+  const handles = getWorkersForTerminal(terminalId)
+  const result = proxyDestroySessionsForTerminal(terminalId)
+  if (result) {
+    for (const h of handles) {
+      bellSubscriptions.delete(h.shellId)
+    }
     lastDirtyStatus.delete(terminalId)
     lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()
-    updateTerminal(terminalId, {
-      pid: null,
-      status: 'stopped',
-    }).catch((err) =>
-      log.error(
-        { err },
-        `[pty] Failed to update terminal ${terminalId} on exit`,
-      ),
-    )
-    emitShellUpdate(terminalId, shellId, { active_cmd: null })
-    session.onExit?.(exitCode)
-  })
+    untrackTerminal(terminalId)
+  }
+  return result
+}
 
-  // Update terminal with PID (SSH sessions have no local PID)
-  await updateTerminal(terminalId, {
-    pid: backend.pid || null,
-    status: 'running',
-  })
+// ── Worker command event handler ────────────────────────────────────
+// Called by session-proxy when a worker sends a command-event IPC message.
 
-  sessions.set(shellId, session)
+function handleWorkerCommandEvent(
+  terminalId: number,
+  shellId: number,
+  event: CommandEvent,
+  handle: WorkerHandle,
+) {
+  switch (event.type) {
+    case 'prompt':
+      emitShellUpdate(terminalId, shellId, { active_cmd: null })
+      break
 
-  // Start global polling if not already running
-  startGlobalProcessPolling()
-
-  // Write terminal/shell name files for dynamic zellij session naming (fire-and-forget)
-  writeTerminalNameFile(terminalId, terminalName)
-  writeShellNameFile(shellId, shellRecord.name)
-
-  if (terminal.ssh_host) {
-    // Inject shell integration for SSH terminals inline via heredoc
-    const sshScriptPath = path.join(WORKIO_INTEGRATION_DIR, 'ssh-inline.sh')
-    fs.promises
-      .readFile(sshScriptPath, 'utf-8')
-      .then((inlineScript) => {
-        setTimeout(() => {
-          // Use heredoc + eval so the script is interpreted with real newlines
-          const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
-          backend.write(injection)
-          if (terminal.cwd && terminal.cwd !== '~') {
-            backend.write(`cd ${terminal.cwd}\n`)
-          }
-          backend.write('clear\n')
-        }, 200)
+    case 'command_start':
+      emitShellUpdate(terminalId, shellId, {
+        active_cmd: event.command || null,
       })
-      .catch((err) => {
-        log.error({ err }, '[pty] Failed to inject SSH shell integration')
-        // Still cd into cwd even if integration fails
-        if (terminal.cwd && terminal.cwd !== '~') {
+      // Debounced process poll
+      {
+        const existing = processPollTimeoutIds.get(terminalId)
+        if (existing) clearTimeout(existing)
+        processPollTimeoutIds.set(
+          terminalId,
           setTimeout(() => {
-            backend.write(`cd ${terminal.cwd}\n`)
-          }, 200)
-        }
-      })
-  } else {
-    // Inject shell integration for local terminals via source from ~/.workio/shell-integration/
-    const shellSettings = await getSettings()
-    const shell = terminal.shell || shellSettings.default_shell || '/bin/bash'
-    const shellName = path.basename(shell)
-    let integrationScript: string | null = null
-
-    if (shellName === 'zsh') {
-      integrationScript = path.join(WORKIO_INTEGRATION_DIR, 'zsh.sh')
-    } else if (shellName === 'bash') {
-      integrationScript = path.join(WORKIO_INTEGRATION_DIR, 'bash.sh')
-    }
-
-    // Check if integration script exists before the timeout
-    const scriptExists = integrationScript
-      ? await fs.promises
-          .access(integrationScript)
-          .then(() => true)
-          .catch(() => false)
-      : false
-
-    setTimeout(() => {
-      if (integrationScript && scriptExists) {
-        backend.write(`source "${integrationScript}"\n`)
-        backend.write('clear\n')
+            processPollTimeoutIds.delete(terminalId)
+            scanAndEmitProcessesForTerminal(terminalId)
+          }, 1000),
+        )
       }
-    }, 100)
-  }
+      break
 
-  // Detect git branch and track terminal for GitHub PR checks (local + SSH)
-  detectGitBranch(terminalId)
-  trackTerminal(terminalId).then(() => startChecksPolling())
-
-  return session
-}
-
-export function updateSessionName(
-  shellId: number,
-  newSessionName: string,
-): void {
-  const session = sessions.get(shellId)
-  if (session) {
-    session.sessionName = newSessionName
-  }
-}
-
-export function writeToSession(shellId: number, data: string): boolean {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return false
-  }
-  session.pty.write(data)
-  return true
-}
-
-export function resizeSession(
-  shellId: number,
-  cols: number,
-  rows: number,
-): boolean {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return false
-  }
-  session.cols = cols
-  session.rows = rows
-  session.pty.resize(cols, rows)
-  return true
-}
-
-export function getSessionBuffer(shellId: number): string[] {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return []
-  }
-  return [...session.buffer]
-}
-
-export function startSessionTimeout(shellId: number): void {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return
-  }
-
-  // Clear any existing timeout
-  if (session.timeoutId) {
-    clearTimeout(session.timeoutId)
-  }
-
-  // Start new timeout
-  session.timeoutId = setTimeout(() => {
-    destroySession(shellId)
-  }, SESSION_TIMEOUT_MS)
-}
-
-export function clearSessionTimeout(shellId: number): void {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return
-  }
-
-  if (session.timeoutId) {
-    clearTimeout(session.timeoutId)
-    session.timeoutId = null
-  }
-}
-
-function destroySessionInternal(session: PtySession): void {
-  // Clear timeout
-  if (session.timeoutId) {
-    clearTimeout(session.timeoutId)
-  }
-
-  // Clean up bell subscription
-  bellSubscriptions.delete(session.shell.id)
-
-  // Kill PTY process and all child processes
-  try {
-    const pid = session.pty.pid
-    if (pid && pid > 0) {
-      try {
-        process.kill(-pid, 'SIGTERM')
-      } catch {
-        // Process group may not exist
+    case 'command_end': {
+      const existing = processPollTimeoutIds.get(terminalId)
+      if (existing) {
+        clearTimeout(existing)
+        processPollTimeoutIds.delete(terminalId)
       }
+
+      detectGitBranch(terminalId)
+      checkAndEmitSingleGitDirty(terminalId)
       setTimeout(() => {
-        try {
-          process.kill(-pid, 'SIGKILL')
-        } catch {
-          // Already dead
-        }
-      }, 100)
-    }
-    session.pty.kill('SIGKILL')
-  } catch {
-    // Process may already be dead
-  }
+        scanAndEmitProcessesForTerminal(terminalId)
+      }, 1000)
 
-  sessions.delete(session.shell.id)
-}
-
-export function destroySession(shellId: number): boolean {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return false
-  }
-
-  destroySessionInternal(session)
-
-  // Update database (fire-and-forget since PTY is already killed)
-  updateTerminal(session.terminalId, {
-    pid: null,
-    status: 'stopped',
-  }).catch((err) =>
-    log.error(
-      { err },
-      `[pty] Failed to update terminal ${session.terminalId} on destroy`,
-    ),
-  )
-  emitShellUpdate(session.terminalId, shellId, { active_cmd: null })
-
-  lastDirtyStatus.delete(session.terminalId)
-  lastRemoteSyncStatus.delete(session.terminalId)
-  stopGlobalProcessPolling()
-  untrackTerminal(session.terminalId)
-  return true
-}
-
-// Destroy all sessions for a terminal (used when deleting a terminal)
-export function destroySessionsForTerminal(terminalId: number): boolean {
-  const terminalSessions = getSessionsForTerminal(terminalId)
-  if (terminalSessions.length === 0) return false
-
-  for (const session of terminalSessions) {
-    destroySessionInternal(session)
-    emitShellUpdate(terminalId, session.shell.id, { active_cmd: null })
-  }
-
-  updateTerminal(terminalId, {
-    pid: null,
-    status: 'stopped',
-  }).catch((err) =>
-    log.error(
-      { err },
-      `[pty] Failed to update terminal ${terminalId} on destroy`,
-    ),
-  )
-
-  lastDirtyStatus.delete(terminalId)
-  lastRemoteSyncStatus.delete(terminalId)
-  stopGlobalProcessPolling()
-  untrackTerminal(terminalId)
-  return true
-}
-
-export function hasActiveSession(shellId: number): boolean {
-  return sessions.has(shellId)
-}
-
-export function hasActiveSessionForTerminal(terminalId: number): boolean {
-  return getSessionsForTerminal(terminalId).length > 0
-}
-
-// Update callbacks when a new WebSocket connects to an existing session
-export function attachSession(
-  shellId: number,
-  onData: (data: string) => void,
-  onExit: (code: number) => void,
-  onCommandEvent?: (event: CommandEvent) => void,
-): boolean {
-  const session = sessions.get(shellId)
-  if (!session) {
-    return false
-  }
-  session.onData = onData
-  session.onExit = onExit
-  if (onCommandEvent) {
-    session.onCommandEvent = onCommandEvent
-  }
-  return true
-}
-
-export function waitForMarker(shellId: number): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    const session = sessions.get(shellId)
-    if (!session) {
-      resolve(0)
-      return
-    }
-    const timeout = setTimeout(() => {
-      session.onDoneMarker = null
-      reject(new Error(`waitForMarker timed out for shell ${shellId}`))
-    }, LONG_TIMEOUT)
-    session.onDoneMarker = (exitCode: number) => {
-      clearTimeout(timeout)
-      resolve(exitCode)
-    }
-  })
-}
-
-export function waitForSession(
-  shellId: number,
-  timeoutMs: number,
-): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
-    if (sessions.has(shellId)) {
-      resolve(true)
-      return
-    }
-    const start = Date.now()
-    const interval = setInterval(() => {
-      if (sessions.has(shellId)) {
-        clearInterval(interval)
-        resolve(true)
-        return
+      // Bell notification
+      const bellSub = bellSubscriptions.get(shellId)
+      if (bellSub) {
+        bellSubscriptions.delete(shellId)
+        const command = handle.currentCommand || bellSub.command
+        getIO()?.emit('bell:notify', {
+          shellId,
+          terminalId,
+          command,
+          terminalName: bellSub.terminalName,
+          exitCode: event.exitCode,
+        })
+        const resolved = resolveNotification('bell_notify', {
+          command,
+          terminalName: bellSub.terminalName,
+          exitCode: event.exitCode,
+        })
+        sendPushNotification({
+          title: `${resolved.emoji} ${resolved.title}`,
+          body: resolved.body,
+          tag: `bell:${shellId}`,
+        })
+        getIO()?.emit('bell:subscriptions', getBellSubscribedShellIds())
       }
-      if (Date.now() - start >= timeoutMs) {
-        clearInterval(interval)
-        resolve(false)
-      }
-    }, 500)
-  })
-}
-
-export function interruptSession(shellId: number): void {
-  const session = sessions.get(shellId)
-  if (session) {
-    session.pty.write('\x03')
-  }
-}
-
-export async function killShellChildren(shellId: number): Promise<boolean> {
-  const session = sessions.get(shellId)
-  if (!session) return false
-
-  const shellPid = session.pty.pid
-  if (!shellPid || shellPid <= 0) return false
-
-  // Kill direct children of the shell, not the shell itself
-  const childPids = await getChildPids(shellPid)
-  for (const cpid of childPids) {
-    try {
-      process.kill(cpid, 'SIGKILL')
-    } catch {
-      // Already dead
+      break
     }
+
+    case 'done_marker':
+      // done_marker is handled by the proxy's onDoneMarker callback
+      break
   }
-  return childPids.length > 0
 }
 
-export function cancelWaitForMarker(shellId: number): void {
-  const session = sessions.get(shellId)
-  if (session?.onDoneMarker) {
-    const cb = session.onDoneMarker
-    session.onDoneMarker = null
-    cb(0)
-  }
-}
+// Register the command event handler with the session proxy
+setCommandEventHandler(handleWorkerCommandEvent)
+
+// Start process polling when module loads (sessions may exist from proxy)
+startGlobalProcessPolling()
