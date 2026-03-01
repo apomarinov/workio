@@ -164,7 +164,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const updateSession = useCallback(
     async (sessionId: string, updates: { name?: string }) => {
       await api.updateSession(sessionId, updates)
-      mutate()
+      mutate(
+        (prev) =>
+          prev?.map((s) =>
+            s.session_id === sessionId ? { ...s, ...updates } : s,
+          ),
+        { revalidate: false },
+      )
     },
     [mutate],
   )
@@ -175,7 +181,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (sessionId === activeSessionId) {
         clearSession()
       }
-      mutate()
+      mutate((prev) => prev?.filter((s) => s.session_id !== sessionId), {
+        revalidate: false,
+      })
     },
     [mutate, activeSessionId, clearSession],
   )
@@ -186,7 +194,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (activeSessionId && ids.includes(activeSessionId)) {
         clearSession()
       }
-      mutate()
+      const deletedSet = new Set(ids)
+      mutate((prev) => prev?.filter((s) => !deletedSet.has(s.session_id)), {
+        revalidate: false,
+      })
     },
     [mutate, activeSessionId, clearSession],
   )

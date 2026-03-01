@@ -69,8 +69,8 @@ export function createCustomCommandsMode(
 
   const repoActions = currentRepo
     ? allActions
-      .filter((ca) => ca.repo === currentRepo)
-      .sort((a, b) => a.label.localeCompare(b.label))
+        .filter((ca) => ca.repo === currentRepo)
+        .sort((a, b) => a.label.localeCompare(b.label))
     : []
   const generalActions = allActions
     .filter((ca) => !ca.repo)

@@ -103,6 +103,10 @@ export async function initPgListener(
           )
         }
 
+        if (!payload.terminal_id) {
+          return
+        }
+
         // Send push notification for permission_needed
         if (payload.status === 'permission_needed') {
           const terminal = payload.terminal_id
