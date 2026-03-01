@@ -43,5 +43,13 @@ else
   PROMPT_COMMAND="__terminal_integration_precmd;$PROMPT_COMMAND"
 fi
 
+# Zellij session naming helpers (use env vars set by workio PTY)
+__workio_dir="$HOME/.workio"
+wioname() { cat "$__workio_dir/terminals/$WORKIO_TERMINAL_ID" 2>/dev/null || echo "terminal-$WORKIO_TERMINAL_ID"; }
+wiosession() { local sn; sn=$(cat "$__workio_dir/shells/$WORKIO_SHELL_ID" 2>/dev/null || echo "main"); if [ "$sn" = "main" ]; then wioname; else echo "$(wioname)-$sn"; fi; }
+
 # Emit initial prompt marker
 printf '\e]133;A\e\\'
+
+# Reset terminal to clear injection artifacts
+printf '\033c\x1b[1;1H'

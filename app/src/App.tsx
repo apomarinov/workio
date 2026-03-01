@@ -171,7 +171,6 @@ function AppContent() {
       await deleteShell(shellId)
       setTimeout(async () => {
         await refetch()
-
         const terminal = terminalsRef.current.find((t) => t.id === terminalId)
         const remaining = terminal?.shells ?? []
         if (remaining.length === 0) return
@@ -188,7 +187,7 @@ function AppContent() {
             detail: { terminalId, shellId: nextShell.id },
           }),
         )
-      })
+      }, 50)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete shell')
     }

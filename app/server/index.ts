@@ -63,6 +63,7 @@ import {
   startGitDirtyPolling,
   subscribeBell,
   unsubscribeBell,
+  writeShellIntegrationScripts,
   writeToSession,
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
@@ -148,6 +149,9 @@ fastify.addHook('onError', async (request, _reply, error) => {
 
 // Initialize database
 await initDb()
+
+// Write shell integration scripts to ~/.workio/shell-integration/
+await writeShellIntegrationScripts()
 
 // Initialize Web Push
 await initWebPush()

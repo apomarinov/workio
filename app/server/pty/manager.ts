@@ -177,6 +177,38 @@ const lastRemoteSyncStatus = new Map<
 // Terminal name file helpers for dynamic zellij session naming
 const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
 const WORKIO_SHELLS_DIR = path.join(os.homedir(), '.workio', 'shells')
+const WORKIO_INTEGRATION_DIR = path.join(
+  os.homedir(),
+  '.workio',
+  'shell-integration',
+)
+
+/**
+ * Copies shell integration scripts from the source tree into ~/.workio/shell-integration/
+ * so shells can source a stable path instead of the build output directory.
+ * Called once on server start.
+ */
+export async function writeShellIntegrationScripts(): Promise<void> {
+  const srcDir = path.join(__dirname, 'shell-integration')
+  await fs.promises.mkdir(WORKIO_INTEGRATION_DIR, { recursive: true })
+  const files = ['bash.sh', 'zsh.sh', 'ssh-inline.sh']
+  await Promise.all(
+    files.map(async (file) => {
+      const content = await fs.promises.readFile(
+        path.join(srcDir, file),
+        'utf-8',
+      )
+      await fs.promises.writeFile(
+        path.join(WORKIO_INTEGRATION_DIR, file),
+        content,
+        { mode: 0o644 },
+      )
+    }),
+  )
+  log.info(
+    `[pty] Shell integration scripts written to ${WORKIO_INTEGRATION_DIR}`,
+  )
+}
 
 export async function writeTerminalNameFile(
   terminalId: number,
@@ -1282,18 +1314,9 @@ export async function createSession(
   writeTerminalNameFile(terminalId, terminalName)
   writeShellNameFile(shellId, shellRecord.name)
 
-  // wioname function to read current terminal name (for zellij session naming)
-  const wionameFunc = `wioname() { cat "${WORKIO_TERMINALS_DIR}/${terminalId}" 2>/dev/null || echo "terminal-${terminalId}"; }`
-  // wiosession function to compute the full zellij session name: terminalName for main, terminalName-shellName for others
-  const wiosessionFunc = `wiosession() { local sn; sn=$(cat "${WORKIO_SHELLS_DIR}/${shellId}" 2>/dev/null || echo "${shellRecord.name}"); if [ "$sn" = "main" ]; then wioname; else echo "$(wioname)-$sn"; fi; }`
-
   if (terminal.ssh_host) {
     // Inject shell integration for SSH terminals inline via heredoc
-    const sshScriptPath = path.join(
-      __dirname,
-      'shell-integration',
-      'ssh-inline.sh',
-    )
+    const sshScriptPath = path.join(WORKIO_INTEGRATION_DIR, 'ssh-inline.sh')
     fs.promises
       .readFile(sshScriptPath, 'utf-8')
       .then((inlineScript) => {
@@ -1301,11 +1324,9 @@ export async function createSession(
           // Use heredoc + eval so the script is interpreted with real newlines
           const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${inlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
           backend.write(injection)
-          backend.write(`${wionameFunc}\n${wiosessionFunc}\n`)
           if (terminal.cwd && terminal.cwd !== '~') {
             backend.write(`cd ${terminal.cwd}\n`)
           }
-          backend.write("printf '\\033c\\x1b[1;1H'\n")
           backend.write('clear\n')
         }, 200)
       })
@@ -1319,16 +1340,16 @@ export async function createSession(
         }
       })
   } else {
-    // Inject shell integration for local terminals via source
+    // Inject shell integration for local terminals via source from ~/.workio/shell-integration/
     const shellSettings = await getSettings()
     const shell = terminal.shell || shellSettings.default_shell || '/bin/bash'
     const shellName = path.basename(shell)
     let integrationScript: string | null = null
 
     if (shellName === 'zsh') {
-      integrationScript = path.join(__dirname, 'shell-integration', 'zsh.sh')
+      integrationScript = path.join(WORKIO_INTEGRATION_DIR, 'zsh.sh')
     } else if (shellName === 'bash') {
-      integrationScript = path.join(__dirname, 'shell-integration', 'bash.sh')
+      integrationScript = path.join(WORKIO_INTEGRATION_DIR, 'bash.sh')
     }
 
     // Check if integration script exists before the timeout
@@ -1341,14 +1362,8 @@ export async function createSession(
 
     setTimeout(() => {
       if (integrationScript && scriptExists) {
-        // Source the integration silently, then reset and position cursor at top
-        backend.write(
-          `source "${integrationScript}"; ${wionameFunc}; ${wiosessionFunc}; printf '\\033c\\x1b[1;1H'\n`,
-        )
+        backend.write(`source "${integrationScript}"\n`)
         backend.write('clear\n')
-      } else {
-        // Still inject wioname/wiosession even without shell integration
-        backend.write(`${wionameFunc}\n${wiosessionFunc}\n`)
       }
     }, 100)
   }
