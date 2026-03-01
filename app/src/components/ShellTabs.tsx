@@ -72,7 +72,6 @@ interface ShellTabsProps {
   isActiveTerminal?: boolean
   onSelectShell: (shellId: number) => void
   onCreateShell: () => void
-  onDeleteShell: (shellId: number) => void
   onRenameShell: (shellId: number, name: string) => Promise<void>
   position?: 'top' | 'bottom'
   className?: string
@@ -542,7 +541,6 @@ export function ShellTabs({
   isActiveTerminal = true,
   onSelectShell,
   onCreateShell,
-  onDeleteShell,
   onRenameShell,
   position = 'top',
   className,
@@ -550,7 +548,7 @@ export function ShellTabs({
   rightExtra,
 }: ShellTabsProps) {
   const { processes, isBellSubscribed } = useProcessContext()
-  const { shellClients: shellClientsMap, refetch } = useTerminalContext()
+  const { shellClients: shellClientsMap } = useTerminalContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -636,12 +634,15 @@ export function ShellTabs({
   const isMainShell = (shellId: number) =>
     terminal.shells.find((s) => s.id === shellId)?.name === 'main'
 
-  const handleDeleteShell = async (shellId: number) => {
+  const handleDeleteShell = (shellId: number) => {
     if (isMobile || shellHasActivity(shellId)) {
       setDeleteShellId(shellId)
     } else {
-      await onDeleteShell(shellId)
-      refetch()
+      window.dispatchEvent(
+        new CustomEvent('shell-delete', {
+          detail: { terminalId: terminal.id, shellId },
+        }),
+      )
     }
   }
 
@@ -1060,10 +1061,13 @@ export function ShellTabs({
         message={`Are you sure you want to delete "${deleteShellName}"? This will terminate any running processes in this shell.`}
         confirmLabel="Delete"
         variant="danger"
-        onConfirm={async () => {
+        onConfirm={() => {
           if (deleteShellId !== null) {
-            await onDeleteShell(deleteShellId)
-            await refetch()
+            window.dispatchEvent(
+              new CustomEvent('shell-delete', {
+                detail: { terminalId: terminal.id, shellId: deleteShellId },
+              }),
+            )
             setDeleteShellId(null)
           }
         }}

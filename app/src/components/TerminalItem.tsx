@@ -406,13 +406,6 @@ export const TerminalItem = memo(function TerminalItem({
                 }),
               )
             }}
-            onDeleteShell={(shellId) => {
-              window.dispatchEvent(
-                new CustomEvent('shell-delete', {
-                  detail: { terminalId: terminal.id, shellId },
-                }),
-              )
-            }}
             onRenameShell={async (shellId, name) => {
               window.dispatchEvent(
                 new CustomEvent('shell-rename', {

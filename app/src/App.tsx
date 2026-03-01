@@ -169,24 +169,26 @@ function AppContent() {
       const deletedIndex = shellsBefore.findIndex((s) => s.id === shellId)
 
       await deleteShell(shellId)
-      await refetch()
+      setTimeout(async () => {
+        await refetch()
 
-      const terminal = terminalsRef.current.find((t) => t.id === terminalId)
-      const remaining = terminal?.shells ?? []
-      if (remaining.length === 0) return
+        const terminal = terminalsRef.current.find((t) => t.id === terminalId)
+        const remaining = terminal?.shells ?? []
+        if (remaining.length === 0) return
 
-      // Pick next shell at same index (or last if deleted was at end), fallback to main
-      const nextShell =
-        remaining[Math.min(deletedIndex, remaining.length - 1)] ??
-        remaining.find((s) => s.name === 'main') ??
-        remaining[0]
+        // Pick next shell at same index (or last if deleted was at end), fallback to main
+        const nextShell =
+          remaining[Math.min(deletedIndex, remaining.length - 1)] ??
+          remaining.find((s) => s.name === 'main') ??
+          remaining[0]
 
-      setShell(terminalId, nextShell.id)
-      window.dispatchEvent(
-        new CustomEvent('shell-select', {
-          detail: { terminalId, shellId: nextShell.id },
-        }),
-      )
+        setShell(terminalId, nextShell.id)
+        window.dispatchEvent(
+          new CustomEvent('shell-select', {
+            detail: { terminalId, shellId: nextShell.id },
+          }),
+        )
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete shell')
     }
@@ -694,7 +696,6 @@ function AppContent() {
                   setShell(t.id, shellId)
                 }}
                 onCreateShell={() => handleCreateShell(t.id)}
-                onDeleteShell={(shellId) => handleDeleteShell(t.id, shellId)}
                 onRenameShell={handleRenameShell}
                 position={effectiveTabsTop ? 'top' : 'bottom'}
                 className="pr-2 pl-1 bg-[#1a1a1a]"
@@ -748,9 +749,6 @@ function AppContent() {
                         setShell(t.id, shellId)
                       }}
                       onCreateShell={() => handleCreateShell(t.id)}
-                      onDeleteShell={(shellId) =>
-                        handleDeleteShell(t.id, shellId)
-                      }
                       onRenameShell={handleRenameShell}
                       position="bottom"
                       className="pr-2 pl-1 bg-[#1a1a1a]"
