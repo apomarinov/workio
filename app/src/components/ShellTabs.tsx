@@ -153,15 +153,22 @@ function ShellPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={(e) => {
             e.stopPropagation()
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation()
+              setOpen((o) => !o)
+            }
           }}
           className="flex-shrink-0 p-1 relative text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
         >
           <ChevronDown className="w-3 h-3  absolute -top-0.5 left-0" />
-        </button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-fit p-1" align="start" side="bottom">
         <Button
