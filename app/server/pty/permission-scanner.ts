@@ -396,10 +396,10 @@ function computePermissionUuid(
 export async function scanAndStorePermissionPrompt(
   sessionId: string,
   shellId: number,
-): Promise<void> {
+): Promise<ParsedPermissionPrompt | null> {
   try {
     const buffer = await getSessionBuffer(shellId)
-    if (buffer.length === 0) return
+    if (buffer.length === 0) return null
 
     const parsed = scanBufferForPermissionPrompt(buffer)
     if (!parsed) {
@@ -407,7 +407,7 @@ export async function scanAndStorePermissionPrompt(
       const lines = renderBufferLines(buffer)
       const lastLines = lines.slice(-20).join('\n')
       log.info(`[permission-scanner] parsed=null, last 20 lines:\n${lastLines}`)
-      return
+      return null
     }
 
     log.info(
@@ -423,13 +423,13 @@ export async function scanAndStorePermissionPrompt(
 
     // Dedup check
     const existing = await getMessageByUuid(uuid)
-    if (existing) return
+    if (existing) return parsed
 
     // Get latest prompt for this session
     const promptId = await getLatestPromptId(sessionId)
     if (!promptId) {
       log.warn(`[permission-scanner] No prompt found for session ${sessionId}`)
-      return
+      return null
     }
 
     const toolData: PermissionPromptInput & {
@@ -463,10 +463,13 @@ export async function scanAndStorePermissionPrompt(
     log.info(
       `[permission-scanner] Stored ${parsed.type} prompt for session=${sessionId} uuid=${uuid}`,
     )
+
+    return parsed
   } catch (err) {
     log.error(
       { err },
       `[permission-scanner] Failed to scan/store for session=${sessionId}`,
     )
+    return null
   }
 }

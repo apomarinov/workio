@@ -501,25 +501,21 @@ function AppContent() {
     setSidebarWidth(size.inPixels)
   }
 
-  // Subscribe to hook events for notifications
+  // Subscribe to hook events for Stop notifications
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
-      const terminal = terminals.find(
-        (t) => t.id === data.terminal_id || t.cwd === data.project_path,
-      )
-      const terminalName =
-        terminal?.name || terminal?.cwd || data.project_path || 'Terminal'
-
-      const notiType =
-        data.status === 'permission_needed' ? 'permission_needed' : 'stop'
-
-      if (data.status === 'permission_needed' || data.hook_type === 'Stop') {
-        const resolved = resolveNotification(notiType, { terminalName })
+      if (data.hook_type === 'Stop') {
+        const terminal = terminals.find(
+          (t) => t.id === data.terminal_id || t.cwd === data.project_path,
+        )
+        const terminalName =
+          terminal?.name || terminal?.cwd || data.project_path || 'Terminal'
+        const resolved = resolveNotification('stop', { terminalName })
         sendNotification(`${resolved.emoji} ${resolved.title}`, {
           body: resolved.body,
           audio: resolved.audio,
           data: {
-            type: notiType,
+            type: 'stop',
             terminalId: terminal?.id ?? data.terminal_id,
             shellId: data.shell_id,
             sessionId: data.session_id,
@@ -529,6 +525,34 @@ function AppContent() {
       }
     })
   }, [subscribe, sendNotification, terminals])
+
+  // Subscribe to enriched permission notifications (delayed after buffer scan)
+  useEffect(() => {
+    return subscribe<{
+      session_id: string
+      shell_id: number
+      terminal_id: number
+      project_path: string
+      userMessage: string
+      permissionDetail: string
+    }>('permission_notification', (data) => {
+      const resolved = resolveNotification('permission_needed', {
+        userMessage: data.userMessage,
+        permissionDetail: data.permissionDetail,
+      })
+      sendNotification(`${resolved.emoji} ${resolved.title}`, {
+        body: resolved.body,
+        audio: resolved.audio,
+        data: {
+          type: 'permission_needed',
+          terminalId: data.terminal_id,
+          shellId: data.shell_id,
+          sessionId: data.session_id,
+        },
+        tag: data.session_id ? `session:${data.session_id}` : undefined,
+      })
+    })
+  }, [subscribe, sendNotification])
 
   // Handle push notification clicks from service worker
   useEffect(() => {

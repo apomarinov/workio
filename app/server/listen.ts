@@ -2,7 +2,12 @@ import { execFile } from 'node:child_process'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
 import { resolveNotification } from '../shared/notifications'
-import { getMessagesByIds, getTerminalById, updateSessionData } from './db'
+import {
+  getActivePermissions,
+  getMessagesByIds,
+  getTerminalById,
+  updateSessionData,
+} from './db'
 import { log } from './logger'
 import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
 import { sendPushNotification } from './push'
@@ -107,28 +112,8 @@ export async function initPgListener(
           return
         }
 
-        // Send push notification for permission_needed
-        if (payload.status === 'permission_needed') {
-          const terminal = payload.terminal_id
-            ? await getTerminalById(payload.terminal_id)
-            : null
-          const resolved = resolveNotification('permission_needed', {
-            terminalName: terminal?.name || 'Claude',
-          })
-          sendPushNotification({
-            title: `${resolved.emoji} ${resolved.title}`,
-            body: resolved.body,
-            tag: payload.session_id
-              ? `session:${payload.session_id}`
-              : undefined,
-            data: {
-              type: 'permission_needed',
-              terminalId: payload.terminal_id,
-              shellId: payload.shell_id,
-              sessionId: payload.session_id,
-            },
-          })
-        }
+        // Push notification for permission_needed is sent after the buffer scan
+        // completes (see setTimeout block below) so it includes enriched data.
 
         // Send push notification for Stop events
         if (payload.hook_type === 'Stop') {
@@ -153,15 +138,88 @@ export async function initPgListener(
           })
         }
 
-        // Scan terminal buffer for permission prompts when status changes
+        // Scan terminal buffer for permission prompts when status changes,
+        // then send enriched push + web notifications with actual permission details
         if (payload.status === 'permission_needed') {
           log.info(
             `LISTEN: permission_needed session=${payload.session_id} shell_id=${payload.shell_id}`,
           )
           if (payload.shell_id) {
             // Small delay to let the buffer fill with the full prompt
-            setTimeout(() => {
-              scanAndStorePermissionPrompt(payload.session_id, payload.shell_id)
+            setTimeout(async () => {
+              await scanAndStorePermissionPrompt(
+                payload.session_id,
+                payload.shell_id,
+              )
+
+              // Build enriched notification from active permissions
+              let userMessage = ''
+              let permissionDetail = ''
+              try {
+                const perms = await getActivePermissions()
+                const perm = perms.find(
+                  (p) => p.session_id === payload.session_id,
+                )
+                if (perm) {
+                  userMessage = perm.latest_user_message || ''
+                  const tools = perm.tools as Record<string, unknown>
+                  if (perm.source === 'ask_user_question') {
+                    const input = tools.input as
+                      | { questions?: { question?: string }[] }
+                      | undefined
+                    const questions = input?.questions ?? []
+                    permissionDetail = questions
+                      .map((q) => q.question)
+                      .filter(Boolean)
+                      .join('\n')
+                  } else {
+                    // terminal_prompt (tool_permission or plan_mode)
+                    const permType = tools.type as string | undefined
+                    if (permType === 'plan_mode') {
+                      permissionDetail = perm.latest_agent_message || ''
+                    } else {
+                      // tool_permission — use context or title
+                      const ctx = tools.context as string | undefined
+                      const title = tools.title as string | undefined
+                      permissionDetail = (ctx || title || '').trim()
+                    }
+                  }
+                }
+              } catch (err) {
+                log.error(
+                  { err },
+                  '[listen] Failed to build enriched notification',
+                )
+              }
+
+              // Send push notification with enriched content
+              const resolved = resolveNotification('permission_needed', {
+                userMessage,
+                permissionDetail,
+              })
+              sendPushNotification({
+                title: `${resolved.emoji} ${resolved.title}`,
+                body: resolved.body,
+                tag: payload.session_id
+                  ? `session:${payload.session_id}`
+                  : undefined,
+                data: {
+                  type: 'permission_needed',
+                  terminalId: payload.terminal_id,
+                  shellId: payload.shell_id,
+                  sessionId: payload.session_id,
+                },
+              })
+
+              // Emit enriched event for web clients
+              io.emit('permission_notification', {
+                session_id: payload.session_id,
+                shell_id: payload.shell_id,
+                terminal_id: payload.terminal_id,
+                project_path: payload.project_path,
+                userMessage,
+                permissionDetail,
+              })
             }, 500)
           }
         }

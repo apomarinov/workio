@@ -127,8 +127,8 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
   // OS/push-only types (no icon/iconColor)
   permission_needed: {
     emoji: '⚠️',
-    titleTemplate: 'Permission Required',
-    bodyTemplate: '"{terminalName|Claude}" needs permissions',
+    titleTemplate: '{userMessage|Permission Required}',
+    bodyTemplate: '{permissionDetail|needs permissions}',
     audio: 'permission',
   },
   stop: {
