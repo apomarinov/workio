@@ -203,46 +203,34 @@ io.on('connection', (socket) => {
   })
 
   socket.on(
-    'resume-session',
-    async (data: {
-      terminalId: number
-      sessionId: string
-      shellId?: number
-    }) => {
-      const { terminalId, sessionId, shellId: targetShellId } = data
-      const terminal = await getTerminalById(terminalId)
-      const cmd =
-        (terminal?.settings as { defaultClaudeCommand?: string } | null)
-          ?.defaultClaudeCommand || 'claude'
-      const fullCommand = `${cmd} --resume ${sessionId}`
+    'run-in-shell',
+    async (data: { shellId: number; command: string; terminalId?: number }) => {
+      const { shellId: targetShellId, command, terminalId } = data
 
-      // Use the target shell if provided and valid, otherwise fall back to main shell
-      const ptySession = targetShellId
-        ? getSession(targetShellId)
-        : getSessionByTerminalId(terminalId)
+      const ptySession = getSession(targetShellId)
 
       // If the PTY session doesn't exist yet (e.g. newly created shell),
       // queue the command to run after shell integration injection
       if (!ptySession) {
-        if (targetShellId) {
-          setPendingCommand(targetShellId, fullCommand)
-        }
+        setPendingCommand(targetShellId, command)
         return
       }
 
-      const shellId = ptySession.shell.id
-      const zellijName =
-        ptySession.sessionName || terminal?.name || `terminal-${terminalId}`
+      const zellijName = terminalId
+        ? ptySession.sessionName ||
+          (await getTerminalById(terminalId))?.name ||
+          `terminal-${terminalId}`
+        : ptySession.sessionName
       const zellijSessions = await getActiveZellijSessionNames()
-      const hasZellij = zellijSessions.has(zellijName)
+      const hasZellij = zellijName && zellijSessions.has(zellijName)
 
       if (hasZellij) {
-        writeToSession(shellId, 'zellij action new-tab\n')
+        writeToSession(targetShellId, 'zellij action new-tab\n')
         setTimeout(() => {
-          writeToSession(shellId, `${fullCommand}\n`)
+          writeToSession(targetShellId, `${command}\n`)
         }, 300)
       } else {
-        writeToSession(shellId, `${fullCommand}\n`)
+        writeToSession(targetShellId, `${command}\n`)
       }
     },
   )

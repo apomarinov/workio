@@ -61,9 +61,10 @@ export function createCustomCommandsMode(
     keywords: [ca.label, ca.command],
     onSelect: () => {
       if (terminalId != null) {
-        actions.sendToTerminal(terminalId, `${ca.command}\r`)
+        actions.runCommandInShell(terminalId, ca.command, ca.label)
+      } else {
+        api.close()
       }
-      api.close()
     },
   })
 

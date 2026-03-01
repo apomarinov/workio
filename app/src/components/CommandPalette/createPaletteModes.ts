@@ -104,6 +104,13 @@ export type AppActions = {
   // Terminal paste
   sendToTerminal: (terminalId: number, text: string) => void
 
+  // Run command in shell (with process detection)
+  runCommandInShell: (
+    terminalId: number,
+    command: string,
+    label: string,
+  ) => void
+
   // Cleanup actions
   openCleanupModal: () => void
 

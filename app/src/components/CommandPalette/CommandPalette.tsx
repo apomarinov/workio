@@ -120,11 +120,13 @@ export function CommandPalette() {
     pr: PRCheckStatus
     terminalId: number
   } | null>(null)
-  const [resumeConfirm, setResumeConfirm] = useState<{
-    session: SessionWithProject
+  const [runConfirm, setRunConfirm] = useState<{
+    terminalId: number
     shellId: number
     shellName: string
     processName: string
+    command: string
+    label: string
   } | null>(null)
   const [moveSessionTarget, setMoveSessionTarget] = useState<{
     session: SessionWithProject
@@ -506,10 +508,10 @@ export function CommandPalette() {
     [closePalette],
   )
 
-  const doResumeSession = (
+  const doRunInShell = (
     terminalId: number,
-    sessionId: string,
     shellId: number,
+    command: string,
   ) => {
     selectTerminal(terminalId)
     clearSession()
@@ -521,12 +523,64 @@ export function CommandPalette() {
         detail: { terminalId, shellId },
       }),
     )
-    emit('resume-session', { terminalId, sessionId, shellId })
+    emit('run-in-shell', { shellId, command, terminalId })
     setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent('terminal-focus', { detail: { terminalId } }),
       )
     }, 350)
+  }
+
+  const requestRunInShell = (
+    terminalId: number,
+    command: string,
+    label: string,
+    explicitShellId?: number,
+  ) => {
+    const terminal = terminals.find((t) => t.id === terminalId)
+    if (!terminal) return
+
+    // Resolve target shell: explicit → active from localStorage → main → first
+    let targetShell = explicitShellId
+      ? terminal.shells.find((s) => s.id === explicitShellId)
+      : undefined
+    if (!targetShell) {
+      const stored: Record<number, number> = (() => {
+        try {
+          const saved = localStorage.getItem('active-shells')
+          return saved ? JSON.parse(saved) : {}
+        } catch {
+          return {}
+        }
+      })()
+      const activeShellId = stored[terminalId]
+      if (activeShellId) {
+        targetShell = terminal.shells.find((s) => s.id === activeShellId)
+      }
+    }
+    if (!targetShell) {
+      targetShell =
+        terminal.shells.find((s) => s.name === 'main') ?? terminal.shells[0]
+    }
+    if (!targetShell) return
+
+    // Check if target shell has a running process
+    const shellProcess = processes.find(
+      (p) => p.shellId === targetShell.id && p.pid > 0,
+    )
+
+    if (shellProcess) {
+      setRunConfirm({
+        terminalId,
+        shellId: targetShell.id,
+        shellName: targetShell.name,
+        processName: shellProcess.command || shellProcess.name,
+        command,
+        label,
+      })
+    } else {
+      doRunInShell(terminalId, targetShell.id, command)
+    }
   }
 
   // App actions
@@ -614,33 +668,26 @@ export function CommandPalette() {
         const terminal = terminals.find((t) => t.id === session.terminal_id)
         if (!terminal) return
 
-        // Resolve target shell: prefer session's shell_id if it still exists, else main shell
-        const targetShell =
-          (session.shell_id &&
-            terminal.shells.find((s) => s.id === session.shell_id)) ||
-          terminal.shells.find((s) => s.name === 'main') ||
-          terminal.shells[0]
-        if (!targetShell) return
+        // Build command client-side
+        const cmd =
+          (terminal.settings as { defaultClaudeCommand?: string } | null)
+            ?.defaultClaudeCommand || 'claude'
+        const fullCommand = `${cmd} --resume ${session.session_id}`
+        const label = session.name || session.session_id
 
-        // Check if target shell has a running process
-        const shellProcess = processes.find(
-          (p) => p.shellId === targetShell.id && p.pid > 0,
+        // Resolve target shell: prefer session's shell_id if it still exists
+        const explicitShellId =
+          session.shell_id &&
+          terminal.shells.find((s) => s.id === session.shell_id)
+            ? session.shell_id
+            : undefined
+
+        requestRunInShell(
+          session.terminal_id,
+          fullCommand,
+          label,
+          explicitShellId,
         )
-
-        if (shellProcess) {
-          setResumeConfirm({
-            session,
-            shellId: targetShell.id,
-            shellName: targetShell.name,
-            processName: shellProcess.name || shellProcess.command,
-          })
-        } else {
-          doResumeSession(
-            session.terminal_id,
-            session.session_id,
-            targetShell.id,
-          )
-        }
       },
       openRenameModal: (session) => {
         closePalette()
@@ -1033,6 +1080,12 @@ export function CommandPalette() {
         )
       },
 
+      // Run command in shell (with process detection)
+      runCommandInShell: (terminalId, command, label) => {
+        closePalette()
+        requestRunInShell(terminalId, command, label)
+      },
+
       // Cleanup actions
       openCleanupModal: () => {
         closePalette()
@@ -1174,34 +1227,30 @@ export function CommandPalette() {
         />
       )}
 
-      {resumeConfirm && (
+      {runConfirm && (
         <ConfirmModal
-          open={!!resumeConfirm}
-          title="Resume Session"
-          message={`"${resumeConfirm.processName}" is running in shell "${resumeConfirm.shellName}". Kill it to resume "${resumeConfirm.session.name || resumeConfirm.session.session_id}"?`}
-          confirmLabel="Kill & Resume"
+          open={!!runConfirm}
+          title="Process Running"
+          message={`"${runConfirm.processName}" is running in shell "${runConfirm.shellName}". Kill it to run "${runConfirm.label}"?`}
+          confirmLabel="Kill & Run"
           variant="danger"
           onConfirm={async () => {
-            const { session, shellId } = resumeConfirm
+            const { terminalId, shellId, command } = runConfirm
             await killShell(shellId)
-            setResumeConfirm(null)
-            doResumeSession(session.terminal_id!, session.session_id, shellId)
+            setRunConfirm(null)
+            doRunInShell(terminalId, shellId, command)
           }}
           secondaryAction={{
-            label: 'Resume in a New Shell',
+            label: 'Run in New Shell',
             onAction: async () => {
-              const { session } = resumeConfirm
-              const shell = await createShellForTerminal(session.terminal_id!)
+              const { terminalId, command } = runConfirm
+              const shell = await createShellForTerminal(terminalId)
               await refetch()
-              setResumeConfirm(null)
-              doResumeSession(
-                session.terminal_id!,
-                session.session_id,
-                shell.id,
-              )
+              setRunConfirm(null)
+              doRunInShell(terminalId, shell.id, command)
             },
           }}
-          onCancel={() => setResumeConfirm(null)}
+          onCancel={() => setRunConfirm(null)}
         />
       )}
 
