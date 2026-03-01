@@ -1097,9 +1097,17 @@ export async function getActivePermissions(): Promise<ActivePermission[]> {
       AND m.is_user = false
       AND m.tools IS NOT NULL
       AND (
-        (m.tools->>'name' = 'AskUserQuestion' AND m.tools->'answers' IS NULL)
+        (m.tools->>'name' = 'AskUserQuestion'
+          AND m.tools->'answers' IS NULL
+          AND m.tools->>'status' IS DISTINCT FROM 'error')
         OR (m.tools->>'name' = 'PermissionPrompt' AND m.tools->>'status' = 'pending')
       )
+      AND p.id = (
+        SELECT p2.id FROM prompts p2
+        WHERE p2.session_id = s.session_id
+        ORDER BY p2.created_at DESC LIMIT 1
+      )
+      AND m.created_at >= p.created_at
     ORDER BY s.session_id, m.created_at DESC
   `)
 

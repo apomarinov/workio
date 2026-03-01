@@ -89,9 +89,12 @@ export function NotificationProvider({
         })
       }
 
-      // Skip OS notification when push subscriptions exist — the server
-      // handles it via sendPushNotification() to avoid duplicate banners.
-      if (hasPushSubscriptions) return
+      // this doesnt work
+      // // When push subscriptions exist, skip the client-side OS notification
+      // // only if the tab is hidden — the server sends push for inactive users.
+      // // When the tab is visible the server suppresses push (isUserActive),
+      // // so the client must show the notification itself.
+      // if (hasPushSubscriptions && document.visibilityState === 'hidden') return
 
       // Use service worker notification so clicks are handled by sw.ts
       // notificationclick handler (focus/open PWA + post NOTIFICATION_CLICK)
