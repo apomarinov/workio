@@ -1,4 +1,4 @@
-import { Terminal } from 'lucide-react'
+import { Plus, Terminal } from 'lucide-react'
 import type { AppActions, AppData } from '../createPaletteModes'
 import type {
   PaletteAPI,
@@ -42,6 +42,17 @@ export function createCustomCommandsMode(
 
   const icon = <Terminal className="h-4 w-4 shrink-0 text-zinc-400" />
 
+  const createNewItem = {
+    id: 'custom-cmd:create-new',
+    label: 'Edit Commands',
+    icon: <Plus className="h-4 w-4 shrink-0 text-zinc-400" />,
+    keywords: ['create', 'new', 'add', 'edit'],
+    onSelect: () => {
+      api.close()
+      window.dispatchEvent(new CustomEvent('open-create-custom-action'))
+    },
+  }
+
   const makeItem = (ca: (typeof allActions)[number]) => ({
     id: `custom-cmd:${ca.id}`,
     label: ca.label,
@@ -58,8 +69,8 @@ export function createCustomCommandsMode(
 
   const repoActions = currentRepo
     ? allActions
-        .filter((ca) => ca.repo === currentRepo)
-        .sort((a, b) => a.label.localeCompare(b.label))
+      .filter((ca) => ca.repo === currentRepo)
+      .sort((a, b) => a.label.localeCompare(b.label))
     : []
   const generalActions = allActions
     .filter((ca) => !ca.repo)
@@ -70,7 +81,7 @@ export function createCustomCommandsMode(
     return {
       id: 'custom-commands',
       placeholder: 'Search commands...',
-      items: generalActions.map(makeItem),
+      items: [createNewItem, ...generalActions.map(makeItem)],
       shouldFilter: true,
     }
   }
@@ -79,7 +90,7 @@ export function createCustomCommandsMode(
     return {
       id: 'custom-commands',
       placeholder: 'Search commands...',
-      items: repoActions.map(makeItem),
+      items: [createNewItem, ...repoActions.map(makeItem)],
       shouldFilter: true,
     }
   }
@@ -104,7 +115,7 @@ export function createCustomCommandsMode(
   return {
     id: 'custom-commands',
     placeholder: 'Search commands...',
-    items: [],
+    items: [createNewItem],
     groups,
     shouldFilter: true,
   }

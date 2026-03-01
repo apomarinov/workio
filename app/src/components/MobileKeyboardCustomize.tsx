@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
+import { ActionChip } from './ActionChip'
 import { MobileKeyboardNewGroup } from './MobileKeyboardNewGroup'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
@@ -114,12 +115,11 @@ export function MobileKeyboardCustomize({
                     const action = actionsMap[actionId]
                     if (!action) return null
                     return (
-                      <div
+                      <ActionChip
                         key={`preview-${row.id}-${actionId}`}
-                        className="flex-shrink-0 px-2 py-2 min-w-10 rounded bg-zinc-700/60 text-center text-xs text-zinc-300"
-                      >
-                        {action.label}
-                      </div>
+                        label={action.label}
+                        className="flex-shrink-0"
+                      />
                     )
                   }),
                 )}
@@ -153,17 +153,13 @@ export function MobileKeyboardCustomize({
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <div className="flex-1 min-w-0 flex gap-1 overflow-x-auto">
-                    {row.actions.map((actionId, i) => {
-                      const action = actionsMap[actionId]
-                      return (
-                        <div
-                          key={`${row.id}-${actionId}-${i}`}
-                          className="flex-shrink-0 px-2.5 py-2 min-w-8 text-center rounded bg-zinc-700/60 text-xs text-zinc-300"
-                        >
-                          {action?.label ?? actionId}
-                        </div>
-                      )
-                    })}
+                    {row.actions.map((actionId, i) => (
+                      <ActionChip
+                        key={`${row.id}-${actionId}-${i}`}
+                        label={actionsMap[actionId]?.label ?? actionId}
+                        className="flex-shrink-0 min-w-10"
+                      />
+                    ))}
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
                     <button

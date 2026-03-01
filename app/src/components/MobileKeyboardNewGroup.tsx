@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { ALL_ACTIONS, buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
+import { ActionChip } from './ActionChip'
 import { ConfirmModal } from './ConfirmModal'
 import { MobileKeyboardCustomAction } from './MobileKeyboardCustomAction'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
@@ -341,21 +342,12 @@ export function MobileKeyboardNewGroup({
                                 key={action.id}
                                 className="flex items-center gap-0.5"
                               >
-                                <button
-                                  type="button"
-                                  onClick={() => toggleAction(action.id)}
-                                  className={cn(
-                                    'px-2.5 py-2 min-w-10 rounded text-xs font-medium transition-colors',
-                                    isSelected
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
-                                    selected.length >= 8 &&
-                                      !isSelected &&
-                                      'opacity-40',
-                                  )}
-                                >
-                                  {action.label}
-                                </button>
+                                <ActionChip
+                                  label={action.label}
+                                  active={isSelected}
+                                  dimmed={selected.length >= 8 && !isSelected}
+                                  onTap={() => toggleAction(action.id)}
+                                />
                                 {customAction && (
                                   <>
                                     <button
@@ -391,20 +383,13 @@ export function MobileKeyboardNewGroup({
                     {group.actions.map((action) => {
                       const isSelected = selected.includes(action.id)
                       return (
-                        <button
+                        <ActionChip
                           key={action.id}
-                          type="button"
-                          onClick={() => toggleAction(action.id)}
-                          className={cn(
-                            'px-2.5 py-2 min-w-10 rounded text-xs font-medium transition-colors',
-                            isSelected
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-zinc-700/60 text-zinc-300 active:bg-zinc-600',
-                            selected.length >= 8 && !isSelected && 'opacity-40',
-                          )}
-                        >
-                          {action.label}
-                        </button>
+                          label={action.label}
+                          active={isSelected}
+                          dimmed={selected.length >= 8 && !isSelected}
+                          onTap={() => toggleAction(action.id)}
+                        />
                       )
                     })}
                   </div>

@@ -11,6 +11,7 @@ import {
 } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
+import { ActionChip } from './ActionChip'
 import { MobileKeyboardActions } from './MobileKeyboardActions'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 
@@ -165,20 +166,15 @@ export function MobileKeyboard({
                 const isActive =
                   isModifier && activeModifiers[actionId as keyof Modifiers]
                 return (
-                  <button
+                  <ActionChip
                     key={`quick-${row.id}-${actionId}`}
-                    type="button"
-                    onPointerDown={(e) => e.preventDefault()}
-                    onPointerUp={() => handleActionTap(actionId)}
-                    className={cn(
-                      'px-2 py-1.5 min-w-10 max-w-[220px] truncate rounded-md text-base font-medium flex-shrink-0 select-none',
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',
-                    )}
-                  >
-                    {action.label}
-                  </button>
+                    label={action.label}
+                    active={isActive}
+                    size="lg"
+                    preventFocusLoss
+                    onTap={() => handleActionTap(actionId)}
+                    className="flex-shrink-0 max-w-[220px]"
+                  />
                 )
               }),
             )}

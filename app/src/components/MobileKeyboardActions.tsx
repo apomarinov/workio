@@ -1,6 +1,6 @@
 import type { Modifiers, TerminalAction } from '@/lib/terminalActions'
-import { cn } from '@/lib/utils'
 import type { MobileKeyboardRow } from '../types'
+import { ActionChip } from './ActionChip'
 
 interface MobileKeyboardActionsProps {
   rows: MobileKeyboardRow[]
@@ -26,20 +26,15 @@ export function MobileKeyboardActions({
             const isActive =
               isModifier && activeModifiers[actionId as keyof Modifiers]
             return (
-              <button
+              <ActionChip
                 key={`${row.id}-${actionId}-${i}`}
-                type="button"
-                onPointerDown={(e) => e.preventDefault()}
-                onPointerUp={() => onActionTap(actionId)}
-                className={cn(
-                  'flex-1 min-w-0 py-1.5 rounded-md truncate max-w-[220px] text-base font-medium transition-colors select-none',
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-zinc-700/80 text-zinc-200 active:bg-zinc-600',
-                )}
-              >
-                {action.label}
-              </button>
+                label={action.label}
+                active={isActive}
+                size="lg"
+                preventFocusLoss
+                onTap={() => onActionTap(actionId)}
+                className="flex-1 min-w-0 max-w-[220px]"
+              />
             )
           })}
         </div>
