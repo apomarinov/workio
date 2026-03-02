@@ -68,7 +68,7 @@ import {
   writeToSession,
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
-import { initWebPush, markUserActive } from './push'
+import { initWebPush, markDesktopActive } from './push'
 import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
@@ -259,8 +259,8 @@ io.on('connection', (socket) => {
     },
   )
 
-  socket.on('user:active', () => {
-    markUserActive()
+  socket.on('desktop:active', () => {
+    markDesktopActive()
   })
 
   socket.on('disconnect', () => {

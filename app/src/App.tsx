@@ -586,11 +586,12 @@ function AppContent() {
       navigator.serviceWorker?.removeEventListener('message', handler)
   }, [terminals, selectTerminal])
 
-  // Report user activity to server so push notifications are suppressed while active
+  // Desktop (non-push) clients report activity so the server suppresses
+  // push notifications while the user is at their main device. Mobile/push
+  // clients skip this — they should never mark the user as active, otherwise
+  // they'd suppress the push notifications meant for themselves.
   useEffect(() => {
-    if (hasDevicePushSubscription) {
-      return
-    }
+    if (hasDevicePushSubscription) return
 
     let lastEmit = 0
     const THROTTLE_MS = 30_000
@@ -598,14 +599,13 @@ function AppContent() {
       const now = Date.now()
       if (now - lastEmit > THROTTLE_MS) {
         lastEmit = now
-        emit('user:active')
+        emit('desktop:active')
       }
     }
     window.addEventListener('mousemove', handler)
     window.addEventListener('keydown', handler)
     window.addEventListener('terminal-activity', handler)
-    // Emit once on mount so the server knows we're here
-    emit('user:active')
+    emit('desktop:active')
     return () => {
       window.removeEventListener('mousemove', handler)
       window.removeEventListener('keydown', handler)

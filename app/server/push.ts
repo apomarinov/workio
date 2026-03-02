@@ -8,13 +8,17 @@ let lastActiveAt = 0
 
 const ACTIVE_TIMEOUT_MS = 60_000
 
-export function markUserActive(): void {
+// Only desktop (non-push) clients report activity. When the user is active
+// on their main device, push notifications are suppressed for all devices.
+// Mobile/push clients never report activity so they don't accidentally
+// suppress the push notifications meant for them.
+export function markDesktopActive(): void {
   lastActiveAt = Date.now()
 }
 
-export function isUserActive(): boolean {
+export function isDesktopActive(): boolean {
   const lastActive = Date.now() - lastActiveAt
-  log.info(`[push] user last active ${lastActive}/${ACTIVE_TIMEOUT_MS}`)
+  log.info(`[push] desktop last active ${lastActive}/${ACTIVE_TIMEOUT_MS}`)
   return lastActive < ACTIVE_TIMEOUT_MS
 }
 
@@ -40,7 +44,7 @@ export async function sendPushNotification(
   options?: { force?: boolean },
 ): Promise<void> {
   if (!initialized) return
-  if (!options?.force && isUserActive()) return
+  if (!options?.force && isDesktopActive()) return
 
   const settings = await getSettings()
   const subscriptions = settings.push_subscriptions
