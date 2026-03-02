@@ -40,6 +40,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useTerminalContext } from '@/context/TerminalContext'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { formatTimeAgo } from '@/lib/time'
@@ -204,6 +205,7 @@ const ReviewRow = memo(function ReviewRow({
   onMarkRead?: () => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   const handleReReview = useCallback(
     () => onReReview(review.author),
@@ -251,7 +253,12 @@ const ReviewRow = memo(function ReviewRow({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+                className={cn(
+                  'text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                  isMobile
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover/review:opacity-100',
+                )}
               >
                 {review.reactions?.find((r) => r.viewerHasReacted) ? (
                   <span className="text-xs leading-none">
@@ -304,7 +311,12 @@ const ReviewRow = memo(function ReviewRow({
         <button
           type="button"
           onClick={handleReply}
-          className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+          className={cn(
+            'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+            isMobile
+              ? 'opacity-100'
+              : 'opacity-0 group-hover/review:opacity-100',
+          )}
         >
           <Reply className="w-3.5 h-3.5" />
         </button>
@@ -312,7 +324,12 @@ const ReviewRow = memo(function ReviewRow({
           <button
             type="button"
             onClick={handleReReview}
-            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity cursor-pointer"
+            className={cn(
+              'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+              isMobile
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/review:opacity-100',
+            )}
           >
             <RefreshIcon className="w-3.5 h-3.5" />
           </button>
@@ -323,7 +340,10 @@ const ReviewRow = memo(function ReviewRow({
             onClick={() => onMerge()}
             disabled={hasConflicts}
             className={cn(
-              'text-[10px] flex-shrink-0 opacity-0 group-hover/review:opacity-100 transition-opacity pr-2',
+              'text-[10px] flex-shrink-0 transition-opacity pr-2',
+              isMobile
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/review:opacity-100',
               hasConflicts
                 ? 'text-muted-foreground/30 cursor-not-allowed'
                 : 'text-muted-foreground/50 hover:text-muted-foreground cursor-pointer',
@@ -408,6 +428,7 @@ const CommentItem = memo(function CommentItem({
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [modalOpen, setModalOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   const handleHide = useCallback(
     () => onHide(comment.author),
@@ -479,7 +500,12 @@ const CommentItem = memo(function CommentItem({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+                  className={cn(
+                    'text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                    isMobile
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover/comment:opacity-100',
+                  )}
                 >
                   {comment.reactions?.find((r) => r.viewerHasReacted) ? (
                     <span className="text-xs leading-none">
@@ -532,14 +558,24 @@ const CommentItem = memo(function CommentItem({
           <button
             type="button"
             onClick={handleReply}
-            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+            className={cn(
+              'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+              isMobile
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/comment:opacity-100',
+            )}
           >
             <Reply className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleHide}
-            className="text-muted-foreground/30 mt- hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/comment:opacity-100 transition-opacity cursor-pointer"
+            className={cn(
+              'text-muted-foreground/30 mt- hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+              isMobile
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/comment:opacity-100',
+            )}
           >
             <BellOff className="w-3 h-3" />
           </button>
@@ -1265,6 +1301,7 @@ export function PRStatusContent({
   const expanded = hasHeader ? (expandedProp ?? false) : true
 
   const { settings, updateSettings } = useSettings()
+  const isMobile = useIsMobile()
   const [hideAuthor, setHideAuthor] = useState<string | null>(null)
   const hiddenAuthorsSet = useMemo(() => {
     const set = new Set<string>()
@@ -1538,7 +1575,12 @@ export function PRStatusContent({
                           url: check.detailsUrl,
                         })
                       }
-                      className="text-[10px] hidden group-hover/check:block text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 opacity-0 group-hover/check:opacity-100 transition-opacity cursor-pointer"
+                      className={cn(
+                        'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                        isMobile
+                          ? 'block opacity-100'
+                          : 'hidden group-hover/check:block opacity-0 group-hover/check:opacity-100',
+                      )}
                     >
                       <RefreshIcon className="w-3 h-3" />
                     </button>

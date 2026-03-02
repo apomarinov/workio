@@ -33,6 +33,8 @@ import {
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useLongPress } from '@/hooks/useLongPress'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSocket } from '@/hooks/useSocket'
 import { cancelWorkspace } from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -74,6 +76,14 @@ export const TerminalItem = memo(function TerminalItem({
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
   const shortcutIndex =
     shortcutIndexProp ?? terminals.findIndex((t) => t.id === terminal.id) + 1
+  const isMobile = useIsMobile()
+  const longPressHandlers = useLongPress(() => {
+    window.dispatchEvent(
+      new CustomEvent('open-item-actions', {
+        detail: { terminalId: terminal.id, sessionId: null },
+      }),
+    )
+  })
   const { githubPRs } = useTerminalContext()
   const {
     processes: allProcesses,
@@ -208,6 +218,7 @@ export const TerminalItem = memo(function TerminalItem({
             onToggleTerminalSessions?.(terminal.id)
           }
         }}
+        {...longPressHandlers}
         className={cn(
           `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
             isActive
@@ -366,7 +377,10 @@ export const TerminalItem = memo(function TerminalItem({
             <button
               type="button"
               onClick={handleActionsClick}
-              className="text-xs absolute right-1 text-muted-foreground hidden group-hover:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer"
+              className={cn(
+                'text-xs absolute right-1 text-muted-foreground flex-shrink-0 hover:text-foreground transition-colors cursor-pointer',
+                isMobile ? 'block' : 'hidden group-hover:block',
+              )}
             >
               <MoreVertical className="w-4 h-4" />
             </button>
@@ -618,7 +632,13 @@ export const TerminalItem = memo(function TerminalItem({
                                         </span>
                                         <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
                                           {process.startedAt && (
-                                            <span className="text-[10px] text-muted-foreground/40 group-hover/proc:hidden">
+                                            <span
+                                              className={cn(
+                                                'text-[10px] text-muted-foreground/40',
+                                                !isMobile &&
+                                                  'group-hover/proc:hidden',
+                                              )}
+                                            >
                                               {formatTimeAgo(process.startedAt)}
                                             </span>
                                           )}
@@ -631,7 +651,12 @@ export const TerminalItem = memo(function TerminalItem({
                                                   terminalId: terminal.id,
                                                 })
                                               }}
-                                              className="hidden group-hover/proc:block text-muted-foreground/60 hover:text-foreground/90 group-hover/proc:text-muted-foreground/80 transition-colors cursor-pointer"
+                                              className={cn(
+                                                isMobile
+                                                  ? 'block'
+                                                  : 'hidden group-hover/proc:block',
+                                                'text-muted-foreground/60 hover:text-foreground/90 group-hover/proc:text-muted-foreground/80 transition-colors cursor-pointer',
+                                              )}
                                             >
                                               <Link className="w-3 h-3" />
                                             </button>
@@ -646,7 +671,12 @@ export const TerminalItem = memo(function TerminalItem({
                                                 })
                                                 toast.success('Process killed')
                                               }}
-                                              className="hidden group-hover/proc:block text-muted-foreground/60 group-hover/proc:text-muted-foreground/80 hover:text-red-400/90 transition-colors cursor-pointer"
+                                              className={cn(
+                                                isMobile
+                                                  ? 'block'
+                                                  : 'hidden group-hover/proc:block',
+                                                'text-muted-foreground/60 group-hover/proc:text-muted-foreground/80 hover:text-red-400/90 transition-colors cursor-pointer',
+                                              )}
                                             >
                                               <X className="w-3.5 h-3.5" />
                                             </button>
@@ -695,7 +725,14 @@ export const TerminalItem = memo(function TerminalItem({
                           >
                             <Globe className="w-3 h-3 flex-shrink-0 text-blue-400" />
                             <span className="text-xs">{port}</span>
-                            <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block ml-auto" />
+                            <ExternalLink
+                              className={cn(
+                                'w-3 h-3 flex-shrink-0 ml-auto',
+                                isMobile
+                                  ? 'block'
+                                  : 'hidden group-hover/port:block',
+                              )}
+                            />
                           </a>
                         ))
                       }
@@ -735,7 +772,14 @@ export const TerminalItem = memo(function TerminalItem({
                                   >
                                     <Globe className="w-3 h-3 flex-shrink-0 text-blue-400" />
                                     <span className="text-xs">{port}</span>
-                                    <ExternalLink className="w-3 h-3 flex-shrink-0 hidden group-hover/port:block ml-auto" />
+                                    <ExternalLink
+                                      className={cn(
+                                        'w-3 h-3 flex-shrink-0 ml-auto',
+                                        isMobile
+                                          ? 'block'
+                                          : 'hidden group-hover/port:block',
+                                      )}
+                                    />
                                   </a>
                                 ))}
                             </div>

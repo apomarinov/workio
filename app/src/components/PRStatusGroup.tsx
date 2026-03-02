@@ -6,6 +6,8 @@ import {
   MoreVertical,
 } from 'lucide-react'
 import { memo } from 'react'
+import { useLongPress } from '@/hooks/useLongPress'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
@@ -27,10 +29,25 @@ export const PRStatusGroup = memo(function PRStatusGroup({
   isActive,
 }: PRStatusGroupProps) {
   const prInfo = getPRStatusInfo(pr)
+  const isMobile = useIsMobile()
+  const longPressHandlers = useLongPress(() => {
+    if (prInfo.isMerged) return
+    window.dispatchEvent(
+      new CustomEvent('open-item-actions', {
+        detail: {
+          terminalId: null,
+          sessionId: null,
+          prNumber: pr.prNumber,
+          prRepo: pr.repo,
+        },
+      }),
+    )
+  })
 
   return (
     <div data-pr-branch={pr.branch}>
       <div
+        {...longPressHandlers}
         onClick={() => {
           if (!prInfo.isMerged) {
             onToggle()
@@ -84,7 +101,10 @@ export const PRStatusGroup = memo(function PRStatusGroup({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-xs text-muted-foreground hidden group-hover/pr:block flex-shrink-0 hover:text-foreground transition-colors"
+            className={cn(
+              'text-xs text-muted-foreground flex-shrink-0 hover:text-foreground transition-colors',
+              isMobile ? 'block' : 'hidden group-hover/pr:block',
+            )}
           >
             <ExternalLink className="w-4 h-4 cursor-pointer" />
           </a>

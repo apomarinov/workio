@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { SessionItem } from './SessionItem'
@@ -25,6 +26,7 @@ export const SessionGroup = memo(function SessionGroup({
   onToggle,
 }: SessionGroupProps) {
   const { deleteSessions } = useSessionContext()
+  const isMobile = useIsMobile()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -65,14 +67,22 @@ export const SessionGroup = memo(function SessionGroup({
               />
             </div>
           </div>
-          <span className="text-xs text-muted-foreground flex-shrink-0 group-hover:hidden">
+          <span
+            className={cn(
+              'text-xs text-muted-foreground flex-shrink-0',
+              !isMobile && 'group-hover:hidden',
+            )}
+          >
             {sessions.length}
           </span>
           <Button
             variant="ghost"
             size="icon"
             onClick={handleDeleteClick}
-            className="hidden group-hover:flex h-5 w-5 flex-shrink-0 text-muted-foreground hover:text-destructive"
+            className={cn(
+              isMobile ? 'flex' : 'hidden group-hover:flex',
+              'h-5 w-5 flex-shrink-0 text-muted-foreground hover:text-destructive',
+            )}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>

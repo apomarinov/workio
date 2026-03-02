@@ -52,6 +52,7 @@ import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
 import { CreateTerminalModal } from './CreateTerminalModal'
@@ -83,6 +84,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
   )
   const hasAnySessions = pipSessions.length > 0
   const { hasWarning: hasWebhookWarning } = useWebhookWarning()
+  const isMobile = useIsMobile()
   const { settings, updateSettings } = useSettings()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [hiddenPRsModalRepo, setHiddenPRsModalRepo] = useState<string | null>(
@@ -917,7 +919,12 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                             '_blank',
                           )
                         }
-                        className="mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                        className={cn(
+                          'mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
+                          isMobile
+                            ? 'opacity-100'
+                            : 'opacity-0 group-hover/repo-header:opacity-100',
+                        )}
                         title="View my PRs"
                       >
                         <GitPullRequest className="w-3 h-3" />
@@ -926,7 +933,12 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                         <button
                           type="button"
                           onClick={() => setHiddenPRsModalRepo(repo)}
-                          className="mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer opacity-0 group-hover/repo-header:opacity-100"
+                          className={cn(
+                            'mr-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
+                            isMobile
+                              ? 'opacity-100'
+                              : 'opacity-0 group-hover/repo-header:opacity-100',
+                          )}
                           title="Manage hidden items"
                         >
                           <BellOff className="w-3 h-3" />
