@@ -62,6 +62,7 @@ import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
 import { SessionGroup } from './SessionGroup'
 import { SettingsModal } from './SettingsModal'
+import { MultiClientIndicator } from './ShellTabs'
 import { SortableTerminalItem } from './SortableTerminalItem'
 import { useWebhookWarning } from './WebhooksModal'
 
@@ -587,6 +588,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
         </div>
         {width !== undefined && width < 250 ? (
           <div className="flex items-center gap-1">
+            <MultiClientIndicator />
             {(hasAnyUnseenPRs || hasNotifications) && (
               <Popover open={bellOpen} onOpenChange={setBellOpen}>
                 <PopoverTrigger asChild>
@@ -668,6 +670,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
           </div>
         ) : (
           <div className="flex items-center gap-1">
+            <MultiClientIndicator />
             {hasAnythingExpanded && (
               <Button
                 variant="ghost"

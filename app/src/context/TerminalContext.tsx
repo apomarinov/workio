@@ -88,6 +88,7 @@ interface TerminalContextValue {
     remove: boolean,
   ) => Promise<void>
   shellClients: Map<number, ShellClient[]>
+  allClients: ShellClient[]
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -926,6 +927,17 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe])
 
+  const allClients = useMemo(() => {
+    const byIp = new Map<string, ShellClient>()
+    for (const clients of shellClients.values()) {
+      for (const c of clients) {
+        const existing = byIp.get(c.ip)
+        if (!existing || c.isPrimary) byIp.set(c.ip, c)
+      }
+    }
+    return Array.from(byIp.values())
+  }, [shellClients])
+
   const selectTerminal = useCallback((id: number) => {
     storedTerminalId.current = id
     setActiveTerminalId((prev) => {
@@ -1038,6 +1050,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       deleteAllNotifications,
       reactToPR,
       shellClients,
+      allClients,
     }),
     [
       enrichedTerminals,
@@ -1068,6 +1081,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       deleteAllNotifications,
       reactToPR,
       shellClients,
+      allClients,
     ],
   )
 

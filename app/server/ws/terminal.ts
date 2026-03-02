@@ -169,7 +169,12 @@ function broadcastShellClients(shellId: number): void {
       if (ws.readyState !== WebSocket.OPEN) continue
       const info = wsInfo.get(ws)
       if (!info) continue
-      clients.push({ device: info.device, browser: info.browser, ip: info.ip })
+      clients.push({
+        device: info.device,
+        browser: info.browser,
+        ip: info.ip,
+        isPrimary: ws === state.primary,
+      })
     }
   }
   const io = getIO()

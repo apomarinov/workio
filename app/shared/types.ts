@@ -179,6 +179,7 @@ export interface ShellClient {
   device: string
   browser: string
   ip: string
+  isPrimary?: boolean
 }
 
 export interface ShellClientsPayload {

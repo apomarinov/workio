@@ -87,16 +87,6 @@ export function NotificationProvider({
 
   const sendNotification = useCallback(
     (title: string, options?: SendNotificationOptions) => {
-      const { audio, ...notificationOptions } = options || {}
-
-      if (audio) {
-        const audioElement = new Audio(audioFiles[audio])
-        audioElement.volume = 0.5
-        audioElement.play().catch(() => {
-          console.error(`Failed to play audio: ${audioFiles[audio]}`)
-        })
-      }
-
       if (permission === 'default') {
         setPromptOpen(true)
         toast.info(title)
@@ -110,6 +100,16 @@ export function NotificationProvider({
 
       // if (hasPushSubscriptions && document.visibilityState === 'hidden') return
       if (hasDevicePushSubscription) return
+
+      const { audio, ...notificationOptions } = options || {}
+
+      if (audio) {
+        const audioElement = new Audio(audioFiles[audio])
+        audioElement.volume = 0.5
+        audioElement.play().catch(() => {
+          console.error(`Failed to play audio: ${audioFiles[audio]}`)
+        })
+      }
 
       // Use service worker notification so clicks are handled by sw.ts
       // notificationclick handler (focus/open PWA + post NOTIFICATION_CLICK)

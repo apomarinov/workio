@@ -55,7 +55,6 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
 import { cn, sessionStatusColor } from '@/lib/utils'
-import type { ShellClient } from '../../shared/types'
 import type {
   SessionWithProject,
   Shell,
@@ -240,7 +239,7 @@ function ShellPopover({
   )
 }
 
-function DeviceIcon({
+export function DeviceIcon({
   device,
   className,
 }: {
@@ -263,8 +262,9 @@ function DeviceIcon({
   }
 }
 
-function MultiClientIndicator({ clients }: { clients: ShellClient[] }) {
-  if (clients.length <= 1) return null
+export function MultiClientIndicator() {
+  const { allClients } = useTerminalContext()
+  if (allClients.length <= 1) return null
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -274,7 +274,7 @@ function MultiClientIndicator({ clients }: { clients: ShellClient[] }) {
           className="flex items-center gap-0.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer shrink-0"
         >
           <Monitor className="w-3 h-3" />
-          <span className="text-[10px] font-medium">{clients.length}</span>
+          <span className="text-[10px] font-medium">{allClients.length}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -287,17 +287,29 @@ function MultiClientIndicator({ clients }: { clients: ShellClient[] }) {
           Connected Devices
         </div>
         <div className="space-y-1.5">
-          {clients.map((client) => (
-            <div key={client.ip} className="flex items-center gap-2 text-xs">
-              <DeviceIcon
-                device={client.device}
-                className="w-3.5 h-3.5 text-muted-foreground shrink-0"
-              />
-              <span>{client.device}</span>
-              <span className="text-muted-foreground">{client.browser}</span>
-              <span className="text-muted-foreground/60 ml-auto font-mono">
-                {client.ip}
-              </span>
+          {allClients.map((client) => (
+            <div key={client.ip}>
+              <div className="flex items-center gap-2 text-xs">
+                <DeviceIcon
+                  device={client.device}
+                  className={cn(
+                    'w-3.5 h-3.5 shrink-0',
+                    client.isPrimary
+                      ? 'text-blue-400'
+                      : 'text-muted-foreground',
+                  )}
+                />
+                <span>{client.device}</span>
+                <span className="text-muted-foreground">{client.browser}</span>
+                <span className="text-muted-foreground/60 ml-auto font-mono">
+                  {client.ip}
+                </span>
+              </div>
+              {client.isPrimary && (
+                <div className="text-[10px] text-muted-foreground/60 ml-5.5 mt-0.5">
+                  Controls screen size
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -319,7 +331,6 @@ function SortableShellPill({
   terminal,
   shortcutHint,
   shellSession,
-  shellClients,
   ref,
   ...rest
 }: {
@@ -335,7 +346,6 @@ function SortableShellPill({
   terminal: Terminal
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
-  shellClients?: ShellClient[]
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
   const {
@@ -381,9 +391,6 @@ function SortableShellPill({
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
       )}
     >
-      {shellClients && shellClients.length > 1 && (
-        <MultiClientIndicator clients={shellClients} />
-      )}
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
@@ -425,7 +432,6 @@ function SortableShellTab({
   terminal,
   shortcutHint,
   shellSession,
-  shellClients,
   position = 'top',
   ref,
   ...rest
@@ -442,7 +448,6 @@ function SortableShellTab({
   terminal: Terminal
   shortcutHint?: React.ReactNode
   shellSession?: SessionWithProject
-  shellClients?: ShellClient[]
   position?: 'top' | 'bottom'
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
@@ -496,9 +501,6 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
-      {shellClients && shellClients.length > 1 && (
-        <MultiClientIndicator clients={shellClients} />
-      )}
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
@@ -540,7 +542,6 @@ export function ShellTabs({
   rightExtra,
 }: ShellTabsProps) {
   const { processes, isBellSubscribed } = useProcessContext()
-  const { shellClients: shellClientsMap } = useTerminalContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -922,7 +923,6 @@ export function ShellTabs({
                       onRename={() => setRenameShellTarget(shell)}
                       terminal={terminal}
                       shellSession={shellSessionMap.get(shell.id)}
-                      shellClients={shellClientsMap?.get(shell.id)}
                       shortcutHint={
                         showShortcuts && shortcutIndex <= 9 ? (
                           <>
@@ -988,7 +988,6 @@ export function ShellTabs({
                       onRename={() => setRenameShellTarget(shell)}
                       terminal={terminal}
                       shellSession={shellSessionMap.get(shell.id)}
-                      shellClients={shellClientsMap?.get(shell.id)}
                       position={position}
                       shortcutHint={
                         showShortcuts && shortcutIndex <= 9 ? (

@@ -142,7 +142,7 @@ export function useTerminalSocket({
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -233,7 +233,7 @@ export function useTerminalSocket({
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
 

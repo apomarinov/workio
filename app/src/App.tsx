@@ -5,7 +5,7 @@ import {
   Plus,
   Settings,
   SidebarOpen,
-  SquareTerminal,
+  Terminal as TerminalNoBorder,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { PanelSize } from 'react-resizable-panels'
@@ -20,7 +20,7 @@ import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
-import { ShellTabs } from './components/ShellTabs'
+import { MultiClientIndicator, ShellTabs } from './components/ShellTabs'
 import { Sidebar } from './components/Sidebar'
 
 const SessionChat = lazy(() =>
@@ -797,19 +797,6 @@ function AppContent() {
                             <>
                               <button
                                 type="button"
-                                onClick={() =>
-                                  window.dispatchEvent(
-                                    new CustomEvent('open-custom-commands', {
-                                      detail: { terminalId: t.id },
-                                    }),
-                                  )
-                                }
-                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <SquareTerminal className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
                                 onClick={() => setMobileKeyboardMode('actions')}
                                 className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                               >
@@ -828,6 +815,29 @@ function AppContent() {
                             <>
                               <button
                                 type="button"
+                                onClick={() => {
+                                  mobileInputRef.current?.focus()
+                                  setMobileKeyboardMode('input')
+                                }}
+                                className="flex items-center justify-center h-7 px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                ABC
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  window.dispatchEvent(
+                                    new CustomEvent('open-custom-commands', {
+                                      detail: { terminalId: t.id },
+                                    }),
+                                  )
+                                }
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <TerminalNoBorder className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() =>
                                   window.dispatchEvent(
                                     new Event('mobile-keyboard-customize'),
@@ -836,16 +846,6 @@ function AppContent() {
                                 className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                               >
                                 <Settings className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  mobileInputRef.current?.focus()
-                                  setMobileKeyboardMode('input')
-                                }}
-                                className="flex items-center justify-center h-7 px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                ABC
                               </button>
                               <button
                                 type="button"
@@ -859,13 +859,16 @@ function AppContent() {
                         </div>
                       }
                     >
-                      <button
-                        type="button"
-                        onClick={() => setMobileSidebarOpen(true)}
-                        className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer mr-1"
-                      >
-                        <SidebarOpen className="w-4 h-4" />
-                      </button>
+                      <div className='flex mr-1 gap-0.5'>
+                        <button
+                          type="button"
+                          onClick={() => setMobileSidebarOpen(true)}
+                          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          <SidebarOpen className="w-4 h-4" />
+                        </button>
+                        <MultiClientIndicator />
+                      </div>
                     </ShellTabs>
                   )}
                   <MobileKeyboard
