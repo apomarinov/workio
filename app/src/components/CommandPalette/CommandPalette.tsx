@@ -1,4 +1,11 @@
-import { Info, TriangleAlert } from 'lucide-react'
+import {
+  ArrowBigUp,
+  ChevronUp,
+  Command,
+  Info,
+  Option,
+  TriangleAlert,
+} from 'lucide-react'
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
@@ -30,6 +37,7 @@ import {
   searchSessionMessages,
   toggleFavoriteSession,
 } from '@/lib/api'
+import { DEFAULT_KEYMAP } from '@/types'
 import type { PRCheckStatus } from '../../../shared/types'
 import type {
   MoveTarget,
@@ -63,9 +71,20 @@ import {
   createPaletteModes,
   getLastPathSegment,
 } from './createPaletteModes'
-import type { PaletteAPI, PaletteLevel } from './types'
+import type {
+  PaletteAPI,
+  PaletteItem,
+  PaletteLevel,
+  PaletteMode,
+} from './types'
 
 const initialLevel: PaletteLevel = { mode: 'search', title: '' }
+
+/** Get selectable command items from a custom-commands mode in render order */
+function getCommandItems(mode: PaletteMode): PaletteItem[] {
+  if (mode.groups) return mode.groups.flatMap((g) => g.items)
+  return mode.items.filter((i) => i.id !== 'custom-cmd:create-new')
+}
 
 export function CommandPalette() {
   // Single stack state replaces modeStack + all mode-specific state
@@ -445,6 +464,22 @@ export function CommandPalette() {
     setSearchText('')
     setSessionSearchResults(null)
     setSessionSearchLoading(false)
+  }, [open, currentModeId])
+
+  // Broadcast palette state for module-level tracking in useKeyboardShortcuts
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('palette-state', {
+        detail: { open, mode: currentModeId },
+      }),
+    )
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent('palette-state', {
+          detail: { open: false, mode: '' },
+        }),
+      )
+    }
   }, [open, currentModeId])
 
   // Build app data
@@ -1113,10 +1148,80 @@ export function CommandPalette() {
   )
 
   // Create modes
-  const modes = useMemo(
+  const rawModes = useMemo(
     () => createPaletteModes(appData, currentLevel, appActions, api),
     [appData, currentLevel, appActions, api],
   )
+
+  // Resolve goToTab binding for modifier badge display
+  const goToTabBinding =
+    settings?.keymap?.goToTab === null
+      ? null
+      : (settings?.keymap?.goToTab ?? DEFAULT_KEYMAP.goToTab)
+
+  // Post-process custom-commands mode to add modifier+digit badges
+  const modes = useMemo(() => {
+    const ccMode = rawModes['custom-commands']
+    if (!goToTabBinding || !ccMode) return rawModes
+    const commandItems = getCommandItems(ccMode)
+    if (commandItems.length === 0) return rawModes
+    const modIcons = (
+      <span className="inline-flex items-center">
+        {goToTabBinding.ctrlKey && <ChevronUp className="w-3 h-3" />}
+        {goToTabBinding.altKey && <Option className="w-3 h-3" />}
+        {goToTabBinding.shiftKey && <ArrowBigUp className="w-3 h-3" />}
+        {goToTabBinding.metaKey && <Command className="w-3 h-3" />}
+      </span>
+    )
+    // Build a map of item id -> digit badge (1-9)
+    const badgeMap = new Map<string, number>()
+    for (let i = 0; i < Math.min(commandItems.length, 9); i++) {
+      badgeMap.set(commandItems[i].id, i + 1)
+    }
+    const addBadge = (item: PaletteItem): PaletteItem => {
+      const digit = badgeMap.get(item.id)
+      if (digit == null) return item
+      return {
+        ...item,
+        rightSlot: (
+          <span className="flex items-center gap-0.5 text-[11px] text-zinc-500">
+            {modIcons}
+            <span className="w-[15px] text-center">{digit}</span>
+          </span>
+        ),
+      }
+    }
+    return {
+      ...rawModes,
+      'custom-commands': {
+        ...ccMode,
+        items: ccMode.items.map((item) =>
+          badgeMap.has(item.id) ? addBadge(item) : item,
+        ),
+        groups: ccMode.groups?.map((g) => ({
+          ...g,
+          items: g.items.map(addBadge),
+        })),
+      },
+    }
+  }, [rawModes, goToTabBinding])
+
+  // Listen for digit selection when in custom-commands mode
+  const modesRef = useRef(modes)
+  modesRef.current = modes
+  useEffect(() => {
+    if (!open || currentModeId !== 'custom-commands') return
+    const handler = (e: Event) => {
+      const index = (e as CustomEvent).detail.index as number
+      const mode = modesRef.current['custom-commands']
+      if (!mode) return
+      const items = getCommandItems(mode)
+      const target = items[index - 1]
+      if (target) target.onSelect()
+    }
+    window.addEventListener('palette-select-index', handler)
+    return () => window.removeEventListener('palette-select-index', handler)
+  }, [open, currentModeId])
 
   // Handle back navigation - just pop the stack
   const handleBack = useCallback(() => {

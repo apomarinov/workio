@@ -392,7 +392,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               defaultBinding={DEFAULT_KEYMAP.goToTab}
               display={formatBinding(
                 bindings.goToTab,
-                bindings.goToTab ? '1 - 99' : undefined,
+                bindings.goToTab ? '1 - 9' : undefined,
               )}
               hasConflict={duplicates.has('goToTab')}
             />

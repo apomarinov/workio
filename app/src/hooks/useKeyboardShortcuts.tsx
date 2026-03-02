@@ -11,6 +11,16 @@ import {
 } from '../types'
 import { useSettings } from './useSettings'
 
+// --- Module-level palette state tracking ---
+
+let paletteState = { open: false, mode: '' }
+
+function handlePaletteState(e: Event) {
+  const detail = (e as CustomEvent).detail
+  paletteState = { open: detail.open, mode: detail.mode }
+}
+window.addEventListener('palette-state', handlePaletteState)
+
 // --- Module-level modifier tracking ---
 
 let heldState = { meta: false, ctrl: false, alt: false, shift: false }
@@ -383,14 +393,25 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
         e.altKey === !!binding.altKey &&
         e.shiftKey === !!binding.shiftKey
 
-      if (
-        goToTabBinding &&
-        modMatch(goToTabBinding) &&
-        handlersRef.current.goToTab
-      ) {
-        e.preventDefault()
-        e.stopPropagation()
-        handlersRef.current.goToTab(digit)
+      if (goToTabBinding && modMatch(goToTabBinding)) {
+        if (paletteState.open) {
+          // Suppress goToTab when palette is open; dispatch selection for custom-commands
+          e.preventDefault()
+          e.stopPropagation()
+          if (paletteState.mode === 'custom-commands' && digit >= 1) {
+            window.dispatchEvent(
+              new CustomEvent('palette-select-index', {
+                detail: { index: digit },
+              }),
+            )
+          }
+          return
+        }
+        if (handlersRef.current.goToTab) {
+          e.preventDefault()
+          e.stopPropagation()
+          handlersRef.current.goToTab(digit)
+        }
       } else if (
         goToShellBinding &&
         modMatch(goToShellBinding) &&
