@@ -49,6 +49,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings } = useSettings()
   const [defaultShell, setDefaultShell] = useState('')
   const [fontSize, setFontSize] = useState<string>('')
+  const [mobileFontSize, setMobileFontSize] = useState<string>('')
   const [showThinking, setShowThinking] = useState(false)
   const [showTools, setShowTools] = useState(true)
   const [showToolOutput, setShowToolOutput] = useState(false)
@@ -82,6 +83,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     if (settings) {
       setDefaultShell(settings.default_shell)
       setFontSize(settings.font_size?.toString() ?? '')
+      setMobileFontSize(settings.mobile_font_size?.toString() ?? '')
       setShowThinking(settings.show_thinking)
       setShowTools(settings.show_tools)
       setShowToolOutput(settings.show_tool_output)
@@ -97,10 +99,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     setSaving(true)
     try {
       const fontSizeValue = fontSize.trim() ? parseInt(fontSize, 10) : null
+      const mobileFontSizeValue = mobileFontSize.trim()
+        ? parseInt(mobileFontSize, 10)
+        : null
       const lineClampValue = parseInt(messageLineClamp, 10) || 5
       await updateSettings({
         default_shell: defaultShell.trim(),
         font_size: fontSizeValue,
+        mobile_font_size: mobileFontSizeValue,
         show_thinking: showThinking,
         show_tools: showTools,
         show_tool_output: showTools ? showToolOutput : false,
@@ -165,6 +171,28 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </div>
             <p className="text-xs text-muted-foreground">
               Font size in pixels (8-32). Default: {DEFAULT_FONT_SIZE}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="mobile_font_size" className="text-sm font-medium">
+              Mobile Font Size
+            </label>
+            <div className="relative">
+              <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="mobile_font_size"
+                type="number"
+                min={8}
+                max={32}
+                value={mobileFontSize}
+                onChange={(e) => setMobileFontSize(e.target.value)}
+                placeholder="10"
+                className="pl-10"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Terminal font size on mobile devices (8-32). Default: 10
             </p>
           </div>
 

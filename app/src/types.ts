@@ -494,6 +494,7 @@ export interface Settings {
   id: number
   default_shell: string
   font_size: number | null
+  mobile_font_size: number | null
   show_thinking: boolean
   show_tools: boolean
   show_tool_output: boolean

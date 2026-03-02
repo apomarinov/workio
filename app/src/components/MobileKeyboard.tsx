@@ -152,7 +152,7 @@ export function MobileKeyboard({
         className={cn(
           'relative',
           isInput
-            ? 'bg-zinc-900 border-t border-zinc-700/50'
+            ? 'bg-zinc-900'
             : 'h-0 overflow-hidden opacity-0 pointer-events-none',
         )}
       >

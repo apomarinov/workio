@@ -781,6 +781,7 @@ export async function updateShell(
 const DEFAULT_CONFIG = {
   default_shell: '/bin/bash',
   font_size: null as number | null,
+  mobile_font_size: null as number | null,
   show_thinking: false,
   show_tools: true,
   show_tool_output: false,

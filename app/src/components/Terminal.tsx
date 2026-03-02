@@ -61,7 +61,9 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const pendingWritesRef = useRef<string[]>([])
   const { settings } = useSettings()
 
-  const fontSize = settings?.font_size ?? DEFAULT_FONT_SIZE
+  const fontSize = isMobile
+    ? (settings?.mobile_font_size ?? 10)
+    : (settings?.font_size ?? DEFAULT_FONT_SIZE)
   const fontSizeRef = useRef(fontSize)
   const settingsRef = useRef(settings)
   const terminalIdRef = useRef(terminalId)

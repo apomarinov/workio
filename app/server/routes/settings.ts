@@ -93,6 +93,18 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Validate mobile_font_size if provided
+      if (
+        updates.mobile_font_size !== undefined &&
+        updates.mobile_font_size !== null
+      ) {
+        if (updates.mobile_font_size < 8 || updates.mobile_font_size > 32) {
+          return reply
+            .status(400)
+            .send({ error: 'Mobile font size must be between 8 and 32' })
+        }
+      }
+
       // Validate message_line_clamp if provided
       if (updates.message_line_clamp !== undefined) {
         if (updates.message_line_clamp < 1 || updates.message_line_clamp > 20) {
