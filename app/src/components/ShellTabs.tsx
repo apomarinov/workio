@@ -541,7 +541,7 @@ export function ShellTabs({
   children,
   rightExtra,
 }: ShellTabsProps) {
-  const { processes, isBellSubscribed } = useProcessContext()
+  const { isBellSubscribed } = useProcessContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -622,7 +622,7 @@ export function ShellTabs({
   }
 
   const shellHasActivity = (shellId: number) =>
-    processes.some((p) => p.shellId === shellId)
+    !!terminal.shells.find((s) => s.id === shellId)?.active_cmd
 
   const isMainShell = (shellId: number) =>
     terminal.shells.find((s) => s.id === shellId)?.name === 'main'
@@ -1007,7 +1007,6 @@ export function ShellTabs({
               onClick={onCreateShell}
               className={cn(
                 'flex items-center justify-center w-5 h-5 border-transparent text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
-                position === 'top' ? 'border-t-2' : 'border-b-2',
               )}
             >
               <Plus className="w-3 h-3" />
