@@ -20,10 +20,10 @@ import type {
   ShellClientsPayload,
   WorkspacePayload,
 } from '../../shared/types'
-import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useSettings } from '../hooks/useSettings'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
-import type { Notification, Shell, Terminal } from '../types'
+import type { Notification, Settings, Shell, Terminal } from '../types'
 import { useNotifications } from './NotificationContext'
 
 interface TerminalContextValue {
@@ -56,7 +56,7 @@ interface TerminalContextValue {
     id: number,
     opts?: { deleteDirectory?: boolean },
   ) => Promise<void>
-  setTerminalOrder: (value: number[] | ((prev: number[]) => number[])) => void
+  setTerminalOrder: (value: number[]) => void
   refetch: () => void
   ghUsername: string | null
   githubPRs: PRCheckStatus[]
@@ -87,6 +87,7 @@ interface TerminalContextValue {
     content: string,
     remove: boolean,
   ) => Promise<void>
+  cleanupShellOrder: (terminalId: number, shellId: number) => void
   shellClients: Map<number, ShellClient[]>
   allClients: ShellClient[]
 }
@@ -102,10 +103,11 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     api.getTerminals,
   )
 
-  const [terminalOrder, setTerminalOrder] = useLocalStorage<number[]>(
-    'sidebar-terminal-order',
-    [],
-  )
+  const { settings, updateSettings } = useSettings()
+  const terminalOrder = settings?.terminal_order ?? []
+  const setTerminalOrder = (value: number[]) => {
+    updateSettings({ terminal_order: value })
+  }
 
   const raw = data ?? []
 
@@ -270,6 +272,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     return subscribe<WorkspacePayload>('terminal:workspace', (data) => {
       if (data.deleted) {
         mutate((prev) => prev?.filter((t) => t.id !== data.terminalId), false)
+        cleanupTerminalOrder(data.terminalId)
         return
       }
       mutate(
@@ -984,10 +987,10 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }) => {
       const terminal = await api.createTerminal(opts)
       mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
-      setTerminalOrder((prev) => [terminal.id, ...prev])
+      setTerminalOrder([terminal.id, ...terminalOrder])
       return terminal
     },
-    [mutate, setTerminalOrder],
+    [mutate, terminalOrder, setTerminalOrder],
   )
 
   const updateTerminal = useCallback(
@@ -1005,17 +1008,46 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [mutate],
   )
 
+  const cleanupTerminalOrder = (id: number) => {
+    const orderUpdates: Partial<Settings> = {}
+    if (terminalOrder.includes(id)) {
+      orderUpdates.terminal_order = terminalOrder.filter((tid) => tid !== id)
+    }
+    const shellOrder = settings?.shell_order
+    if (shellOrder?.[id]) {
+      const { [id]: _, ...rest } = shellOrder
+      orderUpdates.shell_order = rest
+    }
+    if (Object.keys(orderUpdates).length > 0) {
+      updateSettings(orderUpdates)
+    }
+  }
+
   const deleteTerminal = useCallback(
     async (id: number, opts?: { deleteDirectory?: boolean }) => {
       const isAsync = await api.deleteTerminal(id, opts)
       if (!isAsync) {
         mutate((prev) => prev?.filter((t) => t.id !== id), false)
+        cleanupTerminalOrder(id)
       }
       // For async (202), the WebSocket 'terminal:workspace' event
       // will update setup.status to 'delete' and eventually emit { deleted: true }
     },
-    [mutate],
+    [mutate, cleanupTerminalOrder],
   )
+
+  const cleanupShellOrder = (terminalId: number, shellId: number) => {
+    const shellOrder = settings?.shell_order
+    const order = shellOrder?.[terminalId]
+    if (order?.includes(shellId)) {
+      updateSettings({
+        shell_order: {
+          ...shellOrder,
+          [terminalId]: order.filter((id) => id !== shellId),
+        },
+      })
+    }
+  }
 
   const refetch = useCallback(() => mutate(), [mutate])
 
@@ -1049,6 +1081,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRNotificationsRead,
       deleteAllNotifications,
       reactToPR,
+      cleanupShellOrder,
       shellClients,
       allClients,
     }),
@@ -1080,6 +1113,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRNotificationsRead,
       deleteAllNotifications,
       reactToPR,
+      cleanupShellOrder,
       shellClients,
       allClients,
     ],

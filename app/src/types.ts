@@ -512,6 +512,8 @@ export interface Settings {
   shell_templates?: ShellTemplate[]
   mobile_keyboard_rows?: MobileKeyboardRow[]
   custom_terminal_actions?: CustomTerminalAction[]
+  terminal_order?: number[]
+  shell_order?: Record<number, number[]>
   starred_branches?: Record<string, string[]>
   // Push notification settings
   vapid_public_key?: string

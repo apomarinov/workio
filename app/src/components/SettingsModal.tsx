@@ -152,48 +152,44 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="font_size" className="text-sm font-medium">
-              Terminal Font Size
-            </label>
-            <div className="relative">
-              <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="font_size"
-                type="number"
-                min={8}
-                max={32}
-                value={fontSize}
-                onChange={(e) => setFontSize(e.target.value)}
-                placeholder={DEFAULT_FONT_SIZE.toString()}
-                className="pl-10"
-              />
+          <div className='flex gap-2'>
+            <div className="space-y-2 w-1/2">
+              <label htmlFor="font_size" className="text-sm font-medium">
+                Terminal Font Size
+              </label>
+              <div className="relative">
+                <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="font_size"
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={fontSize}
+                  onChange={(e) => setFontSize(e.target.value)}
+                  placeholder={DEFAULT_FONT_SIZE.toString()}
+                  className="pl-10"
+                />
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Font size in pixels (8-32). Default: {DEFAULT_FONT_SIZE}
-            </p>
-          </div>
 
-          <div className="space-y-2">
-            <label htmlFor="mobile_font_size" className="text-sm font-medium">
-              Mobile Font Size
-            </label>
-            <div className="relative">
-              <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="mobile_font_size"
-                type="number"
-                min={8}
-                max={32}
-                value={mobileFontSize}
-                onChange={(e) => setMobileFontSize(e.target.value)}
-                placeholder="10"
-                className="pl-10"
-              />
+            <div className="space-y-2 w-1/2">
+              <label htmlFor="mobile_font_size" className="text-sm font-medium">
+                Mobile Font Size
+              </label>
+              <div className="relative">
+                <Type className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="mobile_font_size"
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={mobileFontSize}
+                  onChange={(e) => setMobileFontSize(e.target.value)}
+                  placeholder="10"
+                  className="pl-10"
+                />
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Terminal font size on mobile devices (8-32). Default: 10
-            </p>
           </div>
 
           <div className="space-y-2">

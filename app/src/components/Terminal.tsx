@@ -246,7 +246,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
         foreground: '#d4d4d4',
         cursor: '#d4d4d4',
         cursorAccent: '#1a1a1a',
-        selectionBackground: 'rgba(255, 255, 255, 0.3)',
+        selectionBackground: 'rgba(56, 130, 246, 0.35)',
         black: '#000000',
         red: '#cd3131',
         green: '#0dbc79',

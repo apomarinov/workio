@@ -19,9 +19,17 @@ export function useSettings() {
   )
 
   const updateSettings = async (updates: Partial<Omit<Settings, 'id'>>) => {
-    const updated = await api.updateSettings(updates)
-    mutate(updated, false)
-    return updated
+    const optimistic = data ? { ...data, ...updates } : undefined
+    if (optimistic) mutate(optimistic, false)
+    try {
+      const updated = await api.updateSettings(updates)
+      mutate(updated, false)
+      return updated
+    } catch (err) {
+      // Revert optimistic update on failure
+      if (data) mutate(data, false)
+      throw err
+    }
   }
 
   return {

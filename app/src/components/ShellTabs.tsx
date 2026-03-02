@@ -572,10 +572,6 @@ export function ShellTabs({
       setTabBar(true)
     }
   }, [isMobile, tabBar, setTabBar])
-  const [shellOrder, setShellOrder] = useLocalStorage<Record<number, number[]>>(
-    'shell-order',
-    {},
-  )
   const [killAllConfirm, setKillAllConfirm] = useState(false)
   const [deleteShellId, setDeleteShellId] = useState<number | null>(null)
   const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
@@ -589,6 +585,7 @@ export function ShellTabs({
   const [runTemplateTarget, setRunTemplateTarget] =
     useState<ShellTemplate | null>(null)
   const { settings, updateSettings } = useSettings()
+  const shellOrder = settings?.shell_order ?? {}
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -618,7 +615,7 @@ export function ShellTabs({
     const newIds = [...ids]
     newIds.splice(oldIndex, 1)
     newIds.splice(newIndex, 0, active.id as number)
-    setShellOrder({ ...shellOrder, [terminal.id]: newIds })
+    updateSettings({ shell_order: { ...shellOrder, [terminal.id]: newIds } })
   }
 
   const shellHasActivity = (shellId: number) =>

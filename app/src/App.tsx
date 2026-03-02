@@ -39,6 +39,7 @@ import { useActiveShells } from './hooks/useActiveShells'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useIsMobile } from './hooks/useMediaQuery'
+import { useSettings } from './hooks/useSettings'
 import { useSocket } from './hooks/useSocket'
 import {
   createShellForTerminal,
@@ -68,6 +69,7 @@ function AppContent() {
     activeTerminal,
     selectTerminal,
     refetch,
+    cleanupShellOrder,
   } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe, emit } = useSocket()
@@ -80,40 +82,10 @@ function AppContent() {
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
 
-  // Shell DnD order — kept in sync with localStorage used by ShellTabs
-  const shellOrderRef = useRef<Record<number, number[]>>(
-    (() => {
-      try {
-        const saved = localStorage.getItem('shell-order')
-        return saved ? JSON.parse(saved) : {}
-      } catch {
-        return {}
-      }
-    })(),
-  )
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'shell-order') {
-        try {
-          shellOrderRef.current = e.newValue ? JSON.parse(e.newValue) : {}
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    const onLocalSync = (e: Event) => {
-      const detail = (e as CustomEvent).detail
-      if (detail?.key === 'shell-order') {
-        shellOrderRef.current = detail.value ?? {}
-      }
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener('local-storage-sync', onLocalSync)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener('local-storage-sync', onLocalSync)
-    }
-  }, [])
+  // Shell DnD order — read from settings (persisted to DB)
+  const { settings } = useSettings()
+  const shellOrderRef = useRef<Record<number, number[]>>({})
+  shellOrderRef.current = settings?.shell_order ?? {}
 
   // Multi-shell state
   const { activeShells, activeShellsRef, setShell } = useActiveShells(
@@ -169,6 +141,7 @@ function AppContent() {
       const deletedIndex = shellsBefore.findIndex((s) => s.id === shellId)
 
       await deleteShell(shellId)
+      cleanupShellOrder(terminalId, shellId)
       setTimeout(async () => {
         await refetch()
         const terminal = terminalsRef.current.find((t) => t.id === terminalId)
