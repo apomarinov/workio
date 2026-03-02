@@ -286,6 +286,15 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
       if (ports.length > 0) {
         shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
       }
+
+      // Clear stale active_cmd if no actual process found
+      if (
+        h.currentCommand &&
+        !procs.some((p) => p.source === 'direct' && p.pid > 0)
+      ) {
+        h.currentCommand = null
+        emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
+      }
     }),
   )
 
@@ -330,6 +339,15 @@ async function scanAndEmitAllProcesses() {
           ...new Set([...existing, ...ports]),
         ].sort((a, b) => a - b)
         shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+      }
+
+      // Clear stale active_cmd if no actual process found
+      if (
+        h.currentCommand &&
+        !procs.some((p) => p.source === 'direct' && p.pid > 0)
+      ) {
+        h.currentCommand = null
+        emitShellUpdate(h.terminalId, h.shell.id, { active_cmd: null })
       }
     }),
   )

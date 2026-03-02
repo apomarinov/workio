@@ -183,12 +183,13 @@ export async function initPgListener(
                     // terminal_prompt (tool_permission or plan_mode)
                     const permType = tools.type as string | undefined
                     if (permType === 'plan_mode') {
-                      permissionDetail = perm.latest_agent_message || ''
+                      permissionDetail = 'Plan ready'
                     } else {
                       // tool_permission — use context or title
                       const ctx = tools.context as string | undefined
                       const title = tools.title as string | undefined
-                      permissionDetail = `${ctx || ''}\n${title || ''}`.trim()
+                      permissionDetail =
+                        `${(ctx || '').trim()}\n${(title || '').trim()}`.trim()
                     }
                   }
                 }
