@@ -145,12 +145,19 @@ export async function initPgListener(
             `LISTEN: permission_needed session=${payload.session_id} shell_id=${payload.shell_id}`,
           )
           if (payload.shell_id) {
-            // Small delay to let the buffer fill with the full prompt
-            setTimeout(async () => {
-              await scanAndStorePermissionPrompt(
+            // Retry with exponential backoff — the buffer may not have
+            // the full permission prompt yet when the LISTEN fires.
+            const DELAYS = [200, 200, 300, 800, 800, 1000]
+            const tryEnrich = async (attempt: number) => {
+              const parsed = await scanAndStorePermissionPrompt(
                 payload.session_id,
                 payload.shell_id,
               )
+
+              if (!parsed && attempt < DELAYS.length - 1) {
+                setTimeout(() => tryEnrich(attempt + 1), DELAYS[attempt + 1])
+                return
+              }
 
               // Build enriched notification from active permissions
               let userMessage = ''
@@ -220,7 +227,8 @@ export async function initPgListener(
                 userMessage,
                 permissionDetail,
               })
-            }, 500)
+            }
+            setTimeout(() => tryEnrich(0), DELAYS[0])
           }
         }
       }
