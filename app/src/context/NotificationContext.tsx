@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
 } from 'react'
+import { toast } from 'sonner'
 import type { AudioType } from '../../shared/notifications'
 import { NotificationPrompt } from '../components/NotificationPrompt'
 import { useSettings } from '../hooks/useSettings'
@@ -24,6 +25,8 @@ interface SendNotificationOptions extends NotificationOptions {
 
 interface NotificationContextValue {
   sendNotification: (title: string, options?: SendNotificationOptions) => void
+  requestPermission: () => Promise<boolean>
+  hasDevicePushSubscription: boolean
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null)
@@ -40,8 +43,22 @@ export function NotificationProvider({
     return Notification.permission
   })
   const [promptOpen, setPromptOpen] = useState(false)
+  const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null)
   const { settings } = useSettings()
   const hasPushSubscriptions = (settings?.push_subscriptions?.length ?? 0) > 0
+  const hasDevicePushSubscription =
+    hasPushSubscriptions &&
+    !!currentEndpoint &&
+    settings!.push_subscriptions!.some((s) => s.endpoint === currentEndpoint)
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.ready
+        .then((reg) => reg.pushManager.getSubscription())
+        .then((sub) => setCurrentEndpoint(sub?.endpoint ?? null))
+        .catch(() => {})
+    }
+  }, [settings?.push_subscriptions])
 
   useEffect(() => {
     if (permission === 'unsupported') return
@@ -70,15 +87,6 @@ export function NotificationProvider({
 
   const sendNotification = useCallback(
     (title: string, options?: SendNotificationOptions) => {
-      if (permission === 'default') {
-        setPromptOpen(true)
-        return
-      }
-
-      if (permission !== 'granted') {
-        return
-      }
-
       const { audio, ...notificationOptions } = options || {}
 
       if (audio) {
@@ -89,12 +97,19 @@ export function NotificationProvider({
         })
       }
 
-      // this doesnt work
-      // // When push subscriptions exist, skip the client-side OS notification
-      // // only if the tab is hidden — the server sends push for inactive users.
-      // // When the tab is visible the server suppresses push (isUserActive),
-      // // so the client must show the notification itself.
+      if (permission === 'default') {
+        setPromptOpen(true)
+        toast.info(title)
+        return
+      }
+
+      if (permission !== 'granted') {
+        toast.info(title)
+        return
+      }
+
       // if (hasPushSubscriptions && document.visibilityState === 'hidden') return
+      if (hasDevicePushSubscription) return
 
       // Use service worker notification so clicks are handled by sw.ts
       // notificationclick handler (focus/open PWA + post NOTIFICATION_CLICK)
@@ -113,13 +128,15 @@ export function NotificationProvider({
         })
       })
     },
-    [permission, hasPushSubscriptions],
+    [permission, hasDevicePushSubscription],
   )
 
   return (
     <NotificationContext.Provider
       value={{
         sendNotification,
+        requestPermission,
+        hasDevicePushSubscription,
       }}
     >
       {children}

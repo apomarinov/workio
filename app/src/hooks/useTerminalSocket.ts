@@ -23,7 +23,7 @@ interface UseTerminalSocketReturn {
   reconnect: () => void
 }
 
-const RECONNECT_DELAYS = [200, 500, 1000, 2000, 4000, 8000, 16000] // Exponential backoff
+const RECONNECT_DELAYS = [200, 500, 1000, 1000, 1000, 2000, 3000]
 const MAX_RECONNECT_ATTEMPTS = 10
 
 export function useTerminalSocket({
@@ -142,7 +142,7 @@ export function useTerminalSocket({
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -233,7 +233,7 @@ export function useTerminalSocket({
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay =
             RECONNECT_DELAYS[
-              Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
+            Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
           reconnectAttemptRef.current++
 

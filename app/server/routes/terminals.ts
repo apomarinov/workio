@@ -158,7 +158,7 @@ import {
   getShellById,
   getTerminalById,
   logCommand,
-  setPermissionNeededSessionDone,
+  setActiveSessionDone,
   terminalNameExists,
   updateShellName,
   updateTerminal,
@@ -2709,7 +2709,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       // If the shell's session is waiting for permission, mark it done
-      const doneSessionId = await setPermissionNeededSessionDone(id)
+      const doneSessionId = await setActiveSessionDone(id)
       if (doneSessionId) {
         log.info(
           `[interrupt] Set permission_needed session=${doneSessionId} to done (shell=${id})`,

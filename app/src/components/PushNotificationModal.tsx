@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { useNotifications } from '../context/NotificationContext'
 import { useSettings } from '../hooks/useSettings'
 import type { PushSubscriptionRecord } from '../types'
 
@@ -35,6 +36,7 @@ export function PushNotificationModal({
   onOpenChange,
 }: PushNotificationModalProps) {
   const { settings, refetch } = useSettings()
+  const { requestPermission } = useNotifications()
   const [enabling, setEnabling] = useState(false)
   const [disabling, setDisabling] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -54,6 +56,12 @@ export function PushNotificationModal({
   const handleEnable = async () => {
     setEnabling(true)
     try {
+      const granted = await requestPermission()
+      if (!granted) {
+        toast.error('Notification permission is required for push')
+        return
+      }
+
       const res = await fetch('/api/push/vapid-key')
       const { publicKey } = await res.json()
 

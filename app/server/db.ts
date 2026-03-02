@@ -298,12 +298,12 @@ export async function updateSessionData(
   return (result.rowCount ?? 0) > 0
 }
 
-export async function setPermissionNeededSessionDone(
+export async function setActiveSessionDone(
   shellId: number,
 ): Promise<string | null> {
   const { rows } = await pool.query(
     `UPDATE sessions SET status = 'done', updated_at = NOW()
-     WHERE shell_id = $1 AND status = 'permission_needed'
+     WHERE shell_id = $1 AND status in ('permission_needed', 'active')
      RETURNING session_id`,
     [shellId],
   )

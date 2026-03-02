@@ -13,7 +13,9 @@ export function markUserActive(): void {
 }
 
 export function isUserActive(): boolean {
-  return Date.now() - lastActiveAt < ACTIVE_TIMEOUT_MS
+  const lastActive = Date.now() - lastActiveAt
+  log.info(`[push] user last active ${lastActive}/${ACTIVE_TIMEOUT_MS}`)
+  return lastActive < ACTIVE_TIMEOUT_MS
 }
 
 export async function initWebPush(): Promise<void> {
