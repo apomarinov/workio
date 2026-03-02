@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
-import { ActionChip } from './ActionChip'
+import { ActionButton } from './ActionButton'
 import { MobileKeyboardNewGroup } from './MobileKeyboardNewGroup'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 
@@ -115,7 +115,7 @@ export function MobileKeyboardCustomize({
                     const action = actionsMap[actionId]
                     if (!action) return null
                     return (
-                      <ActionChip
+                      <ActionButton
                         key={`preview-${row.id}-${actionId}`}
                         label={action.label}
                         className="flex-shrink-0"
@@ -154,7 +154,7 @@ export function MobileKeyboardCustomize({
                   </button>
                   <div className="flex-1 min-w-0 flex gap-1 overflow-x-auto">
                     {row.actions.map((actionId, i) => (
-                      <ActionChip
+                      <ActionButton
                         key={`${row.id}-${actionId}-${i}`}
                         label={actionsMap[actionId]?.label ?? actionId}
                         className="flex-shrink-0 min-w-10"

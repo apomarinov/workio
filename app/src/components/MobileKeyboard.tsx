@@ -11,7 +11,7 @@ import {
 } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
-import { ActionChip } from './ActionChip'
+import { ActionButton } from './ActionButton'
 import { MobileKeyboardActions } from './MobileKeyboardActions'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 
@@ -166,7 +166,7 @@ export function MobileKeyboard({
                 const isActive =
                   isModifier && activeModifiers[actionId as keyof Modifiers]
                 return (
-                  <ActionChip
+                  <ActionButton
                     key={`quick-${row.id}-${actionId}`}
                     label={action.label}
                     active={isActive}
@@ -266,35 +266,32 @@ export function MobileKeyboard({
             )}
           />
           {isInput && (
-            <button
-              type="button"
-              onPointerDown={(e) => e.preventDefault()}
-              onPointerUp={() => {
+            <ActionButton
+              active={directInput}
+              size="lg"
+              preventFocusLoss
+              onTap={() => {
                 setDirectInput((prev) => !prev)
                 if (!directInput) {
                   setInputValue('')
                 }
                 inputRef?.current?.focus()
               }}
-              className={cn(
-                'flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg',
-                directInput
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-zinc-700/80 text-zinc-300 active:bg-zinc-600',
-              )}
+              className="flex-shrink-0 w-10 h-10 flex items-center justify-center !px-0 !py-0"
             >
               <ArrowUpFromLine className="w-4 h-4" />
-            </button>
+            </ActionButton>
           )}
           {isInput && !directInput && (
-            <button
-              type="button"
-              onPointerDown={(e) => e.preventDefault()}
-              onPointerUp={handleSubmit}
-              className="flex-shrink-0 w-14 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white active:bg-blue-500"
+            <ActionButton
+              active
+              size="lg"
+              preventFocusLoss
+              onTap={handleSubmit}
+              className="flex-shrink-0 w-14 h-10 flex items-center justify-center !px-0 !py-0"
             >
               <CornerDownLeft className="w-4 h-4" />
-            </button>
+            </ActionButton>
           )}
         </div>
       </div>

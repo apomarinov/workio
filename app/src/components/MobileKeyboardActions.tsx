@@ -1,6 +1,6 @@
 import type { Modifiers, TerminalAction } from '@/lib/terminalActions'
 import type { MobileKeyboardRow } from '../types'
-import { ActionChip } from './ActionChip'
+import { ActionButton } from './ActionButton'
 
 interface MobileKeyboardActionsProps {
   rows: MobileKeyboardRow[]
@@ -26,7 +26,7 @@ export function MobileKeyboardActions({
             const isActive =
               isModifier && activeModifiers[actionId as keyof Modifiers]
             return (
-              <ActionChip
+              <ActionButton
                 key={`${row.id}-${actionId}-${i}`}
                 label={action.label}
                 active={isActive}

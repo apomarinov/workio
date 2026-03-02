@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react'
 import { ALL_ACTIONS, buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
-import { ActionChip } from './ActionChip'
+import { ActionButton } from './ActionButton'
 import { ConfirmModal } from './ConfirmModal'
 import { MobileKeyboardCustomAction } from './MobileKeyboardCustomAction'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
@@ -50,17 +50,15 @@ function SortableChip({
   }
 
   return (
-    <button
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      type="button"
-      onClick={onRemove}
-      className="px-2.5 py-2 min-w-10 rounded bg-blue-600/80 text-white text-xs font-medium touch-manipulation"
-    >
-      {label}
-    </button>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <ActionButton
+        label={label}
+        active
+        withAudio={false}
+        onTap={onRemove}
+        className="touch-manipulation"
+      />
+    </div>
   )
 }
 
@@ -250,7 +248,7 @@ export function MobileKeyboardNewGroup({
 
           {/* Selected actions preview */}
           <div className="flex-shrink-0 px-4 pb-2">
-            <div className="flex flex-wrap items-center gap-1 min-h-[32px] px-2 py-1 rounded-lg bg-zinc-800/60 border border-zinc-700/50">
+            <div className="flex flex-wrap items-center gap-1 min-h-[32px] pl-1 pr-2 py-1 rounded-lg bg-zinc-800/60 border border-zinc-700/50">
               {selected.length === 0 ? (
                 <span className="text-xs text-muted-foreground/50">
                   Tap actions below (max 8)
@@ -284,7 +282,7 @@ export function MobileKeyboardNewGroup({
                 <button
                   type="button"
                   onClick={removeLastSelected}
-                  className="ml-auto text-muted-foreground hover:text-foreground flex-shrink-0"
+                  className="ml-auto h-9 text-muted-foreground hover:text-foreground flex-shrink-0"
                 >
                   <Delete className="w-4 h-4" />
                 </button>
@@ -342,7 +340,8 @@ export function MobileKeyboardNewGroup({
                                 key={action.id}
                                 className="flex items-center gap-0.5"
                               >
-                                <ActionChip
+                                <ActionButton
+                                  withAudio={false}
                                   label={action.label}
                                   active={isSelected}
                                   dimmed={selected.length >= 8 && !isSelected}
@@ -383,8 +382,9 @@ export function MobileKeyboardNewGroup({
                     {group.actions.map((action) => {
                       const isSelected = selected.includes(action.id)
                       return (
-                        <ActionChip
+                        <ActionButton
                           key={action.id}
+                          withAudio={false}
                           label={action.label}
                           active={isSelected}
                           dimmed={selected.length >= 8 && !isSelected}
