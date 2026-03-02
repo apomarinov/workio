@@ -613,6 +613,54 @@ function AppContent() {
     }
   }, [emit, hasDevicePushSubscription])
 
+  // Edge swipe to open/close mobile sidebar
+  const mobileSidebarOpenRef = useRef(mobileSidebarOpen)
+  mobileSidebarOpenRef.current = mobileSidebarOpen
+  useEffect(() => {
+    if (!isMobile) return
+
+    const EDGE_ZONE = 30
+    const MIN_SWIPE = 50
+    const MAX_Y_DRIFT = 80
+
+    let startX = 0
+    let startY = 0
+    let tracking = false
+
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      const fromEdge = t.clientX < EDGE_ZONE
+      const sidebarOpen = mobileSidebarOpenRef.current
+      if (fromEdge || sidebarOpen) {
+        startX = t.clientX
+        startY = t.clientY
+        tracking = true
+      }
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!tracking) return
+      tracking = false
+      const t = e.changedTouches[0]
+      const dx = t.clientX - startX
+      const dy = Math.abs(t.clientY - startY)
+      if (dy > MAX_Y_DRIFT) return
+
+      if (!mobileSidebarOpenRef.current && dx > MIN_SWIPE) {
+        setMobileSidebarOpen(true)
+      } else if (mobileSidebarOpenRef.current && dx < -MIN_SWIPE) {
+        setMobileSidebarOpen(false)
+      }
+    }
+
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [isMobile])
+
   // Auto-close mobile sidebar when navigating to a terminal or session
   const prevActiveTerminalId = useRef(activeTerminal?.id)
   const prevActiveSessionId = useRef(activeSessionId)
@@ -797,6 +845,19 @@ function AppContent() {
                             <>
                               <button
                                 type="button"
+                                onClick={() =>
+                                  window.dispatchEvent(
+                                    new CustomEvent('open-custom-commands', {
+                                      detail: { terminalId: t.id },
+                                    }),
+                                  )
+                                }
+                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <TerminalNoBorder className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setMobileKeyboardMode('actions')}
                                 className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                               >
@@ -827,19 +888,6 @@ function AppContent() {
                                 type="button"
                                 onClick={() =>
                                   window.dispatchEvent(
-                                    new CustomEvent('open-custom-commands', {
-                                      detail: { terminalId: t.id },
-                                    }),
-                                  )
-                                }
-                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <TerminalNoBorder className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  window.dispatchEvent(
                                     new Event('mobile-keyboard-customize'),
                                   )
                                 }
@@ -859,7 +907,7 @@ function AppContent() {
                         </div>
                       }
                     >
-                      <div className='flex mr-1 gap-0.5'>
+                      <div className="flex mr-1 gap-0.5">
                         <button
                           type="button"
                           onClick={() => setMobileSidebarOpen(true)}
