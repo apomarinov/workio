@@ -152,7 +152,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </p>
           </div>
 
-          <div className='flex gap-2'>
+          <div className="flex gap-2">
             <div className="space-y-2 w-1/2">
               <label htmlFor="font_size" className="text-sm font-medium">
                 Terminal Font Size

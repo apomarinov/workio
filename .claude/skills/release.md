@@ -31,8 +31,18 @@ Create a new versioned release by tagging the latest commit and updating the cha
    - Omit empty sections.
    - Use today's date.
 
-5. **Commit the changelog** — stage and commit with message `Add vX.Y.Z changelog entry`.
+5. **Update README.md** — if the changes conflict with thats in the readme, update the readme to reflect the changes.
 
-6. **Tag the new commit** — run `git tag vX.Y.Z` on the changelog commit.
+6. **Commit the changelog** — stage and commit with message `Add vX.Y.Z changelog entry`.
 
-7. **Push everything** — run `git push && git push --tags`.
+7. **Tag the new commit** — run `git tag vX.Y.Z` on the changelog commit.
+
+8. **Push everything** — run `git push && git push --tags` 
+
+## Before Pushing
+
+Use the `AskUserQuestion` tool to confirm. Show the summary in the question text and provide "Push" / "Cancel" options:
+
+- Question: include the new version number and the changes
+- Header: "Push"
+- Options: "Push" (proceed) and "Cancel" (abort)

@@ -188,7 +188,7 @@ export async function initPgListener(
                       // tool_permission — use context or title
                       const ctx = tools.context as string | undefined
                       const title = tools.title as string | undefined
-                      permissionDetail = (ctx || title || '').trim()
+                      permissionDetail = `${ctx || ''}\n${title || ''}`.trim()
                     }
                   }
                 }

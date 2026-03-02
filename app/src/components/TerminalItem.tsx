@@ -180,7 +180,8 @@ export const TerminalItem = memo(function TerminalItem({
   const isDeleting = terminal.setup?.status === 'delete'
   const displayName = terminal.name || terminal.cwd || 'Untitled'
   const hasSessions = sessions.length > 0
-  const hasProcesses = processes.length > 0
+  const hasProcesses =
+    terminal.shells.some((s) => !!s.active_cmd) || processes.length > 0
   const hasPorts = ports.length > 0
 
   const gitBranch = terminal.git_branch
@@ -574,7 +575,7 @@ export const TerminalItem = memo(function TerminalItem({
                     </span>
                   )}
                 </div>
-                <div>
+                <div className="ml-1">
                   {activeTab === 'processes' &&
                     hasProcesses &&
                     (() => {
@@ -759,7 +760,10 @@ export const TerminalItem = memo(function TerminalItem({
                                     isCollapsed && '-rotate-90',
                                   )}
                                 />
-                                {sh.name} ({sPorts.length})
+                                {sh.name === 'main'
+                                  ? (terminal.name ?? sh.name)
+                                  : sh.name}{' '}
+                                ({sPorts.length})
                               </button>
                               {!isCollapsed &&
                                 sPorts.map((port) => (

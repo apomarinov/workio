@@ -1028,11 +1028,8 @@ function handleWorkerCommandEvent(
   handle: WorkerHandle,
 ) {
   switch (event.type) {
-    case 'prompt':
-      emitShellUpdate(terminalId, shellId, { active_cmd: null })
-      break
-
     case 'command_start':
+      log.info(`[pty] Command start: "${event.command}"`)
       emitShellUpdate(terminalId, shellId, {
         active_cmd: event.command || null,
       })
@@ -1051,6 +1048,8 @@ function handleWorkerCommandEvent(
       break
 
     case 'command_end': {
+      log.info(`[pty] Command end: "${event.command}"`)
+      emitShellUpdate(terminalId, shellId, { active_cmd: null })
       const existing = processPollTimeoutIds.get(terminalId)
       if (existing) {
         clearTimeout(existing)

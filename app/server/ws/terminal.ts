@@ -184,12 +184,16 @@ function broadcastShellClients(shellId: number): void {
 wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
   // Extract client IP from the upgrade request
   const forwarded = request.headers['x-forwarded-for']
-  const clientIP =
+  let clientIP =
     (typeof forwarded === 'string'
       ? forwarded.split(',')[0].trim()
       : undefined) ??
     request.socket.remoteAddress ??
     'unknown'
+  // Normalize IPv6 localhost variants to a single value
+  if (clientIP === '::1' || clientIP === '::ffff:127.0.0.1') {
+    clientIP = '127.0.0.1'
+  }
   const ua = parseUserAgent(request.headers['user-agent'] ?? '')
   wsInfo.set(ws, {
     ip: clientIP,

@@ -301,7 +301,7 @@ export function MobileKeyboardNewGroup({
                 className={cn(
                   group.category === 'custom' &&
                     open === 'new-action' &&
-                    'border-1 px-2 py-1 pt-2 border-blue-500 rounded-md animate-pulse',
+                    'border-1 px-2 py-2 border-blue-500 rounded-md animate-pulse',
                 )}
               >
                 <div className="flex items-center gap-2 mb-1">

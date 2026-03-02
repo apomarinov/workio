@@ -52,6 +52,7 @@ import { useTerminalContext } from '@/context/TerminalContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
+import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
 import { cn, sessionStatusColor } from '@/lib/utils'
@@ -79,12 +80,10 @@ interface ShellTabsProps {
 }
 
 function ShellSessionIcon({ session }: { session: SessionWithProject }) {
-  const s = 'w-3 h-3 shrink-0'
-  if (session.status === 'done')
-    return <CheckIcon className={cn(s, 'text-green-500/70')} />
+  const s = 'w-3.5 h-3.5 shrink-0'
   if (session.status === 'active' || session.status === 'permission_needed')
     return (
-      <>
+      <div className="flex gap-0.5 mr-0.5">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 300 150"
@@ -112,11 +111,16 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
         {session.status === 'permission_needed' && (
           <AlertTriangle className={cn(s, 'text-yellow-500 animate-pulse')} />
         )}
-      </>
+      </div>
     )
   return (
     <ClaudeIcon
-      className={cn(s, sessionStatusColor[session.status] ?? 'text-gray-400')}
+      className={cn(
+        s,
+        sessionStatusColor[session.status] ?? 'text-gray-400',
+        'opacity-80',
+        'mr-0.5',
+      )}
     />
   )
 }
@@ -356,6 +360,7 @@ function SortableShellPill({
     transition,
     isDragging,
   } = useSortable({ id: shell.id })
+  const overflowRef = useOverflowDetector<HTMLSpanElement>()
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -398,7 +403,10 @@ function SortableShellPill({
       ) : hasActivity ? (
         <Activity className="w-3 h-3 shrink-0 text-green-500" />
       ) : null}
-      <span className="truncate relative w-full text-center">
+      <span
+        ref={overflowRef}
+        className="truncate-fade relative w-full text-center"
+      >
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
         </span>
@@ -459,6 +467,7 @@ function SortableShellTab({
     transition,
     isDragging,
   } = useSortable({ id: shell.id })
+  const overflowRef = useOverflowDetector<HTMLSpanElement>()
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -508,7 +517,10 @@ function SortableShellTab({
       ) : hasActivity ? (
         <Activity className="w-3 h-3 shrink-0 text-green-500" />
       ) : null}
-      <span className="truncate relative w-full text-center">
+      <span
+        ref={overflowRef}
+        className="truncate-fade relative w-full text-center"
+      >
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
         </span>
@@ -541,7 +553,7 @@ export function ShellTabs({
   children,
   rightExtra,
 }: ShellTabsProps) {
-  const { isBellSubscribed } = useProcessContext()
+  const { isBellSubscribed, processes } = useProcessContext()
   const { sessions } = useSessionContext()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
@@ -619,6 +631,7 @@ export function ShellTabs({
   }
 
   const shellHasActivity = (shellId: number) =>
+    processes.some((p) => p.shellId === shellId) ||
     !!terminal.shells.find((s) => s.id === shellId)?.active_cmd
 
   const isMainShell = (shellId: number) =>
