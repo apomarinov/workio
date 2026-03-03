@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ChevronUp,
   Command,
+  MouseLeft,
   Option,
   RotateCcw,
   X,
@@ -476,6 +477,20 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(bindings.nextShell)}
               hasConflict={duplicates.has('nextShell')}
             />
+            <InfoShortcutRow label="Focus active shell" display="TAB" />
+            <InfoShortcutRow
+              label="Open file in IDE"
+              display={<MouseLeft className={ICON_CLASS} />}
+            />
+            <InfoShortcutRow
+              label="Open file in Finder"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <MouseLeft className={ICON_CLASS} />
+                </span>
+              }
+            />
 
             <div className="pt-2 border-t border-zinc-700">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -668,6 +683,25 @@ function bindingsEqual(
     !!a.altKey === !!b.altKey &&
     !!a.shiftKey === !!b.shiftKey &&
     (a.key ?? '') === (b.key ?? '')
+  )
+}
+
+function InfoShortcutRow({
+  label,
+  display,
+}: {
+  label: string
+  display: ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="h-7 px-2.5 text-xs font-mono rounded-md border border-border bg-zinc-800/50 text-muted-foreground inline-flex items-center">
+          {display}
+        </span>
+      </div>
+    </div>
   )
 }
 

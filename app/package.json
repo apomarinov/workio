@@ -51,7 +51,7 @@
     "dotenv": "^17.2.3",
     "fastify": "^5.7.1",
     "katex": "^0.16.28",
-    "lucide-react": "^0.563.0",
+    "lucide-react": "^0.576.0",
     "node-pty": "^1.1.0",
     "pg": "^8.18.0",
     "radix-ui": "^1.4.3",

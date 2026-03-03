@@ -137,8 +137,11 @@ const fastify = Fastify({
 setLogger(fastify.log)
 
 // Simple request logging
-fastify.addHook('onRequest', async (request) => {
-  request.log.info({ method: request.method, url: request.url }, 'request')
+fastify.addHook('preHandler', async (request) => {
+  request.log.info(
+    { method: request.method, url: request.url, body: request.body },
+    'request',
+  )
 })
 
 // Log errors

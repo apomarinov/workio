@@ -45,7 +45,7 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
       ? `shell:${shellId}`
       : terminalId
         ? `terminal:${terminalId}`
-        : undefined
+        : 'custom-noti'
 
     sendPushNotification(
       { title: `📣 ${title}`, body: enrichedBody, tag },
