@@ -23,7 +23,6 @@ import {
   Ban,
   Bell,
   BellRing,
-  CheckIcon,
   ChevronDown,
   FolderOpen,
   Globe,
@@ -55,7 +54,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
-import { cn, sessionStatusColor } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type {
   SessionWithProject,
   Shell,
@@ -117,7 +116,9 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
     <ClaudeIcon
       className={cn(
         s,
-        sessionStatusColor[session.status] ?? 'text-gray-400',
+        ['ended', 'idle'].includes(session.status)
+          ? 'text-gray-500'
+          : 'text-[#D97757]',
         'opacity-80',
         'mr-0.5',
       )}

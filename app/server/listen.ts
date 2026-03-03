@@ -147,7 +147,7 @@ export async function initPgListener(
           if (payload.shell_id) {
             // Retry with exponential backoff — the buffer may not have
             // the full permission prompt yet when the LISTEN fires.
-            const DELAYS = [200, 200, 300, 800, 800, 1000]
+            const DELAYS = [200, 200, 300, 800, 800, 1000, 1000]
             const tryEnrich = async (attempt: number) => {
               const parsed = await scanAndStorePermissionPrompt(
                 payload.session_id,
@@ -189,7 +189,7 @@ export async function initPgListener(
                       const ctx = tools.context as string | undefined
                       const title = tools.title as string | undefined
                       permissionDetail =
-                        `${(ctx || '').trim()}\n${(title || '').trim()}`.trim()
+                        `${(title || '').trim()}\n${(ctx || '').trim()}`.trim()
                     }
                   }
                 }

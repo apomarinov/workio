@@ -376,9 +376,15 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       // Inertia / momentum scrolling state
       let lastTouchTime = 0
       let touchVelocity = 0
-      const SCROLL_MULTIPLIER = 3.5
       const FRICTION = 0.92
       const MIN_VELOCITY = 0.5 // px/ms threshold to stop momentum
+
+      // iOS-style velocity-dependent scroll multiplier:
+      // slow scroll → precise (1.5x), fast flick → amplified (up to 4x)
+      function scrollMultiplier(velocity: number): number {
+        const speed = Math.abs(velocity) // px/ms
+        return 1.5 + 2.5 * (1 - Math.exp(-1.5 * speed))
+      }
 
       function getCellFromTouch(touch: Touch, term: XTerm): [number, number] {
         const rect = scrollTarget!.getBoundingClientRect()
@@ -537,7 +543,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
           lastTouchTime = now
 
           const cellHeight = scrollTarget!.clientHeight / term.rows || 16
-          touchAccum += deltaY * SCROLL_MULTIPLIER
+          touchAccum += deltaY * scrollMultiplier(touchVelocity)
 
           const lines = Math.trunc(touchAccum / cellHeight)
           if (lines === 0) return
@@ -576,7 +582,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
             Math.abs(touchVelocity) > MIN_VELOCITY / 1000
           ) {
             const cellHeight = scrollTarget!.clientHeight / term.rows || 16
-            let velocity = touchVelocity * SCROLL_MULTIPLIER // px/ms
+            let velocity = touchVelocity * scrollMultiplier(touchVelocity) // px/ms
             let accumPx = 0
             let lastFrame = performance.now()
 

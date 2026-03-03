@@ -228,10 +228,7 @@ export function MobileKeyboard({
                 }
                 return
               }
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmit()
-              }
+              // Enter adds a newline naturally; submit via the ↵ button
             }}
             onCompositionStart={() => {
               composingRef.current = true
@@ -259,7 +256,7 @@ export function MobileKeyboard({
             }}
             placeholder={directInput ? 'Direct input...' : 'Type here...'}
             className={cn(
-              'flex-1 min-w-0 px-3 !h-10 py-2 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border resize-none leading-5 overflow-y-auto',
+              'flex-1 min-w-0 px-2 min-h-10 pt-2 pb-1 rounded-lg bg-zinc-800 text-white text-base placeholder-zinc-500 outline-none border resize-none leading-5 overflow-y-auto',
               directInput
                 ? 'border-blue-500/70 focus:border-blue-500'
                 : 'border-zinc-700/50 focus:border-blue-500/50',
