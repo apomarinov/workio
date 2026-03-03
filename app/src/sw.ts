@@ -24,14 +24,31 @@ self.addEventListener('push', (event) => {
   }
 
   if (payload.action === 'dismiss' && payload.tag) {
-    // iOS requires showNotification for every push event, so we replace the
-    // existing notification (same tag) with a silent one, then close it.
     event.waitUntil(
-      self.registration
-        .showNotification('', { tag: payload.tag, silent: true })
-        .then(() => self.registration.getNotifications({ tag: payload.tag }))
-        .then((notifications) => {
-          for (const n of notifications) n.close()
+      self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clients) => {
+          const hasVisibleClient = clients.some(
+            (c) => c.visibilityState === 'visible',
+          )
+          return self.registration
+            .getNotifications({ tag: payload.tag })
+            .then((notifications) => {
+              for (const n of notifications) n.close()
+            })
+            .then(() => {
+              if (hasVisibleClient) return
+              // No visible client — iOS requires showNotification for every
+              // push event, so show a silent one and immediately close it.
+              return self.registration
+                .showNotification('', { tag: payload.tag, silent: true })
+                .then(() =>
+                  self.registration.getNotifications({ tag: payload.tag }),
+                )
+                .then((notifications) => {
+                  for (const n of notifications) n.close()
+                })
+            })
         }),
     )
     return
