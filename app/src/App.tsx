@@ -772,7 +772,7 @@ function AppContent() {
     <>
       {isMobile ? (
         <div
-          className="flex flex-col bg-zinc-950 overflow-hidden h-full"
+          className="flex flex-col bg-[#1a1a1a] overflow-hidden h-full"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           {/* Fullscreen terminal */}
