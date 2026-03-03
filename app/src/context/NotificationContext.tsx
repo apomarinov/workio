@@ -17,6 +17,7 @@ const audioFiles: Record<AudioType, string> = {
   done: '/audio/done.mp3',
   error: '/audio/error.mp3',
   'pr-activity': '/audio/pr-noti.mp3',
+  'bell-notify': '/audio/bell-notify.mp3',
 }
 
 interface SendNotificationOptions extends NotificationOptions {

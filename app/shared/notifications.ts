@@ -1,4 +1,4 @@
-export type AudioType = 'permission' | 'done' | 'pr-activity' | 'error'
+export type AudioType = 'permission' | 'done' | 'pr-activity' | 'error' | 'bell-notify'
 
 export interface NotificationDef {
   emoji: string
@@ -141,7 +141,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
     emoji: '✅',
     titleTemplate: '{command}',
     bodyTemplate: '{terminalName}',
-    audio: 'done',
+    audio: 'bell-notify',
   },
 }
 
