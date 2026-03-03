@@ -61,6 +61,7 @@ export function ActionButton({
 
   const playSound = () => {
     if (withAudio) playPop()
+    navigator.vibrate?.(10)
   }
 
   return (

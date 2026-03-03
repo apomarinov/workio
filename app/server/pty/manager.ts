@@ -1066,7 +1066,7 @@ function handleWorkerCommandEvent(
       break
 
     case 'command_end': {
-      log.info(`[pty] Command end: "${event.command}"`)
+      log.info(`[pty] Command end: "${handle.currentCommand}"`)
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
       const existing = processPollTimeoutIds.get(terminalId)
       if (existing) {

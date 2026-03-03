@@ -7,13 +7,21 @@ type ConnectionStatus =
   | 'error'
   | 'already_open'
 
+interface PtyDimensions {
+  cols: number
+  rows: number
+  fontSize?: number
+}
+
 interface UseTerminalSocketOptions {
   shellId: number | null
   cols: number
   rows: number
+  fontSize: number
   onData: (data: string) => void
   onExit?: (code: number) => void
   onReady?: () => void
+  onPrimaryChanged?: (isPrimary: boolean, ptyDims: PtyDimensions) => void
 }
 
 interface UseTerminalSocketReturn {
@@ -21,6 +29,10 @@ interface UseTerminalSocketReturn {
   sendInput: (data: string) => void
   sendResize: (cols: number, rows: number) => void
   reconnect: () => void
+  isPrimary: boolean
+  ptyDimensions: PtyDimensions | null
+  claimPrimary: () => void
+  releasePrimary: () => void
 }
 
 const RECONNECT_DELAYS = [200, 500, 1000, 1000, 1000, 2000, 3000]
@@ -30,12 +42,16 @@ export function useTerminalSocket({
   shellId,
   cols,
   rows,
+  fontSize,
   onData,
   onExit,
   onReady,
+  onPrimaryChanged,
 }: UseTerminalSocketOptions): UseTerminalSocketReturn {
   const wsRef = useRef<WebSocket | null>(null)
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
+  const [isPrimary, setIsPrimary] = useState(true)
+  const [ptyDimensions, setPtyDimensions] = useState<PtyDimensions | null>(null)
   const reconnectAttemptRef = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -48,6 +64,7 @@ export function useTerminalSocket({
   const shellIdRef = useRef<number | null>(shellId)
   const colsRef = useRef(cols)
   const rowsRef = useRef(rows)
+  const fontSizeRef = useRef(fontSize)
   const onDataRef = useRef(onData)
   const onExitRef = useRef(onExit)
   const onReadyRef = useRef(onReady)
@@ -63,10 +80,17 @@ export function useTerminalSocket({
   }, [cols, rows])
 
   useEffect(() => {
+    fontSizeRef.current = fontSize
+  }, [fontSize])
+
+  const onPrimaryChangedRef = useRef(onPrimaryChanged)
+
+  useEffect(() => {
     onDataRef.current = onData
     onExitRef.current = onExit
     onReadyRef.current = onReady
-  }, [onData, onExit, onReady])
+    onPrimaryChangedRef.current = onPrimaryChanged
+  }, [onData, onExit, onReady, onPrimaryChanged])
 
   // Track mounted state
   useEffect(() => {
@@ -162,6 +186,7 @@ export function useTerminalSocket({
             shellId: currentShellId,
             cols: colsRef.current,
             rows: rowsRef.current,
+            fontSize: fontSizeRef.current,
           }),
         )
       }
@@ -179,8 +204,28 @@ export function useTerminalSocket({
               isConnectingRef.current = false
               initializedRef.current = true
               setStatus('connected')
+              setIsPrimary(message.isPrimary ?? true)
+              if (message.ptyCols != null && message.ptyRows != null) {
+                setPtyDimensions({
+                  cols: message.ptyCols,
+                  rows: message.ptyRows,
+                  fontSize: message.ptyFontSize,
+                })
+              }
               onReadyRef.current?.()
               break
+            case 'primary-changed': {
+              const primary = message.isPrimary ?? false
+              const dims: PtyDimensions = {
+                cols: message.ptyCols ?? 80,
+                rows: message.ptyRows ?? 24,
+                fontSize: message.ptyFontSize,
+              }
+              setIsPrimary(primary)
+              setPtyDimensions(dims)
+              onPrimaryChangedRef.current?.(primary, dims)
+              break
+            }
             case 'output':
               onDataRef.current(message.data)
               break
@@ -310,6 +355,24 @@ export function useTerminalSocket({
     }
   }, [])
 
+  const claimPrimary = useCallback(() => {
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN &&
+      initializedRef.current
+    ) {
+      wsRef.current.send(JSON.stringify({ type: 'claim-primary' }))
+    }
+  }, [])
+
+  const releasePrimary = useCallback(() => {
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN &&
+      initializedRef.current
+    ) {
+      wsRef.current.send(JSON.stringify({ type: 'release-primary' }))
+    }
+  }, [])
+
   const reconnect = useCallback(() => {
     reconnectAttemptRef.current = 0
     connect()
@@ -320,5 +383,9 @@ export function useTerminalSocket({
     sendInput,
     sendResize,
     reconnect,
+    isPrimary,
+    ptyDimensions,
+    claimPrimary,
+    releasePrimary,
   }
 }

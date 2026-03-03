@@ -23,6 +23,7 @@ interface InitMessage {
   shellId: number
   cols: number
   rows: number
+  fontSize?: number
 }
 
 interface InputMessage {
@@ -36,7 +37,20 @@ interface ResizeMessage {
   rows: number
 }
 
-type ClientMessage = InitMessage | InputMessage | ResizeMessage
+interface ClaimPrimaryMessage {
+  type: 'claim-primary'
+}
+
+interface ReleasePrimaryMessage {
+  type: 'release-primary'
+}
+
+type ClientMessage =
+  | InitMessage
+  | InputMessage
+  | ResizeMessage
+  | ClaimPrimaryMessage
+  | ReleasePrimaryMessage
 
 interface OutputMessage {
   type: 'output'
@@ -56,9 +70,26 @@ interface ErrorMessage {
 
 interface ReadyMessage {
   type: 'ready'
+  isPrimary: boolean
+  ptyCols: number
+  ptyRows: number
+  ptyFontSize?: number
 }
 
-type ServerMessage = OutputMessage | ExitMessage | ErrorMessage | ReadyMessage
+interface PrimaryChangedMessage {
+  type: 'primary-changed'
+  isPrimary: boolean
+  ptyCols: number
+  ptyRows: number
+  ptyFontSize?: number
+}
+
+type ServerMessage =
+  | OutputMessage
+  | ExitMessage
+  | ErrorMessage
+  | ReadyMessage
+  | PrimaryChangedMessage
 
 function parseUserAgent(ua: string): { device: string; browser: string } {
   let device = 'Unknown'
@@ -85,6 +116,7 @@ interface WsClientInfo {
   browser: string
   cols: number
   rows: number
+  fontSize: number
 }
 
 const wsInfo = new WeakMap<WebSocket, WsClientInfo>()
@@ -201,6 +233,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     browser: ua.browser,
     cols: 0,
     rows: 0,
+    fontSize: 0,
   })
 
   let shellId: number | null = null
@@ -242,6 +275,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         const info = wsInfo.get(ws)!
         info.cols = message.cols
         info.rows = message.rows
+        info.fontSize = message.fontSize ?? 0
 
         // Check if session already exists (reconnection)
         const existingSession = getSession(shellId)
@@ -263,6 +297,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           )
 
           // Latest client becomes primary (controls PTY dimensions)
+          const previousPrimary = state.primary
           state.primary = ws
 
           // Replay buffer to this client only
@@ -271,8 +306,27 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
             sendMessage(ws, { type: 'output', data })
           }
 
-          // Send ready message
-          sendMessage(ws, { type: 'ready' })
+          // Send ready message — new primary
+          sendMessage(ws, {
+            type: 'ready',
+            isPrimary: true,
+            ptyCols: existingSession.cols,
+            ptyRows: existingSession.rows,
+            ptyFontSize: message.fontSize || undefined,
+          })
+
+          // Demote the previous primary to scaled mode
+          if (previousPrimary && previousPrimary !== ws) {
+            const newFontSize = wsInfo.get(ws)?.fontSize || undefined
+            sendMessage(previousPrimary, {
+              type: 'primary-changed',
+              isPrimary: false,
+              ptyCols: message.cols,
+              ptyRows: message.rows,
+              ptyFontSize: newFontSize,
+            })
+          }
+
           broadcastShellClients(shellId)
 
           // Resize PTY to the new primary's dimensions
@@ -308,8 +362,14 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           return
         }
 
-        // Send ready message
-        sendMessage(ws, { type: 'ready' })
+        // Send ready message — new session, so always primary
+        sendMessage(ws, {
+          type: 'ready',
+          isPrimary: true,
+          ptyCols: message.cols,
+          ptyRows: message.rows,
+          ptyFontSize: message.fontSize || undefined,
+        })
         broadcastShellClients(sid)
         break
       }
@@ -393,6 +453,81 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         )
         break
       }
+
+      case 'claim-primary': {
+        if (shellId === null) {
+          sendMessage(ws, { type: 'error', message: 'Not initialized' })
+          return
+        }
+        const state = shells.get(shellId)
+        if (!state) break
+
+        state.primary = ws
+        const info = wsInfo.get(ws)
+        if (info && info.cols > 0 && info.rows > 0) {
+          resizeSession(shellId, info.cols, info.rows)
+        }
+
+        // Notify all clients about the primary change
+        const session = getSession(shellId)
+        const ptyCols = session?.cols ?? info?.cols ?? 80
+        const ptyRows = session?.rows ?? info?.rows ?? 24
+        const ptyFontSize = info?.fontSize || undefined
+        for (const client of state.clients) {
+          sendMessage(client, {
+            type: 'primary-changed',
+            isPrimary: client === ws,
+            ptyCols,
+            ptyRows,
+            ptyFontSize,
+          })
+        }
+        broadcastShellClients(shellId)
+        break
+      }
+
+      case 'release-primary': {
+        if (shellId === null) {
+          sendMessage(ws, { type: 'error', message: 'Not initialized' })
+          return
+        }
+        const state = shells.get(shellId)
+        if (!state || state.primary !== ws) break
+
+        // Promote another client (first one that isn't the current primary)
+        let next: WebSocket | null = null
+        for (const client of state.clients) {
+          if (client !== ws) {
+            next = client
+            break
+          }
+        }
+
+        if (next) {
+          state.primary = next
+          const nextInfo = wsInfo.get(next)
+          if (nextInfo && nextInfo.cols > 0 && nextInfo.rows > 0) {
+            resizeSession(shellId, nextInfo.cols, nextInfo.rows)
+          }
+          const session = getSession(shellId)
+          const ptyCols = session?.cols ?? nextInfo?.cols ?? 80
+          const ptyRows = session?.rows ?? nextInfo?.rows ?? 24
+          const ptyFontSize = nextInfo?.fontSize || undefined
+          for (const client of state.clients) {
+            sendMessage(client, {
+              type: 'primary-changed',
+              isPrimary: client === next,
+              ptyCols,
+              ptyRows,
+              ptyFontSize,
+            })
+          }
+        }
+        // If no other client, stay primary (nothing to release to)
+
+        broadcastShellClients(shellId)
+        break
+      }
     }
   })
 
@@ -426,6 +561,20 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           const nextInfo = wsInfo.get(next)
           if (nextInfo) {
             resizeSession(shellId, nextInfo.cols, nextInfo.rows)
+          }
+          // Notify all clients about the primary change
+          const session = getSession(shellId)
+          const ptyCols = session?.cols ?? nextInfo?.cols ?? 80
+          const ptyRows = session?.rows ?? nextInfo?.rows ?? 24
+          const ptyFontSize = nextInfo?.fontSize || undefined
+          for (const client of state.clients) {
+            sendMessage(client, {
+              type: 'primary-changed',
+              isPrimary: client === next,
+              ptyCols,
+              ptyRows,
+              ptyFontSize,
+            })
           }
         }
         broadcastShellClients(shellId)

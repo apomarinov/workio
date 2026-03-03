@@ -269,9 +269,21 @@ export function DeviceIcon({
 
 export function MultiClientIndicator() {
   const { allClients } = useTerminalContext()
+  const [isPrimary, setIsPrimary] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ isPrimary: boolean }>) => {
+      setIsPrimary(e.detail.isPrimary)
+    }
+    window.addEventListener('primary-status', handler as EventListener)
+    return () =>
+      window.removeEventListener('primary-status', handler as EventListener)
+  }, [])
+
   if (allClients.length <= 1) return null
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -312,11 +324,27 @@ export function MultiClientIndicator() {
               </div>
               {client.isPrimary && (
                 <div className="text-[10px] text-muted-foreground/60 ml-5.5 mt-0.5">
-                  Controls screen size
+                  Controls shell size
                 </div>
               )}
             </div>
           ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-border">
+          <button
+            type="button"
+            className="w-full text-xs px-2 py-1 rounded-sm transition-colors text-blue-400 hover:bg-accent cursor-pointer"
+            onClick={() => {
+              if (isPrimary) {
+                window.dispatchEvent(new Event('release-primary'))
+              } else {
+                window.dispatchEvent(new Event('claim-primary'))
+              }
+              setIsOpen(false)
+            }}
+          >
+            {isPrimary ? 'Handover shell size' : 'Takeover shell size'}
+          </button>
         </div>
       </PopoverContent>
     </Popover>

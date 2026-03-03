@@ -123,18 +123,158 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     terminalRef.current?.write('', () => {
       sessionLiveRef.current = true
       sessionLiveAtRef.current = Date.now()
+
+      // If non-primary on initial connect, switch to scaled mode
+      if (
+        !isPrimaryRef.current &&
+        ptyDimsRef.current &&
+        terminalRef.current &&
+        containerRef.current
+      ) {
+        applyScaledMode(
+          terminalRef.current,
+          ptyDimsRef.current,
+          containerRef.current,
+        )
+      }
     })
   }, [])
 
+  const isPrimaryRef = useRef(true)
+  const ptyDimsRef = useRef<{ cols: number; rows: number } | null>(null)
+
+  const handlePrimaryChanged = useCallback(
+    (primary: boolean, dims: { cols: number; rows: number }) => {
+      isPrimaryRef.current = primary
+      ptyDimsRef.current = dims
+      const term = terminalRef.current
+      const container = containerRef.current
+      if (!term || !container) return
+
+      if (primary) {
+        // Promoted to primary — remove scaling, re-fit
+        clearScaledMode(container)
+        if (fitAddonRef.current) {
+          fitAddonRef.current.fit()
+          const cols = term.cols
+          const rows = term.rows
+          setDimensions({ cols, rows })
+          sendResizeRef.current(cols, rows)
+        }
+      } else {
+        // Demoted — switch to scaled mode
+        applyScaledMode(term, dims, container)
+      }
+    },
+    [],
+  )
+
   const plusCols = 0
-  const { status, sendInput, sendResize } = useTerminalSocket({
+  const {
+    status,
+    sendInput,
+    sendResize,
+    isPrimary,
+    ptyDimensions,
+    claimPrimary,
+    releasePrimary,
+  } = useTerminalSocket({
     shellId: isCloning ? null : shellId,
     cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
+    fontSize,
     onData: handleData,
     onExit: handleExit,
     onReady: handleReady,
+    onPrimaryChanged: handlePrimaryChanged,
   })
+
+  // Keep refs in sync
+  useEffect(() => {
+    isPrimaryRef.current = isPrimary
+    window.dispatchEvent(
+      new CustomEvent('primary-status', { detail: { isPrimary } }),
+    )
+  }, [isPrimary])
+  useEffect(() => {
+    ptyDimsRef.current = ptyDimensions
+  }, [ptyDimensions])
+
+  // Apply scaled mode: resize xterm to PTY dims and CSS-scale to fit container.
+  // Uses the primary client's font size so the rendered cell grid matches theirs.
+  const applyScaledMode = useCallback(
+    (
+      term: XTerm,
+      dims: { cols: number; rows: number; fontSize?: number },
+      container: HTMLElement,
+    ) => {
+      // Use the primary's font size if available
+      if (dims.fontSize && dims.fontSize > 0) {
+        term.options.fontSize = dims.fontSize
+      }
+
+      // Resize xterm to match PTY dimensions
+      term.resize(dims.cols, dims.rows)
+
+      // Calculate scale factor after xterm re-renders
+      requestAnimationFrame(() => {
+        const xtermEl = container.querySelector('.xterm') as HTMLElement
+        if (!xtermEl) return
+        const xtermScreen = container.querySelector(
+          '.xterm-screen',
+        ) as HTMLElement
+        if (!xtermScreen) return
+        const renderedWidth = xtermScreen.offsetWidth
+        const renderedHeight = xtermScreen.offsetHeight
+        const containerWidth = container.clientWidth
+        const containerHeight = container.clientHeight
+
+        if (renderedWidth > 0 && renderedHeight > 0) {
+          const scaleX = containerWidth / renderedWidth
+          const scaleY = containerHeight / renderedHeight
+          const scale = Math.min(scaleX, scaleY, 1)
+          xtermEl.style.transform = `scale(${scale})`
+          xtermEl.style.transformOrigin = 'top left'
+          // Center vertically and horizontally
+          const scaledW = renderedWidth * scale
+          const scaledH = renderedHeight * scale
+          const offsetX = Math.max(0, (containerWidth - scaledW) / 2)
+          const offsetY = Math.max(0, (containerHeight - scaledH) / 2)
+          xtermEl.style.position = 'absolute'
+          xtermEl.style.left = `${offsetX}px`
+          xtermEl.style.top = `${offsetY}px`
+        }
+      })
+    },
+    [],
+  )
+
+  // Remove scaling and restore normal positioning + local font size
+  const clearScaledMode = useCallback((container: HTMLElement) => {
+    const xtermEl = container.querySelector('.xterm') as HTMLElement
+    if (!xtermEl) return
+    xtermEl.style.transform = ''
+    xtermEl.style.transformOrigin = ''
+    xtermEl.style.position = ''
+    xtermEl.style.left = ''
+    xtermEl.style.top = ''
+    // Restore this client's own font size
+    if (terminalRef.current) {
+      terminalRef.current.options.fontSize = fontSizeRef.current
+    }
+  }, [])
+
+  // Listen for claim-primary / release-primary custom events (from ShellTabs button)
+  useEffect(() => {
+    const handleClaim = () => claimPrimary()
+    const handleRelease = () => releasePrimary()
+    window.addEventListener('claim-primary', handleClaim)
+    window.addEventListener('release-primary', handleRelease)
+    return () => {
+      window.removeEventListener('claim-primary', handleClaim)
+      window.removeEventListener('release-primary', handleRelease)
+    }
+  }, [claimPrimary, releasePrimary])
 
   // Delay showing status bar to avoid flash on quick connections
   const [showStatus, setShowStatus] = useState(false)
@@ -800,7 +940,20 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       if (resizeRafId !== null) cancelAnimationFrame(resizeRafId)
       resizeRafId = requestAnimationFrame(() => {
         resizeRafId = null
-        if (fitAddonRef.current && terminalRef.current) {
+        if (!terminalRef.current || !containerRef.current) return
+
+        // Non-primary: recalculate CSS scale, don't resize PTY
+        if (!isPrimaryRef.current && ptyDimsRef.current) {
+          applyScaledMode(
+            terminalRef.current,
+            ptyDimsRef.current,
+            containerRef.current,
+          )
+          return
+        }
+
+        // Primary: normal fit behavior
+        if (fitAddonRef.current) {
           fitAddonRef.current.fit()
           // Add extra row and column for better coverage
           const cols = terminalRef.current.cols + plusCols
@@ -846,26 +999,43 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
 
   // Re-fit, flush buffered data, and focus when becoming visible
   useEffect(() => {
-    if (isVisible && terminalRef.current && fitAddonRef.current) {
+    if (isVisible && terminalRef.current) {
       // Flush data that arrived while hidden
       if (pendingWritesRef.current.length > 0) {
         const pending = pendingWritesRef.current.join('')
         pendingWritesRef.current = []
         terminalRef.current.write(pending)
       }
-      fitAddonRef.current.fit()
-      const cols = terminalRef.current.cols + plusCols
-      const rows = terminalRef.current.rows
-      terminalRef.current.resize(cols, rows)
-      setDimensions({ cols, rows })
-      sendResizeRef.current(cols, rows)
+      if (!isPrimaryRef.current && ptyDimsRef.current && containerRef.current) {
+        // Non-primary: re-apply scaled mode
+        applyScaledMode(
+          terminalRef.current,
+          ptyDimsRef.current,
+          containerRef.current,
+        )
+      } else if (fitAddonRef.current) {
+        fitAddonRef.current.fit()
+        const cols = terminalRef.current.cols + plusCols
+        const rows = terminalRef.current.rows
+        terminalRef.current.resize(cols, rows)
+        setDimensions({ cols, rows })
+        sendResizeRef.current(cols, rows)
+      }
       terminalRef.current.focus()
     }
   }, [isVisible])
 
   // Update font size when settings change
   useEffect(() => {
-    if (terminalRef.current && fitAddonRef.current) {
+    if (!terminalRef.current) return
+    if (!isPrimaryRef.current && ptyDimsRef.current && containerRef.current) {
+      // Non-primary: applyScaledMode uses the primary's font size, not ours
+      applyScaledMode(
+        terminalRef.current,
+        ptyDimsRef.current,
+        containerRef.current,
+      )
+    } else if (fitAddonRef.current) {
       terminalRef.current.options.fontSize = fontSize
       fitAddonRef.current.fit()
       const { cols, rows } = terminalRef.current
