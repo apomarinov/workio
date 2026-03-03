@@ -70,6 +70,7 @@ import {
 import { getActiveZellijSessionNames } from './pty/process-tree'
 import { initWebPush, markDesktopActive } from './push'
 import logsRoutes from './routes/logs'
+import notificationRoutes from './routes/notifications'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
@@ -846,6 +847,7 @@ await fastify.register(terminalRoutes)
 await fastify.register(settingsRoutes)
 await fastify.register(sessionRoutes)
 await fastify.register(logsRoutes)
+await fastify.register(notificationRoutes)
 
 // Start monitor daemon (persistent Python process for hook events)
 const projectRoot = path.resolve(__dirname, '../..')

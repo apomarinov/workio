@@ -575,13 +575,23 @@ function AppContent() {
         emit('desktop:active')
       }
     }
+    const keyHandler = (e: KeyboardEvent) => {
+      if (
+        e.key === 'Shift' ||
+        e.key === 'Control' ||
+        e.key === 'Alt' ||
+        e.key === 'Meta'
+      )
+        return
+      handler()
+    }
     window.addEventListener('mousemove', handler)
-    window.addEventListener('keydown', handler)
+    window.addEventListener('keydown', keyHandler)
     window.addEventListener('terminal-activity', handler)
     emit('desktop:active')
     return () => {
       window.removeEventListener('mousemove', handler)
-      window.removeEventListener('keydown', handler)
+      window.removeEventListener('keydown', keyHandler)
       window.removeEventListener('terminal-activity', handler)
     }
   }, [emit, hasDevicePushSubscription])

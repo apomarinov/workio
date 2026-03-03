@@ -412,6 +412,19 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe])
 
+  // Subscribe to custom notifications (from POST /api/notifications/send)
+  useEffect(() => {
+    return subscribe<{
+      title: string
+      body: string
+    }>('notification:custom', (data) => {
+      sendNotificationRef.current(`📣 ${data.title}`, {
+        body: data.body,
+        audio: 'done',
+      })
+    })
+  }, [subscribe])
+
   // Clean up notification debounce timers on unmount
   useEffect(() => {
     const debounceMap = notifDebounceRef.current
