@@ -68,6 +68,7 @@ export function MobileKeyboard({
     // as part of a paste blob (which would insert a newline instead of submitting)
     setTimeout(() => sendToTerminal(terminalId, '\r'), 10)
     setInputValue('')
+    if (inputRef?.current) inputRef.current.style.height = ''
     resetModifiers()
   }
 

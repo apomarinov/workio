@@ -567,7 +567,7 @@ function AppContent() {
     if (hasDevicePushSubscription) return
 
     let lastEmit = 0
-    const THROTTLE_MS = 30_000
+    const THROTTLE_MS = 50_000
     const handler = () => {
       const now = Date.now()
       if (now - lastEmit > THROTTLE_MS) {
@@ -586,12 +586,12 @@ function AppContent() {
       handler()
     }
     window.addEventListener('mousemove', handler)
-    window.addEventListener('keydown', keyHandler)
+    window.addEventListener('keydown', keyHandler, true)
     window.addEventListener('terminal-activity', handler)
     emit('desktop:active')
     return () => {
       window.removeEventListener('mousemove', handler)
-      window.removeEventListener('keydown', keyHandler)
+      window.removeEventListener('keydown', keyHandler, true)
       window.removeEventListener('terminal-activity', handler)
     }
   }, [emit, hasDevicePushSubscription])

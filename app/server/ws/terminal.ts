@@ -2,7 +2,7 @@ import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { ShellClient } from '../../shared/types'
-import { setActiveSessionDone } from '../db'
+import { resumePermissionSession, setActiveSessionDone } from '../db'
 import { getIO } from '../io'
 import { log } from '../logger'
 import {
@@ -378,6 +378,37 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         if (shellId === null) {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
+        }
+        // Enter: if session is in permission_needed, resume it to active
+        if (message.data === '\r') {
+          resumePermissionSession(shellId)
+            .then((sessionId) => {
+              if (sessionId) {
+                log.info(
+                  `[ws] Enter resumed permission_needed session=${sessionId} shell=${shellId}`,
+                )
+                const io = getIO()
+                io?.emit('session:updated', {
+                  sessionId,
+                  data: { status: 'active' },
+                })
+                sendPushNotification(
+                  {
+                    title: '',
+                    body: '',
+                    tag: `session:${sessionId}`,
+                    action: 'dismiss',
+                  },
+                  { force: true },
+                )
+              }
+            })
+            .catch((err) => {
+              log.error(
+                { err },
+                `[ws] Failed to resume permission_needed for shell=${shellId}`,
+              )
+            })
         }
         // Ctrl+C: if session is active, mark it done
         if (message.data.includes('\x03')) {

@@ -60,7 +60,7 @@ export function ActionButton({
   }
 
   const playSound = () => {
-    if (withAudio) playPop()
+    // if (withAudio) playPop()
     navigator.vibrate?.(10)
   }
 

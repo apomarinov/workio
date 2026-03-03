@@ -310,6 +310,18 @@ export async function setActiveSessionDone(
   return rows[0]?.session_id ?? null
 }
 
+export async function resumePermissionSession(
+  shellId: number,
+): Promise<string | null> {
+  const { rows } = await pool.query(
+    `UPDATE sessions SET status = 'active', updated_at = NOW()
+     WHERE shell_id = $1 AND status = 'permission_needed'
+     RETURNING session_id`,
+    [shellId],
+  )
+  return rows[0]?.session_id ?? null
+}
+
 export async function deleteSession(sessionId: string): Promise<boolean> {
   // Delete in order: messages (via prompts), prompts, hooks, then session
   const promptResult = await pool.query(

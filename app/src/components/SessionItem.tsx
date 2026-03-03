@@ -250,14 +250,7 @@ export const SessionItem = memo(function SessionItem({
                     <div className="w-[15px] border-l-[1px] border-b-[1px] h-[1220px] -translate-y-full"></div>
                   </div>
                 )}
-                <div
-                  className="text-xs border-[1px] rounded-md line-clamp-3 px-2 text-muted-foreground py-0.5 my-1"
-                  style={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: settings?.message_line_clamp ?? 5,
-                    WebkitBoxOrient: 'vertical',
-                  }}
-                >
+                <div className="max-h-[300px] overflow-y-auto text-xs border-[1px] rounded-md px-2 text-muted-foreground py-0.5 my-1">
                   <MarkdownContent content={session.latest_agent_message} />
                 </div>
               </div>

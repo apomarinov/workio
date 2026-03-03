@@ -158,13 +158,13 @@ export function createOscParser(
     }
 
     // Detect bare bell characters (not OSC terminators)
-    if (onBell && data.includes(BEL)) {
-      // Strip all ESC]...\x07 sequences, then check for remaining \x07
-      const stripped = data.replace(oscBelRegex, '')
-      if (stripped.includes(BEL)) {
-        onBell()
-      }
-    }
+    // TODO: too noisy — no way to ID source of \x07, revisit later
+    // if (onBell && data.includes(BEL)) {
+    //   const stripped = data.replace(oscBelRegex, '')
+    //   if (stripped.includes(BEL)) {
+    //     onBell()
+    //   }
+    // }
 
     // Pass through all data (including OSC sequences - xterm.js handles them fine)
     onData(data)

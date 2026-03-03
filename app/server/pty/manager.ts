@@ -147,12 +147,19 @@ export function getBellSubscribedShellIds(): number[] {
 
 type ShellUpdates = { active_cmd?: string | null }
 
+const IGNORE_SHELL_COMMANDS = ['clear']
+
 function emitShellUpdate(
   terminalId: number,
   shellId: number,
   updates: ShellUpdates,
 ) {
-  if (updates.active_cmd === '') return
+  if (
+    updates.active_cmd === '' ||
+    (updates.active_cmd &&
+      IGNORE_SHELL_COMMANDS.includes(updates.active_cmd.trim()))
+  )
+    return
   updateShell(shellId, updates)
   getIO()?.emit('shell:updated', { terminalId, shellId, data: updates })
 }
@@ -1047,7 +1054,7 @@ function handleWorkerCommandEvent(
 ) {
   switch (event.type) {
     case 'command_start':
-      log.info(`[pty] Command start: "${event.command}"`)
+      log.info(`[pty] ${shellId} Command start: "${event.command}"`)
       emitShellUpdate(terminalId, shellId, {
         active_cmd: event.command || null,
       })
@@ -1066,7 +1073,7 @@ function handleWorkerCommandEvent(
       break
 
     case 'command_end': {
-      log.info(`[pty] Command end: "${handle.currentCommand}"`)
+      log.info(`[pty] ${shellId} Command end: "${handle.currentCommand}"`)
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
       const existing = processPollTimeoutIds.get(terminalId)
       if (existing) {
