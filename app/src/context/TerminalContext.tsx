@@ -20,6 +20,7 @@ import type {
   ShellClientsPayload,
   WorkspacePayload,
 } from '../../shared/types'
+import { useActiveShells } from '../hooks/useActiveShells'
 import { useSettings } from '../hooks/useSettings'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
@@ -90,6 +91,9 @@ interface TerminalContextValue {
   cleanupShellOrder: (terminalId: number, shellId: number) => void
   shellClients: Map<number, ShellClient[]>
   allClients: ShellClient[]
+  activeShells: Record<number, number>
+  activeShellsRef: React.RefObject<Record<number, number>>
+  setShell: (terminalId: number, shellId: number) => void
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -986,6 +990,12 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [terminals, activeTerminalId],
   )
 
+  // Multi-shell state — moved here so all consumers can access via context
+  const { activeShells, activeShellsRef, setShell } = useActiveShells(
+    enrichedTerminals,
+    activeTerminalId,
+  )
+
   const createTerminal = useCallback(
     async (opts: {
       cwd: string
@@ -1097,6 +1107,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       cleanupShellOrder,
       shellClients,
       allClients,
+      activeShells,
+      activeShellsRef,
+      setShell,
     }),
     [
       enrichedTerminals,
@@ -1129,6 +1142,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       cleanupShellOrder,
       shellClients,
       allClients,
+      activeShells,
+      activeShellsRef,
+      setShell,
     ],
   )
 

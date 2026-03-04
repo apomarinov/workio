@@ -24,6 +24,7 @@ interface InitMessage {
   cols: number
   rows: number
   fontSize?: number
+  requestPrimary?: boolean
 }
 
 interface InputMessage {
@@ -117,6 +118,7 @@ interface WsClientInfo {
   cols: number
   rows: number
   fontSize: number
+  activeShellId: number | null
 }
 
 const wsInfo = new WeakMap<WebSocket, WsClientInfo>()
@@ -201,6 +203,8 @@ function broadcastShellClients(shellId: number): void {
       if (ws.readyState !== WebSocket.OPEN) continue
       const info = wsInfo.get(ws)
       if (!info) continue
+      // Only include clients that have this shell as their active shell
+      if (info.activeShellId !== shellId) continue
       clients.push({
         device: info.device,
         browser: info.browser,
@@ -211,6 +215,55 @@ function broadcastShellClients(shellId: number): void {
   }
   const io = getIO()
   io?.emit('shell:clients', { shellId, clients })
+}
+
+/**
+ * Auto-release: when a client claims primary on a shell, release it from
+ * all OTHER shells where the same IP is currently primary.
+ * This ensures each client only controls one shell's PTY dimensions at a time.
+ */
+function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
+  for (const [shellId, state] of shells) {
+    if (shellId === newShellId) continue
+    if (!state.primary) continue
+
+    const primaryInfo = wsInfo.get(state.primary)
+    if (!primaryInfo || primaryInfo.ip !== clientIP) continue
+
+    // This shell has the same IP as primary — release it
+    const releasedWs = state.primary
+    let next: WebSocket | null = null
+    for (const client of state.clients) {
+      if (client !== releasedWs) {
+        next = client
+        break
+      }
+    }
+
+    if (next) {
+      state.primary = next
+      const nextInfo = wsInfo.get(next)
+      if (nextInfo && nextInfo.cols > 0 && nextInfo.rows > 0) {
+        resizeSession(shellId, nextInfo.cols, nextInfo.rows)
+      }
+      const session = getSession(shellId)
+      const ptyCols = session?.cols ?? nextInfo?.cols ?? 80
+      const ptyRows = session?.rows ?? nextInfo?.rows ?? 24
+      const ptyFontSize = nextInfo?.fontSize || undefined
+      for (const client of state.clients) {
+        sendMessage(client, {
+          type: 'primary-changed',
+          isPrimary: client === next,
+          ptyCols,
+          ptyRows,
+          ptyFontSize,
+        })
+      }
+    }
+    // If no other client, the released WS stays primary (no one to promote to)
+
+    broadcastShellClients(shellId)
+  }
 }
 
 wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
@@ -234,6 +287,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     cols: 0,
     rows: 0,
     fontSize: 0,
+    activeShellId: null,
   })
 
   let shellId: number | null = null
@@ -279,6 +333,10 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
 
         // Check if session already exists (reconnection)
         const existingSession = getSession(shellId)
+        const wantsPrimary = message.requestPrimary !== false
+        if (wantsPrimary) {
+          info.activeShellId = shellId
+        }
         if (existingSession) {
           // Clear timeout since client reconnected
           clearSessionTimeout(shellId)
@@ -293,12 +351,8 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           }
           state.clients.add(ws)
           log.info(
-            `[ws] Client connected to shell=${shellId} (reconnect), clients=${state.clients.size}`,
+            `[ws] Client connected to shell=${shellId} (reconnect, requestPrimary=${wantsPrimary}), clients=${state.clients.size}`,
           )
-
-          // Latest client becomes primary (controls PTY dimensions)
-          const previousPrimary = state.primary
-          state.primary = ws
 
           // Replay buffer to this client only
           const buffer = await getSessionBuffer(shellId)
@@ -306,31 +360,48 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
             sendMessage(ws, { type: 'output', data })
           }
 
-          // Send ready message — new primary
-          sendMessage(ws, {
-            type: 'ready',
-            isPrimary: true,
-            ptyCols: existingSession.cols,
-            ptyRows: existingSession.rows,
-            ptyFontSize: message.fontSize || undefined,
-          })
+          if (wantsPrimary || !state.primary) {
+            // Client wants primary (or no primary exists) — promote it
+            autoReleaseOtherShells(clientIP, shellId)
+            const previousPrimary = state.primary
+            state.primary = ws
 
-          // Demote the previous primary to scaled mode
-          if (previousPrimary && previousPrimary !== ws) {
-            const newFontSize = wsInfo.get(ws)?.fontSize || undefined
-            sendMessage(previousPrimary, {
-              type: 'primary-changed',
+            // Send ready message — new primary
+            sendMessage(ws, {
+              type: 'ready',
+              isPrimary: true,
+              ptyCols: existingSession.cols,
+              ptyRows: existingSession.rows,
+              ptyFontSize: message.fontSize || undefined,
+            })
+
+            // Demote the previous primary to scaled mode
+            if (previousPrimary && previousPrimary !== ws) {
+              const newFontSize = wsInfo.get(ws)?.fontSize || undefined
+              sendMessage(previousPrimary, {
+                type: 'primary-changed',
+                isPrimary: false,
+                ptyCols: message.cols,
+                ptyRows: message.rows,
+                ptyFontSize: newFontSize,
+              })
+            }
+
+            // Resize PTY to the new primary's dimensions
+            resizeSession(shellId, message.cols, message.rows)
+          } else {
+            // Client does NOT want primary and an existing primary exists — join passively
+            const primaryInfo = wsInfo.get(state.primary)
+            sendMessage(ws, {
+              type: 'ready',
               isPrimary: false,
-              ptyCols: message.cols,
-              ptyRows: message.rows,
-              ptyFontSize: newFontSize,
+              ptyCols: existingSession.cols,
+              ptyRows: existingSession.rows,
+              ptyFontSize: primaryInfo?.fontSize || undefined,
             })
           }
 
           broadcastShellClients(shellId)
-
-          // Resize PTY to the new primary's dimensions
-          resizeSession(shellId, message.cols, message.rows)
           return
         }
 
@@ -338,6 +409,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         const sid = shellId
         state.clients.add(ws)
         state.primary = ws
+        info.activeShellId = shellId
 
         log.info(
           `[ws] Client connected to shell=${sid} (new session), clients=1`,
@@ -493,6 +565,9 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         const state = shells.get(shellId)
         if (!state) break
 
+        const claimInfo = wsInfo.get(ws)
+        if (claimInfo) claimInfo.activeShellId = shellId
+        autoReleaseOtherShells(clientIP, shellId)
         state.primary = ws
         const info = wsInfo.get(ws)
         if (info && info.cols > 0 && info.rows > 0) {

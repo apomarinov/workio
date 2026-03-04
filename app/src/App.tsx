@@ -20,7 +20,7 @@ import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
-import { MultiClientIndicator, ShellTabs } from './components/ShellTabs'
+import { ShellTabs } from './components/ShellTabs'
 import { Sidebar } from './components/Sidebar'
 
 const SessionChat = lazy(() =>
@@ -35,7 +35,6 @@ import { useNotifications } from './context/NotificationContext'
 import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
-import { useActiveShells } from './hooks/useActiveShells'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useIsMobile } from './hooks/useMediaQuery'
@@ -70,6 +69,9 @@ function AppContent() {
     selectTerminal,
     refetch,
     cleanupShellOrder,
+    activeShells,
+    activeShellsRef,
+    setShell,
   } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe, emit } = useSocket()
@@ -86,12 +88,6 @@ function AppContent() {
   const { settings } = useSettings()
   const shellOrderRef = useRef<Record<number, number[]>>({})
   shellOrderRef.current = settings?.shell_order ?? {}
-
-  // Multi-shell state
-  const { activeShells, activeShellsRef, setShell } = useActiveShells(
-    terminals,
-    activeTerminal?.id ?? null,
-  )
 
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
   const [tabsTop] = useLocalStorage('shell-tabs-top', true)
@@ -901,7 +897,6 @@ function AppContent() {
                         >
                           <SidebarOpen className="w-4 h-4" />
                         </button>
-                        <MultiClientIndicator />
                       </div>
                     </ShellTabs>
                   )}

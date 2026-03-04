@@ -18,6 +18,7 @@ interface UseTerminalSocketOptions {
   cols: number
   rows: number
   fontSize: number
+  isVisible: boolean
   onData: (data: string) => void
   onExit?: (code: number) => void
   onReady?: () => void
@@ -43,6 +44,7 @@ export function useTerminalSocket({
   cols,
   rows,
   fontSize,
+  isVisible,
   onData,
   onExit,
   onReady,
@@ -65,6 +67,7 @@ export function useTerminalSocket({
   const colsRef = useRef(cols)
   const rowsRef = useRef(rows)
   const fontSizeRef = useRef(fontSize)
+  const isVisibleRef = useRef(isVisible)
   const onDataRef = useRef(onData)
   const onExitRef = useRef(onExit)
   const onReadyRef = useRef(onReady)
@@ -82,6 +85,10 @@ export function useTerminalSocket({
   useEffect(() => {
     fontSizeRef.current = fontSize
   }, [fontSize])
+
+  useEffect(() => {
+    isVisibleRef.current = isVisible
+  }, [isVisible])
 
   const onPrimaryChangedRef = useRef(onPrimaryChanged)
 
@@ -187,6 +194,7 @@ export function useTerminalSocket({
             cols: colsRef.current,
             rows: rowsRef.current,
             fontSize: fontSizeRef.current,
+            requestPrimary: isVisibleRef.current,
           }),
         )
       }
@@ -206,11 +214,15 @@ export function useTerminalSocket({
               setStatus('connected')
               setIsPrimary(message.isPrimary ?? true)
               if (message.ptyCols != null && message.ptyRows != null) {
-                setPtyDimensions({
+                const dims: PtyDimensions = {
                   cols: message.ptyCols,
                   rows: message.ptyRows,
                   fontSize: message.ptyFontSize,
-                })
+                }
+                setPtyDimensions(dims)
+                // Sync primary/scaled state immediately so handleReady's
+                // deferred callback sees the correct isPrimaryRef value.
+                onPrimaryChangedRef.current?.(message.isPrimary ?? true, dims)
               }
               onReadyRef.current?.()
               break
@@ -334,6 +346,18 @@ export function useTerminalSocket({
       document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [connect])
+
+  // When this shell becomes visible, claim primary so the server
+  // auto-releases this client from any other shell it was primary on.
+  useEffect(() => {
+    if (
+      isVisible &&
+      wsRef.current?.readyState === WebSocket.OPEN &&
+      initializedRef.current
+    ) {
+      wsRef.current.send(JSON.stringify({ type: 'claim-primary' }))
+    }
+  }, [isVisible])
 
   const sendInput = useCallback((data: string) => {
     if (

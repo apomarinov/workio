@@ -183,6 +183,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     cols: dimensions.cols + plusCols,
     rows: dimensions.rows,
     fontSize,
+    isVisible,
     onData: handleData,
     onExit: handleExit,
     onReady: handleReady,
@@ -193,9 +194,9 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   useEffect(() => {
     isPrimaryRef.current = isPrimary
     window.dispatchEvent(
-      new CustomEvent('primary-status', { detail: { isPrimary } }),
+      new CustomEvent('primary-status', { detail: { shellId, isPrimary } }),
     )
-  }, [isPrimary])
+  }, [isPrimary, shellId])
   useEffect(() => {
     ptyDimsRef.current = ptyDimensions
   }, [ptyDimensions])
@@ -265,9 +266,14 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   }, [])
 
   // Listen for claim-primary / release-primary custom events (from ShellTabs button)
+  // Only respond when this terminal is visible so button clicks target the active shell.
   useEffect(() => {
-    const handleClaim = () => claimPrimary()
-    const handleRelease = () => releasePrimary()
+    const handleClaim = () => {
+      if (isVisibleRef.current) claimPrimary()
+    }
+    const handleRelease = () => {
+      if (isVisibleRef.current) releasePrimary()
+    }
     window.addEventListener('claim-primary', handleClaim)
     window.addEventListener('release-primary', handleRelease)
     return () => {

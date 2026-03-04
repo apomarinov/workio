@@ -266,32 +266,46 @@ export function DeviceIcon({
   }
 }
 
-export function MultiClientIndicator() {
-  const { allClients } = useTerminalContext()
+/** Per-shell client badge — renders inline inside each pill/tab when > 1 clients are connected. */
+function ShellClientsBadge({ shellId }: { shellId: number }) {
+  const { shellClients } = useTerminalContext()
   const [isPrimary, setIsPrimary] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
-    const handler = (e: CustomEvent<{ isPrimary: boolean }>) => {
-      setIsPrimary(e.detail.isPrimary)
+    const handler = (
+      e: CustomEvent<{ shellId: number; isPrimary: boolean }>,
+    ) => {
+      if (e.detail.shellId === shellId) {
+        setIsPrimary(e.detail.isPrimary)
+      }
     }
     window.addEventListener('primary-status', handler as EventListener)
     return () =>
       window.removeEventListener('primary-status', handler as EventListener)
-  }, [])
+  }, [shellId])
 
-  if (allClients.length <= 1) return null
+  const clients = shellClients.get(shellId) ?? []
+
+  if (clients.length <= 1) return null
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation()
+              setIsOpen((o) => !o)
+            }
+          }}
           className="flex items-center gap-0.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer shrink-0"
         >
-          <Monitor className="w-3 h-3" />
-          <span className="text-[10px] font-medium">{allClients.length}</span>
-        </button>
+          <Monitor className="w-2.5 h-2.5" />
+          <span className="text-[10px] font-medium">{clients.length}</span>
+        </div>
       </PopoverTrigger>
       <PopoverContent
         className="w-fit p-2"
@@ -303,7 +317,7 @@ export function MultiClientIndicator() {
           Connected Devices
         </div>
         <div className="space-y-1.5">
-          {allClients.map((client) => (
+          {clients.map((client) => (
             <div key={client.ip}>
               <div className="flex items-center gap-2 text-xs">
                 <DeviceIcon
@@ -344,6 +358,52 @@ export function MultiClientIndicator() {
           >
             {isPrimary ? 'Handover shell size' : 'Takeover shell size'}
           </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** Simple badge for the sidebar — just shows how many clients are connected (no shell-specific controls). */
+export function MultiClientIndicator() {
+  const { allClients } = useTerminalContext()
+
+  if (allClients.length <= 1) return null
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-0.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer shrink-0"
+        >
+          <Monitor className="w-3 h-3" />
+          <span className="text-[10px] font-medium">{allClients.length}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-fit p-2"
+        align="start"
+        side="bottom"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-xs font-medium text-muted-foreground mb-1.5">
+          Connected Devices
+        </div>
+        <div className="space-y-1.5">
+          {allClients.map((client) => (
+            <div key={client.ip} className="flex items-center gap-2 text-xs">
+              <DeviceIcon
+                device={client.device}
+                className="w-3.5 h-3.5 shrink-0 text-muted-foreground"
+              />
+              <span>{client.device}</span>
+              <span className="text-muted-foreground">{client.browser}</span>
+              <span className="text-muted-foreground/60 ml-auto font-mono">
+                {client.ip}
+              </span>
+            </div>
+          ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -424,6 +484,7 @@ function SortableShellPill({
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
       )}
     >
+      {isActive && <ShellClientsBadge shellId={shell.id} />}
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
@@ -538,6 +599,7 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
+      {isActive && <ShellClientsBadge shellId={shell.id} />}
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
