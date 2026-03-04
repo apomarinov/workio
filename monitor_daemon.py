@@ -179,6 +179,38 @@ def resolve_project_path(transcript_path: str) -> str:
     return ''
 
 
+def read_last_assistant_message(transcript_path: str, max_bytes: int = 8192) -> str | None:
+    """Read the last assistant text message from a transcript JSONL file.
+
+    Reads the tail of the file to avoid loading the entire transcript.
+    Returns the text content truncated to 200 chars, or None if not found.
+    """
+    try:
+        path = Path(transcript_path)
+        if not path.exists():
+            return None
+        file_size = path.stat().st_size
+        with open(path, 'rb') as f:
+            f.seek(max(0, file_size - max_bytes))
+            tail = f.read().decode('utf-8', errors='replace')
+        # Parse lines in reverse to find the last assistant message
+        for line in reversed(tail.strip().splitlines()):
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get('type') != 'assistant':
+                continue
+            content = entry.get('message', {}).get('content', [])
+            for block in content:
+                if block.get('type') == 'text' and block.get('text', '').strip():
+                    text = block['text'].strip()
+                    return text[:200]
+    except (OSError, IOError):
+        pass
+    return None
+
+
 def process_event(event: dict, env: dict) -> dict:
     """Process a single hook event. Returns the response dict."""
     with _db_lock:
@@ -235,6 +267,11 @@ def process_event(event: dict, env: dict) -> dict:
                 update_session_name_if_empty(conn, session_id, prompt_text)
                 log(conn, "Created prompt", session_id=session_id, prompt_length=len(prompt_text))
 
+            # Extract last assistant message from transcript for Stop notifications
+            last_message = None
+            if hook_type == 'Stop' and transcript_path:
+                last_message = read_last_assistant_message(transcript_path)
+
             notify(conn, "hook", {
                 "session_id": session_id,
                 "hook_type": hook_type,
@@ -242,6 +279,7 @@ def process_event(event: dict, env: dict) -> dict:
                 "project_path": project_path,
                 "terminal_id": terminal_id,
                 "shell_id": shell_id,
+                **({"last_message": last_message} if last_message else {}),
             })
 
             conn.commit()

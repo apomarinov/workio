@@ -278,6 +278,7 @@ export interface HookEvent {
   project_path: string
   terminal_id: number | null
   shell_id: number | null
+  last_message?: string
 }
 
 export interface ShortcutBinding {

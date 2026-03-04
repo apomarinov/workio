@@ -66,6 +66,18 @@ export function PushNotificationModal({
       const { publicKey } = await res.json()
 
       const reg = await navigator.serviceWorker.ready
+
+      // Remove any existing browser subscription from server before creating new one
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) {
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: existing.endpoint }),
+        })
+        await existing.unsubscribe()
+      }
+
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),

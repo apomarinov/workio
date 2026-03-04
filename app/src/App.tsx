@@ -483,7 +483,10 @@ function AppContent() {
         )
         const terminalName =
           terminal?.name || terminal?.cwd || data.project_path || 'Terminal'
-        const resolved = resolveNotification('stop', { terminalName })
+        const resolved = resolveNotification('stop', {
+          terminalName,
+          lastMessage: data.last_message || '',
+        })
         sendNotification(`${resolved.emoji} ${resolved.title}`, {
           body: resolved.body,
           audio: resolved.audio,

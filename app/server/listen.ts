@@ -122,6 +122,7 @@ export async function initPgListener(
             : null
           const resolved = resolveNotification('stop', {
             terminalName: terminal?.name || 'Claude',
+            lastMessage: payload.last_message || '',
           })
           sendPushNotification({
             title: `${resolved.emoji} ${resolved.title}`,

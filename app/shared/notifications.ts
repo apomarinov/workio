@@ -134,7 +134,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
   stop: {
     emoji: '✅',
     titleTemplate: '{terminalName|Claude}',
-    bodyTemplate: 'Done',
+    bodyTemplate: '{lastMessage|Done}',
     audio: 'done',
   },
   bell_notify: {

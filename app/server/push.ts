@@ -17,6 +17,7 @@ export function markDesktopActive(): void {
 }
 
 export function isDesktopActive(): boolean {
+  return false
   const lastActive = Date.now() - lastActiveAt
   log.info(`[push] desktop last active ${lastActive}/${ACTIVE_TIMEOUT_MS}`)
   return lastActive < ACTIVE_TIMEOUT_MS
@@ -51,8 +52,9 @@ export async function sendPushNotification(
   if (!subscriptions || subscriptions.length === 0) return
 
   const expiredEndpoints: string[] = []
+  const errors: Error[] = []
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     subscriptions.map(async (sub: PushSubscriptionRecord) => {
       try {
         await webPush.sendNotification(
@@ -61,6 +63,7 @@ export async function sendPushNotification(
             keys: sub.keys,
           },
           JSON.stringify(payload),
+          { timeout: 10_000 },
         )
       } catch (err: unknown) {
         const statusCode = (err as { statusCode?: number }).statusCode
@@ -71,6 +74,7 @@ export async function sendPushNotification(
           )
         } else {
           log.error({ err }, '[push] Failed to send push notification')
+          errors.push(err instanceof Error ? err : new Error(String(err)))
         }
       }
     }),
@@ -83,5 +87,11 @@ export async function sendPushNotification(
       (s: PushSubscriptionRecord) => !expiredSet.has(s.endpoint),
     )
     await updateSettings({ push_subscriptions: remaining })
+  }
+
+  // If every subscription failed, throw so callers know
+  const succeeded = results.length - expiredEndpoints.length - errors.length
+  if (results.length > 0 && succeeded <= 0 && errors.length > 0) {
+    throw errors[0]
   }
 }
