@@ -160,6 +160,9 @@ function emitShellUpdate(
       IGNORE_SHELL_COMMANDS.includes(updates.active_cmd.trim()))
   )
     return
+  log.info(
+    `[pty] shell:updated t=${terminalId} s=${shellId} active_cmd=${updates.active_cmd === undefined ? '(unchanged)' : updates.active_cmd === null ? 'null' : `"${updates.active_cmd}"`}`,
+  )
   updateShell(shellId, updates)
   getIO()?.emit('shell:updated', { terminalId, shellId, data: updates })
 }
@@ -300,7 +303,13 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
           h.staleScanCount = 0
         } else {
           h.staleScanCount++
+          log.info(
+            `[pty] t=${terminalId} s=${h.shell.id} stale scan ${h.staleScanCount}/3 for "${h.currentCommand}"`,
+          )
           if (h.staleScanCount >= 3) {
+            log.info(
+              `[pty] t=${terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
+            )
             h.currentCommand = null
             h.staleScanCount = 0
             emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
@@ -359,7 +368,13 @@ async function scanAndEmitAllProcesses() {
           h.staleScanCount = 0
         } else {
           h.staleScanCount++
+          log.info(
+            `[pty] t=${h.terminalId} s=${h.shell.id} stale scan ${h.staleScanCount}/3 for "${h.currentCommand}"`,
+          )
           if (h.staleScanCount >= 3) {
+            log.info(
+              `[pty] t=${h.terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
+            )
             h.currentCommand = null
             h.staleScanCount = 0
             emitShellUpdate(h.terminalId, h.shell.id, { active_cmd: null })
@@ -1064,7 +1079,9 @@ function handleWorkerCommandEvent(
 ) {
   switch (event.type) {
     case 'command_start':
-      log.info(`[pty] ${shellId} Command start: "${event.command}"`)
+      log.info(
+        `[pty] t=${terminalId} s=${shellId} Command start: "${event.command}"`,
+      )
       handle.staleScanCount = 0
       emitShellUpdate(terminalId, shellId, {
         active_cmd: event.command || null,
@@ -1084,7 +1101,9 @@ function handleWorkerCommandEvent(
       break
 
     case 'command_end': {
-      log.info(`[pty] ${shellId} Command end: "${handle.currentCommand}"`)
+      log.info(
+        `[pty] t=${terminalId} s=${shellId} Command end: "${handle.currentCommand}"`,
+      )
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
       const existing = processPollTimeoutIds.get(terminalId)
       if (existing) {

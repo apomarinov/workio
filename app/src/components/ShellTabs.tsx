@@ -119,7 +119,6 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
         ['ended', 'idle'].includes(session.status)
           ? 'text-gray-500'
           : 'text-[#D97757]',
-        'opacity-80',
         'mr-0.5',
       )}
     />

@@ -158,18 +158,25 @@ def start_cleanup_worker() -> None:
     )
 
 
-def derive_project_path(transcript_path: str) -> str:
-    """Derive project path from transcript path.
+def resolve_project_path(transcript_path: str) -> str:
+    """Resolve the real project path from a transcript path.
 
-    Example:
-        transcript: /Users/apo/.claude/projects/-Users-apo-code-workio/xxx.jsonl
-        returns: /Users/apo/code/workio
+    Uses ~/.claude.json projects keys to find the real path that matches
+    the encoded directory name, avoiding the lossy dash-to-slash conversion.
     """
     if not transcript_path:
         return ''
-    path = Path(transcript_path)
-    encoded_path = path.parent.name  # e.g., '-Users-apo-code-workio'
-    return encoded_path.replace('-', '/')
+    encoded_dir = Path(transcript_path).parent.name  # e.g., '-Users-apo-code-trashlab-autumn-lily'
+    claude_json = Path.home() / '.claude.json'
+    try:
+        with open(claude_json) as f:
+            data = json.load(f)
+        for real_path in data.get('projects', {}):
+            if real_path.replace('/', '-') == encoded_dir:
+                return real_path
+    except (json.JSONDecodeError, IOError, OSError):
+        pass
+    return ''
 
 
 def process_event(event: dict, env: dict) -> dict:
@@ -179,7 +186,7 @@ def process_event(event: dict, env: dict) -> dict:
         try:
             session_id = event.get('session_id', 'unknown')
             transcript_path = event.get('transcript_path', '')
-            project_path = derive_project_path(transcript_path) or event.get('cwd', '')
+            project_path = resolve_project_path(transcript_path) or event.get('cwd', '')
             hook_type = event.get('hook_event_name', '')
             terminal_id_str = env.get('WORKIO_TERMINAL_ID')
             terminal_id = int(terminal_id_str) if terminal_id_str else None
