@@ -419,7 +419,7 @@ function SortableShellPill({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/pill flex max-w-[150px] min-w-[60px] items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
+        'group/pill flex max-w-[150px] min-w-[80px] items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
         isActive
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
@@ -526,7 +526,7 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[80px] max-w-[180px] border-t-1',
+        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1',
         hasActivity
           ? isActive
             ? 'border-green-500/80'

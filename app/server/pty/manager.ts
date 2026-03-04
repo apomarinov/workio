@@ -294,13 +294,18 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
         shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
       }
 
-      // Clear stale active_cmd if no actual process found
-      if (
-        h.currentCommand &&
-        !procs.some((p) => p.source === 'direct' && p.pid > 0)
-      ) {
-        h.currentCommand = null
-        emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
+      // Clear stale active_cmd if no actual process found after multiple scans
+      if (h.currentCommand) {
+        if (procs.some((p) => p.source === 'direct' && p.pid > 0)) {
+          h.staleScanCount = 0
+        } else {
+          h.staleScanCount++
+          if (h.staleScanCount >= 3) {
+            h.currentCommand = null
+            h.staleScanCount = 0
+            emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
+          }
+        }
       }
     }),
   )
@@ -348,13 +353,18 @@ async function scanAndEmitAllProcesses() {
         shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
       }
 
-      // Clear stale active_cmd if no actual process found
-      if (
-        h.currentCommand &&
-        !procs.some((p) => p.source === 'direct' && p.pid > 0)
-      ) {
-        h.currentCommand = null
-        emitShellUpdate(h.terminalId, h.shell.id, { active_cmd: null })
+      // Clear stale active_cmd if no actual process found after multiple scans
+      if (h.currentCommand) {
+        if (procs.some((p) => p.source === 'direct' && p.pid > 0)) {
+          h.staleScanCount = 0
+        } else {
+          h.staleScanCount++
+          if (h.staleScanCount >= 3) {
+            h.currentCommand = null
+            h.staleScanCount = 0
+            emitShellUpdate(h.terminalId, h.shell.id, { active_cmd: null })
+          }
+        }
       }
     }),
   )
@@ -1055,6 +1065,7 @@ function handleWorkerCommandEvent(
   switch (event.type) {
     case 'command_start':
       log.info(`[pty] ${shellId} Command start: "${event.command}"`)
+      handle.staleScanCount = 0
       emitShellUpdate(terminalId, shellId, {
         active_cmd: event.command || null,
       })

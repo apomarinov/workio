@@ -52,6 +52,7 @@ export interface WorkerHandle {
   // Cached state from worker
   isIdle: boolean
   currentCommand: string | null
+  staleScanCount: number
   sessionName: string
   shell: Shell
   cols: number
@@ -399,6 +400,7 @@ export async function createSession(
     onCommandEvent: onCommandEvent || null,
     isIdle: true,
     currentCommand: null,
+    staleScanCount: 0,
     sessionName,
     shell: shellRecord,
     cols,
