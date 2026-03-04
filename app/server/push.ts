@@ -17,7 +17,6 @@ export function markDesktopActive(): void {
 }
 
 export function isDesktopActive(): boolean {
-  return false
   const lastActive = Date.now() - lastActiveAt
   log.info(`[push] desktop last active ${lastActive}/${ACTIVE_TIMEOUT_MS}`)
   return lastActive < ACTIVE_TIMEOUT_MS
@@ -43,18 +42,20 @@ export async function sendPushNotification(
     data?: Record<string, unknown>
   },
   options?: { force?: boolean },
-): Promise<void> {
-  if (!initialized) return
-  if (!options?.force && isDesktopActive()) return
+): Promise<{ success: boolean; error?: string }> {
+  if (!initialized) return { success: false, error: 'Push not initialized' }
+  if (!options?.force && isDesktopActive())
+    return { success: false, error: 'Desktop active' }
 
   const settings = await getSettings()
   const subscriptions = settings.push_subscriptions
-  if (!subscriptions || subscriptions.length === 0) return
+  if (!subscriptions || subscriptions.length === 0)
+    return { success: false, error: 'No subscriptions' }
 
   const expiredEndpoints: string[] = []
-  const errors: Error[] = []
+  const failures: { endpoint: string; error: Error }[] = []
 
-  const results = await Promise.allSettled(
+  await Promise.allSettled(
     subscriptions.map(async (sub: PushSubscriptionRecord) => {
       try {
         await webPush.sendNotification(
@@ -69,12 +70,11 @@ export async function sendPushNotification(
         const statusCode = (err as { statusCode?: number }).statusCode
         if (statusCode === 410 || statusCode === 404) {
           expiredEndpoints.push(sub.endpoint)
-          log.info(
-            `[push] Removing expired subscription: ${sub.endpoint.slice(0, 60)}...`,
-          )
         } else {
-          log.error({ err }, '[push] Failed to send push notification')
-          errors.push(err instanceof Error ? err : new Error(String(err)))
+          failures.push({
+            endpoint: sub.endpoint,
+            error: err instanceof Error ? err : new Error(String(err)),
+          })
         }
       }
     }),
@@ -87,11 +87,22 @@ export async function sendPushNotification(
       (s: PushSubscriptionRecord) => !expiredSet.has(s.endpoint),
     )
     await updateSettings({ push_subscriptions: remaining })
+    log.info(
+      `[push] Removed ${expiredEndpoints.length} expired subscription(s)`,
+    )
   }
 
-  // If every subscription failed, throw so callers know
-  const succeeded = results.length - expiredEndpoints.length - errors.length
-  if (results.length > 0 && succeeded <= 0 && errors.length > 0) {
-    throw errors[0]
+  if (failures.length > 0) {
+    const detail = failures.map((f) => ({
+      endpoint: f.endpoint.slice(0, 60),
+      error: f.error.message,
+    }))
+    log.error(
+      { payload, failures: detail },
+      `[push] ${failures.length}/${subscriptions.length} subscription(s) failed`,
+    )
+    return { success: false, error: detail.map((d) => d.error).join('; ') }
   }
+
+  return { success: true }
 }
