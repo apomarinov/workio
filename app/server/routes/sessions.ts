@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -481,7 +482,16 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // Step 2: Update sessions-index.json
+      // Step 2: Append meta message to transcript so Claude knows the project moved
+      await appendMoveMetaMessage(
+        sessionSshHost,
+        resolvePath(targetTranscript),
+        id,
+        sourceProjectPath,
+        targetProjectPath,
+      )
+
+      // Step 3: Update sessions-index.json
       if (sessionSshHost) {
         await updateSessionsIndexRemote(
           sessionSshHost,
@@ -501,7 +511,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
         )
       }
 
-      // Step 3: DB update in a transaction
+      // Step 4: DB update in a transaction
       await withTransaction(async (client) => {
         const targetProject = await getProjectByPath(targetProjectPath)
         if (!targetProject) {
@@ -683,4 +693,76 @@ async function updateSessionsIndexRemote(
   entry.projectPath = newProjectPath
   ;(targetData.entries as Record<string, unknown>[]).push(entry)
   await writeRemoteJson(sshHost, targetIndex, targetData)
+}
+
+async function appendMoveMetaMessage(
+  sshHost: string | null,
+  transcriptPath: string,
+  sessionId: string,
+  oldProjectPath: string,
+  newProjectPath: string,
+): Promise<void> {
+  // Read transcript to find last uuid and session metadata
+  let content: string
+  if (sshHost) {
+    const result = await execSSHCommand(
+      sshHost,
+      `cat ${shellEscape(transcriptPath)}`,
+    )
+    content = result.stdout
+  } else {
+    content = await fs.promises.readFile(transcriptPath, 'utf-8')
+  }
+
+  // Scan lines in reverse to find last uuid and pick up version/gitBranch/slug
+  const lines = content.trimEnd().split('\n')
+  let parentUuid: string | null = null
+  let version = ''
+  let gitBranch = ''
+  let slug: string | undefined
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const obj = JSON.parse(lines[i])
+      if (!version && obj.version) version = obj.version
+      if (!gitBranch && obj.gitBranch) gitBranch = obj.gitBranch
+      if (slug === undefined && obj.slug) slug = obj.slug
+      if (!parentUuid && obj.uuid) parentUuid = obj.uuid
+      if (parentUuid && version) break
+    } catch {
+      // skip malformed lines
+    }
+  }
+
+  const metaMessage: Record<string, unknown> = {
+    parentUuid,
+    isSidechain: false,
+    userType: 'external',
+    cwd: newProjectPath,
+    sessionId,
+    version,
+    gitBranch,
+    type: 'user',
+    message: {
+      role: 'user',
+      content:
+        `[Session moved] This session has been moved from ${oldProjectPath} to ${newProjectPath}. ` +
+        `The current working directory is now ${newProjectPath}. ` +
+        'All file paths from previous messages that referenced the old project directory should be understood as now being in the new project directory or missing. ' +
+        'Always use the new project path for any file operations going forward.',
+    },
+    isMeta: true,
+    uuid: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+  }
+  if (slug) metaMessage.slug = slug
+
+  const line = `\n${JSON.stringify(metaMessage)}`
+  if (sshHost) {
+    await execSSHCommand(
+      sshHost,
+      `printf '%s' ${shellEscape(line)} >> ${shellEscape(transcriptPath)}`,
+    )
+  } else {
+    await fs.promises.appendFile(transcriptPath, line)
+  }
 }
