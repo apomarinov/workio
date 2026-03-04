@@ -219,14 +219,25 @@ function broadcastShellClients(shellId: number): void {
 
 /**
  * Auto-release: when a client claims primary on a shell, release it from
- * all OTHER shells where the same IP is currently primary.
- * This ensures each client only controls one shell's PTY dimensions at a time.
+ * all OTHER shells where the same IP is currently primary, and clear
+ * activeShellId on that IP's WS for each other shell so the client count
+ * only reflects clients actively viewing each shell.
  */
 function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
   for (const [shellId, state] of shells) {
     if (shellId === newShellId) continue
-    if (!state.primary) continue
 
+    // Clear activeShellId for this IP's WS on this shell regardless of primary
+    const ipWs = state.devices.get(clientIP)
+    if (ipWs) {
+      const info = wsInfo.get(ipWs)
+      if (info && info.activeShellId === shellId) {
+        info.activeShellId = null
+        broadcastShellClients(shellId)
+      }
+    }
+
+    if (!state.primary) continue
     const primaryInfo = wsInfo.get(state.primary)
     if (!primaryInfo || primaryInfo.ip !== clientIP) continue
 

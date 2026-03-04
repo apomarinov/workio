@@ -266,9 +266,9 @@ export function DeviceIcon({
   }
 }
 
-/** Per-shell client badge — renders inline inside each pill/tab when > 1 clients are connected. */
+/** Per-shell client badge — shows clients that have this shell as their active shell. */
 function ShellClientsBadge({ shellId }: { shellId: number }) {
-  const { shellClients } = useTerminalContext()
+  const { shellClients, allClients } = useTerminalContext()
   const [isPrimary, setIsPrimary] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
 
@@ -286,8 +286,10 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
   }, [shellId])
 
   const clients = shellClients.get(shellId) ?? []
+  const multi = clients.length > 1
 
-  if (clients.length <= 1) return null
+  if (clients.length === 0) return null
+  if (clients.length === 1 && allClients.length <= 1) return null
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -303,7 +305,11 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
           }}
           className="flex items-center gap-0.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer shrink-0"
         >
-          <Monitor className="w-2.5 h-2.5" />
+          {clients.length === 1 ? (
+            <DeviceIcon device={clients[0].device} className="w-2.5 h-2.5" />
+          ) : (
+            <Monitor className="w-2.5 h-2.5" />
+          )}
           <span className="text-[10px] font-medium">{clients.length}</span>
         </div>
       </PopoverTrigger>
@@ -313,9 +319,6 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
         side="bottom"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-xs font-medium text-muted-foreground mb-1.5">
-          Connected Devices
-        </div>
         <div className="space-y-1.5">
           {clients.map((client) => (
             <div key={client.ip}>
@@ -324,7 +327,7 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
                   device={client.device}
                   className={cn(
                     'w-3.5 h-3.5 shrink-0',
-                    client.isPrimary
+                    multi && client.isPrimary
                       ? 'text-blue-400'
                       : 'text-muted-foreground',
                   )}
@@ -335,7 +338,7 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
                   {client.ip}
                 </span>
               </div>
-              {client.isPrimary && (
+              {multi && client.isPrimary && (
                 <div className="text-[10px] text-muted-foreground/60 ml-5.5 mt-0.5">
                   Controls shell size
                 </div>
@@ -343,22 +346,24 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
             </div>
           ))}
         </div>
-        <div className="mt-2 pt-2 border-t border-border">
-          <button
-            type="button"
-            className="w-full text-xs px-2 py-1 rounded-sm transition-colors text-blue-400 hover:bg-accent cursor-pointer"
-            onClick={() => {
-              if (isPrimary) {
-                window.dispatchEvent(new Event('release-primary'))
-              } else {
-                window.dispatchEvent(new Event('claim-primary'))
-              }
-              setIsOpen(false)
-            }}
-          >
-            {isPrimary ? 'Handover shell size' : 'Takeover shell size'}
-          </button>
-        </div>
+        {multi && (
+          <div className="mt-2 pt-2 border-t border-border">
+            <button
+              type="button"
+              className="w-full text-xs px-2 py-1 rounded-sm transition-colors text-blue-400 hover:bg-accent cursor-pointer"
+              onClick={() => {
+                if (isPrimary) {
+                  window.dispatchEvent(new Event('release-primary'))
+                } else {
+                  window.dispatchEvent(new Event('claim-primary'))
+                }
+                setIsOpen(false)
+              }}
+            >
+              {isPrimary ? 'Handover shell size' : 'Takeover shell size'}
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )
@@ -484,7 +489,7 @@ function SortableShellPill({
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
       )}
     >
-      {isActive && <ShellClientsBadge shellId={shell.id} />}
+      <ShellClientsBadge shellId={shell.id} />
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
@@ -599,7 +604,7 @@ function SortableShellTab({
           : 'text-muted-foreground hover:text-foreground',
       )}
     >
-      {isActive && <ShellClientsBadge shellId={shell.id} />}
+      <ShellClientsBadge shellId={shell.id} />
       {shellSession ? (
         <ShellSessionIcon session={shellSession} />
       ) : bellSubscribed ? (
