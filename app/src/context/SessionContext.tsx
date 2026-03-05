@@ -142,6 +142,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     })
   }, [subscribe, mutate])
 
+  // Listen for refetch events from other clients
+  useEffect(() => {
+    return subscribe<{ group: string }>('refetch', ({ group }) => {
+      if (group === 'sessions') mutate()
+    })
+  }, [subscribe, mutate])
+
   useEffect(() => {
     return subscribe<SessionsDeletedEvent>('sessions_deleted', (data) => {
       const deletedSet = new Set(data.session_ids)

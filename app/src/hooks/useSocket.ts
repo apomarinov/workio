@@ -16,6 +16,10 @@ function getSocket(): Socket {
   return socket
 }
 
+export function getSocketId(): string | undefined {
+  return socket?.id
+}
+
 export function useSocket() {
   const socketRef = useRef<Socket>(getSocket())
 

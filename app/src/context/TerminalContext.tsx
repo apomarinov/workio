@@ -518,44 +518,40 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   const hasAnyUnseenPRs = unreadPRData.size > 0
 
-  // Notifications
-  const [notifications, setNotifications] = useState<Notification[]>([])
-
-  // Fetch notifications on mount
-  useEffect(() => {
-    let cancelled = false
-    async function fetchNotifications() {
-      try {
-        const result = await api.getNotifications()
-        if (!cancelled) {
-          setNotifications(result.notifications)
-        }
-      } catch {
-        toast.error('Failed to fetch notifications')
-      }
-    }
-    fetchNotifications()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  // Notifications (SWR-backed for multi-client sync)
+  const { data: notifications = [], mutate: mutateNotifications } = useSWR<
+    Notification[]
+  >('/api/notifications', () =>
+    api.getNotifications().then((r) => r.notifications),
+  )
 
   // Listen for new notifications from socket
   useEffect(() => {
     return subscribe<Notification>('notifications:new', (notification) => {
-      setNotifications((prev) => {
-        // Check if notification already exists (by dedup_hash or id)
-        const exists = prev.some(
-          (n) =>
-            (n.dedup_hash && n.dedup_hash === notification.dedup_hash) ||
-            n.id === notification.id,
-        )
-        if (exists) return prev
-        return [notification, ...prev]
-      })
+      mutateNotifications(
+        (prev) => {
+          if (!prev) return [notification]
+          const exists = prev.some(
+            (n) =>
+              (n.dedup_hash && n.dedup_hash === notification.dedup_hash) ||
+              n.id === notification.id,
+          )
+          if (exists) return prev
+          return [notification, ...prev]
+        },
+        { revalidate: false },
+      )
       refetchUnreadPRData()
     })
-  }, [subscribe, refetchUnreadPRData])
+  }, [subscribe, mutateNotifications, refetchUnreadPRData])
+
+  // Listen for refetch events from other clients
+  useEffect(() => {
+    return subscribe<{ group: string }>('refetch', ({ group }) => {
+      if (group === 'terminals') mutate()
+      if (group === 'notifications') mutateNotifications()
+    })
+  }, [subscribe, mutate, mutateNotifications])
 
   const hasNotifications = notifications.length > 0
 
@@ -573,8 +569,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     async (id: number) => {
       try {
         await api.markNotificationRead(id)
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        mutateNotifications(
+          (prev) => prev?.map((n) => (n.id === id ? { ...n, read: true } : n)),
+          { revalidate: false },
         )
         refetchUnreadPRData()
       } catch (err) {
@@ -583,21 +580,25 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         )
       }
     },
-    [refetchUnreadPRData],
+    [mutateNotifications, refetchUnreadPRData],
   )
 
-  const markNotificationUnread = useCallback(async (id: number) => {
-    try {
-      await api.markNotificationUnread(id)
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: false } : n)),
-      )
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to mark as unread',
-      )
-    }
-  }, [])
+  const markNotificationUnread = useCallback(
+    async (id: number) => {
+      try {
+        await api.markNotificationUnread(id)
+        mutateNotifications(
+          (prev) => prev?.map((n) => (n.id === id ? { ...n, read: false } : n)),
+          { revalidate: false },
+        )
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to mark as unread',
+        )
+      }
+    },
+    [mutateNotifications],
+  )
 
   const markNotificationReadByItem = useCallback(
     async (
@@ -613,16 +614,18 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           commentId,
           reviewId,
         )
-        setNotifications((prev) =>
-          prev.map((n) => {
-            if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
+        mutateNotifications(
+          (prev) =>
+            prev?.map((n) => {
+              if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
+                return n
+              if (commentId && n.data.commentId === commentId)
+                return { ...n, read: true }
+              if (reviewId && n.data.reviewId === reviewId)
+                return { ...n, read: true }
               return n
-            if (commentId && n.data.commentId === commentId)
-              return { ...n, read: true }
-            if (reviewId && n.data.reviewId === reviewId)
-              return { ...n, read: true }
-            return n
-          }),
+            }),
+          { revalidate: false },
         )
         refetchUnreadPRData()
       } catch (err) {
@@ -631,13 +634,15 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         )
       }
     },
-    [refetchUnreadPRData],
+    [mutateNotifications, refetchUnreadPRData],
   )
 
   const markAllNotificationsRead = useCallback(async () => {
     try {
       await api.markAllNotificationsRead()
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      mutateNotifications((prev) => prev?.map((n) => ({ ...n, read: true })), {
+        revalidate: false,
+      })
       setUnreadPRData(new Map())
     } catch (err) {
       toast.error(
@@ -646,18 +651,20 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
           : 'Failed to mark notifications as read',
       )
     }
-  }, [])
+  }, [mutateNotifications])
 
   const markPRNotificationsRead = useCallback(
     async (repo: string, prNumber: number) => {
       try {
         await api.markPRNotificationsRead(repo, prNumber)
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.repo === repo && n.data.prNumber === prNumber
-              ? { ...n, read: true }
-              : n,
-          ),
+        mutateNotifications(
+          (prev) =>
+            prev?.map((n) =>
+              n.repo === repo && n.data.prNumber === prNumber
+                ? { ...n, read: true }
+                : n,
+            ),
+          { revalidate: false },
         )
         setUnreadPRData((prev) => {
           const next = new Map(prev)
@@ -670,20 +677,20 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         )
       }
     },
-    [],
+    [mutateNotifications],
   )
 
   const deleteAllNotifications = useCallback(async () => {
     try {
       await api.deleteAllNotifications()
-      setNotifications([])
+      mutateNotifications([], { revalidate: false })
       setUnreadPRData(new Map())
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to delete notifications',
       )
     }
-  }, [])
+  }, [mutateNotifications])
 
   const updatePRReaction = useCallback(
     (

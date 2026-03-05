@@ -4,6 +4,7 @@ import type {
   MergedPRSummary,
   UnreadPRNotification,
 } from '../../shared/types'
+import { getSocketId } from '../hooks/useSocket'
 import type {
   SessionMessagesResponse,
   SessionSearchMatch,
@@ -15,8 +16,28 @@ import type {
 
 const API_BASE = '/api'
 
+/**
+ * Fetch wrapper that attaches the current socket ID header on mutation requests.
+ * The server uses this to broadcast refetch events to all clients *except* the sender.
+ */
+function apiFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const method = init?.method?.toUpperCase()
+  if (method && method !== 'GET' && method !== 'HEAD') {
+    const socketId = getSocketId()
+    if (socketId) {
+      const headers = new Headers(init?.headers)
+      headers.set('x-socket-id', socketId)
+      return fetch(input, { ...init, headers })
+    }
+  }
+  return fetch(input, init)
+}
+
 export async function getTerminals(): Promise<Terminal[]> {
-  const res = await fetch(`${API_BASE}/terminals`)
+  const res = await apiFetch(`${API_BASE}/terminals`)
   if (!res.ok) throw new Error('Failed to fetch terminals')
   return res.json()
 }
@@ -28,14 +49,14 @@ export interface SSHHostEntry {
 }
 
 export async function getSSHHosts(): Promise<SSHHostEntry[]> {
-  const res = await fetch(`${API_BASE}/ssh/hosts`)
+  const res = await apiFetch(`${API_BASE}/ssh/hosts`)
   if (!res.ok) throw new Error('Failed to fetch SSH hosts')
   return res.json()
 }
 
 export async function getGitHubRepos(query?: string): Promise<string[]> {
   const params = query ? `?q=${encodeURIComponent(query)}` : ''
-  const res = await fetch(`${API_BASE}/github/repos${params}`)
+  const res = await apiFetch(`${API_BASE}/github/repos${params}`)
   if (!res.ok) return []
   const data = await res.json()
   return data.repos
@@ -43,7 +64,7 @@ export async function getGitHubRepos(query?: string): Promise<string[]> {
 
 export async function checkConductor(repo: string): Promise<boolean> {
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/github/conductor?repo=${encodeURIComponent(repo)}`,
     )
     if (!res.ok) return false
@@ -65,7 +86,7 @@ export async function createTerminal(opts: {
   delete_script?: string
   source_terminal_id?: number
 }): Promise<Terminal> {
-  const res = await fetch(`${API_BASE}/terminals`, {
+  const res = await apiFetch(`${API_BASE}/terminals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts),
@@ -84,7 +105,7 @@ export async function updateTerminal(
     settings?: { defaultClaudeCommand?: string } | null
   },
 ): Promise<Terminal> {
-  const res = await fetch(`${API_BASE}/terminals/${id}`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
@@ -103,13 +124,13 @@ export async function deleteTerminal(
   const url = opts?.deleteDirectory
     ? `${API_BASE}/terminals/${id}?deleteDirectory=1`
     : `${API_BASE}/terminals/${id}`
-  const res = await fetch(url, { method: 'DELETE' })
+  const res = await apiFetch(url, { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete terminal')
   return res.status === 202
 }
 
 export async function cancelWorkspace(terminalId: number): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/cancel-workspace`,
     {
       method: 'POST',
@@ -119,7 +140,7 @@ export async function cancelWorkspace(terminalId: number): Promise<void> {
 }
 
 export async function browseFolder(): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/browse-folder`)
+  const res = await apiFetch(`${API_BASE}/browse-folder`)
   if (res.status === 204) return null
   if (!res.ok) throw new Error('Failed to open folder picker')
   const data = await res.json()
@@ -127,7 +148,7 @@ export async function browseFolder(): Promise<string | null> {
 }
 
 export async function openFullDiskAccess(): Promise<void> {
-  await fetch(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
+  await apiFetch(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
 }
 
 export async function openInIDE(
@@ -135,7 +156,7 @@ export async function openInIDE(
   ide: 'cursor' | 'vscode',
   terminalId?: number,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/open-in-ide`, {
+  const res = await apiFetch(`${API_BASE}/open-in-ide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -151,7 +172,7 @@ export async function openInExplorer(
   path: string,
   terminalId?: number,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/open-in-explorer`, {
+  const res = await apiFetch(`${API_BASE}/open-in-explorer`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -189,7 +210,7 @@ export async function listDirectories(
     hidden: hidden ?? false,
   }
   if (sshHost) body.ssh_host = sshHost
-  const res = await fetch(`${API_BASE}/list-directories`, {
+  const res = await apiFetch(`${API_BASE}/list-directories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -205,7 +226,7 @@ export async function createDirectory(
 ): Promise<{ path: string }> {
   const body: Record<string, unknown> = { path: parentPath, name }
   if (sshHost) body.ssh_host = sshHost
-  const res = await fetch(`${API_BASE}/create-directory`, {
+  const res = await apiFetch(`${API_BASE}/create-directory`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -218,7 +239,7 @@ export async function createDirectory(
 }
 
 export async function getSettings(): Promise<Settings> {
-  const res = await fetch(`${API_BASE}/settings`)
+  const res = await apiFetch(`${API_BASE}/settings`)
   if (!res.ok) throw new Error('Failed to fetch settings')
   return res.json()
 }
@@ -226,7 +247,7 @@ export async function getSettings(): Promise<Settings> {
 export async function updateSettings(
   updates: Partial<Omit<Settings, 'id'>>,
 ): Promise<Settings> {
-  const res = await fetch(`${API_BASE}/settings`, {
+  const res = await apiFetch(`${API_BASE}/settings`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
@@ -245,13 +266,13 @@ export interface ActivePermission extends SessionWithProject {
 }
 
 export async function getActivePermissions(): Promise<ActivePermission[]> {
-  const res = await fetch(`${API_BASE}/permissions/active`)
+  const res = await apiFetch(`${API_BASE}/permissions/active`)
   if (!res.ok) throw new Error('Failed to fetch active permissions')
   return res.json()
 }
 
 export async function getClaudeSessions(): Promise<SessionWithProject[]> {
-  const res = await fetch(`${API_BASE}/sessions`)
+  const res = await apiFetch(`${API_BASE}/sessions`)
   if (!res.ok) throw new Error('Failed to fetch sessions')
   return res.json()
 }
@@ -259,7 +280,7 @@ export async function getClaudeSessions(): Promise<SessionWithProject[]> {
 export async function getClaudeSession(
   sessionId: string,
 ): Promise<SessionWithProject> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}`)
+  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}`)
   if (!res.ok) throw new Error('Failed to fetch session')
   return res.json()
 }
@@ -268,7 +289,7 @@ export async function updateSession(
   sessionId: string,
   updates: { name?: string },
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
@@ -277,14 +298,14 @@ export async function updateSession(
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete session')
 }
 
 export async function deleteSessions(ids: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/sessions`, {
+  const res = await apiFetch(`${API_BASE}/sessions`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids }),
@@ -295,7 +316,7 @@ export async function deleteSessions(ids: string[]): Promise<void> {
 export async function cleanupOldSessions(
   weeks: number,
 ): Promise<{ deleted: number }> {
-  const res = await fetch(`${API_BASE}/sessions/cleanup`, {
+  const res = await apiFetch(`${API_BASE}/sessions/cleanup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ weeks }),
@@ -307,7 +328,7 @@ export async function cleanupOldSessions(
 export async function toggleFavoriteSession(
   sessionId: string,
 ): Promise<{ is_favorite: boolean }> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/favorite`, {
+  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}/favorite`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to toggle favorite')
@@ -318,7 +339,7 @@ export async function searchSessionMessages(
   query: string,
   signal?: AbortSignal,
 ): Promise<SessionSearchMatch[]> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/sessions/search?q=${encodeURIComponent(query)}`,
     { signal },
   )
@@ -330,7 +351,7 @@ export async function getClosedPRs(
   repos: string[],
   limit: number,
 ): Promise<MergedPRSummary[]> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/closed-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
   )
   if (!res.ok) throw new Error('Failed to fetch closed PRs')
@@ -342,7 +363,7 @@ export async function getInvolvedPRs(
   repos: string[],
   limit: number,
 ): Promise<InvolvedPRSummary[]> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/involved-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
   )
   if (!res.ok) throw new Error('Failed to fetch involved PRs')
@@ -356,7 +377,7 @@ export async function requestPRReview(
   prNumber: number,
   reviewer: string,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/request-review`,
     {
       method: 'POST',
@@ -376,7 +397,7 @@ export async function mergePR(
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase' = 'squash',
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/merge`,
     {
       method: 'POST',
@@ -395,7 +416,7 @@ export async function closePR(
   repo: string,
   prNumber: number,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/close`,
     { method: 'POST' },
   )
@@ -411,7 +432,7 @@ export async function renamePR(
   prNumber: number,
   title: string,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rename`,
     {
       method: 'POST',
@@ -433,7 +454,7 @@ export async function editPR(
   body: string,
   draft?: boolean,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/edit`,
     {
       method: 'POST',
@@ -452,11 +473,14 @@ export async function renameBranch(
   branch: string,
   newName: string,
 ): Promise<{ success: boolean; branch: string; newName: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/rename-branch`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ branch, newName }),
-  })
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/rename-branch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch, newName }),
+    },
+  )
   const data = await res.json()
   if (!res.ok) {
     throw new Error(data.error || 'Failed to rename branch')
@@ -470,7 +494,7 @@ export async function rerunFailedCheck(
   prNumber: number,
   checkUrl: string,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-check`,
     {
       method: 'POST',
@@ -490,7 +514,7 @@ export async function rerunAllFailedChecks(
   prNumber: number,
   checkUrls: string[],
 ): Promise<{ rerunCount: number }> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-all-checks`,
     {
       method: 'POST',
@@ -511,7 +535,7 @@ export async function addPRComment(
   prNumber: number,
   body: string,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment`,
     {
       method: 'POST',
@@ -532,7 +556,7 @@ export async function replyToReviewComment(
   commentId: number,
   body: string,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/reply/${commentId}`,
     {
       method: 'POST',
@@ -554,7 +578,7 @@ export async function editComment(
   body: string,
   type: 'issue_comment' | 'review_comment' | 'review',
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment/${commentId}`,
     {
       method: 'PATCH',
@@ -576,7 +600,7 @@ export async function addReaction(
   content: string,
   prNumber?: number,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
+  const res = await apiFetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subjectId, subjectType, content, prNumber }),
@@ -595,7 +619,7 @@ export async function removeReaction(
   content: string,
   prNumber?: number,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
+  const res = await apiFetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subjectId, subjectType, content, prNumber }),
@@ -611,7 +635,7 @@ export async function getSessionMessages(
   limit: number,
   offset: number,
 ): Promise<SessionMessagesResponse> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
   )
   if (!res.ok) throw new Error('Failed to fetch session messages')
@@ -632,7 +656,7 @@ export interface BranchesResponse {
 export async function getBranches(
   terminalId: number,
 ): Promise<BranchesResponse> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/branches`)
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/branches`)
   if (!res.ok) {
     const data = await res.json()
     throw new Error(data.error || 'Failed to fetch branches')
@@ -643,7 +667,7 @@ export async function getBranches(
 export async function fetchAll(
   terminalId: number,
 ): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/fetch-all`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/fetch-all`, {
     method: 'POST',
   })
   if (!res.ok) {
@@ -658,7 +682,7 @@ export async function checkoutBranch(
   branch: string,
   isRemote: boolean,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/checkout`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/checkout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ branch, isRemote }),
@@ -674,7 +698,7 @@ export async function pullBranch(
   terminalId: number,
   branch: string,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/pull`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/pull`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ branch }),
@@ -691,7 +715,7 @@ export async function pushBranch(
   branch: string,
   force?: boolean,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/push`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/push`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ branch, force }),
@@ -707,7 +731,7 @@ export async function rebaseBranch(
   terminalId: number,
   branch: string,
 ): Promise<{ success: boolean; branch: string; onto: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/rebase`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/rebase`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ branch }),
@@ -724,11 +748,14 @@ export async function createBranch(
   name: string,
   from: string,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/create-branch`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, from }),
-  })
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/create-branch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, from }),
+    },
+  )
   const data = await res.json()
   if (!res.ok) {
     throw new Error(data.error || 'Failed to create branch')
@@ -746,7 +773,7 @@ export async function deleteBranch(
   deletedRemote?: boolean
   error?: string
 }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/branch`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/branch`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ branch, deleteRemote }),
@@ -765,7 +792,7 @@ export async function commitChanges(
   noVerify?: boolean,
   files?: string[],
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/commit`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/commit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, amend, noVerify, files }),
@@ -781,7 +808,7 @@ export async function discardChanges(
   terminalId: number,
   files: string[],
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/discard`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/discard`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ files }),
@@ -796,7 +823,7 @@ export async function discardChanges(
 export async function getHeadMessage(
   terminalId: number,
 ): Promise<{ message: string }> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/head-message`)
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/head-message`)
   if (!res.ok) {
     const data = await res.json()
     throw new Error(data.error || 'Failed to get HEAD message')
@@ -813,7 +840,7 @@ export async function createPR(
   body: string,
   draft: boolean,
 ): Promise<{ prNumber: number }> {
-  const res = await fetch(`${API_BASE}/github/${owner}/${repo}/pr/create`, {
+  const res = await apiFetch(`${API_BASE}/github/${owner}/${repo}/pr/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ head, base, title, body, draft }),
@@ -838,7 +865,7 @@ export async function checkBranchConflicts(
   base: string,
 ): Promise<{ hasConflicts: boolean }> {
   const params = new URLSearchParams({ head, base })
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/branch-conflicts?${params.toString()}`,
   )
   if (!res.ok) {
@@ -854,7 +881,7 @@ export async function getCommitsBetween(
   head: string,
 ): Promise<{ commits: PRCommit[]; noRemote?: boolean }> {
   const params = new URLSearchParams({ head, base })
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/commits?${params.toString()}`,
   )
   if (!res.ok) {
@@ -880,7 +907,7 @@ export async function getBranchCommits(
     limit: String(limit),
     offset: String(offset),
   })
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/branch-commits?${params.toString()}`,
   )
   if (!res.ok) {
@@ -895,7 +922,7 @@ export async function getChangedFiles(
   base?: string,
 ): Promise<{ files: ChangedFile[] }> {
   const params = base ? `?base=${encodeURIComponent(base)}` : ''
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/changed-files${params}`,
   )
   if (!res.ok) {
@@ -914,7 +941,7 @@ export async function getFileDiff(
   const context = fullFile ? '99999' : '5'
   const params = new URLSearchParams({ path: filePath, context })
   if (base) params.set('base', base)
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
   )
   if (!res.ok) {
@@ -930,7 +957,7 @@ export async function createWebhook(
   owner: string,
   repo: string,
 ): Promise<{ webhookId?: number }> {
-  const res = await fetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
+  const res = await apiFetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
     method: 'POST',
   })
   if (!res.ok) {
@@ -944,7 +971,7 @@ export async function deleteWebhook(
   owner: string,
   repo: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
+  const res = await apiFetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
     method: 'DELETE',
   })
   if (!res.ok) {
@@ -957,7 +984,7 @@ export async function recreateWebhook(
   owner: string,
   repo: string,
 ): Promise<{ webhookId?: number }> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/github/webhooks/${owner}/${repo}/recreate`,
     {
       method: 'POST',
@@ -971,9 +998,12 @@ export async function recreateWebhook(
 }
 
 export async function testWebhook(owner: string, repo: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
-    method: 'POST',
-  })
+  const res = await apiFetch(
+    `${API_BASE}/github/webhooks/${owner}/${repo}/test`,
+    {
+      method: 'POST',
+    },
+  )
   if (!res.ok) {
     const data = await res.json()
     throw new Error(data.error || 'Failed to test webhook')
@@ -988,7 +1018,7 @@ export async function getNotifications(
   limit = 50,
   offset = 0,
 ): Promise<{ notifications: Notification[]; total: number }> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/notifications?limit=${limit}&offset=${offset}`,
   )
   if (!res.ok) throw new Error('Failed to fetch notifications')
@@ -996,7 +1026,7 @@ export async function getNotifications(
 }
 
 export async function markAllNotificationsRead(): Promise<{ count: number }> {
-  const res = await fetch(`${API_BASE}/notifications/mark-all-read`, {
+  const res = await apiFetch(`${API_BASE}/notifications/mark-all-read`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to mark notifications as read')
@@ -1009,7 +1039,7 @@ export async function markNotificationReadByItem(
   commentId?: number,
   reviewId?: number,
 ): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/notifications/item-read`, {
+  const res = await apiFetch(`${API_BASE}/notifications/item-read`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repo, prNumber, commentId, reviewId }),
@@ -1022,7 +1052,7 @@ export async function markPRNotificationsRead(
   repo: string,
   prNumber: number,
 ): Promise<{ count: number }> {
-  const res = await fetch(`${API_BASE}/notifications/pr-read`, {
+  const res = await apiFetch(`${API_BASE}/notifications/pr-read`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repo, prNumber }),
@@ -1034,7 +1064,7 @@ export async function markPRNotificationsRead(
 export async function markNotificationRead(
   id: number,
 ): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+  const res = await apiFetch(`${API_BASE}/notifications/${id}/read`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to mark notification as read')
@@ -1044,7 +1074,7 @@ export async function markNotificationRead(
 export async function markNotificationUnread(
   id: number,
 ): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/notifications/${id}/unread`, {
+  const res = await apiFetch(`${API_BASE}/notifications/${id}/unread`, {
     method: 'POST',
   })
   if (!res.ok) throw new Error('Failed to mark notification as unread')
@@ -1054,13 +1084,13 @@ export async function markNotificationUnread(
 export async function getUnreadPRNotifications(): Promise<
   UnreadPRNotification[]
 > {
-  const res = await fetch(`${API_BASE}/notifications/pr-unread`)
+  const res = await apiFetch(`${API_BASE}/notifications/pr-unread`)
   if (!res.ok) throw new Error('Failed to fetch unread PR notifications')
   return res.json()
 }
 
 export async function deleteAllNotifications(): Promise<{ count: number }> {
-  const res = await fetch(`${API_BASE}/notifications`, {
+  const res = await apiFetch(`${API_BASE}/notifications`, {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error('Failed to delete notifications')
@@ -1073,7 +1103,7 @@ export async function createShellForTerminal(
   terminalId: number,
   name?: string,
 ): Promise<Shell> {
-  const res = await fetch(`${API_BASE}/terminals/${terminalId}/shells`, {
+  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/shells`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -1086,7 +1116,7 @@ export async function createShellForTerminal(
 }
 
 export async function deleteShell(shellId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/shells/${shellId}`, {
+  const res = await apiFetch(`${API_BASE}/shells/${shellId}`, {
     method: 'DELETE',
   })
   if (!res.ok) {
@@ -1099,7 +1129,7 @@ export async function writeToShell(
   shellId: number,
   data: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/shells/${shellId}/write`, {
+  const res = await apiFetch(`${API_BASE}/shells/${shellId}/write`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data }),
@@ -1111,7 +1141,7 @@ export async function writeToShell(
 }
 
 export async function interruptShell(shellId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/shells/${shellId}/interrupt`, {
+  const res = await apiFetch(`${API_BASE}/shells/${shellId}/interrupt`, {
     method: 'POST',
   })
   if (!res.ok) {
@@ -1121,7 +1151,7 @@ export async function interruptShell(shellId: number): Promise<void> {
 }
 
 export async function killShell(shellId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/shells/${shellId}/kill`, {
+  const res = await apiFetch(`${API_BASE}/shells/${shellId}/kill`, {
     method: 'POST',
   })
   if (!res.ok) {
@@ -1134,7 +1164,7 @@ export async function renameShell(
   shellId: number,
   name: string,
 ): Promise<Shell> {
-  const res = await fetch(`${API_BASE}/shells/${shellId}`, {
+  const res = await apiFetch(`${API_BASE}/shells/${shellId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -1153,7 +1183,7 @@ import type { MoveTarget } from '../types'
 export async function getMoveTargets(
   sessionId: string,
 ): Promise<{ targets: MoveTarget[] }> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/move-targets`)
+  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}/move-targets`)
   if (!res.ok) {
     const data = await res.json()
     throw new Error(data.error || 'Failed to fetch move targets')
@@ -1166,7 +1196,7 @@ export async function moveSession(
   targetProjectPath: string,
   targetTerminalId: number,
 ): Promise<{ snapshotDir?: string }> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/move`, {
+  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}/move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ targetProjectPath, targetTerminalId }),

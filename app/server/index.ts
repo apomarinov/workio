@@ -56,7 +56,7 @@ import {
   testWebhook,
   verifyWebhookSignature,
 } from './github/webhooks'
-import { setIO } from './io'
+import { broadcastRefetch, type RefetchGroup, setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import {
@@ -913,6 +913,33 @@ fastify.post<{ Params: { id: string } }>(
 fastify.delete('/api/notifications', async () => {
   const count = await deleteAllNotifications()
   return { count }
+})
+
+// Broadcast refetch events to all clients after successful mutations
+const REFETCH_ROUTES: [string, RefetchGroup][] = [
+  ['/api/terminals', 'terminals'],
+  ['/api/shells', 'terminals'],
+  ['/api/sessions', 'sessions'],
+  ['/api/settings', 'settings'],
+  ['/api/notifications', 'notifications'],
+]
+const MUTATION_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
+
+fastify.addHook('onResponse', (request, reply, done) => {
+  if (
+    MUTATION_METHODS.has(request.method) &&
+    reply.statusCode >= 200 &&
+    reply.statusCode < 300
+  ) {
+    const excludeSocketId = request.headers['x-socket-id'] as string | undefined
+    for (const [prefix, group] of REFETCH_ROUTES) {
+      if (request.url.startsWith(prefix)) {
+        broadcastRefetch(group, excludeSocketId)
+        break
+      }
+    }
+  }
+  done()
 })
 
 // Routes

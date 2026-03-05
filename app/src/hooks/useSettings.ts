@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import useSWR from 'swr'
 import * as api from '../lib/api'
 import { migrateKeymap, type Settings } from '../types'
+import { useSocket } from './useSocket'
 
 async function fetchSettings(): Promise<Settings> {
   const settings = await api.getSettings()
@@ -12,11 +14,19 @@ async function fetchSettings(): Promise<Settings> {
 }
 
 export function useSettings() {
+  const { subscribe } = useSocket()
   const { data, error, isLoading, mutate } = useSWR<Settings>(
     '/api/settings',
     fetchSettings,
     { refreshInterval: 5 * 60 * 1000 }, // Refresh every 5 minutes
   )
+
+  // Listen for refetch events from other clients
+  useEffect(() => {
+    return subscribe<{ group: string }>('refetch', ({ group }) => {
+      if (group === 'settings') mutate()
+    })
+  }, [subscribe, mutate])
 
   const updateSettings = async (updates: Partial<Omit<Settings, 'id'>>) => {
     const optimistic = data ? { ...data, ...updates } : undefined
