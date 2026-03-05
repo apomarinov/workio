@@ -3,7 +3,7 @@ import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { ShellClient } from '../../shared/types'
 import { resumePermissionSession, setActiveSessionDone } from '../db'
-import { getIO } from '../io'
+import { getIO, parseUserAgent } from '../io'
 import { log } from '../logger'
 import {
   attachSession,
@@ -91,24 +91,6 @@ type ServerMessage =
   | ErrorMessage
   | ReadyMessage
   | PrimaryChangedMessage
-
-function parseUserAgent(ua: string): { device: string; browser: string } {
-  let device = 'Unknown'
-  if (/iPhone/i.test(ua)) device = 'iPhone'
-  else if (/iPad/i.test(ua)) device = 'iPad'
-  else if (/Android/i.test(ua)) device = 'Android'
-  else if (/Macintosh/i.test(ua)) device = 'Mac'
-  else if (/Windows/i.test(ua)) device = 'Windows'
-  else if (/Linux/i.test(ua)) device = 'Linux'
-
-  let browser = 'Unknown'
-  if (/Edg\//i.test(ua)) browser = 'Edge'
-  else if (/Chrome\//i.test(ua)) browser = 'Chrome'
-  else if (/Safari\//i.test(ua)) browser = 'Safari'
-  else if (/Firefox\//i.test(ua)) browser = 'Firefox'
-
-  return { device, browser }
-}
 
 // Per-WebSocket metadata (set once at connection time)
 interface WsClientInfo {
