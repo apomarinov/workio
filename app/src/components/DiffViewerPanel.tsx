@@ -8,7 +8,13 @@ import {
   Undo2,
 } from 'lucide-react'
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Group, Panel, type PanelSize, Separator } from 'react-resizable-panels'
+import {
+  Group,
+  Panel,
+  type PanelSize,
+  Separator,
+  useDefaultLayout,
+} from 'react-resizable-panels'
 import useSWR from 'swr'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -593,6 +599,11 @@ export function DiffViewerPanel({
     }
   }, [externalFiles, internalData, base])
 
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: 'diff-files-layout',
+    storage: localStorage,
+  })
+
   return (
     <Group
       orientation="horizontal"
@@ -600,6 +611,8 @@ export function DiffViewerPanel({
         'min-h-0 flex-1 overflow-hidden',
         !integrated && 'rounded-md border border-zinc-700',
       )}
+      defaultLayout={defaultLayout}
+      onLayoutChanged={onLayoutChanged}
     >
       {/* Left column: file list */}
       <Panel
