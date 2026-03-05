@@ -181,6 +181,15 @@ body {
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
 }
 
+/* Hide scrollbars (iOS + Safari + Chrome + Firefox) */
+.no-scrollbar {
+  -ms-overflow-style: none;   /* IE/Edge legacy */
+  scrollbar-width: none;      /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;              /* iOS Safari / WebKit */
+}
+
 .xterm .xterm-scrollable-element > .scrollbar.vertical {
   width: 8px !important;
   margin-right: 2px;

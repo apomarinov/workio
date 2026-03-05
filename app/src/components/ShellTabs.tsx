@@ -1006,6 +1006,9 @@ export function ShellTabs({
           className,
         )}
       >
+        {isMobile && (
+          <div className="absolute top-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
+        )}
         {tabBar && (
           <div className="absolute bottom-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
         )}
@@ -1015,7 +1018,7 @@ export function ShellTabs({
           {/* <400px: pills (hidden on mobile) */}
           <div
             className={cn(
-              'flex gap-1 items-center @[400px]/shells:hidden',
+              'flex gap-1 items-center @[400px]/shells:hidden no-scrollbar',
               isMobile && 'hidden',
               wrap ? 'flex-wrap' : 'overflow-x-auto flex-nowrap p-0.5',
             )}

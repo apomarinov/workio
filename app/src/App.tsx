@@ -1,6 +1,4 @@
 import {
-  Keyboard,
-  KeyboardOff,
   LayoutGrid,
   Plus,
   Settings,
@@ -764,6 +762,7 @@ function AppContent() {
               onOpenSidebar={
                 isMobile ? () => setMobileSidebarOpen(true) : undefined
               }
+              hideAvatars={isMobile}
             />
           </Suspense>
         </div>
@@ -885,18 +884,6 @@ function AppContent() {
                       className="pr-2 bg-[#1a1a1a]"
                       rightExtra={
                         <div className="flex items-center gap-0.5">
-                          {mobileKeyboardMode === 'hidden' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                mobileInputRef.current?.focus()
-                                setMobileKeyboardMode('input')
-                              }}
-                              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                            >
-                              <Keyboard className="w-4 h-4" />
-                            </button>
-                          )}
                           {mobileKeyboardMode === 'input' && (
                             <>
                               <button
@@ -918,13 +905,6 @@ function AppContent() {
                                 className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                               >
                                 <LayoutGrid className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setMobileKeyboardMode('hidden')}
-                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <KeyboardOff className="w-4 h-4" />
                               </button>
                             </>
                           )}
@@ -950,13 +930,6 @@ function AppContent() {
                                 className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                               >
                                 <Settings className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setMobileKeyboardMode('hidden')}
-                                className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                <KeyboardOff className="w-4 h-4" />
                               </button>
                             </>
                           )}

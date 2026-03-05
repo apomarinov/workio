@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { DEFAULT_KEYBOARD_ROWS } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
@@ -67,6 +68,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     missingCount,
     orphanedCount,
   } = useWebhookWarning()
+  const isMobile = useIsMobile()
 
   // Open settings + customize keyboard when triggered from command palette
   useEffect(() => {
@@ -126,7 +128,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-sidebar max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className={cn(
+          'bg-sidebar overflow-y-auto',
+          isMobile ? 'max-h-[70vh]' : 'max-h-[90vh]',
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
