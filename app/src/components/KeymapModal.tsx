@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ChevronUp,
   Command,
+  CornerDownLeft,
   MouseLeft,
   Option,
   RotateCcw,
@@ -72,6 +73,7 @@ function renderKey(key: string): ReactNode {
   if (key === 'ArrowDown') return <ArrowDown className={cls} />
   if (key === 'ArrowLeft') return <ArrowLeft className={cls} />
   if (key === 'ArrowRight') return <ArrowRight className={cls} />
+  if (key === 'Enter') return <CornerDownLeft className={cls} />
   return <span>{key.toUpperCase()}</span>
 }
 
@@ -81,6 +83,7 @@ function formatKeyDisplay(key: string): ReactNode {
   if (key === 'arrowdown') return <ArrowDown className={cls} />
   if (key === 'arrowleft') return <ArrowLeft className={cls} />
   if (key === 'arrowright') return <ArrowRight className={cls} />
+  if (key === 'enter') return <CornerDownLeft className={cls} />
   // Map code-based names to display characters
   const display = CODE_TO_DISPLAY[key]
   if (display) return <span>{display.toUpperCase()}</span>
@@ -366,6 +369,11 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
           </DialogHeader>
 
           <div className="space-y-1.5 max-h-[75vh] overflow-y-auto pr-1">
+            <div className="pb-1 border-b border-zinc-700">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                General
+              </span>
+            </div>
             <ShortcutRow
               label="Command Palette"
               binding={bindings.palette}
@@ -380,6 +388,76 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(bindings.palette)}
               hasConflict={hasConflict || duplicates.has('palette')}
             />
+            <ShortcutRow
+              label="Settings"
+              binding={bindings.settings}
+              isRecording={recording === 'settings'}
+              recordingKeys={recording === 'settings' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'settings' ? null : 'settings')
+              }
+              onReset={() => setBinding('settings', DEFAULT_KEYMAP.settings)}
+              onUnset={() => setBinding('settings', null)}
+              hasConflict={duplicates.has('settings')}
+              defaultBinding={DEFAULT_KEYMAP.settings}
+              display={formatBinding(bindings.settings)}
+            />
+            <ShortcutRow
+              label="Collapse All"
+              binding={bindings.collapseAll}
+              isRecording={recording === 'collapseAll'}
+              recordingKeys={recording === 'collapseAll' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'collapseAll' ? null : 'collapseAll')
+              }
+              onReset={() =>
+                setBinding('collapseAll', DEFAULT_KEYMAP.collapseAll)
+              }
+              onUnset={() => setBinding('collapseAll', null)}
+              defaultBinding={DEFAULT_KEYMAP.collapseAll}
+              display={formatBinding(bindings.collapseAll)}
+              hasConflict={duplicates.has('collapseAll')}
+            />
+            <ShortcutRow
+              label="Custom Commands"
+              binding={bindings.customCommands}
+              isRecording={recording === 'customCommands'}
+              recordingKeys={
+                recording === 'customCommands' ? recordingKeys : []
+              }
+              onRecord={() =>
+                setRecording(
+                  recording === 'customCommands' ? null : 'customCommands',
+                )
+              }
+              onReset={() =>
+                setBinding('customCommands', DEFAULT_KEYMAP.customCommands)
+              }
+              onUnset={() => setBinding('customCommands', null)}
+              hasConflict={duplicates.has('customCommands')}
+              defaultBinding={DEFAULT_KEYMAP.customCommands}
+              display={formatBinding(bindings.customCommands)}
+            />
+            <ShortcutRow
+              label="Toggle PiP Window"
+              binding={bindings.togglePip}
+              isRecording={recording === 'togglePip'}
+              recordingKeys={recording === 'togglePip' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'togglePip' ? null : 'togglePip')
+              }
+              onReset={() => setBinding('togglePip', DEFAULT_KEYMAP.togglePip)}
+              onUnset={() => setBinding('togglePip', null)}
+              defaultBinding={DEFAULT_KEYMAP.togglePip}
+              display={formatBinding(bindings.togglePip)}
+              hasConflict={duplicates.has('togglePip')}
+            />
+
+            <div className="pt-4 pb-1 border-b border-zinc-700">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Projects
+              </span>
+            </div>
             <ShortcutRow
               label="Go to project"
               binding={bindings.goToTab}
@@ -397,7 +475,24 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               )}
               hasConflict={duplicates.has('goToTab')}
             />
-            <div className="pt-2 border-t border-zinc-700">
+            <ShortcutRow
+              label="Actions"
+              binding={bindings.itemActions}
+              isRecording={recording === 'itemActions'}
+              recordingKeys={recording === 'itemActions' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'itemActions' ? null : 'itemActions')
+              }
+              onReset={() =>
+                setBinding('itemActions', DEFAULT_KEYMAP.itemActions)
+              }
+              onUnset={() => setBinding('itemActions', null)}
+              defaultBinding={DEFAULT_KEYMAP.itemActions}
+              display={formatBinding(bindings.itemActions)}
+              hasConflict={duplicates.has('itemActions')}
+            />
+
+            <div className="pt-4 pb-1 border-b border-zinc-700">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Shells
               </span>
@@ -477,86 +572,6 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(bindings.nextShell)}
               hasConflict={duplicates.has('nextShell')}
             />
-            <InfoShortcutRow label="Focus active shell" display="TAB" />
-            <InfoShortcutRow
-              label="Open file in IDE"
-              display={<MouseLeft className={ICON_CLASS} />}
-            />
-            <InfoShortcutRow
-              label="Open file in Finder"
-              display={
-                <span className="inline-flex items-center gap-1">
-                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
-                  <MouseLeft className={ICON_CLASS} />
-                </span>
-              }
-            />
-
-            <div className="pt-2 border-t border-zinc-700">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Other
-              </span>
-            </div>
-            <ShortcutRow
-              label="Toggle PiP Window"
-              binding={bindings.togglePip}
-              isRecording={recording === 'togglePip'}
-              recordingKeys={recording === 'togglePip' ? recordingKeys : []}
-              onRecord={() =>
-                setRecording(recording === 'togglePip' ? null : 'togglePip')
-              }
-              onReset={() => setBinding('togglePip', DEFAULT_KEYMAP.togglePip)}
-              onUnset={() => setBinding('togglePip', null)}
-              defaultBinding={DEFAULT_KEYMAP.togglePip}
-              display={formatBinding(bindings.togglePip)}
-              hasConflict={duplicates.has('togglePip')}
-            />
-            <ShortcutRow
-              label="Project Actions"
-              binding={bindings.itemActions}
-              isRecording={recording === 'itemActions'}
-              recordingKeys={recording === 'itemActions' ? recordingKeys : []}
-              onRecord={() =>
-                setRecording(recording === 'itemActions' ? null : 'itemActions')
-              }
-              onReset={() =>
-                setBinding('itemActions', DEFAULT_KEYMAP.itemActions)
-              }
-              onUnset={() => setBinding('itemActions', null)}
-              defaultBinding={DEFAULT_KEYMAP.itemActions}
-              display={formatBinding(bindings.itemActions)}
-              hasConflict={duplicates.has('itemActions')}
-            />
-            <ShortcutRow
-              label="Collapse All"
-              binding={bindings.collapseAll}
-              isRecording={recording === 'collapseAll'}
-              recordingKeys={recording === 'collapseAll' ? recordingKeys : []}
-              onRecord={() =>
-                setRecording(recording === 'collapseAll' ? null : 'collapseAll')
-              }
-              onReset={() =>
-                setBinding('collapseAll', DEFAULT_KEYMAP.collapseAll)
-              }
-              onUnset={() => setBinding('collapseAll', null)}
-              defaultBinding={DEFAULT_KEYMAP.collapseAll}
-              display={formatBinding(bindings.collapseAll)}
-              hasConflict={duplicates.has('collapseAll')}
-            />
-            <ShortcutRow
-              label="Settings"
-              binding={bindings.settings}
-              isRecording={recording === 'settings'}
-              recordingKeys={recording === 'settings' ? recordingKeys : []}
-              onRecord={() =>
-                setRecording(recording === 'settings' ? null : 'settings')
-              }
-              onReset={() => setBinding('settings', DEFAULT_KEYMAP.settings)}
-              onUnset={() => setBinding('settings', null)}
-              hasConflict={duplicates.has('settings')}
-              defaultBinding={DEFAULT_KEYMAP.settings}
-              display={formatBinding(bindings.settings)}
-            />
             <ShortcutRow
               label="Shell Templates"
               binding={bindings.shellTemplates}
@@ -577,32 +592,40 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               defaultBinding={DEFAULT_KEYMAP.shellTemplates}
               display={formatBinding(bindings.shellTemplates)}
             />
-            <ShortcutRow
-              label="Custom Commands"
-              binding={bindings.customCommands}
-              isRecording={recording === 'customCommands'}
-              recordingKeys={
-                recording === 'customCommands' ? recordingKeys : []
+            <InfoShortcutRow label="Focus active shell" display="TAB" />
+            <InfoShortcutRow
+              label="Open file in IDE"
+              display={<MouseLeft className={ICON_CLASS} />}
+            />
+            <InfoShortcutRow
+              label="Open file in Finder"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <MouseLeft className={ICON_CLASS} />
+                </span>
               }
-              onRecord={() =>
-                setRecording(
-                  recording === 'customCommands' ? null : 'customCommands',
-                )
-              }
-              onReset={() =>
-                setBinding('customCommands', DEFAULT_KEYMAP.customCommands)
-              }
-              onUnset={() => setBinding('customCommands', null)}
-              hasConflict={duplicates.has('customCommands')}
-              defaultBinding={DEFAULT_KEYMAP.customCommands}
-              display={formatBinding(bindings.customCommands)}
             />
 
-            <div className="pt-2 border-t border-zinc-700">
+            <div className="pt-4 pb-1 border-b border-zinc-700">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Commit
+                Git
               </span>
             </div>
+            <ShortcutRow
+              label="Branches"
+              binding={bindings.branches}
+              isRecording={recording === 'branches'}
+              recordingKeys={recording === 'branches' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'branches' ? null : 'branches')
+              }
+              onReset={() => setBinding('branches', DEFAULT_KEYMAP.branches)}
+              onUnset={() => setBinding('branches', null)}
+              hasConflict={duplicates.has('branches')}
+              defaultBinding={DEFAULT_KEYMAP.branches}
+              display={formatBinding(bindings.branches)}
+            />
             <ShortcutRow
               label="Toggle Amend"
               binding={bindings.commitAmend}

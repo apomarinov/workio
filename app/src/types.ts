@@ -305,6 +305,7 @@ export interface Keymap {
   commitNoVerify: ShortcutBinding | null
   shellTemplates: ShortcutBinding | null
   customCommands: ShortcutBinding | null
+  branches: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -323,6 +324,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   commitNoVerify: { altKey: true, key: 'n' },
   shellTemplates: { shiftKey: true, altKey: true, key: 'k' },
   customCommands: { altKey: true, key: 'a' },
+  branches: { ctrlKey: true, shiftKey: true, key: 'enter' },
 }
 
 // Map event.code-based key names to display characters

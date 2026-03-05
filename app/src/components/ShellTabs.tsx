@@ -604,8 +604,8 @@ function SortableShellTab({
         'group/tab flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
         hasActivity
           ? isActive
-            ? 'border-green-500/90'
-            : 'border-green-500/40 hover:border-green-500'
+            ? 'border-t-green-500/90'
+            : 'border-t-green-500/40 hover:border-t-green-500'
           : isActive
             ? 'border-t-primary'
             : 'border-t-transparent hover:border-t-primary',
@@ -1005,11 +1005,7 @@ export function ShellTabs({
         )}
         {children && <div className="flex-shrink-0">{children}</div>}
         {/* Shell items — responsive */}
-        <div
-          className={cn(
-            'flex-1 min-w-0 @container/inner'
-          )}
-        >
+        <div className={cn('flex-1 min-w-0 @container/inner')}>
           {/* <400px: pills (hidden on mobile) */}
           <div
             className={cn(
@@ -1137,7 +1133,7 @@ export function ShellTabs({
               type="button"
               onClick={onCreateShell}
               className={cn(
-                'flex items-center justify-center w-5 h-5 border-transparent text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
+                'flex items-center justify-center w-8 h-5 border-transparent text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
               )}
             >
               <Plus className="w-3 h-3" />

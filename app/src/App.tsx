@@ -453,6 +453,15 @@ function AppContent() {
         }),
       )
     },
+    branches: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      window.dispatchEvent(
+        new CustomEvent('open-terminal-branches', {
+          detail: { terminalId: t.id },
+        }),
+      )
+    },
   })
 
   // Example: Change favicon based on session status
