@@ -260,7 +260,7 @@ export function DirectoryBrowser({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="bg-sidebar sm:max-w-[90vw] p-0 gap-0 flex flex-col"
+        className="bg-sidebar sm:max-w-[95vw] max-h-[calc(85vh-env(safe-area-inset-top))] p-0 gap-0 flex flex-col"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="px-6 pt-6 pb-3">
@@ -269,13 +269,13 @@ export function DirectoryBrowser({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 pb-3 flex items-center gap-3">
+        <div className="px-6 pb-3 flex items-center gap-3 flex-wrap">
           <Input
             value={inputPath}
             onChange={(e) => setInputPath(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder={defaultRoot}
-            className="flex-1 font-mono text-sm"
+            className="flex-1 font-mono text-sm min-w-[300px]"
           />
           <div className="flex items-center gap-2 shrink-0">
             <Checkbox
