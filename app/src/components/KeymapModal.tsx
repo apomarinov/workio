@@ -627,6 +627,22 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(bindings.branches)}
             />
             <ShortcutRow
+              label="Pull Current Branch"
+              binding={bindings.pullBranch}
+              isRecording={recording === 'pullBranch'}
+              recordingKeys={recording === 'pullBranch' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'pullBranch' ? null : 'pullBranch')
+              }
+              onReset={() =>
+                setBinding('pullBranch', DEFAULT_KEYMAP.pullBranch)
+              }
+              onUnset={() => setBinding('pullBranch', null)}
+              hasConflict={duplicates.has('pullBranch')}
+              defaultBinding={DEFAULT_KEYMAP.pullBranch}
+              display={formatBinding(bindings.pullBranch)}
+            />
+            <ShortcutRow
               label="Toggle Amend"
               binding={bindings.commitAmend}
               isRecording={recording === 'commitAmend'}

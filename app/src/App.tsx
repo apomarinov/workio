@@ -53,6 +53,7 @@ import {
   createShellForTerminal,
   deleteShell,
   interruptShell,
+  pullBranch,
   renameShell,
   writeToShell,
 } from './lib/api'
@@ -92,6 +93,7 @@ function AppContent() {
   terminalsRef.current = terminals
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
+  const pullingRef = useRef(false)
 
   // Shell DnD order — read from settings (persisted to DB)
   const { settings } = useSettings()
@@ -461,6 +463,24 @@ function AppContent() {
           detail: { terminalId: t.id },
         }),
       )
+    },
+    pullBranch: () => {
+      if (pullingRef.current) return
+      const t = activeTerminalRef.current
+      if (!t?.git_branch) return
+      pullingRef.current = true
+      const toastId = toast.loading(`Pulling ${t.git_branch}...`)
+      pullBranch(t.id, t.git_branch)
+        .then(() => toast.success(`Pulled ${t.git_branch}`, { id: toastId }))
+        .catch((err) =>
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to pull branch',
+            { id: toastId },
+          ),
+        )
+        .finally(() => {
+          pullingRef.current = false
+        })
     },
   })
 

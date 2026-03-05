@@ -306,6 +306,7 @@ export interface Keymap {
   shellTemplates: ShortcutBinding | null
   customCommands: ShortcutBinding | null
   branches: ShortcutBinding | null
+  pullBranch: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -325,6 +326,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   shellTemplates: { shiftKey: true, altKey: true, key: 'k' },
   customCommands: { altKey: true, key: 'a' },
   branches: { ctrlKey: true, shiftKey: true, key: 'enter' },
+  pullBranch: { metaKey: true, key: 't' },
 }
 
 // Map event.code-based key names to display characters

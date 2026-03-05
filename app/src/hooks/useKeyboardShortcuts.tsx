@@ -168,6 +168,7 @@ interface KeymapHandlers {
   shellTemplates?: () => void
   customCommands?: () => void
   branches?: () => void
+  pullBranch?: () => void
 }
 
 function resolveBinding(
@@ -223,6 +224,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const shellTemplatesBinding = resolveBinding(keymap, 'shellTemplates')
   const customCommandsBinding = resolveBinding(keymap, 'customCommands')
   const branchesBinding = resolveBinding(keymap, 'branches')
+  const pullBranchBinding = resolveBinding(keymap, 'pullBranch')
 
   // --- Standard key-based shortcuts (one useHotkeys per shortcut) ---
 
@@ -387,6 +389,16 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       if (disabledRef.current) return
       e.stopPropagation()
       handlersRef.current.branches?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    pullBranchBinding?.key ? bindingToHotkeyString(pullBranchBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.pullBranch?.()
     },
     HOTKEY_OPTS,
   )
