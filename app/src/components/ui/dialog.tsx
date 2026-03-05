@@ -5,9 +5,21 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function Dialog({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  return (
+    <DialogPrimitive.Root
+      data-slot="dialog"
+      onOpenChange={(open) => {
+        onOpenChange?.(open)
+        if (!open) {
+          window.dispatchEvent(new Event('dialog-closed'))
+        }
+      }}
+      {...props}
+    />
+  )
 }
 
 function DialogTrigger({

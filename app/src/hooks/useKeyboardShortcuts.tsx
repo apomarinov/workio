@@ -179,6 +179,13 @@ function resolveBinding(
   return keymap[name] === null ? null : (keymap[name] ?? DEFAULT_KEYMAP[name])
 }
 
+function focusableXterm(): HTMLTextAreaElement | null {
+  for (const ta of document.querySelectorAll('.xterm-helper-textarea')) {
+    if (!ta.closest('.invisible')) return ta as HTMLTextAreaElement
+  }
+  return null
+}
+
 const HOTKEY_OPTS: Options = {
   enableOnFormTags: true,
   eventListenerOptions: { capture: true },
@@ -455,22 +462,23 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
-      let xtermTextarea: HTMLTextAreaElement | null = null
-      for (const ta of document.querySelectorAll('.xterm-helper-textarea')) {
-        if (!ta.closest('.invisible')) {
-          xtermTextarea = ta as HTMLTextAreaElement
-          break
-        }
-      }
-      if (!xtermTextarea) return
-      if (document.activeElement === xtermTextarea) return
+      if (document.activeElement === focusableXterm()) return
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
       e.preventDefault()
-      xtermTextarea.focus()
+      focusableXterm()?.focus()
     }
 
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [])
+
+  // --- Refocus active shell when any dialog/modal closes ---
+  useEffect(() => {
+    const handleDialogClosed = () => {
+      setTimeout(() => focusableXterm()?.focus(), 50)
+    }
+    window.addEventListener('dialog-closed', handleDialogClosed)
+    return () => window.removeEventListener('dialog-closed', handleDialogClosed)
   }, [])
 }

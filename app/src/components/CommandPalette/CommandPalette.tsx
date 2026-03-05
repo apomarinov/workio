@@ -205,6 +205,7 @@ export function CommandPalette() {
   const handleOpenChange = useCallback((value: boolean) => {
     setOpen(value)
     if (!value) {
+      window.dispatchEvent(new Event('dialog-closed'))
       setTimeout(() => {
         setStack([initialLevel])
       }, 300)
