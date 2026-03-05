@@ -465,17 +465,17 @@ fastify.post<{
   return { ok: true }
 })
 
-// Edit PR (title + body)
+// Edit PR (title + body + draft)
 fastify.post<{
   Params: { owner: string; repo: string; pr: string }
-  Body: { title: string; body: string }
+  Body: { title: string; body: string; draft?: boolean }
 }>('/api/github/:owner/:repo/pr/:pr/edit', async (request, reply) => {
   const { owner, repo, pr } = request.params
-  const { title, body } = request.body
+  const { title, body, draft } = request.body
   if (!title) {
     return reply.status(400).send({ error: 'title is required' })
   }
-  const result = await editPR(owner, repo, Number(pr), title, body ?? '')
+  const result = await editPR(owner, repo, Number(pr), title, body ?? '', draft)
   if (!result.ok) {
     return reply.status(500).send({ error: result.error })
   }

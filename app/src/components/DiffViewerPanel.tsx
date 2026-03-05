@@ -528,6 +528,8 @@ interface DiffViewerPanelProps {
   externalFiles?: ChangedFile[]
   externalLoadingFiles?: boolean
   integrated?: boolean
+  /** Extra suffix for the SWR cache key to bust stale data */
+  cacheKey?: string
 }
 
 export function DiffViewerPanel({
@@ -544,6 +546,7 @@ export function DiffViewerPanel({
   onRequestDiscard,
   externalFiles,
   externalLoadingFiles,
+  cacheKey,
 }: DiffViewerPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
@@ -553,7 +556,7 @@ export function DiffViewerPanel({
   // Fetch changed files via SWR (only when managing internally)
   const swrKey =
     externalFiles === undefined && base
-      ? ['changed-files', terminalId, base]
+      ? ['changed-files', terminalId, base, cacheKey ?? '']
       : null
   const {
     data: internalData,

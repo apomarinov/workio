@@ -185,6 +185,7 @@ const PR_DETAIL_FIELDS = `
 number
 title
 body
+isDraft
 headRefName
 baseRefName
 url
@@ -304,6 +305,7 @@ interface GraphQLOpenPR {
   number: number
   title: string
   body: string
+  isDraft: boolean
   headRefName: string
   baseRefName: string
   url: string
@@ -710,6 +712,7 @@ function mapOpenPRNode(pr: GraphQLOpenPR): PRCheckStatus {
     runningChecksCount,
     failedChecksCount,
     headCommitSha,
+    isDraft: pr.isDraft ?? false,
   }
 }
 
@@ -924,6 +927,7 @@ async function fetchPRsViaRESTAndGraphQL(
         runningChecksCount: 0,
         failedChecksCount: 0,
         headCommitSha: '',
+        isDraft: false,
       })
     }
   }
@@ -1675,48 +1679,49 @@ export function editPR(
   prNumber: number,
   title: string,
   body: string,
+  draft?: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`
+  const args = [
+    'api',
+    '--method',
+    'PATCH',
+    `repos/${owner}/${repo}/pulls/${prNumber}`,
+    '-f',
+    `title=${title}`,
+    '-f',
+    `body=${body}`,
+  ]
+  if (draft !== undefined) {
+    args.push('-F', `draft=${draft}`)
+  }
   return new Promise((resolve) => {
-    execFile(
-      'gh',
-      [
-        'api',
-        '--method',
-        'PATCH',
-        `repos/${owner}/${repo}/pulls/${prNumber}`,
-        '-f',
-        `title=${title}`,
-        '-f',
-        `body=${body}`,
-      ],
-      { timeout: 30000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        // Directly mutate cache and push to clients
-        const existing = lastFetchedPRs.find(
-          (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
-        )
-        if (existing) {
-          existing.prTitle = title
-          existing.prBody = body
-        }
-        emitPRChecks(lastFetchedPRs)
-        resolve({ ok: true })
-      },
-    )
+    execFile('gh', args, { timeout: 30000 }, (err, stdout, stderr) => {
+      logCommand({
+        prId,
+        category: 'github',
+        command: cmd,
+        stdout,
+        stderr,
+        failed: !!err,
+      })
+      if (err) {
+        resolve({ ok: false, error: stderr || err.message })
+        return
+      }
+      // Directly mutate cache and push to clients
+      const existing = lastFetchedPRs.find(
+        (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
+      )
+      if (existing) {
+        existing.prTitle = title
+        existing.prBody = body
+        if (draft !== undefined) existing.isDraft = draft
+      }
+      emitPRChecks(lastFetchedPRs)
+      resolve({ ok: true })
+    })
   })
 }
 
@@ -2534,6 +2539,7 @@ interface WebhookPayload {
     number: number
     title: string
     body?: string
+    draft?: boolean
     head?: { ref: string }
     base?: { ref: string }
     html_url: string
@@ -2612,6 +2618,7 @@ function patchPullRequest(repo: string, payload: WebhookPayload): boolean {
       runningChecksCount: 0,
       failedChecksCount: 0,
       headCommitSha: '',
+      isDraft: prData.draft ?? false,
     }
     lastFetchedPRs = [...lastFetchedPRs, newPR]
     return true
@@ -2637,6 +2644,7 @@ function patchPullRequest(repo: string, payload: WebhookPayload): boolean {
     existing.prBody = prData.body ?? existing.prBody
     existing.branch = prData.head?.ref ?? existing.branch
     existing.updatedAt = prData.updated_at || existing.updatedAt
+    if (prData.draft !== undefined) existing.isDraft = prData.draft
 
     if (prData.mergeable === true) {
       existing.mergeable = 'MERGEABLE'

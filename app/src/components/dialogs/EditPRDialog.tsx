@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,8 @@ interface EditPRDialogProps {
   open: boolean
   currentTitle: string
   currentBody: string
-  onSave: (title: string, body: string) => Promise<void>
+  currentDraft: boolean
+  onSave: (title: string, body: string, draft: boolean) => Promise<void>
   onCancel: () => void
 }
 
@@ -23,11 +25,13 @@ export function EditPRDialog({
   open,
   currentTitle,
   currentBody,
+  currentDraft,
   onSave,
   onCancel,
 }: EditPRDialogProps) {
   const [title, setTitle] = useState(currentTitle)
   const [body, setBody] = useState(currentBody)
+  const [draft, setDraft] = useState(currentDraft)
   const [saving, setSaving] = useState(false)
 
   const handleSave = async (e: React.FormEvent) => {
@@ -35,7 +39,7 @@ export function EditPRDialog({
     if (!title.trim()) return
     setSaving(true)
     try {
-      await onSave(title.trim(), body)
+      await onSave(title.trim(), body, draft)
       onCancel()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
@@ -86,6 +90,15 @@ export function EditPRDialog({
             />
           </div>
           <DialogFooter>
+            <label className="flex items-center gap-2 text-sm cursor-pointer mr-auto">
+              <Checkbox
+                checked={draft}
+                onCheckedChange={(v) => setDraft(v === true)}
+                disabled={saving}
+                className="h-4 w-4"
+              />
+              Draft
+            </label>
             <Button
               type="button"
               variant="ghost"

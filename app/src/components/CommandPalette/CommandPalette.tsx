@@ -1516,9 +1516,17 @@ export function CommandPalette() {
           open={!!editPRTarget}
           currentTitle={editPRTarget.prTitle}
           currentBody={editPRTarget.prBody}
-          onSave={async (newTitle, newBody) => {
+          currentDraft={editPRTarget.isDraft}
+          onSave={async (newTitle, newBody, newDraft) => {
             const [owner, repo] = editPRTarget.repo.split('/')
-            await editPR(owner, repo, editPRTarget.prNumber, newTitle, newBody)
+            await editPR(
+              owner,
+              repo,
+              editPRTarget.prNumber,
+              newTitle,
+              newBody,
+              newDraft,
+            )
             toast.success(`Updated PR #${editPRTarget.prNumber}`)
             setEditPRTarget(null)
           }}

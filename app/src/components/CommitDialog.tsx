@@ -17,6 +17,7 @@ import {
   getHeadMessage,
 } from '@/lib/api'
 import type { ChangedFile, PRCheckStatus } from '../../shared/types'
+import { BranchDiffPanel } from './BranchDiffPanel'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel, type FileListHandle } from './DiffViewerPanel'
 
@@ -284,23 +285,32 @@ export function CommitDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <DiffViewerPanel
-          terminalId={terminalId}
-          base={base}
-          readOnly={viewOnly}
-          commitControls={commitControls}
-          onHasSelectionChange={setHasSelection}
-          fileListRef={fileListRef}
-          loading={loading}
-          discarding={discarding}
-          onRefresh={() => refreshFiles()}
-          onRequestDiscard={(files) => {
-            setDiscardFiles(files)
-            setConfirmDiscard(true)
-          }}
-          externalFiles={changedFiles}
-          externalLoadingFiles={loadingFiles}
-        />
+        {viewOnly && pr ? (
+          <BranchDiffPanel
+            terminalId={terminalId}
+            baseBranch={pr.baseBranch}
+            headBranch={pr.branch}
+            cacheKey={pr.headCommitSha}
+          />
+        ) : (
+          <DiffViewerPanel
+            terminalId={terminalId}
+            base={base}
+            readOnly={viewOnly}
+            commitControls={commitControls}
+            onHasSelectionChange={setHasSelection}
+            fileListRef={fileListRef}
+            loading={loading}
+            discarding={discarding}
+            onRefresh={() => refreshFiles()}
+            onRequestDiscard={(files) => {
+              setDiscardFiles(files)
+              setConfirmDiscard(true)
+            }}
+            externalFiles={changedFiles}
+            externalLoadingFiles={loadingFiles}
+          />
+        )}
 
         {!viewOnly && (
           <DialogFooter>

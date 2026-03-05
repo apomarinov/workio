@@ -93,6 +93,7 @@ export interface PRCheckStatus {
   runningChecksCount: number
   failedChecksCount: number
   headCommitSha: string
+  isDraft: boolean
   hasUnreadNotifications?: boolean
 }
 

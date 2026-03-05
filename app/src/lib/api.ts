@@ -431,13 +431,14 @@ export async function editPR(
   prNumber: number,
   title: string,
   body: string,
+  draft?: boolean,
 ): Promise<void> {
   const res = await fetch(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/edit`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body }),
+      body: JSON.stringify({ title, body, draft }),
     },
   )
   if (!res.ok) {

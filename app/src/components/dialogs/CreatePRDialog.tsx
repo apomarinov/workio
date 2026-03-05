@@ -1,10 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  GitCommitHorizontal,
-  Loader2,
-  X,
-} from 'lucide-react'
+import { Check, ChevronDown, Loader2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -33,12 +27,10 @@ import {
   type BranchesResponse,
   checkBranchConflicts,
   createPR,
-  getCommitsBetween,
-  type PRCommit,
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { Terminal } from '../../types'
-import { DiffViewerPanel } from '../DiffViewerPanel'
+import { BranchDiffPanel } from '../BranchDiffPanel'
 
 interface CreatePRDialogProps {
   open: boolean
@@ -76,42 +68,22 @@ export function CreatePRDialog({
   const [draft, setDraft] = useState(false)
   const [conflicts, setConflicts] = useState<boolean | null>(null)
   const [checkingConflicts, setCheckingConflicts] = useState(false)
-  const [commits, setCommits] = useState<PRCommit[]>([])
-  const [loadingCommits, setLoadingCommits] = useState(false)
-  const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
   const [noRemote, setNoRemote] = useState(false)
   const [creating, setCreating] = useState(false)
   const [branchPickerOpen, setBranchPickerOpen] = useState(false)
 
-  // Compute diff base for DiffViewerPanel
-  const diffBase = selectedCommit
-    ? `${selectedCommit}^..${selectedCommit}`
-    : `origin/${baseBranch}...origin/${headBranch}`
-
-  // Fetch conflicts + commits when base branch changes
+  // Fetch conflicts when base branch changes
   useEffect(() => {
     if (!open) return
     setConflicts(null)
-    setCommits([])
-    setSelectedCommit(null)
     setNoRemote(false)
 
     setCheckingConflicts(true)
-    setLoadingCommits(true)
 
-    Promise.all([
-      checkBranchConflicts(terminal.id, headBranch, baseBranch)
-        .then((data) => setConflicts(data.hasConflicts))
-        .catch(() => setConflicts(null))
-        .finally(() => setCheckingConflicts(false)),
-      getCommitsBetween(terminal.id, baseBranch, headBranch)
-        .then((data) => {
-          setCommits(data.commits)
-          if (data.noRemote) setNoRemote(true)
-        })
-        .catch(() => setCommits([]))
-        .finally(() => setLoadingCommits(false)),
-    ])
+    checkBranchConflicts(terminal.id, headBranch, baseBranch)
+      .then((data) => setConflicts(data.hasConflicts))
+      .catch(() => setConflicts(null))
+      .finally(() => setCheckingConflicts(false))
   }, [open, baseBranch, headBranch, terminal.id])
 
   // Reset state when dialog closes
@@ -123,8 +95,6 @@ export function CreatePRDialog({
       setBaseBranch(defaultBase)
       setDraft(false)
       setConflicts(null)
-      setCommits([])
-      setSelectedCommit(null)
       setNoRemote(false)
       setCreating(false)
     }
@@ -252,68 +222,14 @@ export function CreatePRDialog({
         )}
 
         {/* Main content: commits + diff viewer */}
-        <div className="flex-1 min-h-0 flex gap-0 overflow-hidden rounded-md border border-zinc-700">
-          {/* Left column: commit list */}
-          <div className="w-[220px] flex-shrink-0 border-r border-zinc-700 flex flex-col overflow-hidden">
-            <div className="px-2 py-1.5 border-b border-zinc-700">
-              <span className="text-xs text-zinc-500 uppercase tracking-wider">
-                Commits ({commits.length})
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {loadingCommits ? (
-                <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
-                </div>
-              ) : commits.length === 0 ? (
-                <div className="py-4 text-center text-sm text-zinc-500">
-                  No commits
-                </div>
-              ) : (
-                commits.map((commit) => (
-                  <div
-                    key={commit.hash}
-                    className={cn(
-                      'flex items-start gap-2 px-2 py-2 text-xs cursor-pointer hover:bg-zinc-800/50',
-                      selectedCommit === commit.hash && 'bg-zinc-700/50',
-                    )}
-                    onClick={() =>
-                      setSelectedCommit(
-                        selectedCommit === commit.hash ? null : commit.hash,
-                      )
-                    }
-                  >
-                    <GitCommitHorizontal
-                      className={cn(
-                        'h-3.5 w-3.5 mt-0.5 flex-shrink-0',
-                        selectedCommit === commit.hash
-                          ? 'text-blue-400'
-                          : 'text-zinc-500',
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-zinc-300">{commit.message}</div>
-                      <div className="text-zinc-500 font-mono">
-                        {commit.hash.slice(0, 7)}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Right: diff viewer panel (without outer border since we already have one) */}
-          <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
-            <DiffViewerPanel
-              integrated
-              terminalId={terminal.id}
-              base={diffBase}
-              readOnly
-            />
-          </div>
-        </div>
+        {open && (
+          <BranchDiffPanel
+            terminalId={terminal.id}
+            baseBranch={baseBranch}
+            headBranch={headBranch}
+            onNoRemote={() => setNoRemote(true)}
+          />
+        )}
 
         <DialogFooter className="flex-shrink-0">
           <div className="flex items-center gap-3 mr-auto">
