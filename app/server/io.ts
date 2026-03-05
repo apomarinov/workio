@@ -1,4 +1,5 @@
 import type { Server as SocketIOServer } from 'socket.io'
+import { log } from './logger'
 
 let io: SocketIOServer | null = null
 
@@ -22,6 +23,14 @@ export function broadcastRefetch(
 ) {
   const server = getIO()
   if (!server) return
+  const allIds = [...server.sockets.sockets.keys()]
+  const recipientIds = excludeSocketId
+    ? allIds.filter((id) => id !== excludeSocketId)
+    : allIds
+  log.info(
+    { group, from: excludeSocketId ?? 'server', to: recipientIds },
+    '[refetch]',
+  )
   if (excludeSocketId) {
     server.except(excludeSocketId).emit('refetch', { group })
   } else {

@@ -8,11 +8,19 @@ export function setLogger(l: FastifyBaseLogger) {
 
 /** Falls back to console before fastify is initialized. */
 export const log = {
-  info(msg: string) {
-    _logger ? _logger.info(msg) : console.log(msg)
+  info(objOrMsg: unknown, msg?: string) {
+    if (msg !== undefined) {
+      _logger ? _logger.info(objOrMsg, msg) : console.log(msg, objOrMsg)
+    } else {
+      _logger ? _logger.info(objOrMsg as string) : console.log(objOrMsg)
+    }
   },
-  warn(msg: string) {
-    _logger ? _logger.warn(msg) : console.warn(msg)
+  warn(objOrMsg: unknown, msg?: string) {
+    if (msg !== undefined) {
+      _logger ? _logger.warn(objOrMsg, msg) : console.warn(msg, objOrMsg)
+    } else {
+      _logger ? _logger.warn(objOrMsg as string) : console.warn(objOrMsg)
+    }
   },
   error(objOrMsg: unknown, msg?: string) {
     if (msg !== undefined) {
