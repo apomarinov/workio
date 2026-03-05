@@ -793,7 +793,7 @@ function AppContent() {
                 onCreateShell={() => handleCreateShell(t.id)}
                 onRenameShell={handleRenameShell}
                 position={effectiveTabsTop ? 'top' : 'bottom'}
-                className="pr-2 pl-1 bg-[#1a1a1a]"
+                className="pr-2 bg-[#1a1a1a]"
               />
             )}
             <div className="relative flex-1 min-h-0">
@@ -853,7 +853,7 @@ function AppContent() {
                       onCreateShell={() => handleCreateShell(t.id)}
                       onRenameShell={handleRenameShell}
                       position="bottom"
-                      className="pr-2 pl-1 bg-[#1a1a1a]"
+                      className="pr-2 bg-[#1a1a1a]"
                       rightExtra={
                         <div className="flex items-center gap-0.5">
                           {mobileKeyboardMode === 'hidden' && (

@@ -438,6 +438,13 @@ export function CommandPalette() {
           pr,
         },
         {
+          mode: 'branches',
+          title: 'Branches',
+          terminal,
+          pr,
+          branchesLoading: true,
+        },
+        {
           mode: 'branch-actions',
           title: terminal.git_branch,
           terminal,
@@ -456,8 +463,12 @@ export function CommandPalette() {
           setStack((prev) => {
             const current = prev[prev.length - 1]
             if (current.mode !== 'branch-actions') return prev
+            const branchesLevel = prev[prev.length - 2]
             return [
-              ...prev.slice(0, -1),
+              ...prev.slice(0, -2),
+              branchesLevel.mode === 'branches'
+                ? { ...branchesLevel, branches: data, branchesLoading: false }
+                : branchesLevel,
               { ...current, branches: data, branchesLoading: false },
             ]
           })
@@ -466,8 +477,12 @@ export function CommandPalette() {
           setStack((prev) => {
             const current = prev[prev.length - 1]
             if (current.mode !== 'branch-actions') return prev
+            const branchesLevel = prev[prev.length - 2]
             return [
-              ...prev.slice(0, -1),
+              ...prev.slice(0, -2),
+              branchesLevel.mode === 'branches'
+                ? { ...branchesLevel, branchesLoading: false }
+                : branchesLevel,
               { ...current, branchesLoading: false },
             ]
           })

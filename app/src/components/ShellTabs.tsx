@@ -601,17 +601,17 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1',
+        'group/tab flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
         hasActivity
           ? isActive
             ? 'border-green-500/90'
             : 'border-green-500/40 hover:border-green-500'
           : isActive
-            ? 'border-primary'
-            : 'border-transparent hover:border-primary',
+            ? 'border-t-primary'
+            : 'border-t-transparent hover:border-t-primary',
         isActive
-          ? 'text-foreground'
-          : 'text-muted-foreground hover:text-foreground',
+          ? 'text-foreground bg-zinc-500/10'
+          : 'text-muted-foreground hover:text-foreground hover:bg-zinc-500/10',
       )}
     >
       <ShellClientsBadge shellId={shell.id} />
@@ -1007,8 +1007,7 @@ export function ShellTabs({
         {/* Shell items — responsive */}
         <div
           className={cn(
-            'flex-1 min-w-0 @container/inner',
-            position === 'top' && 'pb-1',
+            'flex-1 min-w-0 @container/inner'
           )}
         >
           {/* <400px: pills (hidden on mobile) */}
@@ -1079,7 +1078,7 @@ export function ShellTabs({
           {/* >=400px: tabs (always on mobile) */}
           <div
             className={cn(
-              '@[400px]/shells:flex items-center gap-1',
+              '@[400px]/shells:flex items-center',
               isMobile ? 'flex' : 'hidden',
               wrap ? 'flex-wrap' : 'overflow-x-auto',
             )}
