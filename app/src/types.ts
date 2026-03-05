@@ -489,6 +489,47 @@ export interface PushSubscriptionRecord {
   created_at: string
 }
 
+export type StatusBarSectionName =
+  | 'pr'
+  | 'processes'
+  | 'ports'
+  | 'gitDirty'
+  | 'branch'
+
+export interface StatusBarSection {
+  name: StatusBarSectionName
+  visible: boolean
+  order: number
+}
+
+export interface StatusBarConfig {
+  enabled: boolean
+  onTop: boolean
+  sections: StatusBarSection[]
+}
+
+export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
+  pr: 'Pull Request',
+  processes: 'Processes',
+  ports: 'Ports',
+  gitDirty: 'Git Changes',
+  branch: 'Branch',
+}
+
+export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
+  { name: 'pr', visible: true, order: 0 },
+  { name: 'processes', visible: true, order: 1 },
+  { name: 'ports', visible: true, order: 2 },
+  { name: 'gitDirty', visible: true, order: 3 },
+  { name: 'branch', visible: true, order: 4 },
+]
+
+export const DEFAULT_STATUS_BAR: StatusBarConfig = {
+  enabled: false,
+  onTop: false,
+  sections: DEFAULT_STATUS_BAR_SECTIONS,
+}
+
 export type PreferredIDE = 'cursor' | 'vscode'
 
 export interface Settings {
@@ -516,6 +557,7 @@ export interface Settings {
   terminal_order?: number[]
   shell_order?: Record<number, number[]>
   starred_branches?: Record<string, string[]>
+  statusBar?: StatusBarConfig
   // Push notification settings
   vapid_public_key?: string
   vapid_private_key?: string

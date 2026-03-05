@@ -23,6 +23,10 @@ import { PinnedSessionsPip } from './components/PinnedSessionsPip'
 import { ShellTabs } from './components/ShellTabs'
 import { Sidebar } from './components/Sidebar'
 
+const StatusBar = lazy(() =>
+  import('./components/StatusBar').then((m) => ({ default: m.StatusBar })),
+)
+
 const SessionChat = lazy(() =>
   import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
 )
@@ -53,7 +57,7 @@ import {
   writeToShell,
 } from './lib/api'
 import { cn } from './lib/utils'
-import type { HookEvent, ShellTemplate } from './types'
+import { DEFAULT_STATUS_BAR, type HookEvent, type ShellTemplate } from './types'
 
 function setFavicon(href: string) {
   let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
@@ -758,6 +762,9 @@ function AppContent() {
           t.shells.find((s) => s.name === 'main')?.id ??
           t.shells[0]?.id
         const isTermVisible = !activeSessionId && t.id === activeTerminal?.id
+        const statusBarConfig = settings?.statusBar ?? DEFAULT_STATUS_BAR
+        const showStatusBar = statusBarConfig.enabled && !isMobile
+        const statusBarOnTop = statusBarConfig.onTop
 
         return (
           <div
@@ -768,6 +775,13 @@ function AppContent() {
               !isTermVisible && 'invisible',
             )}
           >
+            {showStatusBar &&
+              statusBarOnTop === effectiveTabsTop &&
+              activeShellId != null && (
+                <Suspense fallback={null}>
+                  <StatusBar position={statusBarOnTop ? 'top' : 'bottom'} />
+                </Suspense>
+              )}
             {tabBar && activeShellId != null && !isMobile && (
               <ShellTabs
                 terminal={t}
@@ -795,6 +809,13 @@ function AppContent() {
                 )
               })}
             </div>
+            {showStatusBar &&
+              statusBarOnTop !== effectiveTabsTop &&
+              activeShellId != null && (
+                <Suspense fallback={null}>
+                  <StatusBar position={statusBarOnTop ? 'top' : 'bottom'} />
+                </Suspense>
+              )}
           </div>
         )
       })}
@@ -924,6 +945,12 @@ function AppContent() {
                       </div>
                     </ShellTabs>
                   )}
+                  {(settings?.statusBar ?? DEFAULT_STATUS_BAR).enabled &&
+                    activeShellId != null && (
+                      <Suspense fallback={null}>
+                        <StatusBar position="bottom" />
+                      </Suspense>
+                    )}
                   <MobileKeyboard
                     terminalId={t.id}
                     currentRepo={t.git_repo?.repo}

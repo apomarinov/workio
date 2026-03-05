@@ -55,11 +55,12 @@ import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type {
-  SessionWithProject,
-  Shell,
-  ShellTemplate,
-  Terminal,
+import {
+  DEFAULT_STATUS_BAR,
+  type SessionWithProject,
+  type Shell,
+  type ShellTemplate,
+  type Terminal,
 } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { RenameModal } from './EditSessionModal'
@@ -969,6 +970,17 @@ export function ShellTabs({
               checked={tabsTop}
               onCheckedChange={(v) => setTabsTop(v)}
               disabled={!tabBar || isMobile}
+            />
+          </label>
+          <div className="my-1 h-px bg-border" />
+          <label className="flex hover:bg-accent w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
+            Status Bar
+            <Switch
+              checked={(settings?.statusBar ?? DEFAULT_STATUS_BAR).enabled}
+              onCheckedChange={(v) => {
+                const current = settings?.statusBar ?? DEFAULT_STATUS_BAR
+                updateSettings({ statusBar: { ...current, enabled: v } })
+              }}
             />
           </label>
         </div>

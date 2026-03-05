@@ -1,0 +1,567 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers'
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
+  Activity,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  GitBranch,
+  Globe,
+  MoreVertical,
+} from 'lucide-react'
+import { lazy, Suspense, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
+import { useProcessContext } from '@/context/ProcessContext'
+import { useTerminalContext } from '@/context/TerminalContext'
+import { useOverflowDetector } from '@/hooks/useOverflowDetector'
+import { useSettings } from '@/hooks/useSettings'
+import { getPRStatusInfo } from '@/lib/pr-status'
+import { cn } from '@/lib/utils'
+import type { ActiveProcess } from '../../shared/types'
+import type { Terminal } from '../types'
+import {
+  DEFAULT_STATUS_BAR,
+  STATUS_BAR_SECTION_LABELS,
+  type StatusBarConfig,
+  type StatusBarSection,
+  type StatusBarSectionName,
+} from '../types'
+import { PRStatusContent } from './PRStatusContent'
+import {
+  GitDirtyBadge,
+  PortsList,
+  ProcessesList,
+} from './terminal-status-sections'
+import { useIsMobile } from '@/hooks/useMediaQuery'
+
+const CommitDialog = lazy(() =>
+  import('./CommitDialog').then((m) => ({ default: m.CommitDialog })),
+)
+
+interface StatusBarProps {
+  position: 'top' | 'bottom'
+}
+
+function SortableStatusSection({
+  section,
+  children,
+  onClick,
+  className: extraClassName,
+}: {
+  section: StatusBarSection
+  children: React.ReactNode
+  onClick?: () => void
+  className?: string
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.name })
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : undefined,
+    zIndex: isDragging ? 10 : undefined,
+    position: isDragging ? ('relative' as const) : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick?.()
+      }}
+      className={cn(
+        'flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
+        extraClassName,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+function PRSection({
+  section,
+  pr,
+}: {
+  section: StatusBarSection
+  pr: NonNullable<ReturnType<typeof useTerminalContext>['githubPRs'][number]>
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const overflowRef = useOverflowDetector<HTMLSpanElement>()
+  const prInfo = getPRStatusInfo(pr)
+
+  return (
+    <>
+      <SortableStatusSection
+        section={section}
+        onClick={() => setDialogOpen(true)}
+        className="group/pr relative"
+      >
+        {prInfo.icon({ cls: 'w-3 h-3' })}
+        <span ref={overflowRef} className="truncate-fade max-w-[250px]">
+          {pr.prTitle}
+        </span>
+        {pr.hasUnreadNotifications && (
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            window.dispatchEvent(
+              new CustomEvent('open-item-actions', {
+                detail: {
+                  terminalId: null,
+                  sessionId: null,
+                  prNumber: pr.prNumber,
+                  prRepo: pr.repo,
+                },
+              }),
+            )
+          }}
+          className="absolute right-0 inset-y-0 hidden group-hover/pr:flex items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-r"
+        >
+          <MoreVertical className="w-3.5 h-3.5" />
+        </button>
+      </SortableStatusSection>
+      {dialogOpen && (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {prInfo.icon({ cls: 'w-4 h-4' })}
+                <span className="truncate">{pr.prTitle}</span>
+                <span className="text-muted-foreground text-sm font-normal">
+                  #{pr.prNumber}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            <PRStatusContent
+              pr={pr}
+              expanded={true}
+              hasNewActivity={pr.hasUnreadNotifications}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
+  )
+}
+
+function ProcessesSection({
+  section,
+  processes,
+  shells,
+  terminalId,
+  terminalName,
+}: {
+  section: StatusBarSection
+  processes: ActiveProcess[]
+  shells: Terminal['shells']
+  terminalId: number
+  terminalName: string | null
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <div>
+          <SortableStatusSection section={section}>
+            <Activity className="w-3 h-3 text-green-400/80" />{' '}
+            {processes.length}
+          </SortableStatusSection>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-1" align="start" side="bottom">
+        <ProcessesList
+          processes={processes}
+          shells={shells}
+          terminalId={terminalId}
+          terminalName={terminalName}
+          compact
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function PortsSection({
+  section,
+  shellPorts,
+  terminalPorts,
+  shells,
+  terminalName,
+}: {
+  section: StatusBarSection
+  shellPorts: Record<number, number[]>
+  terminalPorts: number[]
+  shells: Terminal['shells']
+  terminalName: string | null
+}) {
+  const totalPorts = terminalPorts.length
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <div>
+          <SortableStatusSection section={section}>
+            <Globe className="w-3 h-3 flex-shrink-0 text-blue-400/80" />{' '}
+            {totalPorts}
+          </SortableStatusSection>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-1" align="start" side="bottom">
+        <PortsList
+          shellPorts={shellPorts}
+          terminalPorts={terminalPorts}
+          shells={shells}
+          terminalName={terminalName}
+          compact
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function GitDirtySection({
+  section,
+  diffStat,
+  terminalId,
+}: {
+  section: StatusBarSection
+  diffStat: { added: number; removed: number; untracked: number }
+  terminalId: number
+}) {
+  const [commitOpen, setCommitOpen] = useState(false)
+
+  return (
+    <>
+      <SortableStatusSection
+        section={section}
+        onClick={() => setCommitOpen(true)}
+      >
+        <GitDirtyBadge
+          added={diffStat.added}
+          removed={diffStat.removed}
+          untracked={diffStat.untracked}
+          className="text-[11px]"
+        />
+      </SortableStatusSection>
+      {commitOpen && (
+        <Suspense>
+          <CommitDialog
+            open={commitOpen}
+            terminalId={terminalId}
+            onClose={() => setCommitOpen(false)}
+          />
+        </Suspense>
+      )}
+    </>
+  )
+}
+
+function BranchSection({
+  section,
+  branch,
+  terminalId,
+}: {
+  section: StatusBarSection
+  branch: string
+  terminalId: number
+}) {
+  return (
+    <SortableStatusSection
+      section={section}
+      onClick={() => {
+        window.dispatchEvent(
+          new CustomEvent('open-branch-actions', {
+            detail: { terminalId },
+          }),
+        )
+      }}
+    >
+      <GitBranch className="w-3 h-3" />
+      <span className="truncate-fade max-w-[250px]">{branch}</span>
+    </SortableStatusSection>
+  )
+}
+
+function StatusBarMenu({
+  statusBar,
+  updateSettings,
+}: {
+  statusBar: StatusBarConfig
+  updateSettings: (updates: Record<string, unknown>) => Promise<unknown>
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isMobile = useIsMobile()
+
+  const toggleSection = (name: StatusBarSectionName) => {
+    const newSections = statusBar.sections.map((s) =>
+      s.name === name ? { ...s, visible: !s.visible } : s,
+    )
+    updateSettings({ statusBar: { ...statusBar, sections: newSections } })
+  }
+
+  return (
+    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-5 w-5 flex-shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          {!statusBar.onTop && <ChevronUp className="w-3 h-3" />}
+          {statusBar.onTop && <ChevronDown className="w-3 h-3" />}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-0" align="end" side="bottom">
+        <div className="p-1">
+          <label className="flex hover:bg-accent w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm cursor-pointer">
+            Status Bar
+            <Switch
+              checked={statusBar.enabled}
+              onCheckedChange={(v) =>
+                updateSettings({ statusBar: { ...statusBar, enabled: v } })
+              }
+            />
+          </label>
+          <label
+            className={cn(
+              'flex w-full items-center hover:bg-accent justify-between rounded-sm px-2 py-1.5 text-sm',
+              statusBar.enabled
+                ? 'cursor-pointer'
+                : 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            On Top
+            <Switch
+              checked={statusBar.onTop}
+              onCheckedChange={(v) =>
+                updateSettings({ statusBar: { ...statusBar, onTop: v } })
+              }
+              disabled={!statusBar.enabled || isMobile}
+            />
+          </label>
+        </div>
+        <div className="h-px bg-border" />
+        <div className="p-1">
+          {statusBar.sections
+            .sort((a, b) => a.order - b.order)
+            .map((section) => (
+              <button
+                key={section.name}
+                type="button"
+                onClick={() => toggleSection(section.name)}
+                className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+              >
+                {STATUS_BAR_SECTION_LABELS[section.name]}
+                {section.visible && (
+                  <Check className="w-3.5 h-3.5 text-foreground" />
+                )}
+              </button>
+            ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+export function StatusBar({ position }: StatusBarProps) {
+  const { activeTerminal: terminal, githubPRs } = useTerminalContext()
+  const {
+    processes: allProcesses,
+    terminalPorts,
+    shellPorts,
+    gitDirtyStatus,
+  } = useProcessContext()
+  const { settings, updateSettings } = useSettings()
+  const isMobile = useIsMobile()
+
+  const statusBar = settings?.statusBar ?? DEFAULT_STATUS_BAR
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  )
+
+  if (!terminal) return null
+
+  // All processes/ports for this terminal
+  const processes = allProcesses.filter((p) => p.terminalId === terminal.id)
+  const ports = terminalPorts[terminal.id] ?? []
+  const diffStat = gitDirtyStatus[terminal.id]
+  const isDirty =
+    !!diffStat &&
+    (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
+
+  const prForBranch = terminal.git_branch
+    ? (githubPRs.find(
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
+      githubPRs.find(
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
+      ))
+    : undefined
+
+  // Get sorted visible sections
+  const sortedSections = [...statusBar.sections].sort(
+    (a, b) => a.order - b.order,
+  )
+
+  // Check which sections have content
+  const hasContent = (name: StatusBarSectionName): boolean => {
+    switch (name) {
+      case 'pr':
+        return !!prForBranch
+      case 'processes':
+        return processes.length > 0
+      case 'ports':
+        return ports.length > 0
+      case 'gitDirty':
+        return isDirty
+      case 'branch':
+        return !!terminal.git_branch
+    }
+  }
+
+  // Filter to visible sections that have content
+  const visibleSections = sortedSections.filter(
+    (s) => s.visible && hasContent(s.name),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const names = sortedSections.map((s) => s.name)
+    const oldIndex = names.indexOf(active.id as StatusBarSectionName)
+    const newIndex = names.indexOf(over.id as StatusBarSectionName)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const newNames = [...names]
+    newNames.splice(oldIndex, 1)
+    newNames.splice(newIndex, 0, active.id as StatusBarSectionName)
+
+    const newSections = statusBar.sections.map((s) => ({
+      ...s,
+      order: newNames.indexOf(s.name),
+    }))
+    updateSettings({ statusBar: { ...statusBar, sections: newSections } })
+  }
+
+  const renderSection = (section: StatusBarSection) => {
+    switch (section.name) {
+      case 'pr':
+        return prForBranch ? (
+          <PRSection key={section.name} section={section} pr={prForBranch} />
+        ) : null
+      case 'processes':
+        return processes.length > 0 ? (
+          <ProcessesSection
+            key={section.name}
+            section={section}
+            processes={processes}
+            shells={terminal.shells}
+            terminalId={terminal.id}
+            terminalName={terminal.name}
+          />
+        ) : null
+      case 'ports':
+        return ports.length > 0 ? (
+          <PortsSection
+            key={section.name}
+            section={section}
+            shellPorts={shellPorts}
+            terminalPorts={ports}
+            shells={terminal.shells}
+            terminalName={terminal.name}
+          />
+        ) : null
+      case 'gitDirty':
+        return isDirty && diffStat ? (
+          <GitDirtySection
+            key={section.name}
+            section={section}
+            diffStat={diffStat}
+            terminalId={terminal.id}
+          />
+        ) : null
+      case 'branch':
+        return terminal.git_branch ? (
+          <BranchSection
+            key={section.name}
+            section={section}
+            branch={terminal.git_branch}
+            terminalId={terminal.id}
+          />
+        ) : null
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'w-full bg-[#1a1a1a] flex relative',
+      )}
+    >
+      <div className={cn('absolute left-0 w-full h-[0.02rem] bg-zinc-400/30', position === 'top' && 'bottom-[0.02rem]',
+        position === 'bottom' && !isMobile && 'top-[0.02rem]',
+        position === 'bottom' && isMobile && 'bottom-[0.02rem]')}></div>
+      <div className='flex items-center w-full overflow-x-auto relative'>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToHorizontalAxis]}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={visibleSections.map((s) => s.name)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {visibleSections.map(renderSection)}
+          </SortableContext>
+        </DndContext>
+      </div>
+      <div className="flex-1" />
+      <div className="px-1 mr-1">
+        <StatusBarMenu statusBar={statusBar} updateSettings={updateSettings} />
+      </div>
+    </div>
+  )
+}

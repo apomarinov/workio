@@ -422,6 +422,65 @@ export function CommandPalette() {
       )
   }, [terminals, branchToPR])
 
+  // Listen for open-branch-actions event (opens branch actions for current branch)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number }>) => {
+      const { terminalId } = e.detail
+      const terminal = terminals.find((t) => t.id === terminalId)
+      if (!terminal?.git_branch) return
+      const pr = branchToPR.get(terminal.git_branch) ?? undefined
+      setStack([
+        initialLevel,
+        {
+          mode: 'actions',
+          title: terminal.name || getLastPathSegment(terminal.cwd),
+          terminal,
+          pr,
+        },
+        {
+          mode: 'branch-actions',
+          title: terminal.git_branch,
+          terminal,
+          pr,
+          branchesLoading: true,
+          branch: {
+            name: terminal.git_branch,
+            isRemote: false,
+            isCurrent: true,
+          },
+        },
+      ])
+      setOpen(true)
+      getBranches(terminalId)
+        .then((data) => {
+          setStack((prev) => {
+            const current = prev[prev.length - 1]
+            if (current.mode !== 'branch-actions') return prev
+            return [
+              ...prev.slice(0, -1),
+              { ...current, branches: data, branchesLoading: false },
+            ]
+          })
+        })
+        .catch(() => {
+          setStack((prev) => {
+            const current = prev[prev.length - 1]
+            if (current.mode !== 'branch-actions') return prev
+            return [
+              ...prev.slice(0, -1),
+              { ...current, branchesLoading: false },
+            ]
+          })
+        })
+    }
+    window.addEventListener('open-branch-actions', handler as EventListener)
+    return () =>
+      window.removeEventListener(
+        'open-branch-actions',
+        handler as EventListener,
+      )
+  }, [terminals, branchToPR])
+
   // Debounced session search
   useEffect(() => {
     if (currentModeId !== 'session-search' || searchText.length < 2) {
