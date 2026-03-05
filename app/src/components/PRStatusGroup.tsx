@@ -77,7 +77,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
         ) : (
           <ChevronRight className="w-4 h-4 flex-shrink-0" />
         )}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col">
           <span
             className={cn('text-xs font-medium block', !expanded && 'truncate')}
           >
@@ -94,6 +94,13 @@ export const PRStatusGroup = memo(function PRStatusGroup({
               #{pr.prNumber}
             </span>
           </div>
+          {pr.baseBranch &&
+            pr.baseBranch !== 'main' &&
+            pr.baseBranch !== 'master' && (
+              <span className="text-[10px] text-muted-foreground/70">
+                &rarr; {pr.baseBranch}
+              </span>
+            )}
         </div>
         {prInfo.isMerged ? (
           <a
@@ -144,7 +151,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => {}}
+            onToggle={() => { }}
             hasNewActivity={hasNewActivity}
           />
         </div>
