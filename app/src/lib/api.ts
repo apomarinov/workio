@@ -546,6 +546,28 @@ export async function replyToReviewComment(
   }
 }
 
+export async function editComment(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  commentId: number,
+  body: string,
+  type: 'issue_comment' | 'review_comment' | 'review',
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment/${commentId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body, type }),
+    },
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to edit comment')
+  }
+}
+
 export async function addReaction(
   owner: string,
   repo: string,

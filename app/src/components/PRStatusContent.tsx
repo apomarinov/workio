@@ -9,6 +9,8 @@ import {
   MailCheck,
   Maximize2,
   MessageSquare,
+  Pencil,
+  Quote,
   Reply,
   Smile,
 } from 'lucide-react'
@@ -55,6 +57,7 @@ import type {
 import * as api from '../lib/api'
 import {
   ContentDialog,
+  EditCommentDialog,
   HideAuthorDialog,
   MergeDialog,
   ReplyDialog,
@@ -185,6 +188,7 @@ const ReviewRow = memo(function ReviewRow({
   onMerge,
   onReply,
   onReact,
+  onEdit,
   onMarkRead,
 }: {
   review: PRReview
@@ -195,17 +199,27 @@ const ReviewRow = memo(function ReviewRow({
   hasConflicts?: boolean
   onReReview: (author: string) => void
   onMerge?: () => void
-  onReply: (author: string, reviewCommentId?: number) => void
+  onReply: (
+    author: string,
+    reviewCommentId?: number,
+    quotedBody?: string,
+  ) => void
   onReact?: (
     subjectId: number,
     subjectType: 'issue_comment' | 'review_comment' | 'review',
     content: string,
     remove?: boolean,
   ) => void
+  onEdit?: (
+    commentId: number,
+    type: 'issue_comment' | 'review_comment' | 'review',
+    currentBody: string,
+  ) => void
   onMarkRead?: () => void
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
   const isMobile = useIsMobile()
+  const { ghUsername } = useTerminalContext()
 
   const handleReReview = useCallback(
     () => onReReview(review.author),
@@ -215,6 +229,11 @@ const ReviewRow = memo(function ReviewRow({
   const handleReply = useCallback(
     () => onReply(review.author),
     [onReply, review.author],
+  )
+
+  const handleQuoteReply = useCallback(
+    () => onReply(review.author, undefined, review.body || ''),
+    [onReply, review.author, review.body],
   )
 
   const handleMarkRead = () => {
@@ -308,18 +327,60 @@ const ReviewRow = memo(function ReviewRow({
             </PopoverContent>
           </Popover>
         )}
-        <button
-          type="button"
-          onClick={handleReply}
-          className={cn(
-            'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
-            isMobile
-              ? 'opacity-100'
-              : 'opacity-0 group-hover/review:opacity-100',
-          )}
-        >
-          <Reply className="w-3.5 h-3.5" />
-        </button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                isMobile
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/review:opacity-100',
+              )}
+            >
+              <Reply className="w-3.5 h-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-1" side="top" align="center">
+            <div className="flex flex-col">
+              <PopoverClose asChild>
+                <button
+                  type="button"
+                  onClick={handleReply}
+                  className="text-xs text-left px-2 py-1 rounded hover:bg-sidebar-accent cursor-pointer"
+                >
+                  Reply
+                </button>
+              </PopoverClose>
+              {review.body && (
+                <PopoverClose asChild>
+                  <button
+                    type="button"
+                    onClick={handleQuoteReply}
+                    className="text-xs text-left px-2 py-1 rounded hover:bg-sidebar-accent cursor-pointer flex items-center gap-1"
+                  >
+                    <Quote className="w-3 h-3" />
+                    Quote reply
+                  </button>
+                </PopoverClose>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+        {onEdit && review.id && review.body && ghUsername === review.author && (
+          <button
+            type="button"
+            onClick={() => onEdit(review.id!, 'review', review.body!)}
+            className={cn(
+              'text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+              isMobile
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/review:opacity-100',
+            )}
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        )}
         {showReReview && (
           <button
             type="button"
@@ -394,6 +455,7 @@ const CommentItem = memo(function CommentItem({
   onHide,
   onReply,
   onReact,
+  onEdit,
   onMarkRead,
   hidePath,
   indent,
@@ -413,12 +475,21 @@ const CommentItem = memo(function CommentItem({
   }
   prUrl: string
   onHide: (author: string) => void
-  onReply: (author: string, reviewCommentId?: number) => void
+  onReply: (
+    author: string,
+    reviewCommentId?: number,
+    quotedBody?: string,
+  ) => void
   onReact?: (
     subjectId: number,
     subjectType: 'issue_comment' | 'review_comment' | 'review',
     content: string,
     remove?: boolean,
+  ) => void
+  onEdit?: (
+    commentId: number,
+    type: 'issue_comment' | 'review_comment' | 'review',
+    currentBody: string,
   ) => void
   onMarkRead?: () => void
   hidePath?: boolean
@@ -429,6 +500,7 @@ const CommentItem = memo(function CommentItem({
   const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [modalOpen, setModalOpen] = useState(false)
   const isMobile = useIsMobile()
+  const { ghUsername } = useTerminalContext()
 
   const handleHide = useCallback(
     () => onHide(comment.author),
@@ -438,6 +510,11 @@ const CommentItem = memo(function CommentItem({
   const handleReply = useCallback(
     () => onReply(comment.author),
     [onReply, comment.author],
+  )
+
+  const handleQuoteReply = useCallback(
+    () => onReply(comment.author, undefined, comment.body),
+    [onReply, comment.author, comment.body],
   )
 
   const handleMarkRead = () => {
@@ -555,30 +632,80 @@ const CommentItem = memo(function CommentItem({
               </PopoverContent>
             </Popover>
           )}
-          <button
-            type="button"
-            onClick={handleReply}
-            className={cn(
-              'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
-              isMobile
-                ? 'opacity-100'
-                : 'opacity-0 group-hover/comment:opacity-100',
-            )}
-          >
-            <Reply className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleHide}
-            className={cn(
-              'text-muted-foreground/30 mt- hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
-              isMobile
-                ? 'opacity-100'
-                : 'opacity-0 group-hover/comment:opacity-100',
-            )}
-          >
-            <BellOff className="w-3 h-3" />
-          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                  isMobile
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover/comment:opacity-100',
+                )}
+              >
+                <Reply className="w-3.5 h-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-1" side="top" align="center">
+              <div className="flex flex-col">
+                <PopoverClose asChild>
+                  <button
+                    type="button"
+                    onClick={handleReply}
+                    className="text-xs text-left px-2 py-1 rounded hover:bg-sidebar-accent cursor-pointer"
+                  >
+                    Reply
+                  </button>
+                </PopoverClose>
+                {comment.body && (
+                  <PopoverClose asChild>
+                    <button
+                      type="button"
+                      onClick={handleQuoteReply}
+                      className="text-xs text-left px-2 py-1 rounded hover:bg-sidebar-accent cursor-pointer flex items-center gap-1"
+                    >
+                      <Quote className="w-3 h-3" />
+                      Quote reply
+                    </button>
+                  </PopoverClose>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {onEdit && comment.id && ghUsername === comment.author && (
+            <button
+              type="button"
+              onClick={() =>
+                onEdit(
+                  comment.id!,
+                  comment.path ? 'review_comment' : 'issue_comment',
+                  comment.body,
+                )
+              }
+              className={cn(
+                'text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                isMobile
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/comment:opacity-100',
+              )}
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+          {ghUsername !== comment.author && (
+            <button
+              type="button"
+              onClick={handleHide}
+              className={cn(
+                'text-muted-foreground/50 mt- hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                isMobile
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/comment:opacity-100',
+              )}
+            >
+              <BellOff className="w-3 h-3" />
+            </button>
+          )}
         </div>
         <div
           onClick={() => {
@@ -637,6 +764,7 @@ function ReviewThreadGroup({
   onHide,
   onReply,
   onReact,
+  onEdit,
   defaultExpanded,
   largeText,
 }: {
@@ -644,12 +772,21 @@ function ReviewThreadGroup({
   prUrl: string
   pr?: PRCheckStatus
   onHide: (author: string) => void
-  onReply: (author: string, reviewCommentId?: number) => void
+  onReply: (
+    author: string,
+    reviewCommentId?: number,
+    quotedBody?: string,
+  ) => void
   onReact?: (
     subjectId: number,
     subjectType: 'issue_comment' | 'review_comment' | 'review',
     content: string,
     remove?: boolean,
+  ) => void
+  onEdit?: (
+    commentId: number,
+    type: 'issue_comment' | 'review_comment' | 'review',
+    currentBody: string,
   ) => void
   defaultExpanded?: boolean
   largeText?: boolean
@@ -666,7 +803,11 @@ function ReviewThreadGroup({
   const remainingReplies = sortedReplies.slice(REPLY_LIMIT)
 
   // Wrap onReply to include the root comment ID for review thread replies
-  const handleThreadReply = (author: string) => onReply(author, root.id)
+  const handleThreadReply = (
+    author: string,
+    _reviewCommentId?: number,
+    quotedBody?: string,
+  ) => onReply(author, root.id, quotedBody)
 
   return (
     <div>
@@ -682,6 +823,7 @@ function ReviewThreadGroup({
         onHide={onHide}
         onReply={handleThreadReply}
         onReact={onReact}
+        onEdit={onEdit}
         onMarkRead={
           pr && root.isUnread && root.id
             ? () => markNotificationReadByItem(pr.repo, pr.prNumber, root.id)
@@ -699,6 +841,7 @@ function ReviewThreadGroup({
           onHide={onHide}
           onReply={handleThreadReply}
           onReact={onReact}
+          onEdit={onEdit}
           onMarkRead={
             pr && reply.isUnread && reply.id
               ? () => markNotificationReadByItem(pr.repo, pr.prNumber, reply.id)
@@ -736,6 +879,7 @@ function ReviewThreadGroup({
             onHide={onHide}
             onReply={handleThreadReply}
             onReact={onReact}
+            onEdit={onEdit}
             onMarkRead={
               pr && reply.isUnread && reply.id
                 ? () =>
@@ -811,16 +955,26 @@ function CollapsedAuthorGroup({
   onReply,
   onHide,
   onReact,
+  onEdit,
 }: {
   group: CollapsedGroup
   prUrl: string
-  onReply: (author: string, reviewCommentId?: number) => void
+  onReply: (
+    author: string,
+    reviewCommentId?: number,
+    quotedBody?: string,
+  ) => void
   onHide: (author: string) => void
   onReact?: (
     subjectId: number,
     subjectType: 'issue_comment' | 'review_comment' | 'review',
     content: string,
     remove?: boolean,
+  ) => void
+  onEdit?: (
+    commentId: number,
+    type: 'issue_comment' | 'review_comment' | 'review',
+    currentBody: string,
   ) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -861,6 +1015,7 @@ function CollapsedAuthorGroup({
             onHide={onHide}
             onReply={onReply}
             onReact={onReact}
+            onEdit={onEdit}
           />
         ))}
     </div>
@@ -873,19 +1028,29 @@ function FullDiscussionDialog({
   onReply,
   onHide,
   onReact,
+  onEdit,
   onReReview,
   onMerge,
   onClose,
 }: {
   groupedDiscussion: DisplayItem[]
   pr: PRCheckStatus
-  onReply: (author: string, reviewCommentId?: number) => void
+  onReply: (
+    author: string,
+    reviewCommentId?: number,
+    quotedBody?: string,
+  ) => void
   onHide: (author: string) => void
   onReact?: (
     subjectId: number,
     subjectType: 'issue_comment' | 'review_comment' | 'review',
     content: string,
     remove?: boolean,
+  ) => void
+  onEdit?: (
+    commentId: number,
+    type: 'issue_comment' | 'review_comment' | 'review',
+    currentBody: string,
   ) => void
   onReReview: (author: string) => void
   onMerge: () => void
@@ -919,6 +1084,7 @@ function FullDiscussionDialog({
                     onReply={onReply}
                     onHide={onHide}
                     onReact={onReact}
+                    onEdit={onEdit}
                   />
                 )
               case 'review':
@@ -937,6 +1103,7 @@ function FullDiscussionDialog({
                       }
                       onReply={onReply}
                       onReact={onReact}
+                      onEdit={onEdit}
                       onMarkRead={
                         item.review.isUnread && item.review.id
                           ? () =>
@@ -961,6 +1128,7 @@ function FullDiscussionDialog({
                           onHide={onHide}
                           onReply={onReply}
                           onReact={onReact}
+                          onEdit={onEdit}
                           defaultExpanded
                           largeText
                         />
@@ -977,6 +1145,7 @@ function FullDiscussionDialog({
                     onHide={onHide}
                     onReply={onReply}
                     onReact={onReact}
+                    onEdit={onEdit}
                     onMarkRead={
                       item.comment.isUnread && item.comment.id
                         ? () =>
@@ -1001,6 +1170,7 @@ function FullDiscussionDialog({
                     onHide={onHide}
                     onReply={onReply}
                     onReact={onReact}
+                    onEdit={onEdit}
                     defaultExpanded
                     largeText
                   />
@@ -1025,6 +1195,7 @@ function DiscussionTimeline({
   onReply,
   onHide,
   onReact,
+  onEdit,
 }: {
   discussion: PRDiscussionItem[]
   pr: PRCheckStatus
@@ -1032,13 +1203,22 @@ function DiscussionTimeline({
   collapsedAuthorsSet: Set<string>
   onReReview: (author: string) => void
   onMerge: () => void
-  onReply: (author: string, reviewCommentId?: number) => void
+  onReply: (
+    author: string,
+    reviewCommentId?: number,
+    quotedBody?: string,
+  ) => void
   onHide: (author: string) => void
   onReact?: (
     subjectId: number,
     subjectType: 'issue_comment' | 'review_comment' | 'review',
     content: string,
     remove?: boolean,
+  ) => void
+  onEdit?: (
+    commentId: number,
+    type: 'issue_comment' | 'review_comment' | 'review',
+    currentBody: string,
   ) => void
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
@@ -1175,6 +1355,7 @@ function DiscussionTimeline({
           onReply={onReply}
           onHide={onHide}
           onReact={onReact}
+          onEdit={onEdit}
           onReReview={onReReview}
           onMerge={onMerge}
           onClose={() => setFullViewOpen(false)}
@@ -1193,6 +1374,7 @@ function DiscussionTimeline({
                     onReply={onReply}
                     onHide={onHide}
                     onReact={onReact}
+                    onEdit={onEdit}
                   />
                 )
               case 'review':
@@ -1211,6 +1393,7 @@ function DiscussionTimeline({
                       }
                       onReply={onReply}
                       onReact={onReact}
+                      onEdit={onEdit}
                       onMarkRead={
                         item.review.isUnread && item.review.id
                           ? () =>
@@ -1235,6 +1418,7 @@ function DiscussionTimeline({
                           onHide={onHide}
                           onReply={onReply}
                           onReact={onReact}
+                          onEdit={onEdit}
                         />
                       </div>
                     ))}
@@ -1249,6 +1433,7 @@ function DiscussionTimeline({
                     onHide={onHide}
                     onReply={onReply}
                     onReact={onReact}
+                    onEdit={onEdit}
                     onMarkRead={
                       item.comment.isUnread && item.comment.id
                         ? () =>
@@ -1271,6 +1456,7 @@ function DiscussionTimeline({
                     onHide={onHide}
                     onReply={onReply}
                     onReact={onReact}
+                    onEdit={onEdit}
                   />
                 )
               default:
@@ -1357,6 +1543,12 @@ export function PRStatusContent({
   const [replyTarget, setReplyTarget] = useState<{
     author: string
     reviewCommentId?: number
+    quotedBody?: string
+  } | null>(null)
+  const [editTarget, setEditTarget] = useState<{
+    commentId: number
+    type: 'issue_comment' | 'review_comment' | 'review'
+    body: string
   } | null>(null)
 
   const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
@@ -1376,8 +1568,8 @@ export function PRStatusContent({
   )
 
   const handleReply = useCallback(
-    (author: string, reviewCommentId?: number) => {
-      setReplyTarget({ author, reviewCommentId })
+    (author: string, reviewCommentId?: number, quotedBody?: string) => {
+      setReplyTarget({ author, reviewCommentId, quotedBody })
     },
     [],
   )
@@ -1419,6 +1611,30 @@ export function PRStatusContent({
       await api.addPRComment(owner, repo, pr.prNumber, body)
     }
     toast.success('Comment posted')
+  }
+
+  const handleEdit = useCallback(
+    (
+      commentId: number,
+      type: 'issue_comment' | 'review_comment' | 'review',
+      currentBody: string,
+    ) => {
+      setEditTarget({ commentId, type, body: currentBody })
+    },
+    [],
+  )
+
+  const handleSendEdit = async (newBody: string) => {
+    if (!editTarget) return
+    await api.editComment(
+      owner,
+      repo,
+      pr.prNumber,
+      editTarget.commentId,
+      newBody,
+      editTarget.type,
+    )
+    toast.success('Comment updated')
   }
 
   const handleRerunCheck = async () => {
@@ -1612,6 +1828,7 @@ export function PRStatusContent({
             onReply={handleReply}
             onHide={handleHideComment}
             onReact={handleReact}
+            onEdit={handleEdit}
           />
 
           {reReviewAuthor && (
@@ -1661,8 +1878,17 @@ export function PRStatusContent({
           {replyTarget && (
             <ReplyDialog
               author={replyTarget.author}
+              quotedBody={replyTarget.quotedBody}
               onConfirm={handleSendReply}
               onClose={() => setReplyTarget(null)}
+            />
+          )}
+
+          {editTarget && (
+            <EditCommentDialog
+              body={editTarget.body}
+              onConfirm={handleSendEdit}
+              onClose={() => setEditTarget(null)}
             />
           )}
         </div>

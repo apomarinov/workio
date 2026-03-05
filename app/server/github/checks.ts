@@ -2068,6 +2068,125 @@ export function replyToReviewComment(
   })
 }
 
+export function editIssueComment(
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const cmd = `gh api repos/${owner}/${repo}/issues/comments/${commentId} -X PATCH -f body="..."`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/issues/comments/${commentId}`,
+        '-X',
+        'PATCH',
+        '-f',
+        `body=${body}`,
+      ],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId: `${owner}/${repo}`,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        invalidateChecksCache()
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
+export function editReviewComment(
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const cmd = `gh api repos/${owner}/${repo}/pulls/comments/${commentId} -X PATCH -f body="..."`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/pulls/comments/${commentId}`,
+        '-X',
+        'PATCH',
+        '-f',
+        `body=${body}`,
+      ],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId: `${owner}/${repo}`,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        invalidateChecksCache()
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
+export function editReview(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  reviewId: number,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const prId = `${owner}/${repo}#${prNumber}`
+  const cmd = `gh api repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId} -X PUT -f body="..."`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId}`,
+        '-X',
+        'PUT',
+        '-f',
+        `body=${body}`,
+      ],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+          failed: !!err,
+        })
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        invalidateChecksCache()
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
 // GitHub REST API doesn't support reactions on reviews (only review comments).
 // For reviews, we use GraphQL addReaction/removeReaction mutations.
 const REACTION_CONTENT_TO_GRAPHQL: Record<string, string> = {

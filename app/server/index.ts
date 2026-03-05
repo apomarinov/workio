@@ -27,7 +27,10 @@ import {
   closePR,
   createPR,
   detectAllTerminalBranches,
+  editIssueComment,
   editPR,
+  editReview,
+  editReviewComment,
   emitCachedPRChecks,
   fetchAllClosedPRs,
   fetchInvolvedPRs,
@@ -558,6 +561,49 @@ fastify.post<{
       Number(commentId),
       body,
     )
+    if (!result.ok) {
+      return reply.status(500).send({ error: result.error })
+    }
+    await refreshPRChecks(true)
+    return { ok: true }
+  },
+)
+
+// Edit a comment or review
+fastify.patch<{
+  Params: { owner: string; repo: string; pr: string; commentId: string }
+  Body: { body: string; type: 'issue_comment' | 'review_comment' | 'review' }
+}>(
+  '/api/github/:owner/:repo/pr/:pr/comment/:commentId',
+  async (request, reply) => {
+    const { owner, repo, pr, commentId } = request.params
+    const { body, type } = request.body
+    if (!body) {
+      return reply.status(400).send({ error: 'body is required' })
+    }
+    if (!type) {
+      return reply.status(400).send({ error: 'type is required' })
+    }
+    let result: { ok: boolean; error?: string }
+    switch (type) {
+      case 'issue_comment':
+        result = await editIssueComment(owner, repo, Number(commentId), body)
+        break
+      case 'review_comment':
+        result = await editReviewComment(owner, repo, Number(commentId), body)
+        break
+      case 'review':
+        result = await editReview(
+          owner,
+          repo,
+          Number(pr),
+          Number(commentId),
+          body,
+        )
+        break
+      default:
+        return reply.status(400).send({ error: 'Invalid type' })
+    }
     if (!result.ok) {
       return reply.status(500).send({ error: result.error })
     }

@@ -1,4 +1,5 @@
 export { ContentDialog } from './ContentDialog'
+export { EditCommentDialog } from './EditCommentDialog'
 export { EditPRDialog } from './EditPRDialog'
 export { HideAuthorDialog } from './HideAuthorDialog'
 export { MergeDialog } from './MergeDialog'

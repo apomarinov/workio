@@ -141,7 +141,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
         )}
       </div>
       {!prInfo.isMerged && expanded && (
-        <div className="ml-4">
+        <div className="ml-2">
           <PRTabButton
             pr={pr}
             withIcon
