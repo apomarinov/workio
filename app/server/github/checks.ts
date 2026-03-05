@@ -1673,7 +1673,7 @@ export function renamePR(
   })
 }
 
-export function editPR(
+export async function editPR(
   owner: string,
   repo: string,
   prNumber: number,
@@ -1682,47 +1682,139 @@ export function editPR(
   draft?: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`
-  const args = [
-    'api',
-    '--method',
-    'PATCH',
-    `repos/${owner}/${repo}/pulls/${prNumber}`,
-    '-f',
-    `title=${title}`,
-    '-f',
-    `body=${body}`,
-  ]
-  if (draft !== undefined) {
-    args.push('-F', `draft=${draft}`)
-  }
-  return new Promise((resolve) => {
-    execFile('gh', args, { timeout: 30000 }, (err, stdout, stderr) => {
-      logCommand({
-        prId,
-        category: 'github',
-        command: cmd,
-        stdout,
-        stderr,
-        failed: !!err,
-      })
-      if (err) {
-        resolve({ ok: false, error: stderr || err.message })
-        return
-      }
-      // Directly mutate cache and push to clients
-      const existing = lastFetchedPRs.find(
-        (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
+
+  // Update title + body via REST API
+  const patchResult = await new Promise<{ ok: boolean; error?: string }>(
+    (resolve) => {
+      const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`
+      execFile(
+        'gh',
+        [
+          'api',
+          '--method',
+          'PATCH',
+          `repos/${owner}/${repo}/pulls/${prNumber}`,
+          '-f',
+          `title=${title}`,
+          '-f',
+          `body=${body}`,
+        ],
+        { timeout: 30000 },
+        (err, stdout, stderr) => {
+          logCommand({
+            prId,
+            category: 'github',
+            command: cmd,
+            stdout,
+            stderr,
+            failed: !!err,
+          })
+          if (err) {
+            resolve({ ok: false, error: stderr || err.message })
+            return
+          }
+          resolve({ ok: true })
+        },
       )
-      if (existing) {
-        existing.prTitle = title
-        existing.prBody = body
-        if (draft !== undefined) existing.isDraft = draft
-      }
-      emitPRChecks(lastFetchedPRs)
-      resolve({ ok: true })
-    })
-  })
+    },
+  )
+
+  if (!patchResult.ok) return patchResult
+
+  // Draft status requires GraphQL mutations (REST API ignores the draft field)
+  if (draft !== undefined) {
+    const draftResult = await new Promise<{ ok: boolean; error?: string }>(
+      (resolve) => {
+        if (draft) {
+          // Convert to draft: need node_id first, then GraphQL mutation
+          execFile(
+            'gh',
+            [
+              'api',
+              `repos/${owner}/${repo}/pulls/${prNumber}`,
+              '--jq',
+              '.node_id',
+            ],
+            { timeout: 15000 },
+            (err, stdout, stderr) => {
+              if (err) {
+                resolve({
+                  ok: false,
+                  error: stderr || err.message,
+                })
+                return
+              }
+              const nodeId = stdout.trim()
+              const mutation = `mutation { convertPullRequestToDraft(input: {pullRequestId: "${nodeId}"}) { pullRequest { isDraft } } }`
+              execFile(
+                'gh',
+                ['api', 'graphql', '-f', `query=${mutation}`],
+                { timeout: 15000 },
+                (err2, stdout2, stderr2) => {
+                  logCommand({
+                    prId,
+                    category: 'github',
+                    command: 'gh api graphql convertPullRequestToDraft',
+                    stdout: stdout2,
+                    stderr: stderr2,
+                    failed: !!err2,
+                  })
+                  if (err2) {
+                    resolve({
+                      ok: false,
+                      error: stderr2 || err2.message,
+                    })
+                    return
+                  }
+                  resolve({ ok: true })
+                },
+              )
+            },
+          )
+        } else {
+          // Mark as ready for review
+          const cmd = `gh pr ready ${prNumber} -R ${owner}/${repo}`
+          execFile(
+            'gh',
+            ['pr', 'ready', String(prNumber), '-R', `${owner}/${repo}`],
+            { timeout: 15000 },
+            (err, stdout, stderr) => {
+              logCommand({
+                prId,
+                category: 'github',
+                command: cmd,
+                stdout,
+                stderr,
+                failed: !!err,
+              })
+              if (err) {
+                resolve({
+                  ok: false,
+                  error: stderr || err.message,
+                })
+                return
+              }
+              resolve({ ok: true })
+            },
+          )
+        }
+      },
+    )
+
+    if (!draftResult.ok) return draftResult
+  }
+
+  // Directly mutate cache and push to clients
+  const existing = lastFetchedPRs.find(
+    (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
+  )
+  if (existing) {
+    existing.prTitle = title
+    existing.prBody = body
+    if (draft !== undefined) existing.isDraft = draft
+  }
+  emitPRChecks(lastFetchedPRs)
+  return { ok: true }
 }
 
 export function createPR(

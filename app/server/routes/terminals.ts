@@ -1290,8 +1290,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           }
         }
 
-        // Refresh git branch detection
+        // Refresh git branch detection and sync status
         detectGitBranch(id)
+        checkAndEmitSingleGitDirty(id)
 
         return { success: true, branch }
       } catch (err) {
@@ -1330,11 +1331,11 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       const pushArgs = force
-        ? ['push', '--force', 'origin', branch]
-        : ['push', 'origin', branch]
+        ? ['push', '-u', '--force', 'origin', branch]
+        : ['push', '-u', 'origin', branch]
       const gitCmd = force
-        ? `git push --force origin ${branch.replace(/'/g, "'\\''")}`
-        : `git push origin ${branch.replace(/'/g, "'\\''")}`
+        ? `git push -u --force origin ${branch.replace(/'/g, "'\\''")}`
+        : `git push -u origin ${branch.replace(/'/g, "'\\''")}`
 
       try {
         if (terminal.ssh_host) {
@@ -1370,8 +1371,28 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           })
         }
 
-        // Refresh git branch detection
+        // Update the local remote-tracking ref to match what we just pushed.
+        // This is needed because single-branch clones (--single-branch / --depth)
+        // have a narrow fetch refspec and `git push` may not update origin/<branch>.
+        const cwd = expandPath(terminal.cwd)
+        if (terminal.ssh_host) {
+          execSSHCommand(
+            terminal.ssh_host,
+            `git update-ref refs/remotes/origin/${branch.replace(/'/g, "'\\''")} HEAD`,
+            { cwd: terminal.cwd },
+          ).catch(() => {})
+        } else {
+          execFile(
+            'git',
+            ['update-ref', `refs/remotes/origin/${branch}`, 'HEAD'],
+            { cwd, timeout: 5000 },
+            () => {},
+          )
+        }
+
+        // Refresh git branch detection and sync status
         detectGitBranch(id)
+        checkAndEmitSingleGitDirty(id)
 
         return { success: true, branch }
       } catch (err) {

@@ -8,7 +8,7 @@ import {
   GitPullRequestArrow,
   Loader2,
 } from 'lucide-react'
-import { RefreshIcon } from '@/components/icons'
+import { GithubDrafPrIcon, RefreshIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 
@@ -68,6 +68,24 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       ),
     }
   }
+  if (pr.isDraft) {
+    return {
+      isClosed: true,
+      label: 'Draft',
+      colorClass: 'text-gray-400',
+      dimColorClass: 'text-gray-400/60 hover:text-gray-400',
+      icon: (props?: { cls?: string; group?: string }) => (
+        <GithubDrafPrIcon
+          className={cn(
+            iconClass,
+            `text-gray-400/70 ${props?.group ? `${props.group}:text-gray-400` : ''}`,
+            props?.cls,
+          )}
+        />
+      ),
+    }
+  }
+
   if (runningChecksCount > 0) {
     return {
       hasRunningChecks: true,
