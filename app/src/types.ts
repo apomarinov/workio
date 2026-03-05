@@ -495,6 +495,7 @@ export type StatusBarSectionName =
   | 'ports'
   | 'gitDirty'
   | 'branch'
+  | 'spacer'
 
 export interface StatusBarSection {
   name: StatusBarSectionName
@@ -514,14 +515,16 @@ export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
   ports: 'Ports',
   gitDirty: 'Git Changes',
   branch: 'Branch',
+  spacer: 'Spacer',
 }
 
 export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
-  { name: 'pr', visible: true, order: 0 },
-  { name: 'processes', visible: true, order: 1 },
-  { name: 'ports', visible: true, order: 2 },
-  { name: 'gitDirty', visible: true, order: 3 },
-  { name: 'branch', visible: true, order: 4 },
+  { name: 'branch', visible: true, order: 0 },
+  { name: 'gitDirty', visible: true, order: 1 },
+  { name: 'spacer', visible: true, order: 2 },
+  { name: 'processes', visible: true, order: 3 },
+  { name: 'ports', visible: true, order: 4 },
+  { name: 'pr', visible: true, order: 5 },
 ]
 
 export const DEFAULT_STATUS_BAR: StatusBarConfig = {

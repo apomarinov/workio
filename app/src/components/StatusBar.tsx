@@ -38,6 +38,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useTerminalContext } from '@/context/TerminalContext'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -57,7 +58,6 @@ import {
   PortsList,
   ProcessesList,
 } from './terminal-status-sections'
-import { useIsMobile } from '@/hooks/useMediaQuery'
 
 const CommitDialog = lazy(() =>
   import('./CommitDialog').then((m) => ({ default: m.CommitDialog })),
@@ -322,6 +322,31 @@ function BranchSection({
   )
 }
 
+function SpacerSection({ section }: { section: StatusBarSection }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.name })
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : undefined,
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="flex-1 min-w-2"
+    />
+  )
+}
+
 function StatusBarMenu({
   statusBar,
   updateSettings,
@@ -383,6 +408,7 @@ function StatusBarMenu({
         <div className="h-px bg-border" />
         <div className="p-1">
           {statusBar.sections
+            .filter((s) => s.name !== 'spacer')
             .sort((a, b) => a.order - b.order)
             .map((section) => (
               <button
@@ -414,7 +440,18 @@ export function StatusBar({ position }: StatusBarProps) {
   const { settings, updateSettings } = useSettings()
   const isMobile = useIsMobile()
 
-  const statusBar = settings?.statusBar ?? DEFAULT_STATUS_BAR
+  const rawStatusBar = settings?.statusBar ?? DEFAULT_STATUS_BAR
+  const sections = rawStatusBar.sections.some((s) => s.name === 'spacer')
+    ? rawStatusBar.sections
+    : [
+        ...rawStatusBar.sections,
+        {
+          name: 'spacer' as const,
+          visible: true,
+          order: rawStatusBar.sections.length,
+        },
+      ]
+  const statusBar = { ...rawStatusBar, sections }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -432,8 +469,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-    ) ??
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+      ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -457,12 +494,14 @@ export function StatusBar({ position }: StatusBarProps) {
         return isDirty
       case 'branch':
         return !!terminal.git_branch
+      case 'spacer':
+        return true
     }
   }
 
   // Filter to visible sections that have content
   const visibleSections = sortedSections.filter(
-    (s) => s.visible && hasContent(s.name),
+    (s) => (s.name === 'spacer' || s.visible) && hasContent(s.name),
   )
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -531,19 +570,22 @@ export function StatusBar({ position }: StatusBarProps) {
             terminalId={terminal.id}
           />
         ) : null
+      case 'spacer':
+        return <SpacerSection key={section.name} section={section} />
     }
   }
 
   return (
-    <div
-      className={cn(
-        'w-full bg-[#1a1a1a] flex relative',
-      )}
-    >
-      <div className={cn('absolute left-0 w-full h-[0.02rem] bg-zinc-400/30', position === 'top' && 'bottom-[0.02rem]',
-        position === 'bottom' && !isMobile && 'top-[0.02rem]',
-        position === 'bottom' && isMobile && 'bottom-[0.02rem]')}></div>
-      <div className='flex items-center w-full overflow-x-auto relative'>
+    <div className={cn('w-full bg-[#1a1a1a] flex relative')}>
+      <div
+        className={cn(
+          'absolute left-0 w-full h-[0.02rem] bg-zinc-400/30',
+          position === 'top' && 'bottom-[0.02rem]',
+          position === 'bottom' && !isMobile && 'top-[0.02rem]',
+          position === 'bottom' && isMobile && 'bottom-[0.02rem]',
+        )}
+      ></div>
+      <div className="flex items-center w-full overflow-x-auto relative">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -558,7 +600,6 @@ export function StatusBar({ position }: StatusBarProps) {
           </SortableContext>
         </DndContext>
       </div>
-      <div className="flex-1" />
       <div className="px-1 mr-1">
         <StatusBarMenu statusBar={statusBar} updateSettings={updateSettings} />
       </div>
