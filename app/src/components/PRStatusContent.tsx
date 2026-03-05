@@ -1735,7 +1735,10 @@ export function PRStatusContent({
           {hasBody && (
             <div
               onClick={() => setBodyModalOpen(true)}
-              className="px-2 py-1 text-xs text-sidebar-foreground/70 line-clamp-2 leading-[1.5] cursor-pointer hover:bg-sidebar-accent/30 rounded transition-colors"
+              className={cn(
+                'px-2 py-1 text-xs text-sidebar-foreground/70 leading-[1.5] cursor-pointer hover:bg-sidebar-accent/30 rounded transition-colors',
+                hasHeader && 'line-clamp-2',
+              )}
             >
               <MarkdownContent content={pr.prBody} />
             </div>

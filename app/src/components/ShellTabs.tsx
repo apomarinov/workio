@@ -865,7 +865,8 @@ export function ShellTabs({
           </button>
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive"
+            disabled={!processes.some((p) => p.terminalId === terminal.id)}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => {
               setKillAllConfirm(true)
               setMenuOpen(false)
@@ -965,7 +966,7 @@ export function ShellTabs({
                 : 'opacity-50 cursor-not-allowed',
             )}
           >
-            Tab Bar on Top
+            On Top
             <Switch
               checked={tabsTop}
               onCheckedChange={(v) => setTabsTop(v)}

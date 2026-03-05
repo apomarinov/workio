@@ -108,7 +108,7 @@ function SortableStatusSection({
         if (e.key === 'Enter' || e.key === ' ') onClick?.()
       }}
       className={cn(
-        'flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
+        'flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer flex-shrink-0',
         extraClassName,
       )}
     >
@@ -164,11 +164,13 @@ function PRSection({
       </SortableStatusSection>
       {dialogOpen && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {prInfo.icon({ cls: 'w-4 h-4' })}
-                <span className="truncate">{pr.prTitle}</span>
+              <DialogTitle className="flex items-center gap-2 min-w-0">
+                <span className="flex-shrink-0">
+                  {prInfo.icon({ cls: 'w-4 h-4' })}
+                </span>
+                <span className="break-all">{pr.prTitle}</span>
                 <span className="text-muted-foreground text-sm font-normal">
                   #{pr.prNumber}
                 </span>
@@ -576,7 +578,7 @@ export function StatusBar({ position }: StatusBarProps) {
   }
 
   return (
-    <div className={cn('w-full bg-[#1a1a1a] flex relative')}>
+    <div className={cn('w-full bg-[#1a1a1a] flex relative items-center')}>
       <div
         className={cn(
           'absolute left-0 w-full h-[0.02rem] bg-zinc-400/30',

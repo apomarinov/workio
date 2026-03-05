@@ -140,7 +140,7 @@ export function CreatePRDialog({
             <div className="flex items-center gap-3">
               <span>Create Pull Request</span>
               <span className="text-xs font-normal text-zinc-500 font-mono">
-                {headBranch} → {baseBranch}
+                {headBranch} →
               </span>
               <Popover
                 open={branchPickerOpen}
@@ -181,6 +181,29 @@ export function CreatePRDialog({
                   </Command>
                 </PopoverContent>
               </Popover>
+              <div className="flex items-center gap-3 mr-auto">
+                {noRemote ? (
+                  <span className="flex items-center gap-1.5 text-xs text-yellow-400">
+                    <X className="h-3 w-3" />
+                    Branch not pushed to remote
+                  </span>
+                ) : checkingConflicts ? (
+                  <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Checking...
+                  </span>
+                ) : conflicts === false ? (
+                  <span className="flex items-center gap-1.5 text-xs text-green-400">
+                    <Check className="h-3 w-3" />
+                    Able to merge
+                  </span>
+                ) : conflicts === true ? (
+                  <span className="flex items-center gap-1.5 text-xs text-red-400">
+                    <X className="h-3 w-3" />
+                    Can't automatically merge
+                  </span>
+                ) : null}
+              </div>
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -232,29 +255,6 @@ export function CreatePRDialog({
         )}
 
         <DialogFooter className="flex-shrink-0">
-          <div className="flex items-center gap-3 mr-auto">
-            {noRemote ? (
-              <span className="flex items-center gap-1.5 text-xs text-yellow-400">
-                <X className="h-3 w-3" />
-                Branch not pushed to remote
-              </span>
-            ) : checkingConflicts ? (
-              <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Checking...
-              </span>
-            ) : conflicts === false ? (
-              <span className="flex items-center gap-1.5 text-xs text-green-400">
-                <Check className="h-3 w-3" />
-                Able to merge
-              </span>
-            ) : conflicts === true ? (
-              <span className="flex items-center gap-1.5 text-xs text-red-400">
-                <X className="h-3 w-3" />
-                Can't automatically merge
-              </span>
-            ) : null}
-          </div>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <Checkbox
               checked={draft}
