@@ -2919,4 +2919,70 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: errorMessage })
     }
   })
+
+  // Get paginated commits for a branch
+  fastify.get<{
+    Params: TerminalParams
+    Querystring: { branch: string; limit?: string; offset?: string }
+  }>('/api/terminals/:id/branch-commits', async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'Invalid terminal id' })
+    }
+
+    const terminal = await getTerminalById(id)
+    if (!terminal) {
+      return reply.status(404).send({ error: 'Terminal not found' })
+    }
+
+    const { branch } = request.query
+    if (!branch) {
+      return reply.status(400).send({ error: 'branch is required' })
+    }
+
+    const limit = Math.min(parseInt(request.query.limit || '20', 10) || 20, 100)
+    const offset = parseInt(request.query.offset || '0', 10) || 0
+
+    try {
+      const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+      const gitArgs = [
+        'log',
+        '--format=%H|%s|%an|%aI',
+        `--max-count=${limit + 1}`,
+        `--skip=${offset}`,
+        branch,
+      ]
+
+      let stdout: string
+      if (terminal.ssh_host) {
+        const result = await execSSHCommand(
+          terminal.ssh_host,
+          `git ${gitArgs.join(' ')}`,
+          { cwd: terminal.cwd },
+        )
+        stdout = result.stdout
+      } else {
+        stdout = await new Promise<string>((resolve, reject) => {
+          execFile('git', gitArgs, { cwd, timeout: 15000 }, (err, out) => {
+            if (err) reject(err)
+            else resolve(out)
+          })
+        })
+      }
+
+      const lines = stdout.trim().split('\n').filter(Boolean)
+      const hasMore = lines.length > limit
+      const commits = lines.slice(0, limit).map((line) => {
+        const [hash, message, author, date] = line.split('|')
+        return { hash, message, author, date }
+      })
+
+      return { commits, hasMore }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to get branch commits'
+      return reply.status(400).send({ error: errorMessage })
+    }
+  })
 }

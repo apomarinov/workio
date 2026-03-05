@@ -2,6 +2,7 @@ import { GitCommitHorizontal, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { getCommitsBetween } from '@/lib/api'
+import { formatDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { DiffViewerPanel } from './DiffViewerPanel'
 
@@ -112,6 +113,9 @@ export function BranchDiffPanel({
                   <div className="text-zinc-300">{commit.message}</div>
                   <div className="text-zinc-500 font-mono">
                     {commit.hash.slice(0, 7)}
+                  </div>
+                  <div className="text-zinc-500">
+                    {formatDate(commit.date)} · {commit.author}
                   </div>
                 </div>
               </div>

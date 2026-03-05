@@ -26,6 +26,11 @@ import { Sidebar } from './components/Sidebar'
 const SessionChat = lazy(() =>
   import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
 )
+const BranchCommitsDialog = lazy(() =>
+  import('./components/dialogs/BranchCommitsDialog').then((m) => ({
+    default: m.BranchCommitsDialog,
+  })),
+)
 
 import { resolveNotification } from '../shared/notifications'
 import { MobileKeyboard } from './components/MobileKeyboard'
@@ -97,6 +102,10 @@ function AppContent() {
     'hidden' | 'input' | 'actions'
   >('input')
   const mobileInputRef = useRef<HTMLTextAreaElement>(null)
+  const [branchCommitsTarget, setBranchCommitsTarget] = useState<{
+    terminalId: number
+    branch: string
+  } | null>(null)
 
   // Mark active shells so the context can track suspension timestamps
   useEffect(() => {
@@ -248,6 +257,21 @@ function AppContent() {
     window.addEventListener('shell-template-run', handler as EventListener)
     return () =>
       window.removeEventListener('shell-template-run', handler as EventListener)
+  }, [])
+
+  // Listen for open-branch-commits events
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number; branch: string }>,
+    ) => {
+      setBranchCommitsTarget(e.detail)
+    }
+    window.addEventListener('open-branch-commits', handler as EventListener)
+    return () =>
+      window.removeEventListener(
+        'open-branch-commits',
+        handler as EventListener,
+      )
   }, [])
 
   // Shell event listeners (dispatched from TerminalItem sidebar)
@@ -960,6 +984,16 @@ function AppContent() {
       <Toaster />
       <CommandPalette />
       <PinnedSessionsPip />
+      {branchCommitsTarget && (
+        <Suspense>
+          <BranchCommitsDialog
+            open
+            terminalId={branchCommitsTarget.terminalId}
+            branch={branchCommitsTarget.branch}
+            onClose={() => setBranchCommitsTarget(null)}
+          />
+        </Suspense>
+      )}
     </>
   )
 }

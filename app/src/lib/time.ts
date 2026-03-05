@@ -8,6 +8,16 @@ function formatElapsed(timestampMs: number): string {
   return `${Math.floor(hours / 24)}d`
 }
 
+/** Short date: `Mar 5, 2026` */
+export function formatDate(date: string | number): string {
+  const d = typeof date === 'number' ? new Date(date) : new Date(date)
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 /** Human-readable "X ago" from a date string or unix-ms timestamp: `just now`, `3m ago`, `2h ago`, `1d ago` */
 export function formatTimeAgo(date: string | number): string {
   const ms = typeof date === 'number' ? date : new Date(date).getTime()

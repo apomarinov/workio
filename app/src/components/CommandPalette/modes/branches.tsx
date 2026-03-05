@@ -408,6 +408,21 @@ export function createBranchActionsMode(
     })
   }
 
+  // View Commits
+  items.push({
+    id: 'action:view-commits',
+    label: 'View Commits',
+    icon: <GitCommitHorizontal className="h-4 w-4 shrink-0 text-zinc-400" />,
+    onSelect: () => {
+      api.close()
+      window.dispatchEvent(
+        new CustomEvent('open-branch-commits', {
+          detail: { terminalId: terminal.id, branch: branch.name },
+        }),
+      )
+    },
+  })
+
   // Claude Sessions for this branch
   {
     const count = sessions.filter((s) => s.data?.branch === branch.name).length

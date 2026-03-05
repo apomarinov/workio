@@ -842,6 +842,27 @@ export async function getCommitsBetween(
   return res.json()
 }
 
+export async function getBranchCommits(
+  terminalId: number,
+  branch: string,
+  limit = 20,
+  offset = 0,
+): Promise<{ commits: PRCommit[]; hasMore: boolean }> {
+  const params = new URLSearchParams({
+    branch,
+    limit: String(limit),
+    offset: String(offset),
+  })
+  const res = await fetch(
+    `${API_BASE}/terminals/${terminalId}/branch-commits?${params.toString()}`,
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to get branch commits')
+  }
+  return res.json()
+}
+
 export async function getChangedFiles(
   terminalId: number,
   base?: string,
