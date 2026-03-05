@@ -1,4 +1,4 @@
-import { GitCommitHorizontal, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Group,
@@ -70,6 +70,8 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
 
   // ── Mode B: paginated fetch for single branch ──
   const [branchCommits, setBranchCommits] = useState<PRCommit[]>([])
+  const [mergeBase, setMergeBase] = useState<string | undefined>()
+  const [mergeBaseBranch, setMergeBaseBranch] = useState<string | undefined>()
   const [hasMore, setHasMore] = useState(false)
   const [loadingBranch, setLoadingBranch] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -81,6 +83,8 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
   useEffect(() => {
     if (!isBranchMode) return
     setBranchCommits([])
+    setMergeBase(undefined)
+    setMergeBaseBranch(undefined)
     setHasMore(false)
     setSelectedCommit(null)
     offsetRef.current = 0
@@ -89,6 +93,8 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
       .then((data) => {
         setBranchCommits(data.commits)
         setHasMore(data.hasMore)
+        setMergeBase(data.mergeBase)
+        setMergeBaseBranch(data.mergeBaseBranch)
         offsetRef.current = data.commits.length
         if (data.commits.length > 0) {
           setSelectedCommit(data.commits[0].hash)
@@ -203,32 +209,51 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
               </div>
             ) : (
               <>
-                {commits.map((commit) => (
-                  <div
-                    key={commit.hash}
-                    className={cn(
-                      'flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-zinc-800/50',
-                      selectedCommit === commit.hash && 'bg-zinc-700/50',
-                    )}
-                    onClick={() =>
-                      setSelectedCommit(
-                        selectedCommit === commit.hash ? null : commit.hash,
-                      )
-                    }
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className={cn(selectedCommit === commit.hash
-                        ? 'text-blue-400'
-                        : 'text-zinc-300',)}>{commit.message}</div>
-                      <div className="text-zinc-500 font-mono">
-                        {commit.hash.slice(0, 7)}
-                      </div>
-                      <div className="text-zinc-500">
-                        {formatDate(commit.date)} · {commit.author}
+                {commits.map((commit) => {
+                  const isMergeBase = mergeBase && commit.hash === mergeBase
+                  return (
+                    <div key={commit.hash}>
+                      {isMergeBase && (
+                        <div className="flex items-center gap-2 px-2 py-1">
+                          <div className="flex-1 border-t border-zinc-600" />
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider shrink-0">
+                            {mergeBaseBranch}
+                          </span>
+                          <div className="flex-1 border-t border-zinc-600" />
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          'flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-zinc-800/50',
+                          selectedCommit === commit.hash && 'bg-zinc-700/50',
+                        )}
+                        onClick={() =>
+                          setSelectedCommit(
+                            selectedCommit === commit.hash ? null : commit.hash,
+                          )
+                        }
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={cn(
+                              selectedCommit === commit.hash
+                                ? 'text-blue-400'
+                                : 'text-zinc-300',
+                            )}
+                          >
+                            {commit.message}
+                          </div>
+                          <div className="text-zinc-500 font-mono">
+                            {commit.hash.slice(0, 7)}
+                          </div>
+                          <div className="text-zinc-500">
+                            {formatDate(commit.date)} · {commit.author}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 {isBranchMode && (
                   <>
                     <div ref={sentinelRef} className="h-1" />

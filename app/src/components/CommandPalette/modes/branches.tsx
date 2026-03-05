@@ -411,7 +411,7 @@ export function createBranchActionsMode(
   // View Commits
   items.push({
     id: 'action:view-commits',
-    label: 'View Commits',
+    label: 'Commits',
     icon: <GitCommitHorizontal className="h-4 w-4 shrink-0 text-zinc-400" />,
     onSelect: () => {
       api.close()

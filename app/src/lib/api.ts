@@ -847,7 +847,12 @@ export async function getBranchCommits(
   branch: string,
   limit = 20,
   offset = 0,
-): Promise<{ commits: PRCommit[]; hasMore: boolean }> {
+): Promise<{
+  commits: PRCommit[]
+  hasMore: boolean
+  mergeBase?: string
+  mergeBaseBranch?: string
+}> {
   const params = new URLSearchParams({
     branch,
     limit: String(limit),

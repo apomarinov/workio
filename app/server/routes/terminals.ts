@@ -2978,7 +2978,38 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return { hash, message, author, date }
       })
 
-      return { commits, hasMore }
+      // Find merge-base with default branch (only on first page)
+      let mergeBase: string | undefined
+      let mergeBaseBranch: string | undefined
+      if (offset === 0) {
+        const runGit = (args: string[]): Promise<string> => {
+          if (terminal.ssh_host) {
+            return execSSHCommand(terminal.ssh_host, `git ${args.join(' ')}`, {
+              cwd: terminal.cwd,
+            }).then((r) => r.stdout)
+          }
+          return new Promise((resolve, reject) => {
+            execFile('git', args, { cwd, timeout: 5000 }, (err, out) => {
+              if (err) reject(err)
+              else resolve(out)
+            })
+          })
+        }
+
+        // Try main, then master
+        for (const defaultBranch of ['main', 'master']) {
+          try {
+            const mb = await runGit(['merge-base', defaultBranch, branch])
+            mergeBase = mb.trim()
+            mergeBaseBranch = defaultBranch
+            break
+          } catch {
+            // branch doesn't exist, try next
+          }
+        }
+      }
+
+      return { commits, hasMore, mergeBase, mergeBaseBranch }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to get branch commits'
