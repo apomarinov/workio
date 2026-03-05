@@ -807,7 +807,7 @@ function AppContent() {
             {showStatusBar &&
               statusBarOnTop === effectiveTabsTop &&
               activeShellId != null && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<div className="w-full h-[29px]" />}>
                   <StatusBar position={statusBarOnTop ? 'top' : 'bottom'} />
                 </Suspense>
               )}
@@ -841,7 +841,7 @@ function AppContent() {
             {showStatusBar &&
               statusBarOnTop !== effectiveTabsTop &&
               activeShellId != null && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<div className="w-full h-[29px]" />}>
                   <StatusBar position={statusBarOnTop ? 'top' : 'bottom'} />
                 </Suspense>
               )}
@@ -976,7 +976,7 @@ function AppContent() {
                   )}
                   {(settings?.statusBar ?? DEFAULT_STATUS_BAR).enabled &&
                     activeShellId != null && (
-                      <Suspense fallback={null}>
+                      <Suspense fallback={<div className="w-full h-[29px]" />}>
                         <StatusBar position="bottom" />
                       </Suspense>
                     )}

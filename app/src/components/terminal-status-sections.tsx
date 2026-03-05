@@ -31,9 +31,7 @@ export function GitDirtyBadge({
   return (
     <div className={cn('font-mono flex gap-1 items-center', className)}>
       {added > 0 && <span className="text-green-500/80">+{added}</span>}
-      {added > 0 && removed > 0 && '/'}
       {removed > 0 && <span className="text-red-400/80">-{removed}</span>}
-      {untracked > 0 && (added > 0 || removed > 0) && '/'}
       {untracked > 0 && (
         <span className="text-yellow-500/80">?{untracked}</span>
       )}

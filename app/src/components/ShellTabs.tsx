@@ -133,11 +133,13 @@ function ShellPopover({
   shell,
   isMain,
   terminal,
+  isPill,
   onRename,
   onDelete,
 }: {
   shell: Shell
   isMain: boolean
+  isPill?: boolean
   terminal: Terminal
   onRename: () => void
   onDelete: () => void
@@ -145,7 +147,6 @@ function ShellPopover({
   const [open, setOpen] = useState(false)
   const { subscribeToBell, unsubscribeFromBell, isBellSubscribed } =
     useProcessContext()
-  const isMobile = useIsMobile()
   const bellSubscribed = isBellSubscribed(shell.id)
   const hasActiveCmd = !!shell.active_cmd
 
@@ -164,9 +165,13 @@ function ShellPopover({
               setOpen((o) => !o)
             }
           }}
-          className="flex-shrink-0 p-1 relative text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          className={cn(
+            'flex-shrink-0 p-2 flex items-center relative text-muted-foreground hover:text-foreground cursor-pointer transition-colors rounded hover:bg-zinc-500/30',
+            isPill && 'rounded-full',
+            open && 'text-foreground bg-zinc-500/30',
+          )}
         >
-          <ChevronDown className="w-3 h-3  absolute -top-0.5 left-0" />
+          <ChevronDown className="w-3.5 h-3.5 absolute top-0.5 left-[1px]" />
         </div>
       </PopoverTrigger>
       <PopoverContent className="w-fit p-1" align="start" side="bottom">
@@ -488,7 +493,7 @@ function SortableShellPill({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/pill flex max-w-[150px] min-w-[80px] items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
+        'group/pill flex max-w-[150px] min-w-[80px] items-center gap-1 pl-2 pr-0.5 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
         isActive
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
@@ -523,6 +528,7 @@ function SortableShellPill({
       <ShellPopover
         shell={shell}
         isMain={isMain}
+        isPill
         terminal={terminal}
         onRename={onRename}
         onDelete={onDelete}
@@ -601,7 +607,7 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
+        'group/tab flex items-center gap-1.5 pl-2 pr-1 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
         hasActivity
           ? isActive
             ? 'border-t-green-500/90'

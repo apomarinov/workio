@@ -43,7 +43,7 @@ export function useSocket() {
     s.on('disconnect', handleDisconnect)
 
     if (s.connected) {
-      console.log('[Socket] Already connected:', s.id)
+      // console.log('[Socket] Already connected:', s.id)
     }
 
     return () => {
