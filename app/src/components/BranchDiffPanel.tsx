@@ -24,22 +24,22 @@ function simpleHash(str: string): string {
 
 type BranchDiffPanelProps =
   | {
-    terminalId: number
-    baseBranch: string
-    headBranch: string
-    branch?: undefined
-    /** Extra suffix for the commits SWR cache key (e.g. headCommitSha) */
-    cacheKey?: string
-    onNoRemote?: () => void
-  }
+      terminalId: number
+      baseBranch: string
+      headBranch: string
+      branch?: undefined
+      /** Extra suffix for the commits SWR cache key (e.g. headCommitSha) */
+      cacheKey?: string
+      onNoRemote?: () => void
+    }
   | {
-    terminalId: number
-    branch: string
-    baseBranch?: undefined
-    headBranch?: undefined
-    cacheKey?: undefined
-    onNoRemote?: undefined
-  }
+      terminalId: number
+      branch: string
+      baseBranch?: undefined
+      headBranch?: undefined
+      cacheKey?: undefined
+      onNoRemote?: undefined
+    }
 
 export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const { terminalId } = props
@@ -51,12 +51,12 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const { data: compareData, isLoading: loadingCompare } = useSWR(
     !isBranchMode
       ? [
-        'commits-between',
-        terminalId,
-        props.baseBranch,
-        props.headBranch,
-        props.cacheKey ?? '',
-      ]
+          'commits-between',
+          terminalId,
+          props.baseBranch,
+          props.headBranch,
+          props.cacheKey ?? '',
+        ]
       : null,
     async ([, tid, base, head]) => {
       return await getCommitsBetween(

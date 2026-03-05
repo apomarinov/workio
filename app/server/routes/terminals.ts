@@ -265,6 +265,33 @@ interface DirResult {
 const PAGE_SIZE = 100
 
 export default async function terminalRoutes(fastify: FastifyInstance) {
+  // Cache git fetch calls to avoid redundant network round-trips.
+  // Key: "cwd\0" + sorted refspecs, Value: timestamp of last fetch
+  const fetchCache = new Map<string, number>()
+
+  function fetchOriginIfNeeded(
+    cwd: string,
+    refspecs: string[],
+    ttlMs = 30000,
+  ): Promise<void> {
+    const key = `${cwd}\0${[...refspecs].sort().join('\0')}`
+    const last = fetchCache.get(key)
+    if (last && Date.now() - last < ttlMs) {
+      return Promise.resolve()
+    }
+    return new Promise<void>((resolve) => {
+      execFile(
+        'git',
+        ['fetch', 'origin', ...refspecs],
+        { cwd, timeout: 30000 },
+        () => {
+          fetchCache.set(key, Date.now())
+          resolve()
+        },
+      )
+    })
+  }
+
   // Open native OS folder picker and return selected path
   fastify.get('/api/browse-folder', async (_request, reply) => {
     return new Promise<void>((resolve) => {
@@ -1441,14 +1468,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             const refspecs = refs.map(
               (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
             )
-            await new Promise<void>((resolve) => {
-              execFile(
-                'git',
-                ['fetch', 'origin', ...refspecs],
-                { cwd, timeout: 30000 },
-                () => resolve(),
-              )
-            })
+            await fetchOriginIfNeeded(cwd, refspecs)
           }
 
           const [numstatOut, nameStatusOut] = await Promise.all([
@@ -2773,14 +2793,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const refspecs = [head, base].map(
           (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
         )
-        await new Promise<void>((resolve) => {
-          execFile(
-            'git',
-            ['fetch', 'origin', ...refspecs],
-            { cwd, timeout: 30000 },
-            () => resolve(),
-          )
-        })
+        await fetchOriginIfNeeded(cwd, refspecs)
       }
 
       const hasConflicts = await new Promise<boolean>((resolve) => {
@@ -2846,14 +2859,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const refspecs = [head, base].map(
           (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
         )
-        await new Promise<void>((resolve) => {
-          execFile(
-            'git',
-            ['fetch', 'origin', ...refspecs],
-            { cwd, timeout: 30000 },
-            () => resolve(),
-          )
-        })
+        await fetchOriginIfNeeded(cwd, refspecs)
       }
 
       // Verify that the head ref exists on remote
