@@ -141,6 +141,7 @@ function ShellPopover({
   const [open, setOpen] = useState(false)
   const { subscribeToBell, unsubscribeFromBell, isBellSubscribed } =
     useProcessContext()
+  const isMobile = useIsMobile()
   const bellSubscribed = isBellSubscribed(shell.id)
   const hasActiveCmd = !!shell.active_cmd
 
@@ -495,7 +496,12 @@ function SortableShellPill({
       ) : bellSubscribed ? (
         <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
       ) : hasActivity ? (
-        <Activity className="w-3 h-3 shrink-0 text-green-500" />
+        <Activity
+          className={cn(
+            'w-3 h-3 shrink-0',
+            isActive ? 'text-green-500' : 'text-green-500/60',
+          )}
+        />
       ) : null}
       <span
         ref={overflowRef}
@@ -594,8 +600,8 @@ function SortableShellTab({
         'group/tab flex items-center gap-1.5 px-2 py-1 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1',
         hasActivity
           ? isActive
-            ? 'border-green-500/80'
-            : 'border-green-500/50 hover:border-green-500'
+            ? 'border-green-500/90'
+            : 'border-green-500/40 hover:border-green-500'
           : isActive
             ? 'border-primary'
             : 'border-transparent hover:border-primary',
@@ -610,7 +616,12 @@ function SortableShellTab({
       ) : bellSubscribed ? (
         <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
       ) : hasActivity ? (
-        <Activity className="w-3 h-3 shrink-0 text-green-500" />
+        <Activity
+          className={cn(
+            'w-3 h-3 shrink-0',
+            isActive ? 'text-green-500' : 'text-green-500/60',
+          )}
+        />
       ) : null}
       <span
         ref={overflowRef}

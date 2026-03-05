@@ -1971,7 +1971,83 @@ export function replyToReviewComment(
   })
 }
 
-export function addReaction(
+// GitHub REST API doesn't support reactions on reviews (only review comments).
+// For reviews, we use GraphQL addReaction/removeReaction mutations.
+const REACTION_CONTENT_TO_GRAPHQL: Record<string, string> = {
+  '+1': 'THUMBS_UP',
+  '-1': 'THUMBS_DOWN',
+  laugh: 'LAUGH',
+  hooray: 'HOORAY',
+  confused: 'CONFUSED',
+  heart: 'HEART',
+  rocket: 'ROCKET',
+  eyes: 'EYES',
+}
+
+function getReviewNodeId(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  reviewId: number,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId}`,
+        '--jq',
+        '.node_id',
+      ],
+      { timeout: 15000 },
+      (err, stdout) => {
+        if (err || !stdout.trim()) {
+          resolve(null)
+          return
+        }
+        resolve(stdout.trim())
+      },
+    )
+  })
+}
+
+function graphqlReaction(
+  nodeId: string,
+  content: string,
+  remove: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const gqlContent = REACTION_CONTENT_TO_GRAPHQL[content] || content
+  const mutation = remove ? 'removeReaction' : 'addReaction'
+  const query = `mutation { ${mutation}(input: { subjectId: "${nodeId}", content: ${gqlContent} }) { reaction { content } } }`
+  return new Promise((resolve) => {
+    execFile(
+      'gh',
+      ['api', 'graphql', '-f', `query=${query}`],
+      { timeout: 15000 },
+      (err, stdout, stderr) => {
+        if (err) {
+          resolve({ ok: false, error: stderr || err.message })
+          return
+        }
+        try {
+          const result = JSON.parse(stdout)
+          if (result.errors?.length) {
+            resolve({
+              ok: false,
+              error: result.errors
+                .map((e: { message: string }) => e.message)
+                .join(', '),
+            })
+            return
+          }
+        } catch {}
+        resolve({ ok: true })
+      },
+    )
+  })
+}
+
+export async function addReaction(
   owner: string,
   repo: string,
   subjectId: number,
@@ -1979,6 +2055,29 @@ export function addReaction(
   content: string,
   prNumber?: number,
 ): Promise<{ ok: boolean; error?: string }> {
+  // Reviews use GraphQL (REST API doesn't support review reactions)
+  if (subjectType === 'review') {
+    if (!prNumber) {
+      return { ok: false, error: 'prNumber is required for review reactions' }
+    }
+    const nodeId = await getReviewNodeId(owner, repo, prNumber, subjectId)
+    if (!nodeId) {
+      return { ok: false, error: 'Failed to get review node ID' }
+    }
+    const result = await graphqlReaction(nodeId, content, false)
+    const cmd = `gh graphql addReaction(review=${subjectId}, content=${content})`
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout: result.ok ? 'ok' : undefined,
+      stderr: result.error,
+      failed: !result.ok,
+    })
+    if (result.ok) invalidateChecksCache()
+    return result
+  }
+
   let endpoint: string
   switch (subjectType) {
     case 'issue_comment':
@@ -1986,15 +2085,6 @@ export function addReaction(
       break
     case 'review_comment':
       endpoint = `repos/${owner}/${repo}/pulls/comments/${subjectId}/reactions`
-      break
-    case 'review':
-      if (!prNumber) {
-        return Promise.resolve({
-          ok: false,
-          error: 'prNumber is required for review reactions',
-        })
-      }
-      endpoint = `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${subjectId}/reactions`
       break
   }
 
@@ -2032,6 +2122,29 @@ export async function removeReaction(
   content: string,
   prNumber?: number,
 ): Promise<{ ok: boolean; error?: string }> {
+  // Reviews use GraphQL (REST API doesn't support review reactions)
+  if (subjectType === 'review') {
+    if (!prNumber) {
+      return { ok: false, error: 'prNumber is required for review reactions' }
+    }
+    const nodeId = await getReviewNodeId(owner, repo, prNumber, subjectId)
+    if (!nodeId) {
+      return { ok: false, error: 'Failed to get review node ID' }
+    }
+    const result = await graphqlReaction(nodeId, content, true)
+    const cmd = `gh graphql removeReaction(review=${subjectId}, content=${content})`
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout: result.ok ? 'ok' : undefined,
+      stderr: result.error,
+      failed: !result.ok,
+    })
+    if (result.ok) invalidateChecksCache()
+    return result
+  }
+
   let listEndpoint: string
   switch (subjectType) {
     case 'issue_comment':
@@ -2039,12 +2152,6 @@ export async function removeReaction(
       break
     case 'review_comment':
       listEndpoint = `repos/${owner}/${repo}/pulls/comments/${subjectId}/reactions`
-      break
-    case 'review':
-      if (!prNumber) {
-        return { ok: false, error: 'prNumber is required for review reactions' }
-      }
-      listEndpoint = `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${subjectId}/reactions`
       break
   }
 

@@ -4,6 +4,7 @@ import {
   Eye,
   GitBranch,
   GitMerge,
+  GitMergeConflict,
   GitPullRequestArrow,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -48,7 +49,7 @@ export function OlderMergedPRsList({ olderPRs }: OlderMergedPRsListProps) {
             {pr.state === 'MERGED' ? (
               <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500/70" />
             ) : (
-              <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500/70" />
+              <GitMergeConflict className="w-4 h-4 flex-shrink-0 text-red-500/70" />
             )}
             <div className="flex-1 min-w-0">
               <span className="text-xs truncate block">{pr.prTitle}</span>

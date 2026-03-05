@@ -144,12 +144,26 @@ fastify.addHook('preHandler', async (request) => {
   )
 })
 
-// Log errors
+// Log errors (uncaught exceptions)
 fastify.addHook('onError', async (request, _reply, error) => {
   request.log.error(
     { method: request.method, url: request.url, error: error.message },
     'error',
   )
+})
+
+// Log non-2xx responses
+fastify.addHook('onResponse', async (request, reply) => {
+  if (reply.statusCode >= 400) {
+    request.log.error(
+      {
+        method: request.method,
+        url: request.url,
+        statusCode: reply.statusCode,
+      },
+      'error response',
+    )
+  }
 })
 
 // Initialize database

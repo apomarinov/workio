@@ -4,6 +4,7 @@ import {
   CircleX,
   Clock,
   GitMerge,
+  GitMergeConflict,
   GitPullRequestArrow,
   Loader2,
 } from 'lucide-react'
@@ -57,7 +58,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
       colorClass: 'text-red-400',
       dimColorClass: 'text-red-400/60 hover:text-red-400',
       icon: (props?: { cls?: string; group?: string }) => (
-        <GitPullRequestArrow
+        <GitMergeConflict
           className={cn(
             iconClass,
             `text-red-400/70 ${props?.group ? `${props.group}:text-red-400` : ''}`,
