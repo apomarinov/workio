@@ -94,8 +94,12 @@ export function CommitDialog({
       .then((data) => {
         setChangedFiles(data.files)
         fileListRef.current?.resetSelection(data.files)
-        if (autoSelect && data.files.length > 0) {
-          setSelectedFile(data.files[0].path)
+        if (data.files.length > 0) {
+          if (autoSelect) {
+            setSelectedFile(data.files[0].path)
+          }
+        } else {
+          setSelectedFile(null)
         }
       })
       .catch((err) => {

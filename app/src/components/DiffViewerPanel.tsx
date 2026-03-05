@@ -589,7 +589,7 @@ export function DiffViewerPanel({
     prevBaseRef.current = base
 
     if (!files || files.length === 0) {
-      if (baseChanged) setSelectedFile(null)
+      setSelectedFile(null)
       return
     }
 
