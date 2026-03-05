@@ -1,7 +1,8 @@
 import { GitCommitHorizontal, Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { getCommitsBetween } from '@/lib/api'
+import { toast } from '@/components/ui/sonner'
+import { getBranchCommits, getCommitsBetween, type PRCommit } from '@/lib/api'
 import { formatDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { DiffViewerPanel } from './DiffViewerPanel'
@@ -15,38 +16,133 @@ function simpleHash(str: string): string {
   return (h >>> 0).toString(16)
 }
 
-interface BranchDiffPanelProps {
-  terminalId: number
-  baseBranch: string
-  headBranch: string
-  /** Extra suffix for the commits SWR cache key (e.g. headCommitSha) */
-  cacheKey?: string
-  onNoRemote?: () => void
-}
+type BranchDiffPanelProps =
+  | {
+      terminalId: number
+      baseBranch: string
+      headBranch: string
+      branch?: undefined
+      /** Extra suffix for the commits SWR cache key (e.g. headCommitSha) */
+      cacheKey?: string
+      onNoRemote?: () => void
+    }
+  | {
+      terminalId: number
+      branch: string
+      baseBranch?: undefined
+      headBranch?: undefined
+      cacheKey?: undefined
+      onNoRemote?: undefined
+    }
 
-export function BranchDiffPanel({
-  terminalId,
-  baseBranch,
-  headBranch,
-  cacheKey,
-  onNoRemote,
-}: BranchDiffPanelProps) {
+export function BranchDiffPanel(props: BranchDiffPanelProps) {
+  const { terminalId } = props
+  const isBranchMode = props.branch != null
+
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
 
-  const { data, isLoading: loadingCommits } = useSWR(
-    ['commits-between', terminalId, baseBranch, headBranch, cacheKey ?? ''],
+  // ── Mode A: SWR fetch for base..head comparison ──
+  const { data: compareData, isLoading: loadingCompare } = useSWR(
+    !isBranchMode
+      ? [
+          'commits-between',
+          terminalId,
+          props.baseBranch,
+          props.headBranch,
+          props.cacheKey ?? '',
+        ]
+      : null,
     async ([, tid, base, head]) => {
-      const result = await getCommitsBetween(
+      return await getCommitsBetween(
         tid as number,
         base as string,
         head as string,
       )
-      return result
     },
     { revalidateOnFocus: false },
   )
 
-  const commits = data?.commits ?? []
+  // ── Mode B: paginated fetch for single branch ──
+  const [branchCommits, setBranchCommits] = useState<PRCommit[]>([])
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingBranch, setLoadingBranch] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const offsetRef = useRef(0)
+
+  // Initial fetch for branch mode
+  useEffect(() => {
+    if (!isBranchMode) return
+    setBranchCommits([])
+    setHasMore(false)
+    setSelectedCommit(null)
+    offsetRef.current = 0
+    setLoadingBranch(true)
+    getBranchCommits(terminalId, props.branch, 20, 0)
+      .then((data) => {
+        setBranchCommits(data.commits)
+        setHasMore(data.hasMore)
+        offsetRef.current = data.commits.length
+        if (data.commits.length > 0) {
+          setSelectedCommit(data.commits[0].hash)
+        }
+      })
+      .catch(() => toast.error('Failed to load commits'))
+      .finally(() => setLoadingBranch(false))
+  }, [isBranchMode, terminalId, props.branch])
+
+  // Intersection observer for infinite scroll (branch mode)
+  useEffect(() => {
+    if (!isBranchMode) return
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMore &&
+          !loadingMore &&
+          !loadingBranch
+        ) {
+          setLoadingMore(true)
+          getBranchCommits(terminalId, props.branch, 20, offsetRef.current)
+            .then((data) => {
+              setBranchCommits((prev) => [...prev, ...data.commits])
+              setHasMore(data.hasMore)
+              offsetRef.current += data.commits.length
+            })
+            .catch(() => toast.error('Failed to load commits'))
+            .finally(() => setLoadingMore(false))
+        }
+      },
+      { root: scrollRef.current, threshold: 0.1 },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [
+    isBranchMode,
+    hasMore,
+    loadingMore,
+    loadingBranch,
+    terminalId,
+    props.branch,
+  ])
+
+  // Notify parent when noRemote is detected (compare mode only)
+  useEffect(() => {
+    if (!isBranchMode && compareData?.noRemote) props.onNoRemote?.()
+  }, [isBranchMode, compareData?.noRemote])
+
+  // Reset selected commit when branches change (compare mode only)
+  useEffect(() => {
+    if (!isBranchMode) setSelectedCommit(null)
+  }, [isBranchMode, props.baseBranch, props.headBranch])
+
+  // ── Resolve commits and loading state ──
+  const commits = isBranchMode ? branchCommits : (compareData?.commits ?? [])
+  const loading = isBranchMode ? loadingBranch : loadingCompare
 
   // Compute a cache key from commit hashes for the file list
   const commitsCacheKey =
@@ -54,19 +150,12 @@ export function BranchDiffPanel({
       ? simpleHash(commits.map((c) => c.hash).join(','))
       : undefined
 
-  // Notify parent when noRemote is detected
-  useEffect(() => {
-    if (data?.noRemote) onNoRemote?.()
-  }, [data?.noRemote])
-
-  // Reset selected commit when branches change
-  useEffect(() => {
-    setSelectedCommit(null)
-  }, [baseBranch, headBranch])
-
+  // ── Diff base ──
   const diffBase = selectedCommit
     ? `${selectedCommit}^..${selectedCommit}`
-    : `origin/${baseBranch}...origin/${headBranch}`
+    : isBranchMode
+      ? undefined
+      : `origin/${props.baseBranch}...origin/${props.headBranch}`
 
   return (
     <div className="flex-1 min-h-0 flex gap-0 overflow-hidden rounded-md border border-zinc-700">
@@ -77,8 +166,11 @@ export function BranchDiffPanel({
             Commits ({commits.length})
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {loadingCommits ? (
+        <div
+          className="flex-1 overflow-y-auto"
+          ref={isBranchMode ? scrollRef : undefined}
+        >
+          {loading ? (
             <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Loading...
@@ -88,51 +180,70 @@ export function BranchDiffPanel({
               No commits
             </div>
           ) : (
-            commits.map((commit) => (
-              <div
-                key={commit.hash}
-                className={cn(
-                  'flex items-start gap-2 px-2 py-2 text-xs cursor-pointer hover:bg-zinc-800/50',
-                  selectedCommit === commit.hash && 'bg-zinc-700/50',
-                )}
-                onClick={() =>
-                  setSelectedCommit(
-                    selectedCommit === commit.hash ? null : commit.hash,
-                  )
-                }
-              >
-                <GitCommitHorizontal
+            <>
+              {commits.map((commit) => (
+                <div
+                  key={commit.hash}
                   className={cn(
-                    'h-3.5 w-3.5 mt-0.5 flex-shrink-0',
-                    selectedCommit === commit.hash
-                      ? 'text-blue-400'
-                      : 'text-zinc-500',
+                    'flex items-start gap-2 px-2 py-2 text-xs cursor-pointer hover:bg-zinc-800/50',
+                    selectedCommit === commit.hash && 'bg-zinc-700/50',
                   )}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-zinc-300">{commit.message}</div>
-                  <div className="text-zinc-500 font-mono">
-                    {commit.hash.slice(0, 7)}
-                  </div>
-                  <div className="text-zinc-500">
-                    {formatDate(commit.date)} · {commit.author}
+                  onClick={() =>
+                    setSelectedCommit(
+                      selectedCommit === commit.hash ? null : commit.hash,
+                    )
+                  }
+                >
+                  <GitCommitHorizontal
+                    className={cn(
+                      'h-3.5 w-3.5 mt-0.5 flex-shrink-0',
+                      selectedCommit === commit.hash
+                        ? 'text-blue-400'
+                        : 'text-zinc-500',
+                    )}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-zinc-300">{commit.message}</div>
+                    <div className="text-zinc-500 font-mono">
+                      {commit.hash.slice(0, 7)}
+                    </div>
+                    <div className="text-zinc-500">
+                      {formatDate(commit.date)} · {commit.author}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+              {isBranchMode && (
+                <>
+                  <div ref={sentinelRef} className="h-1" />
+                  {loadingMore && (
+                    <div className="flex items-center justify-center py-3 text-sm text-zinc-500">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading more...
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
 
       {/* Right: diff viewer panel */}
       <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
-        <DiffViewerPanel
-          integrated
-          terminalId={terminalId}
-          base={diffBase}
-          readOnly
-          cacheKey={commitsCacheKey}
-        />
+        {diffBase ? (
+          <DiffViewerPanel
+            integrated
+            terminalId={terminalId}
+            base={diffBase}
+            readOnly
+            cacheKey={commitsCacheKey}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-sm text-zinc-500">
+            Select a commit to view changes
+          </div>
+        )}
       </div>
     </div>
   )
