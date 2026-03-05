@@ -16,6 +16,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationReadByItem,
+  markNotificationUnread,
   markPRNotificationsRead,
 } from './db'
 import { env } from './env'
@@ -850,6 +851,15 @@ fastify.post<{ Params: { id: string } }>(
   async (request) => {
     const id = Number(request.params.id)
     const success = await markNotificationRead(id)
+    return { success }
+  },
+)
+
+fastify.post<{ Params: { id: string } }>(
+  '/api/notifications/:id/unread',
+  async (request) => {
+    const id = Number(request.params.id)
+    const success = await markNotificationUnread(id)
     return { success }
   },
 )

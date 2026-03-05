@@ -151,7 +151,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           <PRStatusContent
             pr={pr}
             expanded
-            onToggle={() => { }}
+            onToggle={() => {}}
             hasNewActivity={hasNewActivity}
           />
         </div>

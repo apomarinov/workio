@@ -71,6 +71,7 @@ interface TerminalContextValue {
   hasNotifications: boolean
   hasUnreadNotifications: boolean
   markNotificationRead: (id: number) => Promise<void>
+  markNotificationUnread: (id: number) => Promise<void>
   markNotificationReadByItem: (
     repo: string,
     prNumber: number,
@@ -584,6 +585,19 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     },
     [refetchUnreadPRData],
   )
+
+  const markNotificationUnread = useCallback(async (id: number) => {
+    try {
+      await api.markNotificationUnread(id)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: false } : n)),
+      )
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to mark as unread',
+      )
+    }
+  }, [])
 
   const markNotificationReadByItem = useCallback(
     async (
@@ -1099,6 +1113,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasNotifications,
       hasUnreadNotifications,
       markNotificationRead,
+      markNotificationUnread,
       markNotificationReadByItem,
       markAllNotificationsRead,
       markPRNotificationsRead,
@@ -1134,6 +1149,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       hasNotifications,
       hasUnreadNotifications,
       markNotificationRead,
+      markNotificationUnread,
       markNotificationReadByItem,
       markAllNotificationsRead,
       markPRNotificationsRead,

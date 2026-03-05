@@ -938,6 +938,14 @@ export async function markNotificationRead(id: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0
 }
 
+export async function markNotificationUnread(id: number): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE notifications SET read = FALSE WHERE id = $1 AND read = TRUE',
+    [id],
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
 export async function markNotificationReadByItem(
   repo: string,
   prNumber: number,

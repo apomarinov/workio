@@ -11,10 +11,12 @@ import {
   MessageSquare,
   Terminal,
   Trash2,
+  Undo2,
 } from 'lucide-react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { useTerminalContext } from '@/context/TerminalContext'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import type { Notification } from '@/types'
 import {
@@ -133,9 +135,13 @@ function getNotificationUrl(notification: Notification): string | undefined {
 function NotificationItem({
   notification,
   onMarkRead,
+  onMarkUnread,
+  isMobile,
 }: {
   notification: Notification
   onMarkRead: (id: number) => void
+  onMarkUnread: (id: number) => void
+  isMobile: boolean
 }) {
   const { id, type, data, created_at, read } = notification
   const title = getNotificationTitle(notification)
@@ -158,6 +164,15 @@ function NotificationItem({
     }
   }
 
+  const handleToggleRead = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation()
+    if (read) {
+      onMarkUnread(id)
+    } else {
+      onMarkRead(id)
+    }
+  }
+
   return (
     <button
       onClick={handleClick}
@@ -167,7 +182,25 @@ function NotificationItem({
         isWorkspace || !url ? 'cursor-default' : 'cursor-pointer',
       )}
     >
-      <div className="flex-shrink-0 mt-0.5">{getNotificationIcon(type)}</div>
+      <div className="flex-shrink-0 mt-0.5 flex flex-col items-center gap-0.5">
+        {getNotificationIcon(type)}
+        <div
+          className={cn(
+            'items-center justify-center w-4 h-4 mt-1 rounded hover:bg-zinc-700 text-muted-foreground hover:text-foreground',
+            isMobile ? 'flex' : 'hidden group-hover:flex',
+          )}
+          onClick={handleToggleRead}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleToggleRead(e)
+          }}
+        >
+          {read ? (
+            <Undo2 className="w-3.5 h-3.5" />
+          ) : (
+            <Check className="w-3.5 h-3.5 text-green-500" />
+          )}
+        </div>
+      </div>
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium line-clamp-3">
           <MarkdownContent content={title} />
@@ -192,24 +225,7 @@ function NotificationItem({
         </div>
       </div>
       {!read && (
-        <div
-          className="absolute top-1 right-1"
-          onClick={(e) => {
-            e.stopPropagation()
-            onMarkRead(id)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.stopPropagation()
-              onMarkRead(id)
-            }
-          }}
-        >
-          <div className="w-1.5 h-1.5 mt-2 mr-1 rounded-full bg-green-500 group-hover:hidden" />
-          <div className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded hover:bg-zinc-700 text-muted-foreground hover:text-foreground">
-            <Check className="w-3 h-3" />
-          </div>
-        </div>
+        <div className="w-1.5 h-1.5 mt-2 mr-1 rounded-full bg-green-500 flex-shrink-0" />
       )}
     </button>
   )
@@ -219,11 +235,13 @@ export function NotificationList() {
   const {
     notifications,
     markNotificationRead,
+    markNotificationUnread,
     markAllNotificationsRead,
     deleteAllNotifications,
     hasAnyUnseenPRs,
     hasUnreadNotifications,
   } = useTerminalContext()
+  const isMobile = useIsMobile()
 
   return (
     <div className="w-[330px]">
@@ -258,6 +276,8 @@ export function NotificationList() {
               key={notification.id}
               notification={notification}
               onMarkRead={markNotificationRead}
+              onMarkUnread={markNotificationUnread}
+              isMobile={isMobile}
             />
           ))}
         </div>

@@ -80,6 +80,9 @@ interface ShellTabsProps {
 
 function ShellSessionIcon({ session }: { session: SessionWithProject }) {
   const s = 'w-3.5 h-3.5 shrink-0'
+  if (session.status === 'ended') {
+    return null
+  }
   if (session.status === 'active' || session.status === 'permission_needed')
     return (
       <div className="flex gap-0.5 mr-0.5">

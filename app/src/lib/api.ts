@@ -1019,6 +1019,16 @@ export async function markNotificationRead(
   return res.json()
 }
 
+export async function markNotificationUnread(
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/notifications/${id}/unread`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to mark notification as unread')
+  return res.json()
+}
+
 export async function getUnreadPRNotifications(): Promise<
   UnreadPRNotification[]
 > {
