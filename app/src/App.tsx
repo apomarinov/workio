@@ -12,6 +12,7 @@ import {
   Panel,
   Separator,
   useDefaultLayout,
+  usePanelRef,
 } from 'react-resizable-panels'
 import { Button } from '@/components/ui/button'
 import { Toaster, toast } from '@/components/ui/sonner'
@@ -82,6 +83,7 @@ function AppContent() {
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
   const pullingRef = useRef(false)
+  const sidebarPanelRef = usePanelRef()
 
   // Shell DnD order — read from settings (persisted to DB)
   const { settings } = useSettings()
@@ -451,6 +453,13 @@ function AppContent() {
           detail: { terminalId: t.id },
         }),
       )
+    },
+    toggleSidebar: () => {
+      if (sidebarPanelRef.current?.isCollapsed()) {
+        sidebarPanelRef.current.expand()
+      } else {
+        sidebarPanelRef.current?.collapse()
+      }
     },
     pullBranch: () => {
       if (pullingRef.current) return
@@ -973,9 +982,12 @@ function AppContent() {
         >
           <Panel
             id="sidebar"
+            collapsible
+            collapsedSize="0px"
             defaultSize="250px"
             minSize="150px"
             maxSize="50%"
+            panelRef={sidebarPanelRef}
             onResize={handleSidebarResize}
           >
             <Sidebar width={sidebarWidth} />

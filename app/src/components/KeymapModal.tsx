@@ -439,6 +439,24 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(bindings.customCommands)}
             />
             <ShortcutRow
+              label="Toggle Sidebar"
+              binding={bindings.toggleSidebar}
+              isRecording={recording === 'toggleSidebar'}
+              recordingKeys={recording === 'toggleSidebar' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(
+                  recording === 'toggleSidebar' ? null : 'toggleSidebar',
+                )
+              }
+              onReset={() =>
+                setBinding('toggleSidebar', DEFAULT_KEYMAP.toggleSidebar)
+              }
+              onUnset={() => setBinding('toggleSidebar', null)}
+              defaultBinding={DEFAULT_KEYMAP.toggleSidebar}
+              display={formatBinding(bindings.toggleSidebar)}
+              hasConflict={duplicates.has('toggleSidebar')}
+            />
+            <ShortcutRow
               label="Toggle PiP Window"
               binding={bindings.togglePip}
               isRecording={recording === 'togglePip'}

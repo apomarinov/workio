@@ -307,6 +307,7 @@ export interface Keymap {
   customCommands: ShortcutBinding | null
   branches: ShortcutBinding | null
   pullBranch: ShortcutBinding | null
+  toggleSidebar: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -327,6 +328,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   customCommands: { altKey: true, key: 'a' },
   branches: { ctrlKey: true, shiftKey: true, key: 'enter' },
   pullBranch: { metaKey: true, key: 't' },
+  toggleSidebar: { altKey: true, key: 'backquote' },
 }
 
 // Map event.code-based key names to display characters
