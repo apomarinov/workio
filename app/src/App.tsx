@@ -58,15 +58,6 @@ import {
 import { cn } from './lib/utils'
 import { DEFAULT_STATUS_BAR, type HookEvent, type ShellTemplate } from './types'
 
-function setFavicon(href: string) {
-  let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']")
-  if (!link) {
-    link = document.createElement('link')
-    link.rel = 'icon'
-    document.head.appendChild(link)
-  }
-  link.href = href
-}
 
 function AppContent() {
   const {
@@ -481,22 +472,6 @@ function AppContent() {
         })
     },
   })
-
-  // Example: Change favicon based on session status
-  useEffect(() => {
-    const hasPermissionNeeded = sessions.some(
-      (s) => s.status === 'permission_needed',
-    )
-    const hasActive = sessions.some((s) => s.status === 'active')
-
-    if (hasPermissionNeeded) {
-      setFavicon('/favicon-warning.svg')
-    } else if (hasActive) {
-      setFavicon('/favicon-active.svg')
-    } else {
-      setFavicon('/favicon.svg')
-    }
-  }, [sessions])
 
   // Auto-select first active session when there are no terminals
   useEffect(() => {

@@ -1,7 +1,6 @@
-import { execFile } from 'node:child_process'
+import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import { promisify } from 'node:util'
-import ngrok from '@ngrok/ngrok'
 import { WEBHOOK_EVENTS } from '../../shared/types'
 import { getSettings, updateSettings } from '../db'
 import { env } from '../env'
@@ -9,7 +8,7 @@ import { log } from '../logger'
 
 const execFileAsync = promisify(execFile)
 
-let ngrokListener: ngrok.Listener | null = null
+let ngrokProcess: ChildProcess | null = null
 
 export async function getOrCreateWebhookSecret(): Promise<string> {
   const settings = await getSettings()
@@ -22,24 +21,69 @@ export async function getOrCreateWebhookSecret(): Promise<string> {
   return secret
 }
 
-export async function initNgrok(port: number): Promise<void> {
+export async function initNgrok(
+  port: number,
+  useHttps: boolean,
+): Promise<void> {
   const token = env.NGROK_AUTHTOKEN
   const domain = env.NGROK_DOMAIN
-
   // Domain requires token
   if (!token) {
     await updateSettings({ ngrok_url: null } as Record<string, unknown>)
     throw new Error('NGROK_DOMAIN requires NGROK_AUTHTOKEN')
   }
 
-  // Start ngrok (works without token, just with limitations)
-  ngrokListener = await ngrok.forward({
-    addr: port,
-    authtoken: token,
-    domain: domain,
-  })
+  if (!domain) {
+    throw new Error('NGROK_DOMAIN is required')
+  }
 
-  const ngrokUrl = ngrokListener.url()!
+  // Start ngrok via CLI (SDK has issues with HTTPS upstream in long-running processes)
+  const scheme = useHttps ? 'https' : 'http'
+  const args = [
+    'http',
+    `${scheme}://localhost:${port}`,
+    `--domain=${domain}`,
+    `--authtoken=${token}`,
+    '--log=stdout',
+    '--log-format=json',
+  ]
+  if (useHttps) {
+    args.push('--upstream-tls-verify=false')
+  }
+
+  const ngrokUrl = await new Promise<string>((resolve, reject) => {
+    ngrokProcess = spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+
+    const timeout = setTimeout(() => {
+      reject(new Error('ngrok startup timed out'))
+    }, 10000)
+
+    ngrokProcess.stdout?.on('data', (data: Buffer) => {
+      for (const line of data.toString().split('\n').filter(Boolean)) {
+        try {
+          const entry = JSON.parse(line)
+          if (entry.msg === 'started tunnel' || entry.url) {
+            clearTimeout(timeout)
+            resolve(`https://${domain}`)
+          }
+        } catch {}
+      }
+    })
+
+    ngrokProcess.stderr?.on('data', (data: Buffer) => {
+      log.error(`[ngrok] ${data.toString().trim()}`)
+    })
+
+    ngrokProcess.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(err)
+    })
+
+    ngrokProcess.on('exit', (code) => {
+      clearTimeout(timeout)
+      if (code) reject(new Error(`ngrok exited with code ${code}`))
+    })
+  })
   log.info(
     `[webhooks] ngrok tunnel started: ${ngrokUrl}${domain ? ' (static)' : ''}`,
   )
@@ -275,6 +319,13 @@ export function stopWebhookValidationPolling(): void {
   if (validationPollingId) {
     clearInterval(validationPollingId)
     validationPollingId = null
+  }
+}
+
+export function stopNgrok(): void {
+  if (ngrokProcess) {
+    ngrokProcess.kill('SIGTERM')
+    ngrokProcess = null
   }
 }
 

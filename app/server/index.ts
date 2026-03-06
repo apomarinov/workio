@@ -53,6 +53,7 @@ import {
   initNgrok,
   recreateRepoWebhook,
   startWebhookValidationPolling,
+  stopNgrok,
   testWebhook,
   verifyWebhookSignature,
 } from './github/webhooks'
@@ -986,11 +987,13 @@ function stopDaemon() {
 process.on('exit', stopDaemon)
 process.on('SIGTERM', () => {
   destroyAllSessions()
+  stopNgrok()
   stopDaemon()
   process.exit(0)
 })
 process.on('SIGINT', () => {
   destroyAllSessions()
+  stopNgrok()
   stopDaemon()
   process.exit(0)
 })
@@ -1027,7 +1030,7 @@ const start = async () => {
     initGitHubChecks()
 
     try {
-      await initNgrok(port)
+      await initNgrok(port, !!httpsOptions)
       startWebhookValidationPolling()
     } catch (err) {
       log.error({ err }, 'Failed to initialize ngrok')
