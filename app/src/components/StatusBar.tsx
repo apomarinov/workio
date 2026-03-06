@@ -242,8 +242,9 @@ function PortsSection({
   terminalName: string | null
 }) {
   const totalPorts = terminalPorts.length
+  const [isOpen, setIsOpen] = useState(false)
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <div>
           <SortableStatusSection section={section}>
@@ -254,6 +255,7 @@ function PortsSection({
       </PopoverTrigger>
       <PopoverContent className="w-48 p-1" align="start" side="bottom">
         <PortsList
+          onClick={() => setIsOpen(false)}
           shellPorts={shellPorts}
           terminalPorts={terminalPorts}
           shells={shells}

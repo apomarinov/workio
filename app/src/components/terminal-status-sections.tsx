@@ -117,9 +117,10 @@ export function ProcessItem({
 interface PortItemProps {
   port: number
   compact?: boolean
+  onClick?: () => void
 }
 
-export function PortItem({ port, compact }: PortItemProps) {
+export function PortItem({ port, compact, onClick }: PortItemProps) {
   const isMobile = useIsMobile()
 
   return (
@@ -127,6 +128,7 @@ export function PortItem({ port, compact }: PortItemProps) {
       href={`http://localhost:${port}`}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => onClick?.()}
       className={cn(
         'flex items-center group/port gap-2 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors',
         compact ? 'px-1.5 py-0.5' : 'px-2 py-1',
@@ -232,6 +234,7 @@ interface PortsListProps {
   shells: Shell[]
   terminalName: string | null
   compact?: boolean
+  onClick?: () => void
 }
 
 export function PortsList({
@@ -240,6 +243,7 @@ export function PortsList({
   shells,
   terminalName,
   compact,
+  onClick,
 }: PortsListProps) {
   const [collapsedShells, setCollapsedShells] = useState<Set<number>>(new Set())
 
@@ -290,7 +294,7 @@ export function PortsList({
             {!isCollapsed &&
               sPorts.map((port) => (
                 <div key={port} className="ml-2">
-                  <PortItem port={port} compact={compact} />
+                  <PortItem port={port} compact={compact} onClick={onClick} />
                 </div>
               ))}
           </div>
