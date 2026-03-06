@@ -409,6 +409,8 @@ export interface HiddenPR {
 }
 
 export interface NotificationData {
+  // Auth fields
+  attempts?: number
   // PR fields
   prTitle?: string
   prUrl?: string
@@ -435,7 +437,7 @@ export interface Notification {
   id: number
   dedup_hash: string | null
   type: string
-  repo: string
+  repo: string | null
   read: boolean
   created_at: string
   data: NotificationData

@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     id SERIAL PRIMARY KEY,
     dedup_hash VARCHAR(64) UNIQUE,
     type VARCHAR(50) NOT NULL,
-    repo TEXT NOT NULL,
+    repo TEXT,
     read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     data JSONB NOT NULL

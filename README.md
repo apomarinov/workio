@@ -117,6 +117,7 @@ You also need to set up environment variables. Create a `.env.local` file in the
 | `DATABASE_URL` | Yes | PostgreSQL connection string (e.g., `postgresql://localhost/workio`) |
 | `NGROK_AUTHTOKEN` | No | Enables GitHub webhook support for real-time PR updates. Get a token from [ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken). Without this, PR data only refreshes on interval poll and manual actions. |
 | `NGROK_DOMAIN` | No | Use a static ngrok domain instead of a random URL. Requires `NGROK_AUTHTOKEN`. Get a free static domain from your [ngrok dashboard](https://dashboard.ngrok.com/domains). |
+| `BASIC_AUTH` | No | Protect the app with HTTP basic auth when accessed via the ngrok domain (format: `user:pass`). Local/LAN connections are not affected. GitHub webhook route is excluded. |
 
 ---
 

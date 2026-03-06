@@ -58,7 +58,6 @@ import {
 import { cn } from './lib/utils'
 import { DEFAULT_STATUS_BAR, type HookEvent, type ShellTemplate } from './types'
 
-
 function AppContent() {
   const {
     terminals,

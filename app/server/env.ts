@@ -20,6 +20,7 @@ const envSchema = z.object({
     .default('development'),
   NGROK_AUTHTOKEN: z.string().optional(),
   NGROK_DOMAIN: z.string().optional(),
+  BASIC_AUTH: z.string().optional(), // "user:pass" — protects all routes except webhooks
 })
 
 const parsed = envSchema.safeParse(process.env)

@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { format } from 'date-fns'
 import Fastify from 'fastify'
@@ -60,6 +61,7 @@ import {
 import { broadcastRefetch, type RefetchGroup, setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
+import { emitNotification } from './notify'
 import {
   destroyAllSessions,
   getBellSubscribedShellIds,
@@ -170,6 +172,82 @@ fastify.addHook('onResponse', async (request, reply) => {
     )
   }
 })
+
+// Rate limiting (off by default, applied per-route)
+await fastify.register(rateLimit, { global: false })
+
+// Basic auth protection (when BASIC_AUTH env is set)
+if (env.BASIC_AUTH) {
+  const [authUser, authPass] = env.BASIC_AUTH.split(':')
+  const expected = `Basic ${Buffer.from(`${authUser}:${authPass}`).toString('base64')}`
+
+  const ngrokDomain = env.NGROK_DOMAIN
+  const AUTH_MAX_FAILURES = 5
+  const AUTH_LOCKOUT_MS = 10 * 60 * 1000
+  const ipFailures = new Map<
+    string,
+    { attempts: number; lockedUntil: number }
+  >()
+
+  fastify.addHook('onRequest', async (request, reply) => {
+    // Only require auth when accessed through the ngrok domain
+    const host = (request.headers.host || '').split(':')[0]
+    if (host !== ngrokDomain) return
+
+    // Only require auth for API, WebSocket, and Socket.IO routes
+    const url = request.url
+    if (
+      !url.startsWith('/api/') &&
+      !url.startsWith('/ws/') &&
+      !url.startsWith('/socket.io/')
+    )
+      return
+    // GitHub webhooks must pass through without auth
+    if (url.startsWith('/api/webhooks/github')) return
+
+    const deny = () => {
+      reply.code(401).header('WWW-Authenticate', 'Basic').send('Unauthorized')
+    }
+
+    // Valid credentials always pass
+    if (request.headers.authorization === expected) return
+
+    const ip =
+      request.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
+      request.ip
+    const entry = ipFailures.get(ip) ?? { attempts: 0, lockedUntil: 0 }
+
+    // Lockout: deny this IP
+    if (Date.now() < entry.lockedUntil) {
+      deny()
+      return
+    }
+
+    // Only count as brute-force if credentials were actually sent
+    // (no header = browser's initial challenge, not a failed login)
+    if (request.headers.authorization) {
+      entry.attempts++
+      if (entry.attempts >= AUTH_MAX_FAILURES) {
+        entry.lockedUntil = Date.now() + AUTH_LOCKOUT_MS
+        log.warn(
+          `[auth] IP ${ip} locked out after ${entry.attempts} failed attempts`,
+        )
+        emitNotification(
+          'auth_lockout',
+          undefined,
+          { attempts: entry.attempts },
+          `lockout:${ip}:${Date.now()}`,
+        )
+        entry.attempts = 0
+      }
+      ipFailures.set(ip, entry)
+    }
+
+    deny()
+  })
+
+  log.info(`[auth] Basic auth enabled for user "${authUser}"`)
+}
 
 // Initialize database
 await initDb()
@@ -741,67 +819,76 @@ fastify.post<{
 fastify.post<{
   Body: unknown
   Headers: { 'x-hub-signature-256'?: string; 'x-github-event'?: string }
-}>('/api/webhooks/github', async (request, reply) => {
-  const signature = request.headers['x-hub-signature-256']
-  const event = request.headers['x-github-event']
+}>(
+  '/api/webhooks/github',
+  {
+    config: {
+      rateLimit: { max: 100, timeWindow: '1 minute' },
+    },
+  },
+  async (request, reply) => {
+    const signature = request.headers['x-hub-signature-256']
+    const event = request.headers['x-github-event']
 
-  if (!signature) {
-    return reply.status(401).send({ error: 'Missing signature' })
-  }
-
-  const secret = await getOrCreateWebhookSecret()
-  const payload =
-    typeof request.body === 'string'
-      ? request.body
-      : JSON.stringify(request.body)
-
-  if (!verifyWebhookSignature(payload, signature, secret)) {
-    return reply.status(401).send({ error: 'Invalid signature' })
-  }
-
-  // Extract repo and PR author from payload
-  const body = request.body as {
-    repository?: { full_name?: string }
-    pull_request?: { user?: { login?: string } }
-    issue?: { user?: { login?: string } }
-  }
-  const repo = body?.repository?.full_name
-
-  // Handle ping event (webhook test)
-  if (event === 'ping' && repo) {
-    log.info(`[webhooks] Received ping for ${repo}`)
-    io?.emit('webhook:ping', { repo })
-    return { ok: true }
-  }
-
-  if (repo && event) {
-    // Extract PR author based on event type
-    // - pull_request, pull_request_review, pull_request_review_comment: pull_request.user.login
-    // - issue_comment (on PRs): issue.user.login
-    // - check_suite: let all through (CI status is important for our PRs)
-    const prAuthor = body?.pull_request?.user?.login || body?.issue?.user?.login
-    const currentUser = getGhUsername()
-
-    // Process if it's our PR or we can't determine the author
-    if (
-      event === 'check_suite' ||
-      !prAuthor ||
-      !currentUser ||
-      prAuthor === currentUser
-    ) {
-      log.info(`[webhooks] Received ${event} event for ${repo}`)
-      applyWebhookAndRefresh(event, request.body as Record<string, unknown>)
-    } else {
-      // Not our PR - check if we're involved (review requested / mentioned)
-      log.info(
-        `[webhooks] Received ${event} event for ${repo} (author: ${prAuthor}, checking involvement)`,
-      )
-      handleInvolvedPRWebhook(event, request.body as Record<string, unknown>)
+    if (!signature) {
+      return reply.status(401).send({ error: 'Missing signature' })
     }
-  }
 
-  return { ok: true }
-})
+    const secret = await getOrCreateWebhookSecret()
+    const payload =
+      typeof request.body === 'string'
+        ? request.body
+        : JSON.stringify(request.body)
+
+    if (!verifyWebhookSignature(payload, signature, secret)) {
+      return reply.status(401).send({ error: 'Invalid signature' })
+    }
+
+    // Extract repo and PR author from payload
+    const body = request.body as {
+      repository?: { full_name?: string }
+      pull_request?: { user?: { login?: string } }
+      issue?: { user?: { login?: string } }
+    }
+    const repo = body?.repository?.full_name
+
+    // Handle ping event (webhook test)
+    if (event === 'ping' && repo) {
+      log.info(`[webhooks] Received ping for ${repo}`)
+      io?.emit('webhook:ping', { repo })
+      return { ok: true }
+    }
+
+    if (repo && event) {
+      // Extract PR author based on event type
+      // - pull_request, pull_request_review, pull_request_review_comment: pull_request.user.login
+      // - issue_comment (on PRs): issue.user.login
+      // - check_suite: let all through (CI status is important for our PRs)
+      const prAuthor =
+        body?.pull_request?.user?.login || body?.issue?.user?.login
+      const currentUser = getGhUsername()
+
+      // Process if it's our PR or we can't determine the author
+      if (
+        event === 'check_suite' ||
+        !prAuthor ||
+        !currentUser ||
+        prAuthor === currentUser
+      ) {
+        log.info(`[webhooks] Received ${event} event for ${repo}`)
+        applyWebhookAndRefresh(event, request.body as Record<string, unknown>)
+      } else {
+        // Not our PR - check if we're involved (review requested / mentioned)
+        log.info(
+          `[webhooks] Received ${event} event for ${repo} (author: ${prAuthor}, checking involvement)`,
+        )
+        handleInvolvedPRWebhook(event, request.body as Record<string, unknown>)
+      }
+    }
+
+    return { ok: true }
+  },
+)
 
 // Webhook management routes
 fastify.post<{
@@ -1030,7 +1117,7 @@ const start = async () => {
     initGitHubChecks()
 
     try {
-      await initNgrok(port, !!httpsOptions)
+      await initNgrok(env.CLIENT_PORT, !!httpsOptions)
       startWebhookValidationPolling()
     } catch (err) {
       log.error({ err }, 'Failed to initialize ngrok')

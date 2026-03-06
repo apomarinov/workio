@@ -9,6 +9,7 @@ import {
   GitPullRequestArrow,
   MailCheck,
   MessageSquare,
+  ShieldAlert,
   Terminal,
   Trash2,
   Undo2,
@@ -36,6 +37,7 @@ const ICON_MAP: Record<string, LucideIcon | typeof RefreshIcon> = {
   Eye,
   AtSign,
   Terminal,
+  ShieldAlert,
 }
 
 function formatRelativeTime(dateString: string): string {

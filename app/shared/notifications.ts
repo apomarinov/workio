@@ -124,6 +124,15 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
     bodyTemplate: 'Repo init failed',
     audio: 'error',
   },
+  // Security notifications
+  auth_lockout: {
+    emoji: '🚨',
+    icon: 'ShieldAlert',
+    iconColor: 'text-red-500',
+    titleTemplate: 'Failed Login Detected',
+    bodyTemplate: '{attempts} failed login attempts on ngrok — endpoint locked for 10min',
+    audio: 'error',
+  },
   // OS/push-only types (no icon/iconColor)
   permission_needed: {
     emoji: '⚠️',

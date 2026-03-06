@@ -862,7 +862,7 @@ export interface Notification {
   id: number
   dedup_hash: string | null
   type: string
-  repo: string
+  repo: string | null
   read: boolean
   created_at: string
   data: Record<string, unknown>
@@ -870,16 +870,17 @@ export interface Notification {
 
 export async function insertNotification(
   type: string,
-  repo: string,
+  repo: string | null | undefined,
   data: Record<string, unknown>,
   dedupExtra?: string,
   prNumber?: number,
 ): Promise<Notification | null> {
   // Create dedup hash from type + repo + optional prNumber + optional extra
   const crypto = await import('node:crypto')
+  const repoStr = repo ?? ''
   const dedupSource = prNumber
-    ? `${type}:${repo}:${prNumber}${dedupExtra ? `:${dedupExtra}` : ''}`
-    : `${type}:${repo}${dedupExtra ? `:${dedupExtra}` : ''}`
+    ? `${type}:${repoStr}:${prNumber}${dedupExtra ? `:${dedupExtra}` : ''}`
+    : `${type}:${repoStr}${dedupExtra ? `:${dedupExtra}` : ''}`
   const dedupHash = crypto
     .createHash('sha256')
     .update(dedupSource)
@@ -893,7 +894,7 @@ export async function insertNotification(
     ON CONFLICT (dedup_hash) DO NOTHING
     RETURNING *
     `,
-    [dedupHash, type, repo, JSON.stringify(data)],
+    [dedupHash, type, repo ?? null, JSON.stringify(data)],
   )
   return rows[0] || null
 }

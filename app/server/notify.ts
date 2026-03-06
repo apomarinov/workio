@@ -8,7 +8,7 @@ import { sendPushNotification } from './push'
 
 export async function emitNotification(
   type: string,
-  repo: string,
+  repo: string | undefined,
   data: Record<string, unknown>,
   dedupExtra?: string,
   prNumber?: number,
