@@ -1076,8 +1076,13 @@ function stopDaemon() {
   const sockPath = path.join(projectRoot, 'daemon.sock')
   try {
     fs.unlinkSync(sockPath)
-  } catch (err) {
-    log.error({ err }, '[daemon] Failed to clean up socket file')
+  } catch (err: unknown) {
+    if (
+      err instanceof Error &&
+      (err as NodeJS.ErrnoException).code !== 'ENOENT'
+    ) {
+      log.error({ err }, '[daemon] Failed to clean up socket file')
+    }
   }
 }
 

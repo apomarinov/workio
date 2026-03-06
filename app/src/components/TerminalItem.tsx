@@ -643,17 +643,15 @@ export const TerminalItem = memo(function TerminalItem({
                               }
                               className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2"
                             >
-                              {showAllSessions ? (
-                                <>
-                                  <ChevronUp className="w-3 h-3" />
-                                  Hide older
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronRight className="w-3 h-3" />
-                                  Show {hiddenSessions.length} older
-                                </>
-                              )}
+                              <ChevronDown
+                                className={cn(
+                                  'size-3 text-zinc-400 transition-transform duration-150',
+                                  !showAllSessions && '-rotate-90',
+                                )}
+                              />
+                              {showAllSessions
+                                ? 'Hide older'
+                                : `Show ${hiddenSessions.length} older`}
                             </button>
                             {showAllSessions &&
                               hiddenSessions.map((session) => (

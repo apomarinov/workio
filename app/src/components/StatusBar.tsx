@@ -127,6 +127,7 @@ function PRSection({
   const [dialogOpen, setDialogOpen] = useState(false)
   const overflowRef = useOverflowDetector<HTMLSpanElement>()
   const prInfo = getPRStatusInfo(pr)
+  const isMobile = useIsMobile()
 
   return (
     <>
@@ -157,7 +158,10 @@ function PRSection({
               }),
             )
           }}
-          className="absolute right-0 inset-y-0 hidden group-hover/pr:flex items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-r"
+          className={cn(
+            'absolute right-0 inset-y-0 items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-r',
+            !isMobile && 'hidden group-hover/pr:flex',
+          )}
         >
           <MoreVertical className="w-3.5 h-3.5" />
         </button>

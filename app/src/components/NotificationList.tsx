@@ -193,7 +193,7 @@ function NotificationItem({
     >
       <div className="flex-shrink-0 mt-0.5 flex flex-col items-center gap-0.5">
         {getNotificationIcon(type)}
-        <div className='flex flex-col gap-1.5'>
+        <div className="flex flex-col gap-1.5">
           <div
             className={cn(
               'items-center justify-center w-4 h-4 mt-1 rounded hover:bg-zinc-700 text-muted-foreground hover:text-foreground',
