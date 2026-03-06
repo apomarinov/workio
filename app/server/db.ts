@@ -981,6 +981,13 @@ export async function markPRNotificationsRead(
   return result.rowCount ?? 0
 }
 
+export async function deleteNotification(id: number): Promise<boolean> {
+  const result = await pool.query('DELETE FROM notifications WHERE id = $1', [
+    id,
+  ])
+  return (result.rowCount ?? 0) > 0
+}
+
 export async function deleteAllNotifications(): Promise<number> {
   const result = await pool.query('DELETE FROM notifications')
   return result.rowCount ?? 0

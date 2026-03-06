@@ -138,11 +138,13 @@ function NotificationItem({
   notification,
   onMarkRead,
   onMarkUnread,
+  onDelete,
   isMobile,
 }: {
   notification: Notification
   onMarkRead: (id: number) => void
   onMarkUnread: (id: number) => void
+  onDelete: (id: number) => void
   isMobile: boolean
 }) {
   const { id, type, data, created_at, read } = notification
@@ -175,32 +177,48 @@ function NotificationItem({
     }
   }
 
+  const handleDelete = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation()
+    onDelete(id)
+  }
+
   return (
     <button
       onClick={handleClick}
       className={cn(
-        'group relative w-full text-left py-1.5 px-2 rounded hover:bg-accent flex items-start gap-1.5',
+        'group relative w-full text-left py-1.5 min-h-[75px] px-2 rounded hover:bg-accent flex items-start gap-1.5',
         read && 'opacity-60',
         isWorkspace || !url ? 'cursor-default' : 'cursor-pointer',
       )}
     >
       <div className="flex-shrink-0 mt-0.5 flex flex-col items-center gap-0.5">
         {getNotificationIcon(type)}
-        <div
-          className={cn(
-            'items-center justify-center w-4 h-4 mt-1 rounded hover:bg-zinc-700 text-muted-foreground hover:text-foreground',
-            isMobile ? 'flex' : 'hidden group-hover:flex',
-          )}
-          onClick={handleToggleRead}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleToggleRead(e)
-          }}
-        >
-          {read ? (
-            <Undo2 className="w-3.5 h-3.5" />
-          ) : (
-            <Check className="w-3.5 h-3.5 text-green-500" />
-          )}
+        <div className='flex flex-col gap-1.5'>
+          <div
+            className={cn(
+              'items-center justify-center w-4 h-4 mt-1 rounded hover:bg-zinc-700 text-muted-foreground hover:text-foreground',
+              isMobile ? 'flex' : 'hidden group-hover:flex',
+            )}
+            onClick={handleToggleRead}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleToggleRead(e)
+            }}
+          >
+            {read ? (
+              <Undo2 className="w-3.5 h-3.5" />
+            ) : (
+              <Check className="w-3.5 h-3.5 text-green-500" />
+            )}
+          </div>
+          <div
+            className={cn(
+              'items-center justify-center w-4 h-4 text-muted-foreground hover:text-red-400',
+              isMobile ? 'flex' : 'hidden group-hover:flex',
+            )}
+            onClick={handleDelete}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </div>
         </div>
       </div>
       <div className="flex-1 min-w-0">
@@ -226,9 +244,6 @@ function NotificationItem({
           </span>
         </div>
       </div>
-      {!read && (
-        <div className="w-1.5 h-1.5 mt-2 mr-1 rounded-full bg-green-500 flex-shrink-0" />
-      )}
     </button>
   )
 }
@@ -239,6 +254,7 @@ export function NotificationList() {
     markNotificationRead,
     markNotificationUnread,
     markAllNotificationsRead,
+    deleteNotification,
     deleteAllNotifications,
     hasAnyUnseenPRs,
     hasUnreadNotifications,
@@ -279,6 +295,7 @@ export function NotificationList() {
               notification={notification}
               onMarkRead={markNotificationRead}
               onMarkUnread={markNotificationUnread}
+              onDelete={deleteNotification}
               isMobile={isMobile}
             />
           ))}

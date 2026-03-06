@@ -10,6 +10,7 @@ import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
 import {
   deleteAllNotifications,
+  deleteNotification,
   getNotifications,
   getTerminalById,
   getUnreadPRNotifications,
@@ -994,6 +995,15 @@ fastify.post<{ Params: { id: string } }>(
   async (request) => {
     const id = Number(request.params.id)
     const success = await markNotificationUnread(id)
+    return { success }
+  },
+)
+
+fastify.delete<{ Params: { id: string } }>(
+  '/api/notifications/:id',
+  async (request) => {
+    const id = Number(request.params.id)
+    const success = await deleteNotification(id)
     return { success }
   },
 )

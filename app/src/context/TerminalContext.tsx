@@ -80,6 +80,7 @@ interface TerminalContextValue {
   ) => Promise<void>
   markAllNotificationsRead: () => Promise<void>
   markPRNotificationsRead: (repo: string, prNumber: number) => Promise<void>
+  deleteNotification: (id: number) => Promise<void>
   deleteAllNotifications: () => Promise<void>
   reactToPR: (
     repo: string,
@@ -680,6 +681,22 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     [mutateNotifications],
   )
 
+  const deleteNotification = useCallback(
+    async (id: number) => {
+      try {
+        await api.deleteNotification(id)
+        mutateNotifications((prev) => prev?.filter((n) => n.id !== id), {
+          revalidate: false,
+        })
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to delete notification',
+        )
+      }
+    },
+    [mutateNotifications],
+  )
+
   const deleteAllNotifications = useCallback(async () => {
     try {
       await api.deleteAllNotifications()
@@ -1124,6 +1141,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markNotificationReadByItem,
       markAllNotificationsRead,
       markPRNotificationsRead,
+      deleteNotification,
       deleteAllNotifications,
       reactToPR,
       cleanupShellOrder,
@@ -1160,6 +1178,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markNotificationReadByItem,
       markAllNotificationsRead,
       markPRNotificationsRead,
+      deleteNotification,
       deleteAllNotifications,
       reactToPR,
       cleanupShellOrder,

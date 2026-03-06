@@ -616,7 +616,7 @@ function SortableShellTab({
             ? 'border-t-primary'
             : 'border-t-transparent hover:border-t-primary',
         isActive
-          ? 'text-foreground bg-zinc-500/10'
+          ? 'text-foreground bg-zinc-500/10 hover:bg-zinc-500/20'
           : 'text-muted-foreground hover:text-foreground hover:bg-zinc-500/10',
       )}
     >

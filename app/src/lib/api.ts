@@ -1089,6 +1089,16 @@ export async function getUnreadPRNotifications(): Promise<
   return res.json()
 }
 
+export async function deleteNotification(
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await apiFetch(`${API_BASE}/notifications/${id}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error('Failed to delete notification')
+  return res.json()
+}
+
 export async function deleteAllNotifications(): Promise<{ count: number }> {
   const res = await apiFetch(`${API_BASE}/notifications`, {
     method: 'DELETE',
