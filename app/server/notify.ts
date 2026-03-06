@@ -32,10 +32,8 @@ export async function emitNotification(
 
     // For comments/reviews, build OS body with truncated prTitle + body
     if (type === 'new_comment' || type === 'new_review') {
-      const prTitle = String(data.prTitle || '')
-      const truncatedTitle =
-        prTitle.length > 50 ? `${prTitle.slice(0, 50)}…` : prTitle
-      body = data.body ? `${truncatedTitle}\n${data.body}` : truncatedTitle
+      const prLabel = data.prNumber ? `#${data.prNumber}` : ''
+      body = data.body ? `${prLabel}\n${data.body}` : prLabel
     }
 
     sendPushNotification({
