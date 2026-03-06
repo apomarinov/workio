@@ -192,24 +192,6 @@ body {
   display: none;              /* iOS Safari / WebKit */
 }
 
-.xterm .xterm-scrollable-element > .scrollbar.vertical {
-  width: 8px !important;
-  margin-right: 2px;
-}
-
-.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
-  width: 8px !important;
-  border-radius: 999px !important;
-}
-
-.xterm .xterm-scrollable-element > .scrollbar.vertical:hover {
-  width: 13px !important;
-}
-
-.xterm .xterm-scrollable-element > .scrollbar.vertical:hover > .slider {
-  width: 13px !important;
-}
-
 /* Wider xterm scrollbar on mobile for easier touch scrolling */
 @media (max-width: 767px) {
   .xterm .xterm-scrollable-element > .scrollbar.vertical {

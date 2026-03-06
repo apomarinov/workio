@@ -922,7 +922,12 @@ function AppContent() {
                       <div className="flex mr-1 gap-0.5">
                         <button
                           type="button"
-                          onClick={() => setMobileSidebarOpen(true)}
+                          onClick={() => {
+                            setMobileSidebarOpen(true)
+                            toast.info(
+                              'Tip: swipe from the edge to open/close the sidebar',
+                            )
+                          }}
                           className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         >
                           <SidebarOpen className="w-4 h-4" />
