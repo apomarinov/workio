@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "diff2html/node_modules/highlight.js/styles/github-dark.min.css";
+@import "diff2html/bundles/css/diff2html.min.css";
 
 @plugin "@tailwindcss/container-queries";
 
@@ -242,4 +244,139 @@ body {
 
 .animate-flash {
   animation: flash 0.7s ease-in-out infinite;
+}
+
+/* ── diff2html dark theme overrides (zinc palette) ── */
+
+.d2h-dark-color-scheme {
+  --d2h-dark-color: #d4d4d8;
+  --d2h-dark-bg-color: transparent;
+  --d2h-dark-border-color: transparent;
+  --d2h-dark-dim-color: #71717a;
+  --d2h-dark-line-border-color: rgba(63, 63, 70, 0.5);
+  --d2h-dark-file-header-bg-color: transparent;
+  --d2h-dark-file-header-border-color: transparent;
+  --d2h-dark-empty-placeholder-bg-color: rgba(63, 63, 70, 0.1);
+  --d2h-dark-empty-placeholder-border-color: rgba(63, 63, 70, 0.3);
+  --d2h-dark-selected-color: rgba(59, 130, 246, 0.1);
+  --d2h-dark-ins-bg-color: rgba(34, 197, 94, 0.12);
+  --d2h-dark-ins-border-color: rgba(34, 197, 94, 0.3);
+  --d2h-dark-ins-highlight-bg-color: rgba(34, 197, 94, 0.3);
+  --d2h-dark-ins-label-color: #4ade80;
+  --d2h-dark-del-bg-color: rgba(239, 68, 68, 0.12);
+  --d2h-dark-del-border-color: rgba(239, 68, 68, 0.3);
+  --d2h-dark-del-highlight-bg-color: rgba(239, 68, 68, 0.3);
+  --d2h-dark-del-label-color: #f87171;
+  --d2h-dark-change-del-color: rgba(234, 179, 8, 0.15);
+  --d2h-dark-change-ins-color: rgba(34, 197, 94, 0.2);
+  --d2h-dark-info-bg-color: rgba(96, 165, 250, 0.08);
+  --d2h-dark-info-border-color: rgba(96, 165, 250, 0.2);
+  --d2h-dark-change-label-color: #facc15;
+  --d2h-dark-moved-label-color: #60a5fa;
+}
+
+/* Hide file header and file list (our toolbar already shows file path) */
+.d2h-dark-color-scheme .d2h-file-header,
+.d2h-dark-color-scheme .d2h-file-list-wrapper {
+  display: none;
+}
+
+/* Remove file-wrapper borders (parent panel has borders) */
+.d2h-dark-color-scheme .d2h-file-wrapper {
+  border: none;
+  margin: 0;
+}
+
+/* Diff table: smaller font, don't stretch rows to fill container */
+.d2h-dark-color-scheme .d2h-diff-table {
+  width: max-content;
+  min-width: 100%;
+  height: min-content;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+.d2h-dark-color-scheme .d2h-diff-table td {
+  vertical-align: top;
+  padding: 0;
+  line-height: 1.25rem;
+}
+
+/* ── Line number gutter: normal table-cell instead of absolute positioning ── */
+.d2h-dark-color-scheme .d2h-code-linenumber {
+  position: static;
+  display: table-cell;
+  width: auto;
+  white-space: nowrap;
+  padding: 0;
+  direction: ltr;
+  vertical-align: top;
+}
+.d2h-dark-color-scheme .d2h-code-linenumber .line-num1 {
+  display: none;
+}
+.d2h-dark-color-scheme .d2h-code-linenumber .line-num2 {
+  display: block;
+  float: none;
+  direction: ltr;
+  width: auto;
+  padding: 0 0.5em;
+  text-align: right;
+  line-height: 1.25rem;
+  border-right: 1px solid rgba(63, 63, 70, 0.5);
+}
+
+/* ── Hide +/- prefix and @@ hunk info rows ── */
+.d2h-dark-color-scheme .d2h-code-line-prefix {
+  display: none;
+}
+
+
+/* ── Code content: remove absolute-positioning padding hacks ── */
+.d2h-dark-color-scheme .d2h-code-line {
+  padding: 0;
+  width: auto;
+}
+.d2h-dark-color-scheme .d2h-code-linenumber::after {
+  content: none;
+}
+.d2h-dark-color-scheme .d2h-code-line-ctn {
+  padding-left: 0.75em;
+  vertical-align: top;
+  line-height: 1.25rem;
+}
+
+/* ── Line number hover button (injected dynamically on mouseover) ── */
+.d2h-dark-color-scheme .diff-line-open-btn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #71717a;
+  cursor: pointer;
+  background: inherit;
+  border: none;
+  padding: 0;
+}
+.d2h-dark-color-scheme .diff-line-open-btn:hover {
+  color: #d4d4d8;
+}
+.d2h-dark-color-scheme .d2h-code-linenumber {
+  position: relative;
+}
+
+
+/* ── Row hover ── */
+.d2h-dark-color-scheme tr.d2h-ins:hover td {
+  background-color: rgba(34, 197, 94, 0.18) !important;
+}
+.d2h-dark-color-scheme tr.d2h-del:hover td {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+}
+.d2h-dark-color-scheme tr.d2h-info:hover td {
+  background-color: rgba(96, 165, 250, 0.12) !important;
+}
+.d2h-dark-color-scheme tr:not(.d2h-ins):not(.d2h-del):not(.d2h-info):hover td {
+  background-color: rgba(255, 255, 255, 0.03) !important;
 }
