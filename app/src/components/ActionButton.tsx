@@ -1,17 +1,5 @@
 import { cn } from '@/lib/utils'
 
-// Preload the audio element so iOS doesn't need to fetch on first play
-const popAudio =
-  typeof window !== 'undefined' ? new Audio('/audio/pop.mp3') : null
-if (popAudio) popAudio.load()
-
-function playPop() {
-  if (!popAudio) return
-  // Clone the node for overlapping plays — clones use the cached source
-  const clone = popAudio.cloneNode() as HTMLAudioElement
-  clone.play()
-}
-
 interface ActionButtonProps {
   label?: string
   children?: React.ReactNode
@@ -29,7 +17,7 @@ export function ActionButton({
   children,
   active,
   dimmed,
-  withAudio = true,
+  withAudio: _withAudio,
   size = 'sm',
   preventFocusLoss,
   onTap,

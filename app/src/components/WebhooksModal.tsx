@@ -171,7 +171,7 @@ export function WebhooksModal({ open, onOpenChange }: WebhooksModalProps) {
     setLoading((prev) => ({ ...prev, [`${repo}-test`]: true }))
     try {
       await api.testWebhook(owner, repoName)
-      toast.success(`Ping sent to ${repo} webhook`)
+      toast.success(`Ping sent to ${repo}. You should receive a notification.`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to test webhook')
     } finally {

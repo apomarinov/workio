@@ -19,7 +19,6 @@ import { cn, sessionStatusColor } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useLongPress } from '../hooks/useLongPress'
-import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject } from '../types'
 import { MarkdownContent } from './MarkdownContent'
 import { TruncatedPath } from './TruncatedPath'
@@ -42,7 +41,6 @@ export const SessionItem = memo(function SessionItem({
   onClick,
 }: SessionItemProps) {
   const { activeSessionId, selectSession } = useSessionContext()
-  const { settings } = useSettings()
   const [isFlashing, setIsFlashing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [pinnedSessions, setPinnedSessions] = useLocalStorage<string[]>(

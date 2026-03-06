@@ -5,7 +5,6 @@ import {
   GitBranch,
   GitMerge,
   GitMergeConflict,
-  GitPullRequestArrow,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
