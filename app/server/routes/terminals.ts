@@ -1637,10 +1637,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     },
   )
 
-  // Get diff for a single file
+  // Get diff for a single file (or all files when path is omitted)
   fastify.get<{
     Params: TerminalParams
-    Querystring: { path: string; context?: string; base?: string }
+    Querystring: { path?: string; context?: string; base?: string }
   }>('/api/terminals/:id/file-diff', async (request, reply) => {
     const id = parseInt(request.params.id, 10)
     if (Number.isNaN(id)) {
@@ -1657,10 +1657,6 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     const filePath = request.query.path
-    if (!filePath) {
-      return reply.status(400).send({ error: 'Missing path query parameter' })
-    }
-
     const context = request.query.context || '5'
     const base = request.query.base
     const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
@@ -1668,10 +1664,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     try {
       // When base is provided, diff between two refs (for PR view)
       if (base && !terminal.ssh_host) {
+        const args = ['diff', `-U${context}`, base]
+        if (filePath) args.push('--', filePath)
         const diff = await new Promise<string>((resolve) => {
           execFile(
             'git',
-            ['diff', `-U${context}`, base, '--', filePath],
+            args,
             { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
             (_err, stdout) => resolve(stdout || ''),
           )
@@ -1680,37 +1678,86 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       if (terminal.ssh_host) {
-        // SSH: try tracked file diff first, then untracked
-        const escapedPath = filePath.replace(/'/g, "'\\''")
-        let result = await execSSHCommand(
-          terminal.ssh_host,
-          `git diff -U${context} HEAD -- '${escapedPath}' 2>/dev/null || git diff -U${context} -- '${escapedPath}'`,
-          { cwd: terminal.cwd },
-        )
-        if (!result.stdout.trim()) {
-          // Try untracked file
-          result = await execSSHCommand(
+        if (filePath) {
+          // SSH: try tracked file diff first, then untracked
+          const escapedPath = filePath.replace(/'/g, "'\\''")
+          let result = await execSSHCommand(
             terminal.ssh_host,
-            `git diff --no-index -- /dev/null '${escapedPath}' || true`,
+            `git diff -U${context} HEAD -- '${escapedPath}' 2>/dev/null || git diff -U${context} -- '${escapedPath}'`,
             { cwd: terminal.cwd },
           )
+          if (!result.stdout.trim()) {
+            // Try untracked file
+            result = await execSSHCommand(
+              terminal.ssh_host,
+              `git diff --no-index -- /dev/null '${escapedPath}' || true`,
+              { cwd: terminal.cwd },
+            )
+          }
+          return { diff: result.stdout }
         }
+        // SSH: full diff (all files)
+        const result = await execSSHCommand(
+          terminal.ssh_host,
+          `git diff -U${context} HEAD`,
+          { cwd: terminal.cwd },
+        )
         return { diff: result.stdout }
       }
 
-      // Local: try tracked file diff first
+      if (filePath) {
+        // Local: try tracked file diff first
+        let diff = await new Promise<string>((resolve) => {
+          execFile(
+            'git',
+            ['diff', `-U${context}`, 'HEAD', '--', filePath],
+            { cwd, timeout: 10000 },
+            (err, stdout) => {
+              if (err) {
+                // Fallback without HEAD (fresh repo)
+                execFile(
+                  'git',
+                  ['diff', `-U${context}`, '--', filePath],
+                  { cwd, timeout: 10000 },
+                  (_err2, stdout2) => resolve(stdout2 || ''),
+                )
+              } else {
+                resolve(stdout)
+              }
+            },
+          )
+        })
+
+        if (!diff.trim()) {
+          // Try untracked file
+          diff = await new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['diff', '--no-index', '--', '/dev/null', filePath],
+              { cwd, timeout: 10000 },
+              (_err, stdout) => {
+                // exit code 1 is normal for --no-index with differences
+                resolve(stdout || '')
+              },
+            )
+          })
+        }
+
+        return { diff }
+      }
+
+      // Local: full diff (all files — tracked + untracked)
       let diff = await new Promise<string>((resolve) => {
         execFile(
           'git',
-          ['diff', `-U${context}`, 'HEAD', '--', filePath],
-          { cwd, timeout: 10000 },
+          ['diff', `-U${context}`, 'HEAD'],
+          { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
           (err, stdout) => {
             if (err) {
-              // Fallback without HEAD (fresh repo)
               execFile(
                 'git',
-                ['diff', `-U${context}`, '--', filePath],
-                { cwd, timeout: 10000 },
+                ['diff', `-U${context}`],
+                { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
                 (_err2, stdout2) => resolve(stdout2 || ''),
               )
             } else {
@@ -1720,19 +1767,33 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         )
       })
 
-      if (!diff.trim()) {
-        // Try untracked file
-        diff = await new Promise<string>((resolve) => {
-          execFile(
-            'git',
-            ['diff', '--no-index', '--', '/dev/null', filePath],
-            { cwd, timeout: 10000 },
-            (_err, stdout) => {
-              // exit code 1 is normal for --no-index with differences
-              resolve(stdout || '')
-            },
-          )
-        })
+      // Append untracked files
+      const untrackedFiles = await new Promise<string>((resolve) => {
+        execFile(
+          'git',
+          ['ls-files', '--others', '--exclude-standard'],
+          { cwd, timeout: 5000 },
+          (_err, stdout) => resolve(stdout?.trim() || ''),
+        )
+      })
+
+      if (untrackedFiles) {
+        const untrackedParts: string[] = []
+        for (const file of untrackedFiles.split('\n')) {
+          if (!file) continue
+          const part = await new Promise<string>((resolve) => {
+            execFile(
+              'git',
+              ['diff', '--no-index', '--', '/dev/null', file],
+              { cwd, timeout: 10000 },
+              (_err, stdout) => resolve(stdout || ''),
+            )
+          })
+          if (part) untrackedParts.push(part)
+        }
+        if (untrackedParts.length > 0) {
+          diff = `${diff}\n${untrackedParts.join('\n')}`
+        }
       }
 
       return { diff }

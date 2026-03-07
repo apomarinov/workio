@@ -954,6 +954,22 @@ export async function getFileDiff(
   return res.json()
 }
 
+export async function getAllFilesDiff(
+  terminalId: number,
+  base?: string,
+): Promise<{ diff: string }> {
+  const params = new URLSearchParams({ context: '5' })
+  if (base) params.set('base', base)
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
+  )
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.error || 'Failed to get full diff')
+  }
+  return res.json()
+}
+
 // Webhook management
 
 export async function createWebhook(

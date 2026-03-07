@@ -193,7 +193,17 @@ body {
 }
 
 /* Wider xterm scrollbar on mobile for easier touch scrolling */
-@media (max-width: 767px) {
+@media (max-width: 639px) {
+  .d2h-wrapper * {
+    font-size: 11px;
+  }
+  .d2h-tag {
+    font-size: 8px;
+  }
+  .d2h-icon {
+    width: 10px;
+    height: 13px;
+  }
   .xterm .xterm-scrollable-element > .scrollbar.vertical {
     width: 30px !important;
   }
@@ -284,15 +294,27 @@ body {
   line-height: 1.25rem;
 }
 
-/* ── Line number gutter: normal table-cell instead of absolute positioning ── */
+/* ── Line number gutter: sticky table-cell that stays visible on horizontal scroll ── */
 .d2h-dark-color-scheme .d2h-code-linenumber {
-  position: static;
+  position: sticky;
+  left: 0;
+  z-index: 1;
   display: table-cell;
   width: auto;
   white-space: nowrap;
   padding: 0;
   direction: ltr;
   vertical-align: top;
+  background: #18181b;
+}
+.d2h-dark-color-scheme tr.d2h-ins .d2h-code-linenumber {
+  background: #162415;
+}
+.d2h-dark-color-scheme tr.d2h-del .d2h-code-linenumber {
+  background: #241515;
+}
+.d2h-dark-color-scheme tr.d2h-info .d2h-code-linenumber {
+  background: #171b21;
 }
 .d2h-dark-color-scheme .d2h-code-linenumber .line-num1 {
   display: none;
@@ -344,21 +366,50 @@ body {
 .d2h-dark-color-scheme .diff-line-open-btn:hover {
   color: #d4d4d8;
 }
-.d2h-dark-color-scheme .d2h-code-linenumber {
-  position: relative;
-}
 
 
 /* ── Row hover ── */
 .d2h-dark-color-scheme tr.d2h-ins:hover td {
   background-color: rgba(34, 197, 94, 0.18) !important;
 }
+.d2h-dark-color-scheme tr.d2h-ins:hover td.d2h-code-linenumber {
+  background-color: #1a2d18 !important;
+}
 .d2h-dark-color-scheme tr.d2h-del:hover td {
   background-color: rgba(239, 68, 68, 0.18) !important;
+}
+.d2h-dark-color-scheme tr.d2h-del:hover td.d2h-code-linenumber {
+  background-color: #2d1818 !important;
 }
 .d2h-dark-color-scheme tr.d2h-info:hover td {
   background-color: rgba(96, 165, 250, 0.12) !important;
 }
+.d2h-dark-color-scheme tr.d2h-info:hover td.d2h-code-linenumber {
+  background-color: #1a1f27 !important;
+}
 .d2h-dark-color-scheme tr:not(.d2h-ins):not(.d2h-del):not(.d2h-info):hover td {
   background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.d2h-dark-color-scheme tr:not(.d2h-ins):not(.d2h-del):not(.d2h-info):hover td.d2h-code-linenumber {
+  background-color: #1c1c1f !important;
+}
+
+/* ── Unified diff view: show file headers between files ── */
+.unified-diff-view .d2h-file-header {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--sidebar);
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  color: #d4d4d8;
+}
+
+.unified-diff-view .d2h-file-wrapper + .d2h-file-wrapper {
+  margin-top: 4px;
 }

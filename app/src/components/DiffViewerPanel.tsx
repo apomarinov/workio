@@ -2,6 +2,7 @@ import {
   ChevronDown,
   ChevronsDownUp,
   ChevronsUpDown,
+  Files,
   Folder,
   Loader2,
   RefreshCw,
@@ -23,13 +24,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { getChangedFiles } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ChangedFile } from '../../shared/types'
 import { FileDiffViewer } from './FileDiffViewer'
 import { FileStatusBadge } from './FileStatusBadge'
+import { MobileSlidePanel } from './MobileSlidePanel'
 import { TruncatedPath } from './TruncatedPath'
+import { UnifiedDiffViewer } from './UnifiedDiffViewer'
 
 // --- Folder tree helpers ---
 
@@ -129,7 +133,7 @@ interface FileListPanelProps {
   onHasSelectionChange: (hasSelection: boolean) => void
 }
 
-function FileListPanel({
+export function FileListPanel({
   ref,
   changedFiles,
   loadingFiles,
@@ -556,8 +560,11 @@ export function DiffViewerPanel({
 }: DiffViewerPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
+  const [mobileFilesOpen, setMobileFilesOpen] = useState(false)
+  const [scrollToFile, setScrollToFile] = useState<string | null>(null)
   const internalFileListRef = useRef<FileListHandle>(null)
   const { settings } = useSettings()
+  const isMobile = useIsMobile()
 
   // Fetch changed files via SWR (only when managing internally)
   const swrKey =
@@ -603,6 +610,80 @@ export function DiffViewerPanel({
     id: 'diff-files-layout',
     storage: localStorage,
   })
+
+  // Compute file stats for mobile button
+  const totalAdded = changedFiles.reduce((s, f) => s + f.added, 0)
+  const totalRemoved = changedFiles.reduce((s, f) => s + f.removed, 0)
+
+  if (isMobile) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col min-h-0 flex-1 overflow-hidden gap-2',
+          !integrated && 'rounded-md border border-zinc-700',
+        )}
+      >
+        {commitControls}
+        {/* Files button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="justify-start gap-2 text-xs font-mono shrink-0"
+          onClick={() => setMobileFilesOpen(true)}
+        >
+          <Files className="size-3" />
+          <span>
+            {changedFiles.length} file{changedFiles.length !== 1 ? 's' : ''}
+          </span>
+          {(totalAdded > 0 || totalRemoved > 0) && (
+            <span>
+              {totalAdded > 0 && (
+                <span className="text-green-400">+{totalAdded}</span>
+              )}
+              {totalAdded > 0 && totalRemoved > 0 && ' '}
+              {totalRemoved > 0 && (
+                <span className="text-red-400">-{totalRemoved}</span>
+              )}
+            </span>
+          )}
+        </Button>
+        {/* Unified diff viewer */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <UnifiedDiffViewer
+            terminalId={terminalId}
+            base={base}
+            scrollToFile={scrollToFile}
+            onScrollComplete={() => setScrollToFile(null)}
+          />
+        </div>
+        {/* File list slide panel */}
+        <MobileSlidePanel
+          open={mobileFilesOpen}
+          onClose={() => setMobileFilesOpen(false)}
+          title="Files"
+        >
+          <FileListPanel
+            ref={effectiveFileListRef}
+            changedFiles={changedFiles}
+            loadingFiles={loadingFiles}
+            loading={loading}
+            discarding={discarding}
+            selectedFile={selectedFile}
+            fileListWidth={undefined}
+            readOnly={readOnly}
+            onSelectFile={(path) => {
+              setSelectedFile(path)
+              setScrollToFile(path)
+              setMobileFilesOpen(false)
+            }}
+            onRefresh={onRefresh ?? (() => mutateFiles())}
+            onRequestDiscard={onRequestDiscard ?? (() => {})}
+            onHasSelectionChange={onHasSelectionChange ?? (() => {})}
+          />
+        </MobileSlidePanel>
+      </div>
+    )
+  }
 
   return (
     <Group

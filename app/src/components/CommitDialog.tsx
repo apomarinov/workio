@@ -264,7 +264,8 @@ export function CommitDialog({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
-        className="w-[95vw] p-4 sm:max-w-[1500px] h-[95vh] max-h-[1500px] flex flex-col overflow-hidden"
+        className="w-[100vw] max-w-none p-2 pt-[max(0.5rem,env(safe-area-inset-top))] rounded-none sm:w-[95vw] sm:max-w-[1500px] sm:p-4 sm:pt-4 sm:rounded-lg h-[100dvh] max-h-none sm:h-[95vh] sm:max-h-[1500px] flex flex-col overflow-hidden"
+        showCloseButton={viewOnly}
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           if (!viewOnly) textareaRef.current?.focus()
@@ -317,7 +318,7 @@ export function CommitDialog({
         )}
 
         {!viewOnly && (
-          <DialogFooter>
+          <DialogFooter className="flex-row justify-end">
             <Button variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>

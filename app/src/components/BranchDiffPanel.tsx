@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react'
+import { GitCommitHorizontal, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Group,
@@ -7,11 +7,14 @@ import {
   useDefaultLayout,
 } from 'react-resizable-panels'
 import useSWR from 'swr'
+import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getBranchCommits, getCommitsBetween, type PRCommit } from '@/lib/api'
 import { formatDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { DiffViewerPanel } from './DiffViewerPanel'
+import { MobileSlidePanel } from './MobileSlidePanel'
 
 function simpleHash(str: string): string {
   let h = 0x811c9dc5
@@ -44,8 +47,10 @@ type BranchDiffPanelProps =
 export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const { terminalId } = props
   const isBranchMode = props.branch != null
+  const isMobile = useIsMobile()
 
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
+  const [mobileCommitsOpen, setMobileCommitsOpen] = useState(false)
 
   // ── Mode A: SWR fetch for base..head comparison ──
   const { data: compareData, isLoading: loadingCompare } = useSWR(
@@ -174,6 +179,136 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
     storage: localStorage,
   })
 
+  // ── Commit list content (shared between desktop panel and mobile slide panel) ──
+  function renderCommitList() {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading...
+        </div>
+      )
+    }
+    if (commits.length === 0) {
+      return (
+        <div className="py-4 text-center text-sm text-zinc-500">No commits</div>
+      )
+    }
+    return (
+      <>
+        {commits.map((commit) => {
+          const isMergeBaseCommit = mergeBase && commit.hash === mergeBase
+          return (
+            <div key={commit.hash}>
+              {isMergeBaseCommit && (
+                <div className="flex items-center gap-2 px-2 py-1">
+                  <div className="flex-1 border-t border-zinc-600" />
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider shrink-0">
+                    {mergeBaseBranch}
+                  </span>
+                  <div className="flex-1 border-t border-zinc-600" />
+                </div>
+              )}
+              <div
+                className={cn(
+                  'flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-zinc-800/50',
+                  selectedCommit === commit.hash && 'bg-zinc-700/50',
+                )}
+                onClick={() => {
+                  setSelectedCommit(
+                    selectedCommit === commit.hash ? null : commit.hash,
+                  )
+                  if (isMobile) setMobileCommitsOpen(false)
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div
+                    className={cn(
+                      selectedCommit === commit.hash
+                        ? 'text-blue-400'
+                        : 'text-zinc-300',
+                    )}
+                  >
+                    {commit.message}
+                  </div>
+                  <div className="text-zinc-500 font-mono">
+                    {commit.hash.slice(0, 7)}
+                  </div>
+                  <div className="text-zinc-500">
+                    {formatDate(commit.date)} · {commit.author}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        {isBranchMode && (
+          <>
+            <div ref={sentinelRef} className="h-1" />
+            {loadingMore && (
+              <div className="flex items-center justify-center py-3 text-sm text-zinc-500">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading more...
+              </div>
+            )}
+          </>
+        )}
+      </>
+    )
+  }
+
+  // ── Mobile button label ──
+  const selectedCommitObj = selectedCommit
+    ? commits.find((c) => c.hash === selectedCommit)
+    : null
+  const commitButtonLabel = selectedCommitObj
+    ? `${selectedCommitObj.hash.slice(0, 7)} ${selectedCommitObj.message.length > 30 ? `${selectedCommitObj.message.slice(0, 30)}...` : selectedCommitObj.message}`
+    : `All changes (${commits.length} commits)`
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-0 flex-1 overflow-hidden gap-2">
+        {/* Commits button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="justify-start gap-2 text-xs font-mono shrink-0 overflow-hidden"
+          onClick={() => setMobileCommitsOpen(true)}
+        >
+          <GitCommitHorizontal className="size-3 shrink-0" />
+          <span className="truncate">{commitButtonLabel}</span>
+        </Button>
+        {/* DiffViewerPanel (integrated, handles its own files button on mobile) */}
+        {diffBase ? (
+          <DiffViewerPanel
+            integrated
+            terminalId={terminalId}
+            base={diffBase}
+            readOnly
+            cacheKey={commitsCacheKey}
+          />
+        ) : (
+          <div className="flex items-center justify-center flex-1 text-sm text-zinc-500">
+            Select a commit to view changes
+          </div>
+        )}
+        {/* Commits slide panel */}
+        <MobileSlidePanel
+          open={mobileCommitsOpen}
+          onClose={() => setMobileCommitsOpen(false)}
+          title={`Commits (${commits.length})`}
+        >
+          <div
+            ref={isBranchMode ? scrollRef : undefined}
+            className="h-full overflow-y-auto"
+          >
+            {renderCommitList()}
+          </div>
+        </MobileSlidePanel>
+      </div>
+    )
+  }
+
   return (
     <Group
       orientation="horizontal"
@@ -198,75 +333,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
             className="flex-1 overflow-y-auto"
             ref={isBranchMode ? scrollRef : undefined}
           >
-            {loading ? (
-              <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
-              </div>
-            ) : commits.length === 0 ? (
-              <div className="py-4 text-center text-sm text-zinc-500">
-                No commits
-              </div>
-            ) : (
-              <>
-                {commits.map((commit) => {
-                  const isMergeBase = mergeBase && commit.hash === mergeBase
-                  return (
-                    <div key={commit.hash}>
-                      {isMergeBase && (
-                        <div className="flex items-center gap-2 px-2 py-1">
-                          <div className="flex-1 border-t border-zinc-600" />
-                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider shrink-0">
-                            {mergeBaseBranch}
-                          </span>
-                          <div className="flex-1 border-t border-zinc-600" />
-                        </div>
-                      )}
-                      <div
-                        className={cn(
-                          'flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-zinc-800/50',
-                          selectedCommit === commit.hash && 'bg-zinc-700/50',
-                        )}
-                        onClick={() =>
-                          setSelectedCommit(
-                            selectedCommit === commit.hash ? null : commit.hash,
-                          )
-                        }
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className={cn(
-                              selectedCommit === commit.hash
-                                ? 'text-blue-400'
-                                : 'text-zinc-300',
-                            )}
-                          >
-                            {commit.message}
-                          </div>
-                          <div className="text-zinc-500 font-mono">
-                            {commit.hash.slice(0, 7)}
-                          </div>
-                          <div className="text-zinc-500">
-                            {formatDate(commit.date)} · {commit.author}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-                {isBranchMode && (
-                  <>
-                    <div ref={sentinelRef} className="h-1" />
-                    {loadingMore && (
-                      <div className="flex items-center justify-center py-3 text-sm text-zinc-500">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Loading more...
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
+            {renderCommitList()}
           </div>
         </div>
       </Panel>

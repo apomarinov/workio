@@ -132,77 +132,81 @@ export function CreatePRDialog({
       onOpenChange={(isOpen) => !isOpen && !creating && onClose()}
     >
       <DialogContent
-        className="w-[95vw] p-4 sm:max-w-[1500px] h-[95vh] max-h-[1500px] flex flex-col overflow-hidden"
+        className="w-[100vw] max-w-none p-2 pt-[max(0.5rem,env(safe-area-inset-top))] rounded-none sm:w-[95vw] sm:max-w-[1500px] sm:p-4 sm:pt-4 sm:rounded-lg h-[100dvh] max-h-none sm:h-[95vh] sm:max-h-[1500px] flex flex-col overflow-hidden"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>
-            <div className="flex items-center gap-3">
-              <span>Create Pull Request</span>
-              <span className="text-xs font-normal text-zinc-500 font-mono">
-                {headBranch} →
-              </span>
-              <Popover
-                open={branchPickerOpen}
-                onOpenChange={setBranchPickerOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 text-xs font-normal"
-                    disabled={creating}
-                  >
-                    {baseBranch}
-                    <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-0" align="start">
-                  <Command shouldFilter={true}>
-                    <CommandInput placeholder="Search branches..." />
-                    <CommandList>
-                      <CommandEmpty>No branches found</CommandEmpty>
-                      {baseBranchOptions.map((branch) => (
-                        <CommandItem
-                          key={branch}
-                          value={branch}
-                          onSelect={() => {
-                            setBaseBranch(branch)
-                            setBranchPickerOpen(false)
-                          }}
-                        >
-                          {branch}
-                          {branch === baseBranch && (
-                            <Check className="ml-auto h-3 w-3" />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <div className="flex items-center gap-3 mr-auto">
-                {noRemote ? (
-                  <span className="flex items-center gap-1.5 text-xs text-yellow-400">
-                    <X className="h-3 w-3" />
-                    Branch not pushed to remote
-                  </span>
-                ) : checkingConflicts ? (
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Checking...
-                  </span>
-                ) : conflicts === false ? (
-                  <span className="flex items-center gap-1.5 text-xs text-green-400">
-                    <Check className="h-3 w-3" />
-                    Able to merge
-                  </span>
-                ) : conflicts === true ? (
-                  <span className="flex items-center gap-1.5 text-xs text-red-400">
-                    <X className="h-3 w-3" />
-                    Can't automatically merge
-                  </span>
-                ) : null}
+            <div className="flex justify-start gap-3 max-sm:flex-col">
+              <div className="flex justify-start gap-3 ">
+                <span className="w-fit">Create Pull Request</span>
+                <div className="flex items-center gap-3 mr-auto">
+                  {noRemote ? (
+                    <span className="flex items-center gap-1.5 text-xs text-yellow-400">
+                      <X className="h-3 w-3" />
+                      Branch not pushed to remote
+                    </span>
+                  ) : checkingConflicts ? (
+                    <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Checking...
+                    </span>
+                  ) : conflicts === false ? (
+                    <span className="flex items-center gap-1.5 text-xs text-green-400">
+                      <Check className="h-3 w-3" />
+                      Able to merge
+                    </span>
+                  ) : conflicts === true ? (
+                    <span className="flex items-center gap-1.5 text-xs text-red-400">
+                      <X className="h-3 w-3" />
+                      Can't automatically merge
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-normal text-zinc-500 font-mono">
+                  {headBranch} →
+                </span>
+                <Popover
+                  open={branchPickerOpen}
+                  onOpenChange={setBranchPickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-xs font-normal"
+                      disabled={creating}
+                    >
+                      {baseBranch}
+                      <ChevronDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <Command shouldFilter={true}>
+                      <CommandInput placeholder="Search branches..." />
+                      <CommandList>
+                        <CommandEmpty>No branches found</CommandEmpty>
+                        {baseBranchOptions.map((branch) => (
+                          <CommandItem
+                            key={branch}
+                            value={branch}
+                            onSelect={() => {
+                              setBaseBranch(branch)
+                              setBranchPickerOpen(false)
+                            }}
+                          >
+                            {branch}
+                            {branch === baseBranch && (
+                              <Check className="ml-auto h-3 w-3" />
+                            )}
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </DialogTitle>
@@ -254,7 +258,7 @@ export function CreatePRDialog({
           />
         )}
 
-        <DialogFooter className="flex-shrink-0">
+        <DialogFooter className="flex-shrink-0 flex-row justify-end">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <Checkbox
               checked={draft}
