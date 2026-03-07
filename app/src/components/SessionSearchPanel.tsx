@@ -1,4 +1,4 @@
-import { GitBranch, Loader2, Search, X } from 'lucide-react'
+import { GitBranch, Loader2, MoreVertical, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { searchSessionMessages } from '@/lib/api'
@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { SessionSearchMatch } from '../types'
 import { SessionChat } from './SessionChat'
+import { Button } from './ui/button'
 
 type NavItem =
   | { type: 'session'; sessionId: string }
@@ -125,10 +126,21 @@ export function SessionSearchPanel({
     el?.scrollIntoView({ block: 'nearest' })
   }, [highlightedIndex])
 
+  // Track palette open state to suppress key listeners
+  const paletteOpenRef = useRef(false)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      paletteOpenRef.current = (e as CustomEvent).detail.open
+    }
+    window.addEventListener('palette-state', handler)
+    return () => window.removeEventListener('palette-state', handler)
+  }, [])
+
   // Keyboard: Esc, ArrowUp, ArrowDown, Enter
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
+      if (paletteOpenRef.current) return
       if (e.key === 'Escape') {
         e.stopPropagation()
         if (query) {
@@ -166,7 +178,7 @@ export function SessionSearchPanel({
       <div
         className={cn(
           'fixed inset-0 z-40 transition-opacity duration-300',
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          open ? 'opacity-100 bg-sidebar/60' : 'opacity-0 pointer-events-none',
         )}
         onClick={() => {
           onOpenChange(false)
@@ -188,7 +200,7 @@ export function SessionSearchPanel({
       {/* Panel */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 w-[55%] min-w-[600px] bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
+          'fixed inset-y-0 right-0 z-50 w-[75%] min-w-[600px] bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : 'translate-x-full',
         )}
       >
@@ -225,7 +237,7 @@ export function SessionSearchPanel({
         <div className="flex-1 flex min-h-0">
           {/* Left: search results */}
           <div
-            className="w-[40%] border-r border-zinc-800 overflow-y-auto"
+            className="w-[30%] border-r border-zinc-800 overflow-y-auto"
             ref={resultsContainerRef}
           >
             {loading ? (
@@ -329,15 +341,35 @@ export function SessionSearchPanel({
           </div>
 
           {/* Right: chat preview */}
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 relative">
             {selectedSessionId ? (
-              <SessionChat
-                sessionId={selectedSessionId}
-                hideHeader
-                hideAvatars
-                loadAll
-                scrollToMessageId={selectedMessageId}
-              />
+              <>
+                <SessionChat
+                  sessionId={selectedSessionId}
+                  hideHeader
+                  hideAvatars
+                  loadAll
+                  scrollToMessageId={selectedMessageId}
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('open-item-actions', {
+                        detail: {
+                          terminalId: null,
+                          sessionId: selectedSessionId,
+                        },
+                      }),
+                    )
+                  }}
+                  className="absolute top-2 left-2 hover:text-zinc-200 bg-sidebar/60 hover:bg-sidebar"
+                >
+                  Actions
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-zinc-500">
                 Click a result to preview

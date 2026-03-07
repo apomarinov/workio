@@ -641,7 +641,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               }
             />
             <InfoShortcutRow
-              label="Jump line boundary"
+              label="Jump line"
               display={
                 <span className="inline-flex items-center gap-1">
                   <Command className={cn(ICON_CLASS, 'stroke-3')} />
@@ -654,7 +654,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               }
             />
             <InfoShortcutRow
-              label="Jump word boundary"
+              label="Jump word"
               display={
                 <span className="inline-flex items-center gap-1">
                   <Option className={cn(ICON_CLASS, 'stroke-3')} />
