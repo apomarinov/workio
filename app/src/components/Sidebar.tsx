@@ -55,7 +55,6 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
-import { CreateTerminalModal } from './CreateTerminalModal'
 import { LogsModal } from './LogsModal'
 import { InvolvedPRsList, OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
@@ -76,7 +75,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
   const pip = useDocumentPip()
   const { terminals, activeTerminal, selectTerminal, setTerminalOrder } =
     useTerminalContext()
-  const { clearSession, selectSession, sessions } = useSessionContext()
+  const { selectSession, sessions } = useSessionContext()
   const { allSessions: pipSessions } = usePinnedSessionsData()
   const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(
     'pip-layout',
@@ -86,7 +85,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
   const { hasWarning: hasWebhookWarning } = useWebhookWarning()
   const isMobile = useIsMobile()
   const { settings, updateSettings } = useSettings()
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [hiddenPRsModalRepo, setHiddenPRsModalRepo] = useState<string | null>(
     null,
   )
@@ -583,7 +581,9 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
             size="icon"
             className="h-7 w-7"
             title="New Project"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() =>
+              window.dispatchEvent(new Event('open-create-terminal'))
+            }
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -1045,15 +1045,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
           </>
         )}
       </div>
-
-      <CreateTerminalModal
-        open={showCreateModal}
-        onOpenChange={setShowCreateModal}
-        onCreated={(id) => {
-          selectTerminal(id)
-          clearSession()
-        }}
-      />
 
       <SettingsModal
         open={showSettingsModal}

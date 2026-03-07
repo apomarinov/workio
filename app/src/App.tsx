@@ -85,6 +85,13 @@ function AppContent() {
   const { clearSession } = useSessionContext()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
   const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  // Listen for open-create-terminal events (from sidebar + empty state)
+  useEffect(() => {
+    const handler = () => setCreateModalOpen(true)
+    window.addEventListener('open-create-terminal', handler)
+    return () => window.removeEventListener('open-create-terminal', handler)
+  }, [])
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
   const activeTerminalRef = useRef(activeTerminal)
@@ -792,16 +799,13 @@ function AppContent() {
             variant="outline"
             size="lg"
             className="gap-2 text-base"
-            onClick={() => setCreateModalOpen(true)}
+            onClick={() =>
+              window.dispatchEvent(new Event('open-create-terminal'))
+            }
           >
             <Plus className="w-5 h-5" />
             Create New Project
           </Button>
-          <CreateTerminalModal
-            open={createModalOpen}
-            onOpenChange={setCreateModalOpen}
-            onCreated={(id) => selectTerminal(id)}
-          />
         </div>
       ) : null}
       {terminals.map((t) => {
@@ -1058,6 +1062,14 @@ function AppContent() {
           onClose={() => setPrModalTarget(null)}
         />
       )}
+      <CreateTerminalModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onCreated={(id) => {
+          selectTerminal(id)
+          clearSession()
+        }}
+      />
       {commitDialogTarget && (
         <Suspense>
           <CommitDialog
