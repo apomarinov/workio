@@ -61,7 +61,10 @@ export function MessageBubble({ message, hideAvatars }: MessageBubbleProps) {
             <ClaudeIcon className="w-3.5 h-3.5 text-zinc-400" />
           </div>
         )}
-        <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-zinc-800/50 border border-zinc-700/50 rounded-bl-sm">
+        <div
+          className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-zinc-800/50 border border-zinc-700/50 rounded-bl-sm"
+          data-message-bubble
+        >
           <ToolCallDisplay tool={message.tools} />
         </div>
       </div>
@@ -88,6 +91,7 @@ export function MessageBubble({ message, hideAvatars }: MessageBubbleProps) {
             ? 'bg-blue-600 text-white rounded-br-sm whitespace-pre-wrap'
             : 'bg-zinc-800 text-zinc-100 rounded-bl-sm',
         )}
+        data-message-bubble
       >
         {hasImages && (
           <div className="flex flex-col gap-2 mb-2">

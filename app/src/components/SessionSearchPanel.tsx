@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { searchSessionMessages } from '@/lib/api'
 import {
@@ -48,6 +49,18 @@ export function SessionSearchPanel({
 
   const isMobile = useIsMobile()
   const showingChat = isMobile && selectedSessionId != null
+
+  useEdgeSwipe({
+    enabled: isMobile && open,
+    onSwipeRight: () => {
+      if (selectedSessionId != null) {
+        setSelectedSessionId(null)
+        setSelectedMessageId(null)
+      } else {
+        onOpenChange(false)
+      }
+    },
+  })
 
   const inputRef = useRef<HTMLInputElement>(null)
   const searchAbortRef = useRef<AbortController | null>(null)
@@ -372,7 +385,7 @@ export function SessionSearchPanel({
               <PanelRightOpen className="w-4 h-4" />
             </button>
           )}
-          <Search className="w-4 h-4 text-zinc-500 shrink-0" />
+          {!query && <Search className="w-4 h-4 text-zinc-500 shrink-0" />}
           {query && (
             <button
               type="button"
@@ -382,7 +395,7 @@ export function SessionSearchPanel({
               }}
               className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
             >
-              <CircleX className="w-3 h-3" />
+              <CircleX className="w-4 h-4" />
             </button>
           )}
           <input

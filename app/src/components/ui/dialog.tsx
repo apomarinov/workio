@@ -13,9 +13,9 @@ function Dialog({
       data-slot="dialog"
       onOpenChange={(open) => {
         onOpenChange?.(open)
-        if (!open) {
-          window.dispatchEvent(new Event('dialog-closed'))
-        }
+        window.dispatchEvent(
+          new Event(open ? 'dialog-opened' : 'dialog-closed'),
+        )
       }}
       {...props}
     />

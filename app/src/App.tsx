@@ -55,6 +55,7 @@ import { useNotifications } from './context/NotificationContext'
 import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
+import { useEdgeSwipe } from './hooks/useEdgeSwipe'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useIsMobile } from './hooks/useMediaQuery'
@@ -683,50 +684,15 @@ function AppContent() {
   // Edge swipe to open/close mobile sidebar
   const mobileSidebarOpenRef = useRef(mobileSidebarOpen)
   mobileSidebarOpenRef.current = mobileSidebarOpen
-  useEffect(() => {
-    if (!isMobile) return
-
-    const EDGE_ZONE = 30
-    const MIN_SWIPE = 50
-    const MAX_Y_DRIFT = 80
-
-    let startX = 0
-    let startY = 0
-    let tracking = false
-
-    const onTouchStart = (e: TouchEvent) => {
-      const t = e.touches[0]
-      const fromEdge = t.clientX < EDGE_ZONE
-      const sidebarOpen = mobileSidebarOpenRef.current
-      if (fromEdge || sidebarOpen) {
-        startX = t.clientX
-        startY = t.clientY
-        tracking = true
-      }
-    }
-
-    const onTouchEnd = (e: TouchEvent) => {
-      if (!tracking) return
-      tracking = false
-      const t = e.changedTouches[0]
-      const dx = t.clientX - startX
-      const dy = Math.abs(t.clientY - startY)
-      if (dy > MAX_Y_DRIFT) return
-
-      if (!mobileSidebarOpenRef.current && dx > MIN_SWIPE) {
-        setMobileSidebarOpen(true)
-      } else if (mobileSidebarOpenRef.current && dx < -MIN_SWIPE) {
-        setMobileSidebarOpen(false)
-      }
-    }
-
-    window.addEventListener('touchstart', onTouchStart, { passive: true })
-    window.addEventListener('touchend', onTouchEnd, { passive: true })
-    return () => {
-      window.removeEventListener('touchstart', onTouchStart)
-      window.removeEventListener('touchend', onTouchEnd)
-    }
-  }, [isMobile])
+  useEdgeSwipe({
+    enabled: isMobile,
+    onSwipeRight: () => {
+      if (!mobileSidebarOpenRef.current) setMobileSidebarOpen(true)
+    },
+    onSwipeLeft: () => {
+      if (mobileSidebarOpenRef.current) setMobileSidebarOpen(false)
+    },
+  })
 
   // Auto-close mobile sidebar when navigating to a terminal or session
   const prevActiveTerminalId = useRef(activeTerminal?.id)

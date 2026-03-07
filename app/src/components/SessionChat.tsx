@@ -160,14 +160,12 @@ export function SessionChat({
     const container = scrollContainerRef.current
     if (!container) return
 
+    const highlightClasses = ['ring-2', 'ring-amber-400/60']
+
     // Clear previous highlight immediately
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
     if (highlightedElRef.current) {
-      highlightedElRef.current.classList.remove(
-        'ring-2',
-        'ring-amber-400/60',
-        'rounded-lg',
-      )
+      highlightedElRef.current.classList.remove(...highlightClasses)
       highlightedElRef.current = null
     }
 
@@ -178,10 +176,12 @@ export function SessionChat({
       ) as HTMLElement | null
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('ring-2', 'ring-amber-400/60', 'rounded-lg')
-      highlightedElRef.current = el
+      const bubble = (el.querySelector('[data-message-bubble]') ??
+        el) as HTMLElement
+      bubble.classList.add(...highlightClasses)
+      highlightedElRef.current = bubble
       highlightTimerRef.current = setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-amber-400/60', 'rounded-lg')
+        bubble.classList.remove(...highlightClasses)
         highlightedElRef.current = null
       }, 2000)
     })
