@@ -74,7 +74,7 @@ import { DEFAULT_STATUS_BAR, type HookEvent, type ShellTemplate } from './types'
 function AppContent() {
   const {
     terminals,
-    markShellActive,
+    shouldMountShell,
     loading,
     activeTerminal,
     selectTerminal,
@@ -131,20 +131,6 @@ function AppContent() {
   } | null>(null)
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false)
   const [sessionSearchMounted, setSessionSearchMounted] = useState(false)
-
-  // Mark active shells so the context can track suspension timestamps
-  useEffect(() => {
-    for (const shellId of Object.values(activeShells)) {
-      markShellActive(shellId)
-    }
-    // Also refresh on interval to prevent the current shell from going stale
-    const id = setInterval(() => {
-      for (const shellId of Object.values(activeShellsRef.current)) {
-        markShellActive(shellId)
-      }
-    }, 60_000)
-    return () => clearInterval(id)
-  }, [activeShells, markShellActive])
 
   const handleCreateShell = async (terminalId: number) => {
     try {
@@ -867,7 +853,8 @@ function AppContent() {
             )}
             <div className="relative flex-1 min-h-0">
               {t.shells.map((shell) => {
-                if (shell.isSuspended && shell.id !== activeShellId) return null
+                if (!shouldMountShell(shell.id, shell.id === activeShellId))
+                  return null
                 return (
                   <Terminal
                     key={shell.id}

@@ -19,6 +19,7 @@ function persist(map: Record<number, number>) {
 export function useActiveShells(
   terminals: Terminal[],
   activeTerminalId: number | null,
+  markInactive?: (shellId: number) => void,
 ) {
   const [raw, setRaw] = useState<Record<number, number>>(loadStored)
 
@@ -31,6 +32,10 @@ export function useActiveShells(
   const setShell = (terminalId: number, shellId: number) => {
     explicitSelectRef.current = { terminalId, shellId }
     setRaw((prev) => {
+      const prevShellId = prev[terminalId]
+      if (prevShellId && prevShellId !== shellId) {
+        markInactive?.(prevShellId)
+      }
       const next = { ...prev, [terminalId]: shellId }
       persist(next)
       return next
@@ -58,10 +63,13 @@ export function useActiveShells(
     const prevTid = prevActiveTerminalIdRef.current
     const newTid = activeTerminalId
 
-    // Save outgoing terminal's active shell
+    // Save outgoing terminal's active shell and mark it inactive
     if (prevTid !== null && prevTid !== newTid) {
       const shellId = activeShellsRef.current[prevTid]
-      if (shellId) previousShellPerTerminal.current[prevTid] = shellId
+      if (shellId) {
+        previousShellPerTerminal.current[prevTid] = shellId
+        markInactive?.(shellId)
+      }
     }
 
     // Restore incoming terminal's previous shell (unless user explicitly selected one)

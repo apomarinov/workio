@@ -22,6 +22,7 @@ import type {
 } from '../../shared/types'
 import { useActiveShells } from '../hooks/useActiveShells'
 import { useSettings } from '../hooks/useSettings'
+import { useShellLastActive } from '../hooks/useShellLastActive'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
 import type { Notification, Settings, Shell, Terminal } from '../types'
@@ -29,7 +30,7 @@ import { useNotifications } from './NotificationContext'
 
 interface TerminalContextValue {
   terminals: Terminal[]
-  markShellActive: (shellId: number) => void
+  shouldMountShell: (shellId: number, isActive: boolean) => boolean
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
@@ -136,51 +137,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     return ordered
   }, [raw, terminalOrder])
 
-  // Shell suspension: track last-active timestamps and periodically re-evaluate
-  const shellLastActiveRef = useRef<Record<number, number>>({})
-  const [suspendTick, setSuspendTick] = useState(0)
-
-  useEffect(() => {
-    const id = setInterval(() => setSuspendTick((t) => t + 1), 60_000)
-    return () => clearInterval(id)
-  }, [])
-
-  const markShellActive = useCallback((shellId: number) => {
-    shellLastActiveRef.current[shellId] = Date.now()
-  }, [])
-
-  // Initialize timestamps for newly appeared shells
-  useEffect(() => {
-    for (const t of terminals) {
-      for (const s of t.shells) {
-        shellLastActiveRef.current[s.id] ??= Date.now()
-      }
-    }
-  }, [terminals])
-
-  const SUSPEND_AFTER = 10 * 60 * 1000
-  const SUSPEND_ENABLED = false // TODO: enable shell suspension
-  const prevSuspendedRef = useRef<Record<number, boolean>>({})
-  const enrichedTerminals = useMemo(() => {
-    if (!SUSPEND_ENABLED) return terminals
-    const now = Date.now()
-    const result = terminals.map((t) => ({
-      ...t,
-      shells: t.shells.map((s) => {
-        const isSuspended =
-          now - (shellLastActiveRef.current[s.id] ?? now) > SUSPEND_AFTER
-        const wasSuspended = prevSuspendedRef.current[s.id] ?? false
-        if (isSuspended && !wasSuspended) {
-          console.log(`[shell-suspend] shell ${s.id} "${s.name}" suspended`)
-        } else if (!isSuspended && wasSuspended) {
-          console.log(`[shell-suspend] shell ${s.id} "${s.name}" reactivated`)
-        }
-        prevSuspendedRef.current[s.id] = isSuspended
-        return { ...s, isSuspended }
-      }),
-    }))
-    return result
-  }, [terminals, suspendTick])
+  // Shell mount tracking: only mount recently-active shells
+  const { markInactive, shouldMount: shouldMountShell } =
+    useShellLastActive(terminals)
 
   const storedTerminalId = useRef<number | null>(
     (() => {
@@ -1030,8 +989,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   // Multi-shell state — moved here so all consumers can access via context
   const { activeShells, activeShellsRef, setShell } = useActiveShells(
-    enrichedTerminals,
+    terminals,
     activeTerminalId,
+    markInactive,
   )
 
   const createTerminal = useCallback(
@@ -1114,8 +1074,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      terminals: enrichedTerminals,
-      markShellActive,
+      terminals,
+      shouldMountShell,
       loading: isLoading,
       activeTerminal,
       selectTerminal,
@@ -1152,8 +1112,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       setShell,
     }),
     [
-      enrichedTerminals,
-      markShellActive,
+      terminals,
+      shouldMountShell,
       isLoading,
       activeTerminal,
       selectTerminal,

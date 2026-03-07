@@ -19,7 +19,6 @@ export interface Shell {
   name: string
   active_cmd: string | null
   created_at: string
-  isSuspended?: boolean
 }
 
 export interface Terminal {
