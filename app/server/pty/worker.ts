@@ -16,7 +16,8 @@ import { createOscParser } from './osc-parser'
 import { getChildPids } from './process-tree'
 
 const MAX_BUFFER_LINES = 5000
-const BELL_DEBOUNCE_MS = 10_000
+// Monotonic counter for buffer chunks — used to ID bell events
+let chunkIndex = 0
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ let backend: TerminalBackend | null = null
 let buffer: string[] = []
 let pendingCommand: string | null = null
 let onDoneMarker: ((exitCode: number) => void) | null = null
-let lastBellTime = 0
+const seenBells = new Set<number>()
 let shellId = 0
 let terminalId = 0
 
@@ -80,6 +81,7 @@ async function init(config: WorkerInitConfig) {
   // Create OSC parser
   const oscParser = createOscParser(
     (data) => {
+      chunkIndex++
       buffer.push(data)
       if (buffer.length > MAX_BUFFER_LINES) {
         buffer = buffer.slice(-MAX_BUFFER_LINES)
@@ -122,11 +124,17 @@ async function init(config: WorkerInitConfig) {
           break
       }
     },
-    // Bell callback with debounce
+    // Bell callback — ID by buffer chunk position
     () => {
-      const now = Date.now()
-      if (now - lastBellTime < BELL_DEBOUNCE_MS) return
-      lastBellTime = now
+      const pos = chunkIndex
+      if (seenBells.has(pos)) return
+      seenBells.add(pos)
+      // Cap the set size to avoid unbounded growth
+      if (seenBells.size > 1000) {
+        const entries = [...seenBells]
+        for (let i = 0; i < 500; i++) seenBells.delete(entries[i])
+      }
+      workerLog('info', `[bell] shell=${shellId} chunk=${pos}`)
       send({ type: 'bell', shellId, terminalId })
     },
   )
