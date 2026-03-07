@@ -157,7 +157,8 @@ export function createOscParser(
     }
 
     // Detect bare bell characters (not part of OSC terminators)
-    if (onBell && data.includes(BEL)) {
+    const bellEnabled = false
+    if (bellEnabled && onBell && data.includes(BEL)) {
       // Strip OSC sequences that use BEL as terminator (e.g. ESC ] 0 ; title BEL)
       const stripped = data.replace(oscBelRegex, '')
       if (stripped.includes(BEL)) {

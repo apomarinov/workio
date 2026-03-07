@@ -33,6 +33,7 @@ A developer dashboard that brings together your projects, terminals, Claude AI s
 - Resume sessions in specific shells
 - Move sessions between projects
 - Pin sessions in an always-on-top Picture-in-Picture window
+- `claude-skill` - add to your global Claude skills for additional functionality
 
 ### GitHub PRs
 - PR updates via `gh` CLI polling or real-time repo webhooks (ngrok)
