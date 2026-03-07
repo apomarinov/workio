@@ -4,7 +4,6 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   GitBranch,
   Globe,
   MoreVertical,

@@ -3,10 +3,12 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowRightToLine,
   ArrowUp,
   ChevronUp,
   Command,
   CornerDownLeft,
+  Delete,
   MouseLeft,
   Option,
   RotateCcw,
@@ -610,7 +612,12 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               defaultBinding={DEFAULT_KEYMAP.shellTemplates}
               display={formatBinding(bindings.shellTemplates)}
             />
-            <InfoShortcutRow label="Focus active shell" display="TAB" />
+            <InfoShortcutRow
+              label="Focus active shell"
+              display={
+                <ArrowRightToLine className={cn(ICON_CLASS, 'stroke-3')} />
+              }
+            />
             <InfoShortcutRow
               label="Open file in IDE"
               display={<MouseLeft className={ICON_CLASS} />}
@@ -621,6 +628,50 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
                 <span className="inline-flex items-center gap-1">
                   <Command className={cn(ICON_CLASS, 'stroke-3')} />
                   <MouseLeft className={ICON_CLASS} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Jump line boundary"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <div className="flex items-center ml-1">
+                    <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
+                    <span>/</span>
+                    <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
+                  </div>
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Jump word boundary"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Option className={cn(ICON_CLASS, 'stroke-3')} />
+                  <div className="flex items-center ml-1">
+                    <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
+                    <span>/</span>
+                    <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
+                  </div>
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Delete word"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Option className={cn(ICON_CLASS, 'stroke-3')} />
+                  <Delete className={cn(ICON_CLASS, 'stroke-3')} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Delete line"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <Delete className={cn(ICON_CLASS, 'stroke-3')} />
                 </span>
               }
             />

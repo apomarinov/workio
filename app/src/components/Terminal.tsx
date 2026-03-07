@@ -894,6 +894,26 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
         return false
       }
 
+      // Cmd+Arrow line jumping (macOS) — send Ctrl-A / Ctrl-E (Home / End)
+      // Cmd+Backspace — send Ctrl-U (kill line before cursor)
+      if (event.metaKey) {
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault()
+          sendInputRef.current('\x01')
+          return false
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault()
+          sendInputRef.current('\x05')
+          return false
+        }
+        if (event.key === 'Backspace') {
+          event.preventDefault()
+          sendInputRef.current('\x15')
+          return false
+        }
+      }
+
       // Option+Arrow word jumping (macOS) — send Meta-b / Meta-f / ESC-backspace
       if (event.altKey) {
         if (event.key === 'ArrowLeft') {
