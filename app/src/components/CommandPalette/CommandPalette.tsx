@@ -46,9 +46,6 @@ import type {
   Terminal,
 } from '../../types'
 
-const CommitDialog = lazy(() =>
-  import('../CommitDialog').then((m) => ({ default: m.CommitDialog })),
-)
 const CreatePRDialog = lazy(() =>
   import('../dialogs/CreatePRDialog').then((m) => ({
     default: m.CreatePRDialog,
@@ -119,7 +116,6 @@ export function CommandPalette() {
   const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
     null,
   )
-  const [commitTerminalId, setCommitTerminalId] = useState<number | null>(null)
   const [editPRTarget, setEditPRTarget] = useState<PRCheckStatus | null>(null)
   const [renameBranchTarget, setRenameBranchTarget] = useState<{
     terminalId: number
@@ -134,10 +130,6 @@ export function CommandPalette() {
   const [createPRTarget, setCreatePRTarget] = useState<{
     terminal: Terminal
     branches: BranchesResponse
-  } | null>(null)
-  const [diffViewerTarget, setDiffViewerTarget] = useState<{
-    pr: PRCheckStatus
-    terminalId: number
   } | null>(null)
   const [runConfirm, setRunConfirm] = useState<{
     terminalId: number
@@ -1075,7 +1067,15 @@ export function CommandPalette() {
       },
       requestCommit: (terminalId) => {
         closePalette()
-        setTimeout(() => setCommitTerminalId(terminalId), 150)
+        setTimeout(
+          () =>
+            window.dispatchEvent(
+              new CustomEvent('open-commit-dialog', {
+                detail: { terminalId },
+              }),
+            ),
+          150,
+        )
       },
       requestCreateBranch: (terminalId, branch) => {
         closePalette()
@@ -1100,7 +1100,15 @@ export function CommandPalette() {
       },
       openDiffViewer: (pr, terminalId) => {
         closePalette()
-        setTimeout(() => setDiffViewerTarget({ pr, terminalId }), 150)
+        setTimeout(
+          () =>
+            window.dispatchEvent(
+              new CustomEvent('open-commit-dialog', {
+                detail: { terminalId, pr },
+              }),
+            ),
+          150,
+        )
       },
       openMergeModal: (pr) => {
         setMergeModal(pr)
@@ -1636,23 +1644,6 @@ export function CommandPalette() {
           pr={rerunAllModal}
           onClose={() => setRerunAllModal(null)}
           onSuccess={closePalette}
-        />
-      )}
-
-      {commitTerminalId != null && (
-        <CommitDialog
-          open={commitTerminalId != null}
-          terminalId={commitTerminalId}
-          onClose={() => setCommitTerminalId(null)}
-        />
-      )}
-
-      {diffViewerTarget && (
-        <CommitDialog
-          open={!!diffViewerTarget}
-          terminalId={diffViewerTarget.terminalId}
-          pr={diffViewerTarget.pr}
-          onClose={() => setDiffViewerTarget(null)}
         />
       )}
 

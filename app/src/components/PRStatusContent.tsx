@@ -17,12 +17,6 @@ import {
 import { memo, useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Popover,
   PopoverClose,
   PopoverContent,
@@ -175,6 +169,7 @@ interface PRStatusContentProps {
   onToggle?: () => void
   hasNewActivity?: boolean
   unreadItemIds?: Set<string>
+  fullDiscussion?: boolean
 }
 
 const ReviewRow = memo(function ReviewRow({
@@ -1022,174 +1017,12 @@ function CollapsedAuthorGroup({
   )
 }
 
-function FullDiscussionDialog({
-  groupedDiscussion,
-  pr,
-  onReply,
-  onHide,
-  onReact,
-  onEdit,
-  onReReview,
-  onMerge,
-  onClose,
-}: {
-  groupedDiscussion: DisplayItem[]
-  pr: PRCheckStatus
-  onReply: (
-    author: string,
-    reviewCommentId?: number,
-    quotedBody?: string,
-  ) => void
-  onHide: (author: string) => void
-  onReact?: (
-    subjectId: number,
-    subjectType: 'issue_comment' | 'review_comment' | 'review',
-    content: string,
-    remove?: boolean,
-  ) => void
-  onEdit?: (
-    commentId: number,
-    type: 'issue_comment' | 'review_comment' | 'review',
-    currentBody: string,
-  ) => void
-  onReReview: (author: string) => void
-  onMerge: () => void
-  onClose: () => void
-}) {
-  const [open, setOpen] = useState(true)
-  const { markNotificationReadByItem } = useTerminalContext()
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value) {
-      setOpen(false)
-      setTimeout(onClose, 300)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Discussion</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-0.5 min-w-0">
-          {groupedDiscussion.map((item, i) => {
-            switch (item.type) {
-              case 'collapsed-group':
-                return (
-                  <CollapsedAuthorGroup
-                    key={`collapsed-${item.author}-${i}`}
-                    group={item}
-                    prUrl={pr.prUrl}
-                    onReply={onReply}
-                    onHide={onHide}
-                    onReact={onReact}
-                    onEdit={onEdit}
-                  />
-                )
-              case 'review':
-                return (
-                  <div key={`review-${item.review.id || i}`}>
-                    <ReviewRow
-                      review={item.review}
-                      icon={getReviewIcon(item.review.state)}
-                      prUrl={pr.prUrl}
-                      showReReview={item.review.state === 'CHANGES_REQUESTED'}
-                      isApproved={item.review.state === 'APPROVED'}
-                      hasConflicts={pr.hasConflicts}
-                      onReReview={onReReview}
-                      onMerge={
-                        item.review.state === 'APPROVED' ? onMerge : undefined
-                      }
-                      onReply={onReply}
-                      onReact={onReact}
-                      onEdit={onEdit}
-                      onMarkRead={
-                        item.review.isUnread && item.review.id
-                          ? () =>
-                              markNotificationReadByItem(
-                                pr.repo,
-                                pr.prNumber,
-                                undefined,
-                                item.review.id,
-                              )
-                          : undefined
-                      }
-                    />
-                    {item.threads.map((thread, ti) => (
-                      <div
-                        key={`thread-${thread.comments[0]?.id || ti}`}
-                        className="ml-2 border-l border-sidebar-border pl-2"
-                      >
-                        <ReviewThreadGroup
-                          thread={thread}
-                          prUrl={pr.prUrl}
-                          pr={pr}
-                          onHide={onHide}
-                          onReply={onReply}
-                          onReact={onReact}
-                          onEdit={onEdit}
-                          defaultExpanded
-                          largeText
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )
-              case 'comment':
-                return (
-                  <CommentItem
-                    key={`comment-${item.comment.id || i}`}
-                    comment={item.comment}
-                    prUrl={pr.prUrl}
-                    onHide={onHide}
-                    onReply={onReply}
-                    onReact={onReact}
-                    onEdit={onEdit}
-                    onMarkRead={
-                      item.comment.isUnread && item.comment.id
-                        ? () =>
-                            markNotificationReadByItem(
-                              pr.repo,
-                              pr.prNumber,
-                              item.comment.id,
-                            )
-                        : undefined
-                    }
-                    defaultExpanded
-                    largeText
-                  />
-                )
-              case 'thread':
-                return (
-                  <ReviewThreadGroup
-                    key={`standalone-${item.thread.comments[0]?.id || i}`}
-                    thread={item.thread}
-                    prUrl={pr.prUrl}
-                    pr={pr}
-                    onHide={onHide}
-                    onReply={onReply}
-                    onReact={onReact}
-                    onEdit={onEdit}
-                    defaultExpanded
-                    largeText
-                  />
-                )
-              default:
-                return null
-            }
-          })}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function DiscussionTimeline({
   discussion,
   pr,
   hiddenAuthorsSet,
   collapsedAuthorsSet,
+  fullDiscussion,
   onReReview,
   onMerge,
   onReply,
@@ -1201,6 +1034,7 @@ function DiscussionTimeline({
   pr: PRCheckStatus
   hiddenAuthorsSet: Set<string>
   collapsedAuthorsSet: Set<string>
+  fullDiscussion?: boolean
   onReReview: (author: string) => void
   onMerge: () => void
   onReply: (
@@ -1222,7 +1056,6 @@ function DiscussionTimeline({
   ) => void
 }) {
   const [visibleCount, setVisibleCount] = useState(5)
-  const [fullViewOpen, setFullViewOpen] = useState(false)
   const [discussionOpen, setDiscussionOpen] = useState(true)
   const { markPRNotificationsRead, markNotificationReadByItem } =
     useTerminalContext()
@@ -1286,10 +1119,13 @@ function DiscussionTimeline({
   }, [processedDiscussion, collapsedAuthorsSet])
 
   const visibleDiscussion = useMemo(
-    () => groupedDiscussion.slice(0, visibleCount),
-    [groupedDiscussion, visibleCount],
+    () =>
+      fullDiscussion
+        ? groupedDiscussion
+        : groupedDiscussion.slice(0, visibleCount),
+    [groupedDiscussion, visibleCount, fullDiscussion],
   )
-  const hasMore = visibleCount < groupedDiscussion.length
+  const hasMore = !fullDiscussion && visibleCount < groupedDiscussion.length
 
   if (groupedDiscussion.length === 0) return null
 
@@ -1338,29 +1174,24 @@ function DiscussionTimeline({
               </SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5 p-0.5 text-muted-foreground hover:text-white"
-            onClick={() => setFullViewOpen(true)}
-          >
-            <Maximize2 className="max-h-3 max-w-3" />
-          </Button>
+          {!fullDiscussion && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 p-0.5 text-muted-foreground hover:text-white"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent('open-pr-modal', {
+                    detail: { prNumber: pr.prNumber, repo: pr.repo },
+                  }),
+                )
+              }
+            >
+              <Maximize2 className="max-h-3 max-w-3" />
+            </Button>
+          )}
         </div>
       </div>
-      {fullViewOpen && (
-        <FullDiscussionDialog
-          groupedDiscussion={groupedDiscussion}
-          pr={pr}
-          onReply={onReply}
-          onHide={onHide}
-          onReact={onReact}
-          onEdit={onEdit}
-          onReReview={onReReview}
-          onMerge={onMerge}
-          onClose={() => setFullViewOpen(false)}
-        />
-      )}
       {discussionOpen && (
         <>
           {visibleDiscussion.map((item, i) => {
@@ -1419,6 +1250,8 @@ function DiscussionTimeline({
                           onReply={onReply}
                           onReact={onReact}
                           onEdit={onEdit}
+                          defaultExpanded={fullDiscussion}
+                          largeText={fullDiscussion}
                         />
                       </div>
                     ))}
@@ -1444,6 +1277,8 @@ function DiscussionTimeline({
                             )
                         : undefined
                     }
+                    defaultExpanded={fullDiscussion}
+                    largeText={fullDiscussion}
                   />
                 )
               case 'thread':
@@ -1457,6 +1292,8 @@ function DiscussionTimeline({
                     onReply={onReply}
                     onReact={onReact}
                     onEdit={onEdit}
+                    defaultExpanded={fullDiscussion}
+                    largeText={fullDiscussion}
                   />
                 )
               default:
@@ -1482,6 +1319,7 @@ export function PRStatusContent({
   pr,
   expanded: expandedProp,
   onToggle,
+  fullDiscussion,
 }: PRStatusContentProps) {
   const hasHeader = onToggle !== undefined
   const expanded = hasHeader ? (expandedProp ?? false) : true
@@ -1826,6 +1664,7 @@ export function PRStatusContent({
             pr={pr}
             hiddenAuthorsSet={hiddenAuthorsSet}
             collapsedAuthorsSet={collapsedAuthorsSet}
+            fullDiscussion={fullDiscussion}
             onReReview={handleReReview}
             onMerge={() => setMergeOpen(true)}
             onReply={handleReply}

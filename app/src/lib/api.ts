@@ -180,7 +180,10 @@ export async function openInExplorer(
       ...(terminalId != null && { terminal_id: terminalId }),
     }),
   })
-  if (!res.ok) throw new Error('Failed to open file explorer')
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error ?? 'Failed to open file explorer')
+  }
 }
 
 export interface DirEntry {

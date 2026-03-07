@@ -428,6 +428,13 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       const targetPath = expandPath(resolvedPath)
+
+      if (!fs.existsSync(targetPath)) {
+        return reply
+          .status(404)
+          .send({ error: `File not found: ${targetPath}` })
+      }
+
       const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
       // Use -R on macOS to reveal files in Finder instead of opening them
       const args =

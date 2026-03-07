@@ -19,6 +19,7 @@ import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
+import { PRModal } from './components/PRModal'
 import { ShellTabs } from './components/ShellTabs'
 import { Sidebar } from './components/Sidebar'
 
@@ -34,8 +35,14 @@ const BranchCommitsDialog = lazy(() =>
     default: m.BranchCommitsDialog,
   })),
 )
+const CommitDialog = lazy(() =>
+  import('./components/CommitDialog').then((m) => ({
+    default: m.CommitDialog,
+  })),
+)
 
 import { resolveNotification } from '../shared/notifications'
+import type { PRCheckStatus } from '../shared/types'
 import { MobileKeyboard } from './components/MobileKeyboard'
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
@@ -101,6 +108,14 @@ function AppContent() {
   const [branchCommitsTarget, setBranchCommitsTarget] = useState<{
     terminalId: number
     branch: string
+  } | null>(null)
+  const [prModalTarget, setPrModalTarget] = useState<{
+    prNumber: number
+    repo: string
+  } | null>(null)
+  const [commitDialogTarget, setCommitDialogTarget] = useState<{
+    terminalId: number
+    pr?: PRCheckStatus
   } | null>(null)
 
   // Mark active shells so the context can track suspension timestamps
@@ -268,6 +283,28 @@ function AppContent() {
         'open-branch-commits',
         handler as EventListener,
       )
+  }, [])
+
+  // Listen for open-pr-modal events (from status bar + sidebar expand)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ prNumber: number; repo: string }>) => {
+      setPrModalTarget(e.detail)
+    }
+    window.addEventListener('open-pr-modal', handler as EventListener)
+    return () =>
+      window.removeEventListener('open-pr-modal', handler as EventListener)
+  }, [])
+
+  // Listen for open-commit-dialog events (status bar, sidebar, command palette)
+  useEffect(() => {
+    const handler = (
+      e: CustomEvent<{ terminalId: number; pr?: PRCheckStatus }>,
+    ) => {
+      setCommitDialogTarget(e.detail)
+    }
+    window.addEventListener('open-commit-dialog', handler as EventListener)
+    return () =>
+      window.removeEventListener('open-commit-dialog', handler as EventListener)
   }, [])
 
   // Shell event listeners (dispatched from TerminalItem sidebar)
@@ -1011,6 +1048,23 @@ function AppContent() {
             terminalId={branchCommitsTarget.terminalId}
             branch={branchCommitsTarget.branch}
             onClose={() => setBranchCommitsTarget(null)}
+          />
+        </Suspense>
+      )}
+      {prModalTarget && (
+        <PRModal
+          prNumber={prModalTarget.prNumber}
+          repo={prModalTarget.repo}
+          onClose={() => setPrModalTarget(null)}
+        />
+      )}
+      {commitDialogTarget && (
+        <Suspense>
+          <CommitDialog
+            open
+            terminalId={commitDialogTarget.terminalId}
+            pr={commitDialogTarget.pr}
+            onClose={() => setCommitDialogTarget(null)}
           />
         </Suspense>
       )}

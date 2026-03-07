@@ -22,14 +22,8 @@ import {
   Globe,
   MoreVertical,
 } from 'lucide-react'
-import { lazy, Suspense, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   Popover,
   PopoverContent,
@@ -52,16 +46,11 @@ import {
   type StatusBarSection,
   type StatusBarSectionName,
 } from '../types'
-import { PRStatusContent } from './PRStatusContent'
 import {
   GitDirtyBadge,
   PortsList,
   ProcessesList,
 } from './terminal-status-sections'
-
-const CommitDialog = lazy(() =>
-  import('./CommitDialog').then((m) => ({ default: m.CommitDialog })),
-)
 
 interface StatusBarProps {
   position: 'top' | 'bottom'
@@ -124,71 +113,53 @@ function PRSection({
   section: StatusBarSection
   pr: NonNullable<ReturnType<typeof useTerminalContext>['githubPRs'][number]>
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false)
   const overflowRef = useOverflowDetector<HTMLSpanElement>()
   const prInfo = getPRStatusInfo(pr)
   const isMobile = useIsMobile()
 
+  const openModal = () =>
+    window.dispatchEvent(
+      new CustomEvent('open-pr-modal', {
+        detail: { prNumber: pr.prNumber, repo: pr.repo },
+      }),
+    )
+
   return (
-    <>
-      <SortableStatusSection
-        section={section}
-        onClick={() => setDialogOpen(true)}
-        className="group/pr relative"
-      >
-        {prInfo.icon({ cls: 'w-3 h-3' })}
-        <span ref={overflowRef} className="truncate-fade max-w-[250px]">
-          {pr.prTitle}
-        </span>
-        {pr.hasUnreadNotifications && (
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-        )}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            window.dispatchEvent(
-              new CustomEvent('open-item-actions', {
-                detail: {
-                  terminalId: null,
-                  sessionId: null,
-                  prNumber: pr.prNumber,
-                  prRepo: pr.repo,
-                },
-              }),
-            )
-          }}
-          className={cn(
-            'absolute right-0 inset-y-0 items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-r',
-            !isMobile && 'hidden group-hover/pr:flex',
-          )}
-        >
-          <MoreVertical className="w-3.5 h-3.5" />
-        </button>
-      </SortableStatusSection>
-      {dialogOpen && (
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-3xl max-w-[95vw] max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 min-w-0">
-                <span className="flex-shrink-0">
-                  {prInfo.icon({ cls: 'w-4 h-4' })}
-                </span>
-                <span className="break-all">{pr.prTitle}</span>
-                <span className="text-muted-foreground text-sm font-normal">
-                  #{pr.prNumber}
-                </span>
-              </DialogTitle>
-            </DialogHeader>
-            <PRStatusContent
-              pr={pr}
-              expanded={true}
-              hasNewActivity={pr.hasUnreadNotifications}
-            />
-          </DialogContent>
-        </Dialog>
+    <SortableStatusSection
+      section={section}
+      onClick={openModal}
+      className="group/pr relative"
+    >
+      {prInfo.icon({ cls: 'w-3 h-3' })}
+      <span ref={overflowRef} className="truncate-fade max-w-[250px]">
+        {pr.prTitle}
+      </span>
+      {pr.hasUnreadNotifications && (
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
       )}
-    </>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          window.dispatchEvent(
+            new CustomEvent('open-item-actions', {
+              detail: {
+                terminalId: null,
+                sessionId: null,
+                prNumber: pr.prNumber,
+                prRepo: pr.repo,
+              },
+            }),
+          )
+        }}
+        className={cn(
+          'absolute right-0 inset-y-0 items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-r',
+          !isMobile && 'hidden group-hover/pr:flex',
+        )}
+      >
+        <MoreVertical className="w-3.5 h-3.5" />
+      </button>
+    </SortableStatusSection>
   )
 }
 
@@ -276,31 +247,24 @@ function GitDirtySection({
   diffStat: { added: number; removed: number; untracked: number }
   terminalId: number
 }) {
-  const [commitOpen, setCommitOpen] = useState(false)
-
   return (
-    <>
-      <SortableStatusSection
-        section={section}
-        onClick={() => setCommitOpen(true)}
-      >
-        <GitDirtyBadge
-          added={diffStat.added}
-          removed={diffStat.removed}
-          untracked={diffStat.untracked}
-          className="text-[11px]"
-        />
-      </SortableStatusSection>
-      {commitOpen && (
-        <Suspense>
-          <CommitDialog
-            open={commitOpen}
-            terminalId={terminalId}
-            onClose={() => setCommitOpen(false)}
-          />
-        </Suspense>
-      )}
-    </>
+    <SortableStatusSection
+      section={section}
+      onClick={() =>
+        window.dispatchEvent(
+          new CustomEvent('open-commit-dialog', {
+            detail: { terminalId },
+          }),
+        )
+      }
+    >
+      <GitDirtyBadge
+        added={diffStat.added}
+        removed={diffStat.removed}
+        untracked={diffStat.untracked}
+        className="text-[11px]"
+      />
+    </SortableStatusSection>
   )
 }
 

@@ -10,15 +10,7 @@ import {
   MoreVertical,
   Pin,
 } from 'lucide-react'
-import {
-  lazy,
-  memo,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import {
@@ -48,10 +40,6 @@ import {
   PortsList,
   ProcessesList,
 } from './terminal-status-sections'
-
-const CommitDialog = lazy(() =>
-  import('./CommitDialog').then((m) => ({ default: m.CommitDialog })),
-)
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -112,7 +100,6 @@ export const TerminalItem = memo(function TerminalItem({
   const isDirty =
     !!diffStat &&
     (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
-  const [commitOpen, setCommitOpen] = useState(false)
   const remoteSyncStat = gitRemoteSyncStatus[terminal.id]
   const showRemoteSync =
     !!remoteSyncStat &&
@@ -501,7 +488,11 @@ export const TerminalItem = memo(function TerminalItem({
                         )}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setCommitOpen(true)
+                          window.dispatchEvent(
+                            new CustomEvent('open-commit-dialog', {
+                              detail: { terminalId: terminal.id },
+                            }),
+                          )
                         }}
                       >
                         <GitDirtyBadge
@@ -670,15 +661,6 @@ export const TerminalItem = memo(function TerminalItem({
             )}
           </div>
         )}
-      {commitOpen && (
-        <Suspense>
-          <CommitDialog
-            open={commitOpen}
-            terminalId={terminal.id}
-            onClose={() => setCommitOpen(false)}
-          />
-        </Suspense>
-      )}
     </div>
   )
 })
