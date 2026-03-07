@@ -416,7 +416,14 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
 
-    const webLinksAddon = new WebLinksAddon()
+    const webLinksAddon = new WebLinksAddon((event, uri) => {
+      if (event.altKey) {
+        navigator.clipboard.writeText(uri)
+        toast.success('Copied URL to clipboard')
+      } else {
+        window.open(uri, '_blank')
+      }
+    })
     terminal.loadAddon(webLinksAddon)
 
     const searchAddon = new SearchAddon()
@@ -814,7 +821,10 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
             },
             text: filePath,
             activate: (event, linkText) => {
-              if (event instanceof MouseEvent && event.metaKey) {
+              if (event instanceof MouseEvent && event.altKey) {
+                navigator.clipboard.writeText(linkText)
+                toast.success('Copied path to clipboard')
+              } else if (event instanceof MouseEvent && event.metaKey) {
                 openInExplorer(linkText, terminalIdRef.current).catch((err) => {
                   toast.error(
                     err instanceof Error

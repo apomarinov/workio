@@ -632,6 +632,15 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               }
             />
             <InfoShortcutRow
+              label="Copy filepath/URL"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Option className={cn(ICON_CLASS, 'stroke-3')} />
+                  <MouseLeft className={ICON_CLASS} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
               label="Jump line boundary"
               display={
                 <span className="inline-flex items-center gap-1">
