@@ -1,6 +1,16 @@
-import { GitBranch, Loader2, MoreVertical, Search, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  CircleX,
+  GitBranch,
+  Loader2,
+  MoreVertical,
+  PanelRightOpen,
+  Search,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { searchSessionMessages } from '@/lib/api'
 import {
   contextExcerpt,
@@ -35,6 +45,9 @@ export function SessionSearchPanel({
     null,
   )
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+
+  const isMobile = useIsMobile()
+  const showingChat = isMobile && selectedSessionId != null
 
   const inputRef = useRef<HTMLInputElement>(null)
   const searchAbortRef = useRef<AbortController | null>(null)
@@ -172,6 +185,150 @@ export function SessionSearchPanel({
     return () => window.removeEventListener('keydown', handler, true)
   }, [open, query, onDismiss, navItems.length, highlightedIndex])
 
+  const resultsContent = loading ? (
+    <div className="flex items-center justify-center py-8">
+      <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+    </div>
+  ) : results.length === 0 ? (
+    <div className="px-4 py-8 text-sm text-zinc-500 text-center">
+      {query.length < 2
+        ? 'Type to search across all sessions'
+        : 'No matching sessions found'}
+    </div>
+  ) : (
+    <div className="py-1">
+      {(() => {
+        let navIndex = 0
+        return sorted.map((match) => {
+          const sessionTitle = match.name ?? match.session_id.slice(0, 12)
+          const isSessionSelected = selectedSessionId === match.session_id
+          const sessionNavIndex = navIndex++
+          return (
+            <div key={match.session_id} className="mb-1">
+              <button
+                type="button"
+                data-nav-index={sessionNavIndex}
+                onClick={() =>
+                  selectItem({
+                    type: 'session',
+                    sessionId: match.session_id,
+                  })
+                }
+                className={cn(
+                  'w-full text-left px-3 py-1.5 cursor-pointer transition-colors',
+                  highlightedIndex === sessionNavIndex
+                    ? 'bg-zinc-800'
+                    : isSessionSelected && !selectedMessageId
+                      ? 'bg-zinc-800/70'
+                      : 'hover:bg-zinc-800/50',
+                )}
+              >
+                <div className="flex items-center gap-1.5">
+                  <SessionSearchIcon status={match.status} />
+                  <span className="text-xs font-medium text-zinc-200 break-all">
+                    {sessionTitle}
+                  </span>
+                </div>
+                {match.terminal_name && (
+                  <div className="mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
+                    {match.terminal_name}
+                  </div>
+                )}
+                {match.data?.branch && (
+                  <div className="flex items-center gap-0.5 mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
+                    <GitBranch className="w-2.5 h-2.5 shrink-0" />
+                    {match.data.branch}
+                  </div>
+                )}
+              </button>
+              {match.messages.map((msg) => {
+                const prefix = msg.is_user ? 'User: ' : 'Claude: '
+                const excerpt = contextExcerpt(msg.body, query)
+                const isSelected =
+                  isSessionSelected && selectedMessageId === msg.id
+                const msgNavIndex = navIndex++
+                return (
+                  <button
+                    key={`${match.session_id}:${msg.id}`}
+                    type="button"
+                    data-nav-index={msgNavIndex}
+                    onClick={() =>
+                      selectItem({
+                        type: 'message',
+                        sessionId: match.session_id,
+                        messageId: msg.id,
+                      })
+                    }
+                    className={cn(
+                      'w-full text-left px-4 py-1.5 text-xs cursor-pointer transition-colors',
+                      highlightedIndex === msgNavIndex
+                        ? 'bg-zinc-800 text-zinc-200'
+                        : isSelected
+                          ? 'bg-zinc-800/70 text-zinc-200'
+                          : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300',
+                    )}
+                  >
+                    <span className="text-zinc-500">{prefix}</span>
+                    {highlightMatch(excerpt, query)}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })
+      })()}
+    </div>
+  )
+
+  const chatContent = selectedSessionId ? (
+    <>
+      <SessionChat
+        sessionId={selectedSessionId}
+        hideHeader
+        hideAvatars
+        loadAll
+        scrollToMessageId={selectedMessageId}
+      />
+      <div className="absolute top-2 left-2 flex items-center gap-1">
+        {isMobile && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setSelectedSessionId(null)
+              setSelectedMessageId(null)
+            }}
+            className="sm:hidden hover:text-zinc-200 bg-sidebar/60 hover:bg-sidebar"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('open-item-actions', {
+                detail: {
+                  terminalId: null,
+                  sessionId: selectedSessionId,
+                },
+              }),
+            )
+          }}
+          className="hover:text-zinc-200 bg-sidebar/60 hover:bg-sidebar"
+        >
+          Actions
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </div>
+    </>
+  ) : (
+    <div className="flex items-center justify-center h-full text-sm text-zinc-500">
+      Click a result to preview
+    </div>
+  )
+
   return (
     <>
       {/* Transparent backdrop */}
@@ -200,30 +357,42 @@ export function SessionSearchPanel({
       {/* Panel */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 w-[75%] min-w-[600px] bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
+          'fixed inset-y-0 right-0 z-50 w-[100vw] min-w-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:w-[75%] sm:min-w-[600px] sm:pt-0 bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : 'translate-x-full',
         )}
       >
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="sm:hidden text-zinc-500 hover:text-zinc-300 cursor-pointer"
+            >
+              <PanelRightOpen className="w-4 h-4" />
+            </button>
+          )}
           <Search className="w-4 h-4 text-zinc-500 shrink-0" />
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('')
+                inputRef.current?.focus()
+              }}
+              className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+            >
+              <CircleX className="w-3 h-3" />
+            </button>
+          )}
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search session messages..."
-            className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
+            className="flex-1 bg-transparent text-base sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none"
           />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
           <button
             type="button"
             onClick={onDismiss}
@@ -234,149 +403,32 @@ export function SessionSearchPanel({
         </div>
 
         {/* Body */}
-        <div className="flex-1 flex min-h-0">
-          {/* Left: search results */}
-          <div
-            className="w-[30%] border-r border-zinc-800 overflow-y-auto"
-            ref={resultsContainerRef}
-          >
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
-              </div>
-            ) : results.length === 0 ? (
-              <div className="px-4 py-8 text-sm text-zinc-500 text-center">
-                {query.length < 2
-                  ? 'Type to search across all sessions'
-                  : 'No matching sessions found'}
-              </div>
-            ) : (
-              <div className="py-1">
-                {(() => {
-                  let navIndex = 0
-                  return sorted.map((match) => {
-                    const sessionTitle =
-                      match.name ?? match.session_id.slice(0, 12)
-                    const isSessionSelected =
-                      selectedSessionId === match.session_id
-                    const sessionNavIndex = navIndex++
-                    return (
-                      <div key={match.session_id} className="mb-1">
-                        {/* Session header — clickable to load chat */}
-                        <button
-                          type="button"
-                          data-nav-index={sessionNavIndex}
-                          onClick={() =>
-                            selectItem({
-                              type: 'session',
-                              sessionId: match.session_id,
-                            })
-                          }
-                          className={cn(
-                            'w-full text-left px-3 py-1.5 cursor-pointer transition-colors',
-                            highlightedIndex === sessionNavIndex
-                              ? 'bg-zinc-800'
-                              : isSessionSelected && !selectedMessageId
-                                ? 'bg-zinc-800/70'
-                                : 'hover:bg-zinc-800/50',
-                          )}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <SessionSearchIcon status={match.status} />
-                            <span className="text-xs font-medium text-zinc-200 break-all">
-                              {sessionTitle}
-                            </span>
-                          </div>
-                          {match.terminal_name && (
-                            <div className="mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
-                              {match.terminal_name}
-                            </div>
-                          )}
-                          {match.data?.branch && (
-                            <div className="flex items-center gap-0.5 mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
-                              <GitBranch className="w-2.5 h-2.5 shrink-0" />
-                              {match.data.branch}
-                            </div>
-                          )}
-                        </button>
-                        {/* Message excerpts */}
-                        {match.messages.map((msg) => {
-                          const prefix = msg.is_user ? 'User: ' : 'Claude: '
-                          const excerpt = contextExcerpt(msg.body, query)
-                          const isSelected =
-                            isSessionSelected && selectedMessageId === msg.id
-                          const msgNavIndex = navIndex++
-                          return (
-                            <button
-                              key={`${match.session_id}:${msg.id}`}
-                              type="button"
-                              data-nav-index={msgNavIndex}
-                              onClick={() =>
-                                selectItem({
-                                  type: 'message',
-                                  sessionId: match.session_id,
-                                  messageId: msg.id,
-                                })
-                              }
-                              className={cn(
-                                'w-full text-left px-4 py-1.5 text-xs cursor-pointer transition-colors',
-                                highlightedIndex === msgNavIndex
-                                  ? 'bg-zinc-800 text-zinc-200'
-                                  : isSelected
-                                    ? 'bg-zinc-800/70 text-zinc-200'
-                                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300',
-                              )}
-                            >
-                              <span className="text-zinc-500">{prefix}</span>
-                              {highlightMatch(excerpt, query)}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )
-                  })
-                })()}
-              </div>
-            )}
+        {isMobile ? (
+          <div className="flex-1 relative min-h-0 overflow-hidden">
+            {/* Chat layer — always rendered behind */}
+            <div className="absolute inset-0">{chatContent}</div>
+            {/* Results layer — slides left to reveal chat */}
+            <div
+              className={cn(
+                'absolute inset-0 bg-zinc-900 overflow-y-auto overflow-x-hidden transition-transform duration-300',
+                showingChat && '-translate-x-full',
+              )}
+              ref={resultsContainerRef}
+            >
+              {resultsContent}
+            </div>
           </div>
-
-          {/* Right: chat preview */}
-          <div className="flex-1 min-h-0 relative">
-            {selectedSessionId ? (
-              <>
-                <SessionChat
-                  sessionId={selectedSessionId}
-                  hideHeader
-                  hideAvatars
-                  loadAll
-                  scrollToMessageId={selectedMessageId}
-                />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent('open-item-actions', {
-                        detail: {
-                          terminalId: null,
-                          sessionId: selectedSessionId,
-                        },
-                      }),
-                    )
-                  }}
-                  className="absolute top-2 left-2 hover:text-zinc-200 bg-sidebar/60 hover:bg-sidebar"
-                >
-                  Actions
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-full text-sm text-zinc-500">
-                Click a result to preview
-              </div>
-            )}
+        ) : (
+          <div className="flex-1 flex min-h-0">
+            <div
+              className="w-[30%] border-r border-zinc-800 overflow-y-auto"
+              ref={resultsContainerRef}
+            >
+              {resultsContent}
+            </div>
+            <div className="flex-1 min-h-0 relative">{chatContent}</div>
           </div>
-        </div>
+        )}
       </div>
     </>
   )
