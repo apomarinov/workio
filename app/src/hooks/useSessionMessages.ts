@@ -7,7 +7,10 @@ import { useSocket } from './useSocket'
 
 const PAGE_SIZE = 30
 
-export function useSessionMessages(sessionId: string | null) {
+export function useSessionMessages(
+  sessionId: string | null,
+  options?: { loadAll?: boolean },
+) {
   const { subscribe } = useSocket()
   const [allMessages, setAllMessages] = useState<SessionMessage[]>([])
   const [offset, setOffset] = useState(0)
@@ -16,9 +19,12 @@ export function useSessionMessages(sessionId: string | null) {
 
   // Fetch initial page of messages
   // Use dedupingInterval to prevent duplicate requests from StrictMode double-renders
+  const fetchLimit = options?.loadAll ? 10000 : PAGE_SIZE
   const { data, error, isLoading, mutate } = useSWR<SessionMessagesResponse>(
-    sessionId ? `/api/sessions/${sessionId}/messages` : null,
-    () => api.getSessionMessages(sessionId!, PAGE_SIZE, 0),
+    sessionId
+      ? `/api/sessions/${sessionId}/messages?all=${options?.loadAll ?? false}`
+      : null,
+    () => api.getSessionMessages(sessionId!, fetchLimit, 0),
     {
       dedupingInterval: 2000,
       revalidateOnFocus: false,

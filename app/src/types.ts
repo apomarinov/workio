@@ -82,7 +82,7 @@ export interface SessionSearchMatch {
   project_path: string
   status: string
   data: { branch?: string } | null
-  messages: { body: string; is_user: boolean }[]
+  messages: { id: number; body: string; is_user: boolean }[]
 }
 
 export interface Prompt {

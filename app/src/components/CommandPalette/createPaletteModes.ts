@@ -8,7 +8,6 @@ import type {
   CustomTerminalAction,
   MoveTarget,
   PreferredIDE,
-  SessionSearchMatch,
   SessionWithProject,
   ShellTemplate,
   Terminal,
@@ -22,7 +21,6 @@ import { createMoveToProjectMode } from './modes/move-to-project'
 import { createPRActionsMode } from './modes/pr-actions'
 import { createPRCheckoutMode } from './modes/pr-checkout'
 import { createSearchMode } from './modes/search'
-import { createSessionSearchMode } from './modes/session-search'
 import { createShellTemplatesMode } from './modes/shell-templates'
 import { createShellsMode } from './modes/shells'
 import type { PaletteAPI, PaletteLevel, PaletteMode } from './types'
@@ -37,9 +35,6 @@ export type AppData = {
   pinnedTerminalSessions: number[]
   pinnedSessions: string[]
   preferredIDE: PreferredIDE
-  sessionSearchResults: SessionSearchMatch[] | null
-  sessionSearchLoading: boolean
-  sessionSearchQuery: string
   processes: ActiveProcess[]
   shellPorts: Record<number, number[]>
   shellTemplates: ShellTemplate[]
@@ -147,7 +142,6 @@ export function createPaletteModes(
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
     'move-to-project': createMoveToProjectMode(data, level, actions, api),
     shells: createShellsMode(data, level, actions, api),
-    'session-search': createSessionSearchMode(data, level, actions, api),
     'favorite-sessions': createFavoriteSessionsMode(data, level, actions, api),
     'shell-templates': createShellTemplatesMode(data, level, actions, api),
     'custom-commands': createCustomCommandsMode(data, level, actions, api),

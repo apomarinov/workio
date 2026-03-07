@@ -20,18 +20,22 @@ export function SessionChat({
   hideAvatars,
   isMaximizedInPip,
   onOpenSidebar,
+  scrollToMessageId,
+  loadAll,
 }: {
   sessionId?: string | null
   hideHeader?: boolean
   hideAvatars?: boolean
   isMaximizedInPip?: boolean
   onOpenSidebar?: () => void
+  scrollToMessageId?: number | null
+  loadAll?: boolean
 } = {}) {
   const { activeSessionId, sessions } = useSessionContext()
   const resolvedSessionId = sessionIdProp ?? activeSessionId
   const { settings } = useSettings()
   const { messages, loading, isLoadingMore, hasMore, loadMore } =
-    useSessionMessages(resolvedSessionId)
+    useSessionMessages(resolvedSessionId, { loadAll })
 
   const sentinelRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -142,6 +146,47 @@ export function SessionChat({
       prevMessageCountRef.current = messages.length
     }
   }, [loading, messages.length, isMaximizedInPip])
+
+  // Scroll to a specific message (used by search panel)
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastHighlightedRef = useRef<number | null>(null)
+  const highlightedElRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!scrollToMessageId || loading || messages.length === 0) return
+    // Only highlight when the target actually changes
+    if (lastHighlightedRef.current === scrollToMessageId) return
+    lastHighlightedRef.current = scrollToMessageId
+
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    // Clear previous highlight immediately
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+    if (highlightedElRef.current) {
+      highlightedElRef.current.classList.remove(
+        'ring-2',
+        'ring-amber-400/60',
+        'rounded-lg',
+      )
+      highlightedElRef.current = null
+    }
+
+    // Wait for render
+    const raf = requestAnimationFrame(() => {
+      const el = container.querySelector(
+        `[data-message-id="${scrollToMessageId}"]`,
+      ) as HTMLElement | null
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-amber-400/60', 'rounded-lg')
+      highlightedElRef.current = el
+      highlightTimerRef.current = setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-amber-400/60', 'rounded-lg')
+        highlightedElRef.current = null
+      }, 2000)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [scrollToMessageId, loading, messages.length])
 
   if (!resolvedSessionId) {
     return null

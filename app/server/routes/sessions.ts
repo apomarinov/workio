@@ -159,7 +159,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
     Querystring: { limit?: string; offset?: string }
   }>('/api/sessions/:id/messages', async (request) => {
     const { id } = request.params
-    const limit = Math.min(Number(request.query.limit) || 30, 100)
+    const limit = Math.min(Number(request.query.limit) || 30, 10000)
     const offset = Number(request.query.offset) || 0
     return await getSessionMessages(id, limit, offset)
   })

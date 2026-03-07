@@ -40,6 +40,11 @@ const CommitDialog = lazy(() =>
     default: m.CommitDialog,
   })),
 )
+const SessionSearchPanel = lazy(() =>
+  import('./components/SessionSearchPanel').then((m) => ({
+    default: m.SessionSearchPanel,
+  })),
+)
 
 import { resolveNotification } from '../shared/notifications'
 import type { PRCheckStatus } from '../shared/types'
@@ -124,6 +129,8 @@ function AppContent() {
     terminalId: number
     pr?: PRCheckStatus
   } | null>(null)
+  const [sessionSearchOpen, setSessionSearchOpen] = useState(false)
+  const [sessionSearchMounted, setSessionSearchMounted] = useState(false)
 
   // Mark active shells so the context can track suspension timestamps
   useEffect(() => {
@@ -312,6 +319,16 @@ function AppContent() {
     window.addEventListener('open-commit-dialog', handler as EventListener)
     return () =>
       window.removeEventListener('open-commit-dialog', handler as EventListener)
+  }, [])
+
+  // Listen for open-session-search event (from command palette Find button)
+  useEffect(() => {
+    const handler = () => {
+      setSessionSearchMounted(true)
+      setSessionSearchOpen(true)
+    }
+    window.addEventListener('open-session-search', handler)
+    return () => window.removeEventListener('open-session-search', handler)
   }, [])
 
   // Shell event listeners (dispatched from TerminalItem sidebar)
@@ -1077,6 +1094,19 @@ function AppContent() {
             terminalId={commitDialogTarget.terminalId}
             pr={commitDialogTarget.pr}
             onClose={() => setCommitDialogTarget(null)}
+          />
+        </Suspense>
+      )}
+      {sessionSearchMounted && (
+        <Suspense>
+          <SessionSearchPanel
+            open={sessionSearchOpen}
+            onOpenChange={setSessionSearchOpen}
+            onDismiss={() => {
+              setSessionSearchOpen(false)
+              window.dispatchEvent(new Event('dialog-closed'))
+              setTimeout(() => setSessionSearchMounted(false), 300)
+            }}
           />
         </Suspense>
       )}

@@ -360,8 +360,13 @@ export function createSearchMode(
       label: 'Find',
       icon: <Search className="h-4 w-4 shrink-0 text-zinc-400" />,
       keywords: ['find sessions'],
-      onSelect: () =>
-        api.push({ mode: 'session-search', title: 'Find Sessions' }),
+      onSelect: () => {
+        api.close()
+        setTimeout(
+          () => window.dispatchEvent(new Event('open-session-search')),
+          150,
+        )
+      },
     }
     const sessionActions: PaletteItem[] = [findSessionsItem]
     if (sessions.some((s) => s.is_favorite)) {

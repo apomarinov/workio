@@ -34,17 +34,11 @@ import {
   pushBranch,
   rebaseBranch,
   renameBranch,
-  searchSessionMessages,
   toggleFavoriteSession,
 } from '@/lib/api'
 import { DEFAULT_KEYMAP } from '@/types'
 import type { PRCheckStatus } from '../../../shared/types'
-import type {
-  MoveTarget,
-  SessionSearchMatch,
-  SessionWithProject,
-  Terminal,
-} from '../../types'
+import type { MoveTarget, SessionWithProject, Terminal } from '../../types'
 
 const CreatePRDialog = lazy(() =>
   import('../dialogs/CreatePRDialog').then((m) => ({
@@ -144,13 +138,7 @@ export function CommandPalette() {
     target: MoveTarget
   } | null>(null)
 
-  // Session search state
-  const [searchText, setSearchText] = useState('')
-  const [sessionSearchResults, setSessionSearchResults] = useState<
-    SessionSearchMatch[] | null
-  >(null)
-  const [sessionSearchLoading, setSessionSearchLoading] = useState(false)
-  const searchAbortRef = useRef<AbortController | null>(null)
+  const [, setSearchText] = useState('')
 
   // Context data
   const {
@@ -489,48 +477,11 @@ export function CommandPalette() {
       )
   }, [terminals, branchToPR])
 
-  // Debounced session search
+  // Reset search text when palette closes or mode changes (input remounts via key)
   useEffect(() => {
-    if (currentModeId !== 'session-search' || searchText.length < 2) {
-      setSessionSearchResults(null)
-      setSessionSearchLoading(false)
-      return
-    }
-    setSessionSearchLoading(true)
-    const timer = setTimeout(() => {
-      searchAbortRef.current?.abort()
-      const controller = new AbortController()
-      searchAbortRef.current = controller
-      searchSessionMessages(searchText, controller.signal)
-        .then((results) => {
-          if (!controller.signal.aborted) {
-            setSessionSearchResults(results)
-            setSessionSearchLoading(false)
-          }
-        })
-        .catch((err) => {
-          if (!controller.signal.aborted) {
-            if (err instanceof Error && err.name !== 'AbortError') {
-              setSessionSearchLoading(false)
-              toast.error(err.message || 'Failed to search sessions')
-            }
-          }
-        })
-    }, 500)
-    return () => {
-      clearTimeout(timer)
-      searchAbortRef.current?.abort()
-    }
-  }, [searchText, currentModeId])
-
-  // Reset search state when palette closes or mode changes (input remounts via key)
-  useEffect(() => {
-    // Reference deps so the effect re-runs on open/mode changes
     void open
     void currentModeId
     setSearchText('')
-    setSessionSearchResults(null)
-    setSessionSearchLoading(false)
   }, [open, currentModeId])
 
   // Broadcast palette state for module-level tracking in useKeyboardShortcuts
@@ -561,9 +512,6 @@ export function CommandPalette() {
       pinnedTerminalSessions,
       pinnedSessions,
       preferredIDE,
-      sessionSearchResults,
-      sessionSearchLoading,
-      sessionSearchQuery: searchText,
       processes,
       shellPorts,
       shellTemplates: settings?.shell_templates ?? [],
@@ -579,9 +527,6 @@ export function CommandPalette() {
       pinnedTerminalSessions,
       pinnedSessions,
       preferredIDE,
-      sessionSearchResults,
-      sessionSearchLoading,
-      searchText,
       processes,
       shellPorts,
       settings?.shell_templates,

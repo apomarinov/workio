@@ -373,6 +373,7 @@ export async function searchSessionMessages(
   const { rows: matchRows } = await pool.query(
     `
     SELECT
+      m.id,
       m.body,
       m.is_user,
       p.session_id,
@@ -403,12 +404,12 @@ export async function searchSessionMessages(
   // Step 2: Group message matches by session_id, cap messages per session
   const sessionMessages = new Map<
     string,
-    { body: string; is_user: boolean }[]
+    { id: number; body: string; is_user: boolean }[]
   >()
   for (const row of matchRows) {
     const msgs = sessionMessages.get(row.session_id) || []
     if (msgs.length < 5) {
-      msgs.push({ body: row.body, is_user: row.is_user })
+      msgs.push({ id: row.id, body: row.body, is_user: row.is_user })
     }
     sessionMessages.set(row.session_id, msgs)
   }

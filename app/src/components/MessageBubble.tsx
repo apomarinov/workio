@@ -24,7 +24,7 @@ export function ThinkingGroup({ messages }: ThinkingGroupProps) {
   const combinedText = messages.map((m) => m.body).join('\n\n')
 
   return (
-    <div className="flex justify-start">
+    <div className="flex justify-start" data-message-id={messages[0].id}>
       <div className="max-w-[80%] group">
         <button
           type="button"
@@ -55,7 +55,7 @@ export function MessageBubble({ message, hideAvatars }: MessageBubbleProps) {
   // If it's a tool message, render ToolCallDisplay
   if (message.tools) {
     return (
-      <div className="flex gap-2 justify-start">
+      <div className="flex gap-2 justify-start" data-message-id={message.id}>
         {!hideAvatars && (
           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-700/50 flex items-center justify-center">
             <ClaudeIcon className="w-3.5 h-3.5 text-zinc-400" />
@@ -72,7 +72,10 @@ export function MessageBubble({ message, hideAvatars }: MessageBubbleProps) {
   const hasImages = message.images && message.images.length > 0
 
   return (
-    <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
+    <div
+      className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}
+      data-message-id={message.id}
+    >
       {!isUser && !hideAvatars && (
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#D97757]/20 flex items-center justify-center">
           <ClaudeIcon className="w-3.5 h-3.5 text-[#D97757]" />
