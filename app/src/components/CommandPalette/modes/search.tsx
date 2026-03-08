@@ -400,7 +400,7 @@ export function createSearchMode(
       sessionsByTerminal.set(groupName, existing)
     }
 
-    groups.push({ heading: 'Session Actions', items: sessionActions })
+    groups.push({ heading: 'Claude Session Actions', items: sessionActions })
     addPRGroups()
 
     const needsSessionSubheadings = sessionsByTerminal.size > 1

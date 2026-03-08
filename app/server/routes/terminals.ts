@@ -945,6 +945,18 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       const cancelled = cancelWorkspaceOperation(id)
       if (!cancelled) {
+        // No in-memory operation — check if DB is stuck in setup state (e.g. server killed mid-setup)
+        const terminal = await getTerminalById(id)
+        if (terminal?.setup?.status === 'setup') {
+          const failedSetup = {
+            ...terminal.setup,
+            status: 'failed' as const,
+            error: 'Setup interrupted',
+          }
+          await updateTerminal(id, { setup: failedSetup })
+          await emitWorkspace(id, { name: terminal.name, setup: failedSetup })
+          return { cancelled: true }
+        }
         return reply.status(409).send({ error: 'No cancellable operation' })
       }
 

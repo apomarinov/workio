@@ -20,7 +20,6 @@ import {
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { useLongPress } from '@/hooks/useLongPress'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { cancelWorkspace } from '@/lib/api'
@@ -63,13 +62,6 @@ export const TerminalItem = memo(function TerminalItem({
   const shortcutIndex =
     shortcutIndexProp ?? terminals.findIndex((t) => t.id === terminal.id) + 1
   const isMobile = useIsMobile()
-  const longPressHandlers = useLongPress(() => {
-    window.dispatchEvent(
-      new CustomEvent('open-item-actions', {
-        detail: { terminalId: terminal.id, sessionId: null },
-      }),
-    )
-  })
   const { githubPRs } = useTerminalContext()
   const {
     processes: allProcesses,
@@ -205,7 +197,6 @@ export const TerminalItem = memo(function TerminalItem({
             onToggleTerminalSessions?.(terminal.id)
           }
         }}
-        {...longPressHandlers}
         className={cn(
           `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
             isActive

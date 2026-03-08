@@ -275,7 +275,7 @@ export function CommitDialog({
         <DialogHeader className={viewOnly ? '' : 'hidden'}>
           <DialogTitle>
             {viewOnly && pr ? (
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5 max-sm:text-left">
                 <span>
                   {pr.prTitle}{' '}
                   <span className="text-zinc-500">#{pr.prNumber}</span>

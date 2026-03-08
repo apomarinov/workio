@@ -6,7 +6,6 @@ import {
   MoreVertical,
 } from 'lucide-react'
 import { memo } from 'react'
-import { useLongPress } from '@/hooks/useLongPress'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
@@ -30,24 +29,10 @@ export const PRStatusGroup = memo(function PRStatusGroup({
 }: PRStatusGroupProps) {
   const prInfo = getPRStatusInfo(pr)
   const isMobile = useIsMobile()
-  const longPressHandlers = useLongPress(() => {
-    if (prInfo.isMerged) return
-    window.dispatchEvent(
-      new CustomEvent('open-item-actions', {
-        detail: {
-          terminalId: null,
-          sessionId: null,
-          prNumber: pr.prNumber,
-          prRepo: pr.repo,
-        },
-      }),
-    )
-  })
 
   return (
     <div data-pr-branch={pr.branch}>
       <div
-        {...longPressHandlers}
         onClick={() => {
           if (!prInfo.isMerged) {
             onToggle()
@@ -131,7 +116,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
                 }),
               )
             }}
-            className="absolute right-2 text-xs text-muted-foreground hidden group-hover/pr:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer bg-sidebar-accent/60 hover:bg-sidebar-accent py-1 rounded-sm"
+            className="absolute right-2 text-xs text-muted-foreground sm:hidden sm:group-hover/pr:block flex-shrink-0 hover:text-foreground transition-colors cursor-pointer bg-sidebar-accent/60 hover:bg-sidebar-accent py-1 rounded-sm"
           >
             <MoreVertical className="w-4 h-4" />
           </button>

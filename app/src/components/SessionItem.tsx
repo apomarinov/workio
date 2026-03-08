@@ -18,7 +18,6 @@ import {
 import { cn, sessionStatusColor } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { useLongPress } from '../hooks/useLongPress'
 import type { SessionWithProject } from '../types'
 import { MarkdownContent } from './MarkdownContent'
 import { TruncatedPath } from './TruncatedPath'
@@ -118,18 +117,6 @@ export const SessionItem = memo(function SessionItem({
     )
   }
 
-  const longPressHandlers = useLongPress(() => {
-    if (popoverContainer) {
-      setShowMenu(true)
-    } else {
-      window.dispatchEvent(
-        new CustomEvent('open-item-actions', {
-          detail: { terminalId: null, sessionId: session.session_id },
-        }),
-      )
-    }
-  })
-
   const showUserMessage =
     session.latest_user_message &&
     (session.latest_user_message !== displayName ||
@@ -143,7 +130,6 @@ export const SessionItem = memo(function SessionItem({
     <div
       data-session-id={session.session_id}
       onClick={handleClick}
-      {...longPressHandlers}
       className={cn(
         'group flex overflow-hidden items-stretch gap-2 px-2 py-1.5 rounded text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-colors cursor-pointer relative',
         isFlashing && 'animate-flash',
