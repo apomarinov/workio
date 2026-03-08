@@ -88,6 +88,7 @@ export default defineConfig(({ mode }) => {
               'remark-math',
               'katex',
             ],
+            diff2html: ['diff2html'],
             dndkit: [
               '@dnd-kit/core',
               '@dnd-kit/sortable',

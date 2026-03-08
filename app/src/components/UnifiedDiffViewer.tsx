@@ -1,5 +1,5 @@
 import { ColorSchemeType } from 'diff2html/lib-esm/types'
-import { Diff2HtmlUI } from 'diff2html/lib-esm/ui/js/diff2html-ui'
+import { Diff2HtmlUI } from 'diff2html/lib-esm/ui/js/diff2html-ui-slim'
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import useSWR from 'swr'

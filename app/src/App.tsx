@@ -48,7 +48,13 @@ const SessionSearchPanel = lazy(() =>
 
 import { resolveNotification } from '../shared/notifications'
 import type { PRCheckStatus } from '../shared/types'
-import { MobileKeyboard } from './components/MobileKeyboard'
+
+const MobileKeyboard = lazy(() =>
+  import('./components/MobileKeyboard').then((m) => ({
+    default: m.MobileKeyboard,
+  })),
+)
+
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
 import { useNotifications } from './context/NotificationContext'
@@ -952,12 +958,14 @@ function AppContent() {
                         <StatusBar position="bottom" />
                       </Suspense>
                     )}
-                  <MobileKeyboard
-                    terminalId={t.id}
-                    currentRepo={t.git_repo?.repo}
-                    mode={mobileKeyboardMode}
-                    inputRef={mobileInputRef}
-                  />
+                  <Suspense fallback={null}>
+                    <MobileKeyboard
+                      terminalId={t.id}
+                      currentRepo={t.git_repo?.repo}
+                      mode={mobileKeyboardMode}
+                      inputRef={mobileInputRef}
+                    />
+                  </Suspense>
                 </div>
               )
             })()}
