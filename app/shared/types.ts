@@ -136,8 +136,17 @@ export interface ChangedFile {
   oldPath?: string
 }
 
+export interface GitLastCommit {
+  hash: string
+  author: string
+  date: string // ISO 8601
+  subject: string
+  isLocal: boolean // true if author matches local git user.name
+}
+
 export interface GitDirtyPayload {
   dirtyStatus: Record<number, GitDiffStat> // terminalId -> line diff stats
+  lastCommit?: Record<number, GitLastCommit> // terminalId -> last commit info
 }
 
 export interface GitRemoteSyncStat {

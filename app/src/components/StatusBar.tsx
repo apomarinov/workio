@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   GitBranch,
+  GitCommitHorizontal,
   Globe,
   MoreVertical,
 } from 'lucide-react'
@@ -36,8 +37,9 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
+import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import type { ActiveProcess } from '../../shared/types'
+import type { ActiveProcess, GitLastCommit } from '../../shared/types'
 import type { Terminal } from '../types'
 import {
   DEFAULT_STATUS_BAR,
@@ -294,6 +296,38 @@ function BranchSection({
   )
 }
 
+function LastCommitSection({
+  section,
+  commit,
+  terminalId,
+  branch,
+}: {
+  section: StatusBarSection
+  commit: GitLastCommit
+  terminalId: number
+  branch: string
+}) {
+  const displayAuthor = commit.isLocal ? 'You' : commit.author
+  return (
+    <SortableStatusSection
+      section={section}
+      onClick={() =>
+        window.dispatchEvent(
+          new CustomEvent('open-branch-commits', {
+            detail: { terminalId, branch },
+          }),
+        )
+      }
+    >
+      <GitCommitHorizontal className="w-3 h-3" />
+      <span className="truncate-fade max-w-[150px]">{displayAuthor}</span>
+      <span className="text-muted-foreground/60">
+        {formatTimeAgo(commit.date)}
+      </span>
+    </SortableStatusSection>
+  )
+}
+
 function SpacerSection({ section }: { section: StatusBarSection }) {
   const {
     attributes,
@@ -408,21 +442,25 @@ export function StatusBar({ position }: StatusBarProps) {
     terminalPorts,
     shellPorts,
     gitDirtyStatus,
+    gitLastCommit,
   } = useProcessContext()
   const { settings, updateSettings } = useSettings()
   const isMobile = useIsMobile()
 
   const rawStatusBar = settings?.statusBar ?? DEFAULT_STATUS_BAR
-  const sections = rawStatusBar.sections.some((s) => s.name === 'spacer')
-    ? rawStatusBar.sections
-    : [
-        ...rawStatusBar.sections,
-        {
-          name: 'spacer' as const,
-          visible: true,
-          order: rawStatusBar.sections.length,
-        },
-      ]
+  let sections = rawStatusBar.sections
+  if (!sections.some((s) => s.name === 'spacer')) {
+    sections = [
+      ...sections,
+      { name: 'spacer' as const, visible: true, order: sections.length },
+    ]
+  }
+  if (!sections.some((s) => s.name === 'lastCommit')) {
+    sections = [
+      ...sections,
+      { name: 'lastCommit' as const, visible: true, order: sections.length },
+    ]
+  }
   const statusBar = { ...rawStatusBar, sections }
 
   const sensors = useSensors(
@@ -438,6 +476,7 @@ export function StatusBar({ position }: StatusBarProps) {
   const isDirty =
     !!diffStat &&
     (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
+  const lastCommit = gitLastCommit[terminal.id]
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
@@ -464,6 +503,8 @@ export function StatusBar({ position }: StatusBarProps) {
         return ports.length > 0
       case 'gitDirty':
         return isDirty
+      case 'lastCommit':
+        return !!lastCommit
       case 'branch':
         return !!terminal.git_branch
       case 'spacer':
@@ -531,6 +572,16 @@ export function StatusBar({ position }: StatusBarProps) {
             section={section}
             diffStat={diffStat}
             terminalId={terminal.id}
+          />
+        ) : null
+      case 'lastCommit':
+        return lastCommit && terminal.git_branch ? (
+          <LastCommitSection
+            key={section.name}
+            section={section}
+            commit={lastCommit}
+            terminalId={terminal.id}
+            branch={terminal.git_branch}
           />
         ) : null
       case 'branch':

@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotification } from '../../shared/notifications'
-import type { ActiveProcess } from '../../shared/types'
+import type { ActiveProcess, GitLastCommit } from '../../shared/types'
 import {
   getAllTerminals,
   getTerminalById,
@@ -455,6 +455,7 @@ const lastRemoteSyncStatus = new Map<
   number,
   { behind: number; ahead: number; noRemote: boolean }
 >()
+const lastCommitStatus = new Map<number, GitLastCommit>()
 
 function parseDiffNumstat(stdout: string): { added: number; removed: number } {
   let added = 0
@@ -471,6 +472,55 @@ function parseDiffNumstat(stdout: string): { added: number; removed: number } {
 function countUntracked(stdout: string): number {
   if (!stdout.trim()) return 0
   return stdout.trim().split('\n').length
+}
+
+async function checkLastCommit(
+  cwd: string,
+  sshHost?: string | null,
+): Promise<GitLastCommit | null> {
+  try {
+    let logOut: string
+    let userName: string
+    if (sshHost) {
+      const [logResult, userResult] = await Promise.all([
+        execSSHCommand(sshHost, 'git log -1 --format="%H%n%an%n%aI%n%s"', cwd),
+        execSSHCommand(sshHost, 'git config user.name', cwd),
+      ])
+      logOut = logResult.stdout
+      userName = userResult.stdout.trim()
+    } else {
+      ;[logOut, userName] = await Promise.all([
+        new Promise<string>((resolve, reject) => {
+          execFile(
+            'git',
+            ['log', '-1', '--format=%H%n%an%n%aI%n%s'],
+            { cwd, timeout: 5000 },
+            (err, out) => (err ? reject(err) : resolve(out)),
+          )
+        }),
+        new Promise<string>((resolve) => {
+          execFile(
+            'git',
+            ['config', 'user.name'],
+            { cwd, timeout: 5000 },
+            (err, out) => resolve(err ? '' : out.trim()),
+          )
+        }),
+      ])
+    }
+    const lines = logOut.trim().split('\n')
+    if (lines.length < 4) return null
+    const author = lines[1]
+    return {
+      hash: lines[0],
+      author,
+      date: lines[2],
+      subject: lines.slice(3).join('\n'),
+      isLocal: !!userName && author === userName,
+    }
+  } catch {
+    return null
+  }
 }
 
 async function checkGitDirty(
@@ -708,6 +758,7 @@ async function scanAndEmitGitDirty() {
     number,
     { behind: number; ahead: number; noRemote: boolean }
   > = {}
+  const currentLastCommit: Record<number, GitLastCommit> = {}
   const checks: Promise<void>[] = []
 
   try {
@@ -719,12 +770,14 @@ async function scanAndEmitGitDirty() {
       checks.push(
         (async () => {
           try {
-            const [stat, syncStat] = await Promise.all([
+            const [stat, syncStat, commit] = await Promise.all([
               checkGitDirty(terminal.cwd, terminal.ssh_host),
               checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
+              checkLastCommit(terminal.cwd, terminal.ssh_host),
             ])
             currentStatus[terminal.id] = stat
             currentSyncStatus[terminal.id] = syncStat
+            if (commit) currentLastCommit[terminal.id] = commit
 
             let branch: string | null = null
             if (terminal.ssh_host) {
@@ -789,7 +842,15 @@ async function scanAndEmitGitDirty() {
     lastRemoteSyncStatus.set(Number(id), stat)
   }
 
-  getIO()?.emit('git:dirty-status', { dirtyStatus: currentStatus })
+  lastCommitStatus.clear()
+  for (const [id, stat] of Object.entries(currentLastCommit)) {
+    lastCommitStatus.set(Number(id), stat)
+  }
+
+  getIO()?.emit('git:dirty-status', {
+    dirtyStatus: currentStatus,
+    lastCommit: currentLastCommit,
+  })
   getIO()?.emit('git:remote-sync', { syncStatus: currentSyncStatus })
 }
 
@@ -798,20 +859,26 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
     const terminal = await getTerminalById(terminalId)
     if (!terminal || !terminal.git_branch) return
 
-    const [stat, syncStat] = await Promise.all([
+    const [stat, syncStat, commit] = await Promise.all([
       checkGitDirty(terminal.cwd, terminal.ssh_host),
       checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
+      checkLastCommit(terminal.cwd, terminal.ssh_host),
     ])
 
     const prevDirty = lastDirtyStatus.get(terminalId)
+    const prevCommit = lastCommitStatus.get(terminalId)
     const dirtyChanged =
       !prevDirty ||
       prevDirty.added !== stat.added ||
       prevDirty.removed !== stat.removed ||
       prevDirty.untracked !== stat.untracked
+    const commitChanged = commit
+      ? !prevCommit || prevCommit.hash !== commit.hash
+      : false
 
-    if (dirtyChanged) {
+    if (dirtyChanged || commitChanged) {
       lastDirtyStatus.set(terminalId, stat)
+      if (commit) lastCommitStatus.set(terminalId, commit)
       const dirtyStatus: Record<
         number,
         { added: number; removed: number; untracked: number }
@@ -819,7 +886,11 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       for (const [id, s] of lastDirtyStatus) {
         dirtyStatus[id] = s
       }
-      getIO()?.emit('git:dirty-status', { dirtyStatus })
+      const lastCommit: Record<number, GitLastCommit> = {}
+      for (const [id, s] of lastCommitStatus) {
+        lastCommit[id] = s
+      }
+      getIO()?.emit('git:dirty-status', { dirtyStatus, lastCommit })
     }
 
     const prevSync = lastRemoteSyncStatus.get(terminalId)

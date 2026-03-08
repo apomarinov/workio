@@ -3,6 +3,7 @@ import { resolveNotification } from '../../shared/notifications'
 import type {
   ActiveProcess,
   GitDirtyPayload,
+  GitLastCommit,
   GitRemoteSyncPayload,
   ProcessesPayload,
 } from '../../shared/types'
@@ -21,6 +22,7 @@ interface ProcessContextValue {
     number,
     { behind: number; ahead: number; noRemote: boolean }
   >
+  gitLastCommit: Record<number, GitLastCommit>
   subscribeToBell: (
     shellId: number,
     terminalId: number,
@@ -48,6 +50,9 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
   const [gitRemoteSyncStatus, setGitRemoteSyncStatus] = useState<
     Record<number, { behind: number; ahead: number; noRemote: boolean }>
   >({})
+  const [gitLastCommit, setGitLastCommit] = useState<
+    Record<number, GitLastCommit>
+  >({})
 
   // Bell subscriptions (server-side, synced via socket)
   const [bellShellIds, setBellShellIds] = useState<Set<number>>(new Set())
@@ -73,6 +78,20 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
         }
         return prev
       })
+      if (data.lastCommit) {
+        setGitLastCommit((prev) => {
+          const next = data.lastCommit!
+          const prevKeys = Object.keys(prev)
+          const nextKeys = Object.keys(next)
+          if (prevKeys.length !== nextKeys.length) return next
+          for (const key of nextKeys) {
+            const p = prev[Number(key)]
+            const n = next[Number(key)]
+            if (!p || !n || p.hash !== n.hash) return next
+          }
+          return prev
+        })
+      }
     })
   }, [subscribe])
 
@@ -207,6 +226,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       shellPorts,
       gitDirtyStatus,
       gitRemoteSyncStatus,
+      gitLastCommit,
       subscribeToBell,
       unsubscribeFromBell,
       isBellSubscribed,
@@ -217,6 +237,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       shellPorts,
       gitDirtyStatus,
       gitRemoteSyncStatus,
+      gitLastCommit,
       bellShellIds,
     ],
   )

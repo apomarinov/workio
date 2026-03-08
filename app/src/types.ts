@@ -501,6 +501,7 @@ export type StatusBarSectionName =
   | 'processes'
   | 'ports'
   | 'gitDirty'
+  | 'lastCommit'
   | 'branch'
   | 'spacer'
 
@@ -521,6 +522,7 @@ export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
   processes: 'Processes',
   ports: 'Ports',
   gitDirty: 'Git Changes',
+  lastCommit: 'Last Commit',
   branch: 'Branch',
   spacer: 'Spacer',
 }
@@ -528,10 +530,11 @@ export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
 export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
   { name: 'branch', visible: true, order: 0 },
   { name: 'gitDirty', visible: true, order: 1 },
-  { name: 'spacer', visible: true, order: 2 },
-  { name: 'processes', visible: true, order: 3 },
-  { name: 'ports', visible: true, order: 4 },
-  { name: 'pr', visible: true, order: 5 },
+  { name: 'lastCommit', visible: true, order: 2 },
+  { name: 'spacer', visible: true, order: 3 },
+  { name: 'processes', visible: true, order: 4 },
+  { name: 'ports', visible: true, order: 5 },
+  { name: 'pr', visible: true, order: 6 },
 ]
 
 export const DEFAULT_STATUS_BAR: StatusBarConfig = {
