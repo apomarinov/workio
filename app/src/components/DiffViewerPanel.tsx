@@ -617,12 +617,7 @@ export function DiffViewerPanel({
 
   if (isMobile) {
     return (
-      <div
-        className={cn(
-          'flex flex-col min-h-0 flex-1 overflow-hidden gap-2',
-          !integrated && 'rounded-md border border-zinc-700',
-        )}
-      >
+      <div className={cn('flex flex-col min-h-0 flex-1 overflow-hidden gap-2')}>
         {commitControls}
         {/* Files button */}
         <Button

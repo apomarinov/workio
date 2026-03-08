@@ -27,7 +27,7 @@ export function MobileSlidePanel({
       {/* Panel */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-[60] w-[85%] max-w-[320px] bg-zinc-900 border-r border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
+          'fixed inset-y-0 left-0 z-[60] w-[85%] max-w-[320px] pt-[env(safe-area-inset-top)] bg-zinc-900 border-r border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
