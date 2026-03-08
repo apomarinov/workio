@@ -50,6 +50,12 @@ export function SessionSearchPanel({
   const isMobile = useIsMobile()
   const showingChat = isMobile && selectedSessionId != null
 
+  // Start off-screen so the slide-in transition plays even on lazy load
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    requestAnimationFrame(() => setMounted(true))
+  }, [])
+
   useEdgeSwipe({
     enabled: isMobile && open,
     onSwipeRight: () => {
@@ -371,7 +377,7 @@ export function SessionSearchPanel({
       <div
         className={cn(
           'fixed inset-y-0 right-0 z-50 w-[100vw] min-w-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:w-[75%] sm:min-w-[600px] sm:pt-0 bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
-          open ? 'translate-x-0' : 'translate-x-full',
+          open && mounted ? 'translate-x-0' : 'translate-x-full',
         )}
       >
         {/* Header */}

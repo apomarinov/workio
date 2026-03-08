@@ -425,7 +425,11 @@ export function createBranchActionsMode(
 
   // Claude Sessions for this branch
   {
-    const count = sessions.filter((s) => s.data?.branch === branch.name).length
+    const count = sessions.filter(
+      (s) =>
+        s.data?.branch === branch.name ||
+        s.data?.branches?.some((e) => e.branch === branch.name),
+    ).length
     if (count > 0) {
       items.push({
         id: 'action:claude-sessions',

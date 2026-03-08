@@ -44,6 +44,17 @@ export interface Project {
   path: string
 }
 
+export interface SessionBranchEntry {
+  branch: string
+  repo: string
+}
+
+export interface SessionData {
+  branch?: string
+  repo?: string
+  branches?: SessionBranchEntry[]
+}
+
 export interface Session {
   session_id: string
   project_id: number
@@ -53,7 +64,7 @@ export interface Session {
   message_count: number | null
   status: 'started' | 'active' | 'done' | 'ended' | 'permission_needed' | 'idle'
   transcript_path: string | null
-  data: { branch?: string } | null
+  data: SessionData | null
   created_at: string
   updated_at: string
 }
@@ -80,7 +91,7 @@ export interface SessionSearchMatch {
   terminal_name: string | null
   project_path: string
   status: string
-  data: { branch?: string } | null
+  data: SessionData | null
   messages: { id: number; body: string; is_user: boolean }[]
 }
 

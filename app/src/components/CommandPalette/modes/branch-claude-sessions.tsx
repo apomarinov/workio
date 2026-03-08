@@ -70,7 +70,11 @@ export function createBranchClaudeSessionsMode(
     }
   }
 
-  const matching = data.sessions.filter((s) => s.data?.branch === branchName)
+  const matching = data.sessions.filter(
+    (s) =>
+      s.data?.branch === branchName ||
+      s.data?.branches?.some((e) => e.branch === branchName),
+  )
 
   const items: PaletteItem[] = matching.map((s) => ({
     id: `bs:${s.session_id}`,

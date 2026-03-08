@@ -5,6 +5,7 @@ import { resolveNotification } from '../shared/notifications'
 import {
   getActivePermissions,
   getMessagesByIds,
+  getSessionById,
   getTerminalById,
   updateSessionData,
 } from './db'
@@ -44,10 +45,10 @@ async function detectSessionBranch(
 ) {
   try {
     let branch: string
+    const terminal = terminalId ? await getTerminalById(terminalId) : null
 
-    if (terminalId) {
-      const terminal = await getTerminalById(terminalId)
-      if (terminal?.ssh_host) {
+    if (terminal) {
+      if (terminal.ssh_host) {
         const cmd =
           'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null'
         const { stdout } = await execSSHCommand(terminal.ssh_host, cmd, {
@@ -55,7 +56,7 @@ async function detectSessionBranch(
         })
         branch = stdout.trim()
       } else {
-        const cwd = terminal?.cwd || projectPath
+        const cwd = terminal.cwd || projectPath
         branch = await detectLocalBranch(cwd)
       }
     } else {
@@ -64,9 +65,28 @@ async function detectSessionBranch(
 
     if (!branch) return
 
-    await updateSessionData(sessionId, { branch })
-    io.emit('session:updated', { sessionId, data: { branch } })
-    log.info(`[listen] Detected branch="${branch}" for session=${sessionId}`)
+    const repo = terminal?.git_repo?.repo ?? ''
+
+    // Build unique branches list
+    const existing = await getSessionById(sessionId)
+    let branches = existing?.data?.branches ?? []
+
+    // Backfill old branch if it was set before branches tracking existed
+    const oldBranch = existing?.data?.branch
+    if (oldBranch && !branches.some((e) => e.branch === oldBranch)) {
+      branches = [...branches, { branch: oldBranch, repo }]
+    }
+
+    if (!branches.some((e) => e.branch === branch && e.repo === repo)) {
+      branches = [...branches, { branch, repo }]
+    }
+
+    const data = { branch, repo, branches }
+    await updateSessionData(sessionId, data)
+    io.emit('session:updated', { sessionId, data })
+    log.info(
+      `[listen] Detected branch="${branch}" repo="${repo}" for session=${sessionId}`,
+    )
   } catch (err) {
     log.error(
       { err, sessionId },
