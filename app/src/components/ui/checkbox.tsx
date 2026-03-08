@@ -26,7 +26,7 @@ function Checkbox({
         {checked === 'indeterminate' ? (
           <Minus className="size-3.5 stroke-3" />
         ) : (
-          <CheckCheck className="size-3.5 stroke-3" />
+          <CheckCheck className="size-3 stroke-3" />
         )}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>

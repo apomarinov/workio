@@ -1,5 +1,7 @@
 import {
   ArrowLeft,
+  Check,
+  ChevronDown,
   CircleX,
   GitBranch,
   Loader2,
@@ -10,9 +12,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { useTerminalContext } from '@/context/TerminalContext'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import { searchSessionMessages } from '@/lib/api'
+import { getBranches, searchSessionMessages } from '@/lib/api'
 import {
   contextExcerpt,
   highlightMatch,
@@ -22,6 +25,22 @@ import { cn } from '@/lib/utils'
 import type { SessionSearchMatch } from '../types'
 import { SessionChat } from './SessionChat'
 import { Button } from './ui/button'
+import { Checkbox } from './ui/checkbox'
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from './ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
 
 type NavItem =
   | { type: 'session'; sessionId: string }
@@ -36,6 +55,11 @@ export function SessionSearchPanel({
   onOpenChange: (open: boolean) => void
   onDismiss: () => void
 }) {
+  const [dismissing, setDismissing] = useState(false)
+  const dismiss = () => {
+    setDismissing(true)
+    onDismiss()
+  }
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SessionSearchMatch[]>([])
   const [loading, setLoading] = useState(false)
@@ -46,6 +70,51 @@ export function SessionSearchPanel({
     null,
   )
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(null)
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
+  const [branches, setBranches] = useState<string[]>([])
+  const [branchesLoading, setBranchesLoading] = useState(false)
+  const [branchPickerOpen, setBranchPickerOpen] = useState(false)
+  const [recentOnly, setRecentOnly] = useState(true)
+
+  const { terminals } = useTerminalContext()
+
+  // Extract distinct repos from terminals
+  const repos = [
+    ...new Set(
+      terminals
+        .map((t) => (t.git_repo as { repo?: string } | null)?.repo)
+        .filter((r): r is string => r != null),
+    ),
+  ].sort()
+
+  // Fetch branches when repo changes
+  useEffect(() => {
+    if (!selectedRepo) {
+      setBranches([])
+      return
+    }
+    const terminal = terminals.find(
+      (t) => (t.git_repo as { repo?: string } | null)?.repo === selectedRepo,
+    )
+    if (!terminal) {
+      setBranches([])
+      return
+    }
+    setBranchesLoading(true)
+    getBranches(terminal.id)
+      .then((data) => {
+        const allBranches = [
+          ...data.local.map((b) => b.name),
+          ...data.remote.map((b) => b.name),
+        ]
+        setBranches([...new Set(allBranches)].sort())
+      })
+      .catch(() => {
+        setBranches([])
+      })
+      .finally(() => setBranchesLoading(false))
+  }, [selectedRepo, terminals])
 
   const isMobile = useIsMobile()
   const showingChat = isMobile && selectedSessionId != null
@@ -80,8 +149,11 @@ export function SessionSearchPanel({
   }, [open])
 
   // Debounced search
+  const hasTextQuery = query.length >= 2
+  const hasFilter = selectedRepo != null && selectedBranch != null
+
   useEffect(() => {
-    if (query.length < 2) {
+    if (!hasTextQuery && !hasFilter) {
       setResults([])
       setLoading(false)
       setSelectedSessionId(null)
@@ -93,7 +165,12 @@ export function SessionSearchPanel({
       searchAbortRef.current?.abort()
       const controller = new AbortController()
       searchAbortRef.current = controller
-      searchSessionMessages(query, controller.signal)
+      searchSessionMessages(hasTextQuery ? query : null, {
+        repo: selectedRepo ?? undefined,
+        branch: selectedBranch ?? undefined,
+        recentOnly,
+        signal: controller.signal,
+      })
         .then((data) => {
           if (!controller.signal.aborted) {
             setResults(data)
@@ -113,7 +190,7 @@ export function SessionSearchPanel({
       clearTimeout(timer)
       searchAbortRef.current?.abort()
     }
-  }, [query])
+  }, [query, selectedRepo, selectedBranch, recentOnly])
 
   // Sort results by terminal name
   const sorted = [...results].sort((a, b) => {
@@ -175,11 +252,13 @@ export function SessionSearchPanel({
       if (paletteOpenRef.current) return
       if (e.key === 'Escape') {
         e.stopPropagation()
-        if (query) {
+        if (query || selectedRepo) {
           setQuery('')
+          setSelectedRepo(null)
+          setSelectedBranch(null)
           inputRef.current?.focus()
         } else {
-          onDismiss()
+          dismiss()
         }
         return
       }
@@ -205,13 +284,13 @@ export function SessionSearchPanel({
   }, [open, query, onDismiss, navItems.length, highlightedIndex])
 
   const resultsContent = loading ? (
-    <div className="flex items-center justify-center py-8">
+    <div className="flex flex-col items-center justify-center gap-1.5 py-8">
       <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
     </div>
   ) : results.length === 0 ? (
     <div className="px-4 py-8 text-sm text-zinc-500 text-center">
-      {query.length < 2
-        ? 'Type to search across all sessions'
+      {!hasTextQuery && !hasFilter
+        ? 'Type to search or filter by repo & branch'
         : 'No matching sessions found'}
     </div>
   ) : (
@@ -357,13 +436,17 @@ export function SessionSearchPanel({
           open ? 'opacity-100 bg-sidebar/60' : 'opacity-0 pointer-events-none',
         )}
         onClick={() => {
-          onOpenChange(false)
+          if (query.length > 0 || selectedRepo != null) {
+            onOpenChange(false)
+          } else {
+            dismiss()
+          }
           window.dispatchEvent(new Event('dialog-closed'))
         }}
       />
 
-      {/* Tab handle when collapsed */}
-      {!open && (
+      {/* Tab handle when collapsed (not dismissing) */}
+      {!open && !dismissing && (
         <button
           type="button"
           onClick={() => onOpenChange(true)}
@@ -414,12 +497,106 @@ export function SessionSearchPanel({
           />
           <button
             type="button"
-            onClick={onDismiss}
+            onClick={dismiss}
             className="text-zinc-500 hover:text-zinc-300 ml-1 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Filter row */}
+        {repos.length > 0 && (
+          <div className="flex flex-wrap gap-2 pl-2 pr-4 py-2 border-b border-zinc-800">
+            <Select
+              value={selectedRepo ?? '__all__'}
+              onValueChange={(v) => {
+                const repo = v === '__all__' ? null : v
+                setSelectedRepo(repo)
+                setSelectedBranch(null)
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="!h-7 text-xs min-w-0 max-w-48"
+              >
+                <SelectValue placeholder="All repos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All repos</SelectItem>
+                {repos.map((repo) => (
+                  <SelectItem key={repo} value={repo}>
+                    {repo.split('/').pop()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Popover open={branchPickerOpen} onOpenChange={setBranchPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs font-normal min-w-0 max-w-48"
+                  disabled={!selectedRepo || branchesLoading}
+                >
+                  {branchesLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <GitBranch className="w-3 h-3 mr-1" />
+                  )}
+                  <span className="truncate">
+                    {selectedBranch ?? 'All branches'}
+                  </span>
+                  <ChevronDown className="w-3 h-3 ml-1 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command shouldFilter={true}>
+                  <CommandInput placeholder="Search branches..." />
+                  <CommandList>
+                    <CommandEmpty>No branches found</CommandEmpty>
+                    <CommandItem
+                      value="__all_branches__"
+                      onSelect={() => {
+                        setSelectedBranch(null)
+                        setBranchPickerOpen(false)
+                      }}
+                    >
+                      All branches
+                      {selectedBranch == null && (
+                        <Check className="ml-auto h-3 w-3" />
+                      )}
+                    </CommandItem>
+                    {branches.map((branch) => (
+                      <CommandItem
+                        key={branch}
+                        value={branch}
+                        onSelect={() => {
+                          setSelectedBranch(branch)
+                          setBranchPickerOpen(false)
+                        }}
+                      >
+                        {branch}
+                        {branch === selectedBranch && (
+                          <Check className="ml-auto h-3 w-3" />
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer ml-auto select-none">
+              <Checkbox
+                checked={recentOnly}
+                onCheckedChange={(v) => setRecentOnly(v === true)}
+                className="h-4 w-4"
+              />
+              {recentOnly ? 'Recent' : 'All sessions'}
+            </label>
+          </div>
+        )}
 
         {/* Body */}
         {isMobile ? (

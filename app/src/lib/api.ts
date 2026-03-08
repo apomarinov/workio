@@ -339,12 +339,22 @@ export async function toggleFavoriteSession(
 }
 
 export async function searchSessionMessages(
-  query: string,
-  signal?: AbortSignal,
+  query: string | null,
+  opts?: {
+    repo?: string
+    branch?: string
+    recentOnly?: boolean
+    signal?: AbortSignal
+  },
 ): Promise<SessionSearchMatch[]> {
+  const params = new URLSearchParams()
+  if (query) params.set('q', query)
+  if (opts?.repo) params.set('repo', opts.repo)
+  if (opts?.branch) params.set('branch', opts.branch)
+  if (opts?.recentOnly === false) params.set('all', '1')
   const res = await apiFetch(
-    `${API_BASE}/sessions/search?q=${encodeURIComponent(query)}`,
-    { signal },
+    `${API_BASE}/sessions/search?${params.toString()}`,
+    { signal: opts?.signal },
   )
   if (!res.ok) throw new Error('Failed to search sessions')
   return res.json()

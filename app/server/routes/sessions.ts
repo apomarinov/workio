@@ -88,18 +88,32 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
   })
 
   // Search session messages
-  fastify.get<{ Querystring: { q?: string } }>(
-    '/api/sessions/search',
-    async (request, reply) => {
-      const q = request.query.q?.trim()
-      if (!q || q.length < 2) {
-        return reply
-          .status(400)
-          .send({ error: 'Query must be at least 2 characters' })
-      }
-      return await searchSessionMessages(q)
-    },
-  )
+  fastify.get<{
+    Querystring: { q?: string; repo?: string; branch?: string; all?: string }
+  }>('/api/sessions/search', async (request, reply) => {
+    const q = request.query.q?.trim()
+    const repo = request.query.repo?.trim()
+    const branch = request.query.branch?.trim()
+    const recentOnly = request.query.all !== '1'
+
+    const hasTextQuery = q != null && q.length >= 2
+    const hasFilter =
+      repo != null && repo.length > 0 && branch != null && branch.length > 0
+
+    if (!hasTextQuery && !hasFilter) {
+      return reply.status(400).send({
+        error:
+          'Query must be at least 2 characters or repo+branch filter is required',
+      })
+    }
+
+    return await searchSessionMessages(
+      hasTextQuery ? q! : null,
+      100,
+      hasFilter ? { repo: repo!, branch: branch! } : undefined,
+      recentOnly,
+    )
+  })
 
   // Get a single session by ID
   fastify.get<{ Params: { id: string } }>(

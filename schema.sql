@@ -118,6 +118,9 @@ CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX IF NOT EXISTS idx_messages_body_trgm ON messages USING gin (body gin_trgm_ops);
 
+-- GIN index for JSONB containment queries on session branches
+CREATE INDEX IF NOT EXISTS idx_sessions_data_branches ON sessions USING GIN ((data->'branches') jsonb_path_ops);
+
 -- Trigger function: auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
