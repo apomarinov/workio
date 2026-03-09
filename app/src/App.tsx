@@ -139,6 +139,13 @@ function AppContent() {
     terminalId: number
     pr?: PRCheckStatus
   } | null>(null)
+  const [commitSheetState, setCommitSheetState] = useState<
+    'closed' | 'expanded' | 'collapsed'
+  >('closed')
+  const commitDialogTargetRef = useRef(commitDialogTarget)
+  commitDialogTargetRef.current = commitDialogTarget
+  const commitSheetStateRef = useRef(commitSheetState)
+  commitSheetStateRef.current = commitSheetState
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false)
   const [sessionSearchMounted, setSessionSearchMounted] = useState(false)
 
@@ -310,7 +317,21 @@ function AppContent() {
     const handler = (
       e: CustomEvent<{ terminalId: number; pr?: PRCheckStatus }>,
     ) => {
+      const current = commitDialogTargetRef.current
+      const currentState = commitSheetStateRef.current
+      // If collapsed and same terminal — just expand
+      if (
+        currentState === 'collapsed' &&
+        current &&
+        current.terminalId === e.detail.terminalId &&
+        !e.detail.pr === !current.pr
+      ) {
+        setCommitSheetState('expanded')
+        return
+      }
+      // Otherwise set new target and expand
       setCommitDialogTarget(e.detail)
+      setCommitSheetState('expanded')
     }
     window.addEventListener('open-commit-dialog', handler as EventListener)
     return () =>
@@ -1077,10 +1098,16 @@ function AppContent() {
       {commitDialogTarget && (
         <Suspense>
           <CommitDialog
-            open
+            state={commitSheetState}
             terminalId={commitDialogTarget.terminalId}
             pr={commitDialogTarget.pr}
-            onClose={() => setCommitDialogTarget(null)}
+            onClose={() => {
+              setCommitSheetState('closed')
+              window.dispatchEvent(new Event('dialog-closed'))
+              setTimeout(() => setCommitDialogTarget(null), 300)
+            }}
+            onCollapse={() => setCommitSheetState('collapsed')}
+            onExpand={() => setCommitSheetState('expanded')}
           />
         </Suspense>
       )}

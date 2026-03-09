@@ -485,8 +485,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-    ) ??
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+      ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))

@@ -1,14 +1,7 @@
-import { Loader2 } from 'lucide-react'
+import { GitCommitHorizontal, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
 import {
   commitChanges,
@@ -16,26 +9,33 @@ import {
   getChangedFiles,
   getHeadMessage,
 } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import type { ChangedFile, PRCheckStatus } from '../../shared/types'
 import { BranchDiffPanel } from './BranchDiffPanel'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel, type FileListHandle } from './DiffViewerPanel'
 
-// --- CommitDialog ---
+// --- CommitDialog (Bottom Sheet) ---
+
+export type CommitSheetState = 'closed' | 'expanded' | 'collapsed'
 
 interface CommitDialogProps {
-  open: boolean
+  state: CommitSheetState
   terminalId: number
   onClose: () => void
+  onCollapse: () => void
+  onExpand: () => void
   onSuccess?: () => void
   /** When set, shows a read-only diff viewer for the PR instead of commit UI */
   pr?: PRCheckStatus
 }
 
 export function CommitDialog({
-  open,
+  state,
   terminalId,
   onClose,
+  onCollapse,
+  onExpand,
   onSuccess,
   pr,
 }: CommitDialogProps) {
@@ -54,26 +54,42 @@ export function CommitDialog({
   const [discardFiles, setDiscardFiles] = useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const handleCommitRef = useRef<() => void>(() => {})
+  const handleCommitRef = useRef<() => void>(() => { })
   const canCommitRef = useRef(false)
   const fileListRef = useRef<FileListHandle>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  // Entry animation (SessionSearchPanel pattern)
+  const [mounted, setMounted] = useState(false)
+  const prevStateRef = useRef<CommitSheetState>('closed')
+  useEffect(() => {
+    if (state !== 'closed' && prevStateRef.current === 'closed') {
+      // Just opened — start off-screen, then animate in
+      setMounted(false)
+      requestAnimationFrame(() => setMounted(true))
+    }
+    prevStateRef.current = state
+  }, [state])
 
   // Notify keyboard shortcuts hook about commit dialog state
   useEffect(() => {
     if (viewOnly) return
     window.dispatchEvent(
-      new CustomEvent('commit-dialog-open', { detail: open }),
+      new CustomEvent('commit-dialog-open', {
+        detail: state !== 'closed',
+      }),
     )
     return () => {
       window.dispatchEvent(
         new CustomEvent('commit-dialog-open', { detail: false }),
       )
     }
-  }, [open, viewOnly])
+  }, [state, viewOnly])
 
   // Listen for custom events from global keyboard shortcuts
   useEffect(() => {
-    if (!open || viewOnly) return
+    if (state !== 'expanded' || viewOnly) return
     const onToggleAmend = () =>
       setAmend((v) => {
         if (v) setMessage('')
@@ -86,7 +102,7 @@ export function CommitDialog({
       window.removeEventListener('commit-toggle-amend', onToggleAmend)
       window.removeEventListener('commit-toggle-no-verify', onToggleNoVerify)
     }
-  }, [open, viewOnly])
+  }, [state, viewOnly])
 
   function refreshFiles(autoSelect = true) {
     setLoadingFiles(true)
@@ -113,9 +129,10 @@ export function CommitDialog({
       })
   }
 
-  // Fetch changed files on dialog open
+  // Fetch changed files when opening (not on collapse)
   useEffect(() => {
-    if (!open) {
+    if (state === 'closed') {
+      // Reset state only when fully closed
       setMessage('')
       setAmend(false)
       setNoVerify(false)
@@ -125,9 +142,11 @@ export function CommitDialog({
       setHasSelection(false)
       return
     }
-
-    refreshFiles()
-  }, [open, terminalId, base])
+    // Only fetch when transitioning from closed (not from collapsed)
+    if (prevStateRef.current === 'closed' || prevStateRef.current === state) {
+      refreshFiles()
+    }
+  }, [state, terminalId, base])
 
   // When amend is toggled on, fetch HEAD message
   useEffect(() => {
@@ -156,9 +175,23 @@ export function CommitDialog({
     }
   }, [amend, terminalId])
 
-  // Cmd/Ctrl+Enter to commit from anywhere in the dialog
+  // ESC to close when expanded (capture phase)
   useEffect(() => {
-    if (!open || viewOnly) return
+    if (state !== 'expanded') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [state, onClose])
+
+  // Cmd/Ctrl+Enter to commit when expanded
+  useEffect(() => {
+    if (state !== 'expanded' || viewOnly) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === 'Enter' &&
@@ -172,7 +205,15 @@ export function CommitDialog({
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [open])
+  }, [state, viewOnly])
+
+  // Auto-focus textarea when expanding from closed
+  useEffect(() => {
+    if (state === 'expanded' && !viewOnly) {
+      const timer = setTimeout(() => textareaRef.current?.focus(), 350)
+      return () => clearTimeout(timer)
+    }
+  }, [state, viewOnly])
 
   const handleAmendChange = (checked: boolean) => {
     setAmend(checked)
@@ -224,6 +265,11 @@ export function CommitDialog({
   handleCommitRef.current = handleCommit
   canCommitRef.current = canCommit
 
+  const isExpanded = state === 'expanded' && mounted
+  const isCollapsed = state === 'collapsed'
+
+  const fileCount = changedFiles.length
+
   const commitControls = !viewOnly ? (
     <div className="flex gap-3 flex-shrink-0 p-0.5">
       <textarea
@@ -262,73 +308,118 @@ export function CommitDialog({
   ) : undefined
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent
-        className="w-[100vw] max-w-none p-2 pt-[max(0.5rem,env(safe-area-inset-top))] rounded-none sm:w-[95vw] sm:max-w-[1500px] sm:p-4 sm:pt-4 sm:rounded-lg h-[100dvh] max-h-none sm:h-[95vh] sm:max-h-[1500px] flex flex-col overflow-hidden"
-        showCloseButton={viewOnly}
-        onOpenAutoFocus={(e) => {
-          e.preventDefault()
-          if (!viewOnly) textareaRef.current?.focus()
-        }}
-        onInteractOutside={(e) => e.preventDefault()}
+    <>
+      {/* Backdrop — only when expanded */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 transition-opacity duration-300',
+          isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none',
+        )}
+        onClick={onCollapse}
+      />
+
+      {/* Bottom sheet */}
+      <div
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-50 flex flex-col bg-zinc-900 border-t border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out mx-auto max-w-[1400px]',
+          'h-[100dvh] max-h-none sm:h-[95vh] sm:max-h-[1500px] sm:rounded-t-lg',
+          isExpanded && 'translate-y-0',
+          isCollapsed && 'translate-y-[calc(100%-48px)]',
+          !isExpanded && !isCollapsed && 'translate-y-full',
+        )}
       >
-        <DialogHeader className={viewOnly ? '' : 'hidden'}>
-          <DialogTitle>
-            {viewOnly && pr ? (
-              <div className="flex flex-col gap-0.5 max-sm:text-left">
-                <span>
-                  {pr.prTitle}{' '}
-                  <span className="text-zinc-500">#{pr.prNumber}</span>
-                </span>
-                <span className="text-xs font-normal text-zinc-500 font-mono">
-                  {pr.baseBranch} ← {pr.branch}
-                </span>
+        {/* Collapsed bar — always rendered at top, clickable to expand */}
+        <button
+          type="button"
+          onClick={() => {
+            if (state === 'collapsed') onExpand()
+          }}
+          className={cn(
+            'flex items-center gap-2 h-12 px-4 flex-shrink-0 text-left transition-colors',
+            state === 'collapsed'
+              ? 'cursor-pointer hover:bg-zinc-800'
+              : 'cursor-default',
+          )}
+        >
+          <GitCommitHorizontal className="w-4 h-4 text-zinc-400" />
+          <span className="text-sm font-medium text-zinc-200 truncate">
+            {viewOnly && pr
+              ? `${pr.prTitle} #${pr.prNumber}`
+              : 'Commit Changes'}
+          </span>
+          {fileCount > 0 && (
+            <span className="text-xs text-zinc-500 ml-1">
+              {fileCount} file{fileCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          {message.trim() && !viewOnly && (
+            <span className="text-xs text-zinc-500 ml-auto truncate max-w-[200px]">
+              {message.trim().split('\n')[0]}
+            </span>
+          )}
+        </button>
+
+        {/* Content area — inert when collapsed */}
+        <div
+          className="flex-1 min-h-0 flex flex-col overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4"
+          {...(state === 'collapsed'
+            ? { inert: '' as unknown as boolean }
+            : {})}
+        >
+          {viewOnly && pr ? (
+            <>
+              <div className="px-2 pb-2 sm:px-0">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">
+                    {pr.prTitle}{' '}
+                    <span className="text-zinc-500">#{pr.prNumber}</span>
+                  </span>
+                  <span className="text-xs text-zinc-500 font-mono">
+                    {pr.baseBranch} ← {pr.branch}
+                  </span>
+                </div>
               </div>
-            ) : (
-              'Commit Changes'
-            )}
-          </DialogTitle>
-        </DialogHeader>
+              <BranchDiffPanel
+                terminalId={terminalId}
+                baseBranch={pr.baseBranch}
+                headBranch={pr.branch}
+                cacheKey={pr.headCommitSha}
+              />
+            </>
+          ) : (
+            <DiffViewerPanel
+              terminalId={terminalId}
+              base={base}
+              readOnly={viewOnly}
+              commitControls={commitControls}
+              onHasSelectionChange={setHasSelection}
+              fileListRef={fileListRef}
+              loading={loading}
+              discarding={discarding}
+              onRefresh={() => refreshFiles()}
+              onRequestDiscard={(files) => {
+                setDiscardFiles(files)
+                setConfirmDiscard(true)
+              }}
+              externalFiles={changedFiles}
+              externalLoadingFiles={loadingFiles}
+            />
+          )}
 
-        {viewOnly && pr ? (
-          <BranchDiffPanel
-            terminalId={terminalId}
-            baseBranch={pr.baseBranch}
-            headBranch={pr.branch}
-            cacheKey={pr.headCommitSha}
-          />
-        ) : (
-          <DiffViewerPanel
-            terminalId={terminalId}
-            base={base}
-            readOnly={viewOnly}
-            commitControls={commitControls}
-            onHasSelectionChange={setHasSelection}
-            fileListRef={fileListRef}
-            loading={loading}
-            discarding={discarding}
-            onRefresh={() => refreshFiles()}
-            onRequestDiscard={(files) => {
-              setDiscardFiles(files)
-              setConfirmDiscard(true)
-            }}
-            externalFiles={changedFiles}
-            externalLoadingFiles={loadingFiles}
-          />
-        )}
-
-        {!viewOnly && (
-          <DialogFooter className="flex-row justify-end">
-            <Button variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
-            </Button>
-            <Button onClick={handleCommit} disabled={!canCommit || loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {amend ? 'Amend' : 'Commit'}
-            </Button>
-          </DialogFooter>
-        )}
-      </DialogContent>
+          {!viewOnly && (
+            <div className="flex justify-end gap-2 pt-2 flex-shrink-0">
+              <Button variant="outline" onClick={onClose} disabled={loading}>
+                Cancel
+              </Button>
+              <Button onClick={handleCommit} disabled={!canCommit || loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {amend ? 'Amend' : 'Commit'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {!viewOnly && (
         <ConfirmModal
@@ -341,6 +432,6 @@ export function CommitDialog({
           onCancel={() => setConfirmDiscard(false)}
         />
       )}
-    </Dialog>
+    </>
   )
 }
