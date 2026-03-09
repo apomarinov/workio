@@ -1,20 +1,4 @@
-import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { ClaudeIcon } from '@/components/icons'
-import { cn, sessionStatusColor } from '@/lib/utils'
-
-export function SessionSearchIcon({ status }: { status: string }) {
-  if (status === 'done')
-    return <Check className="h-4 w-4 shrink-0 text-green-500/70" />
-  return (
-    <ClaudeIcon
-      className={cn(
-        'h-4 w-4 shrink-0',
-        sessionStatusColor[status] ?? 'text-gray-400',
-      )}
-    />
-  )
-}
 
 export function contextExcerpt(
   text: string,

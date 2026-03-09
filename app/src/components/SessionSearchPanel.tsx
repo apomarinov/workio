@@ -16,11 +16,7 @@ import { useTerminalContext } from '@/context/TerminalContext'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getBranches, searchSessionMessages } from '@/lib/api'
-import {
-  contextExcerpt,
-  highlightMatch,
-  SessionSearchIcon,
-} from '@/lib/search-utils'
+import { contextExcerpt, highlightMatch } from '@/lib/search-utils'
 import { cn } from '@/lib/utils'
 import type { SessionSearchMatch } from '../types'
 import { SessionChat } from './SessionChat'
@@ -322,7 +318,6 @@ export function SessionSearchPanel({
                 )}
               >
                 <div className="flex items-center gap-1.5">
-                  <SessionSearchIcon status={match.status} />
                   <span className="text-xs font-medium text-zinc-200 break-all">
                     {sessionTitle}
                   </span>
