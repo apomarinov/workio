@@ -1,5 +1,71 @@
 # Changelog
 
+## [v0.4.0](../../compare/v0.3.0...v0.4.0) — 2026-03-09
+
+### Features
+- Add Create Pull Request dialog with diff viewer, commit list, and conflict detection
+- Add session search side panel with repo, branch, and recency filters
+- Add mobile responsive session search and diff/changes modals with unified diff view
+- Add branch diff panel with compare and branch commit modes, paginated commit dialog
+- Add resizable panels with localStorage persistence to commit and file lists
+- Add merge-base separator to branch commit list and draft toggle to Edit PR
+- Track all branches a session has been on and show last updated date on session search results
+- Add last commit section to status bar and show all processes/ports grouped by shell
+- Add per-shell primary client with requestPrimary flag, auto-release, and active shell tracking
+- Broadcast refetch events to other clients on mutations for real-time sync
+- Add Opt+Click to copy filepath/URL to clipboard in terminal
+- Add Cmd+Arrow and Cmd+Backspace terminal shortcuts, show in keymap modal
+- Add toggle sidebar shortcut (Opt+`), Pull Branch shortcut (Cmd+T), and Branches shortcut (Ctrl+Shift+Enter)
+- Add Cmd+1-9 to select custom commands in palette
+- Add edge swipe gesture to open/close mobile sidebar
+- Add per-IP auth lockout notification on brute-force detection
+- Add single notification delete with trash icon on hover and read/unread toggle
+- Add edit button for own PR comments and reviews
+- Add custom notification sound for bell subscription notifications
+- Add separate mobile font size setting for terminals
+
+### Improvements
+- Convert CommitDialog from modal to collapsible bottom sheet
+- Replace custom diff viewer with diff2html for smooth scrolling
+- Fork each shell PTY into its own child process to prevent event loop starvation
+- Only mount recently-active shells to reduce DOM/memory overhead, keep active ones mounted
+- Unify CreateTerminalModal, PR modal, and CommitDialog to single instances in App.tsx
+- Unify resume-session and custom commands into run-in-shell
+- Redesign ActionChip as ActionButton with modern depth styling and tap sound
+- Scale-to-fit for non-primary clients instead of PTY resize wars
+- Switch ngrok from SDK to CLI for HTTPS upstream compatibility
+- Optimize large build chunks by reducing bundle sizes
+- Persist terminal and shell DnD order to settings table
+- Write shell integration scripts to ~/.workio/ and source from there
+- Improve PR modal responsiveness, DirectoryBrowser dialog, and status bar layout
+- Block pull shortcut when git is dirty with warning toast
+- Show PR base branch in sidebar when targeting non-main branch
+- Suppress client-side notifications when device has push subscription
+- Move connected clients indicator to sidebar header and mobile bar
+- Add structured logging to broadcastRefetch with human-readable client labels
+- Enrich permission notifications with actual permission details
+- Retry permission prompt scanning with exponential backoff
+- Relax git dirty restrictions, add remote rename, and fix status colors
+- Append meta message to transcript when moving session to new project
+- Replace pixel art mascot icon and deduplicate sessionStatusColor
+- Extract useEdgeSwipe hook and fix search highlight to target bubbles
+
+### Bug Fixes
+- Fix stale active_cmd clearing racing with process detection across multiple scenarios
+- Fix safe area inset handling for mobile slide panels and dialog close button
+- Fix review reactions using GraphQL and log non-2xx responses
+- Fix unhandled push notification error crashing server
+- Fix desktop:active not firing for keyboard input
+- Fix active permissions query returning stale data from old prompts
+- Fix shell close from tab menu not updating state
+- Fix nested button hydration error and limit WebGL contexts to visible shells
+- Fix PR draft toggle, push tracking, and ahead/behind sync
+- Cache git fetch to deduplicate redundant network calls in PR view
+- Clear diff viewer when all files are discarded
+- Fix daemon.sock cleanup error on shutdown
+- Refocus active shell when any dialog or palette closes
+- Match mobile PWA safe-area background to terminal color
+
 ## [v0.3.0](../../compare/v0.2.0...v0.3.0) — 2026-03-01
 
 ### Features
