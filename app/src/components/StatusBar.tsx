@@ -39,7 +39,11 @@ import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import type { ActiveProcess, GitLastCommit } from '../../shared/types'
+import type {
+  ActiveProcess,
+  GitDiffStat,
+  GitLastCommit,
+} from '../../shared/types'
 import type { Terminal } from '../types'
 import {
   DEFAULT_STATUS_BAR,
@@ -246,7 +250,7 @@ function GitDirtySection({
   terminalId,
 }: {
   section: StatusBarSection
-  diffStat: { added: number; removed: number; untracked: number }
+  diffStat: GitDiffStat
   terminalId: number
 }) {
   return (
@@ -264,6 +268,7 @@ function GitDirtySection({
         added={diffStat.added}
         removed={diffStat.removed}
         untracked={diffStat.untracked}
+        untrackedLines={diffStat.untrackedLines}
         className="text-[11px]"
       />
     </SortableStatusSection>
@@ -480,8 +485,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -602,7 +607,7 @@ export function StatusBar({ position }: StatusBarProps) {
     <div className={cn('w-full bg-[#1a1a1a] flex relative items-center')}>
       <div
         className={cn(
-          'absolute left-0 w-full h-[0.02rem] bg-zinc-400/30',
+          'absolute left-0 w-full h-[0.02rem] bg-zinc-400/30 z-1',
           position === 'top' && 'bottom-[0.02rem]',
           position === 'bottom' && !isMobile && 'top-[0.02rem]',
           position === 'bottom' && isMobile && 'bottom-[0.02rem]',

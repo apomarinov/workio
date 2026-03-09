@@ -47,7 +47,7 @@ export function createPRCheckoutMode(
     const isDirty =
       !!dirtyStatus && (dirtyStatus.added > 0 || dirtyStatus.removed > 0)
     const isOnBranch = terminal.git_branch === pr.branch
-    const canCheckout = !isDirty && !isOnBranch && !isLoading
+    const canCheckout = !isOnBranch && !isLoading
 
     return {
       id: `terminal:${terminal.id}`,
@@ -66,15 +66,15 @@ export function createPRCheckoutMode(
       ) : undefined,
       icon: <TerminalIcon2 className="h-4 w-4 shrink-0 fill-zinc-400" />,
       disabled: !canCheckout,
-      disabledReason: isOnBranch
-        ? 'already on this branch'
-        : isDirty
-          ? 'uncommitted changes'
-          : undefined,
+      disabledReason: isOnBranch ? 'already on this branch' : undefined,
       loading: loadingStates.checkingOut === `${terminal.id}:${pr.branch}`,
       onSelect: () => {
         if (canCheckout) {
-          actions.checkoutPRBranch(terminal.id, pr.branch)
+          if (isDirty) {
+            actions.requestCheckoutPRBranch(terminal.id, pr.branch)
+          } else {
+            actions.checkoutPRBranch(terminal.id, pr.branch)
+          }
         }
       },
     }

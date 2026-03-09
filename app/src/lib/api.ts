@@ -485,13 +485,19 @@ export async function renameBranch(
   terminalId: number,
   branch: string,
   newName: string,
-): Promise<{ success: boolean; branch: string; newName: string }> {
+  renameRemote?: boolean,
+): Promise<{
+  success: boolean
+  branch: string
+  newName: string
+  renamedRemote?: boolean
+}> {
   const res = await apiFetch(
     `${API_BASE}/terminals/${terminalId}/rename-branch`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branch, newName }),
+      body: JSON.stringify({ branch, newName, renameRemote }),
     },
   )
   const data = await res.json()

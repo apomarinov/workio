@@ -2491,6 +2491,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   interface RenameBranchBody {
     branch: string
     newName: string
+    renameRemote?: boolean
   }
 
   fastify.post<{ Params: TerminalParams; Body: RenameBranchBody }>(
@@ -2510,7 +2511,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Terminal has no git repo' })
       }
 
-      const { branch, newName } = request.body
+      const { branch, newName, renameRemote } = request.body
       if (!branch) {
         return reply.status(400).send({ error: 'Branch is required' })
       }
@@ -2584,8 +2585,93 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           })
         }
 
+        // Rename remote branch if requested
+        let renamedRemote = false
+        if (renameRemote) {
+          try {
+            // Delete old remote branch
+            const deleteRemoteCmd = `git push origin --delete ${branch.replace(/'/g, "'\\''")}`
+            if (terminal.ssh_host) {
+              const result = await execSSHCommand(
+                terminal.ssh_host,
+                deleteRemoteCmd,
+                {
+                  cwd: terminal.cwd,
+                },
+              )
+              logCommand({
+                terminalId: id,
+                category: 'git',
+                command: deleteRemoteCmd,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              })
+            } else {
+              await new Promise<void>((resolve, reject) => {
+                execFile(
+                  'git',
+                  ['push', 'origin', '--delete', branch],
+                  { cwd: expandPath(terminal.cwd), timeout: 30000 },
+                  (err, stdout, stderr) => {
+                    logCommand({
+                      terminalId: id,
+                      category: 'git',
+                      command: deleteRemoteCmd,
+                      stdout,
+                      stderr: err ? err.message : stderr,
+                    })
+                    if (err) reject(err)
+                    else resolve()
+                  },
+                )
+              })
+            }
+
+            // Push new branch with upstream tracking
+            const pushCmd = `git push -u origin ${newName.replace(/'/g, "'\\''")}`
+            if (terminal.ssh_host) {
+              const result = await execSSHCommand(terminal.ssh_host, pushCmd, {
+                cwd: terminal.cwd,
+              })
+              logCommand({
+                terminalId: id,
+                category: 'git',
+                command: pushCmd,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              })
+            } else {
+              await new Promise<void>((resolve, reject) => {
+                execFile(
+                  'git',
+                  ['push', '-u', 'origin', newName],
+                  { cwd: expandPath(terminal.cwd), timeout: 30000 },
+                  (err, stdout, stderr) => {
+                    logCommand({
+                      terminalId: id,
+                      category: 'git',
+                      command: pushCmd,
+                      stdout,
+                      stderr: err ? err.message : stderr,
+                    })
+                    if (err) reject(err)
+                    else resolve()
+                  },
+                )
+              })
+            }
+            renamedRemote = true
+          } catch (remoteErr) {
+            log.error(
+              { err: remoteErr },
+              `[terminals] Failed to rename remote branch ${branch} to ${newName}`,
+            )
+            // Local rename succeeded, remote failed — still return success but flag it
+          }
+        }
+
         detectGitBranch(id)
-        return { success: true, branch, newName }
+        return { success: true, branch, newName, renamedRemote }
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to rename branch'

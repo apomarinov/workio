@@ -76,6 +76,7 @@ export type AppActions = {
   fetchAll: (terminalId: number) => Promise<void>
   loadBranches: (terminalId: number) => void
   checkoutBranch: (name: string, isRemote: boolean) => Promise<void>
+  requestCheckoutBranch: (name: string, isRemote: boolean) => void
   pullBranch: (name: string) => Promise<void>
   pushBranch: (name: string, force?: boolean) => Promise<void>
   requestForcePush: (terminalId: number, branch: string) => void
@@ -87,7 +88,11 @@ export type AppActions = {
   ) => void
   requestCommit: (terminalId: number) => void
   requestCreateBranch: (terminalId: number, fromBranch: string) => void
-  requestRenameBranch: (terminalId: number, branch: string) => void
+  requestRenameBranch: (
+    terminalId: number,
+    branch: string,
+    hasRemote: boolean,
+  ) => void
 
   // Star actions
   toggleStarBranch: (repo: string, branchName: string) => void
@@ -117,6 +122,7 @@ export type AppActions = {
   openEditPRModal: (pr: PRCheckStatus) => void
   openRerunAllModal: (pr: PRCheckStatus) => void
   checkoutPRBranch: (terminalId: number, branch: string) => Promise<void>
+  requestCheckoutPRBranch: (terminalId: number, branch: string) => void
   hidePR: (pr: PRCheckStatus) => Promise<void>
 }
 

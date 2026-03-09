@@ -124,6 +124,7 @@ export interface GitDiffStat {
   added: number
   removed: number
   untracked: number
+  untrackedLines: number
 }
 
 export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'

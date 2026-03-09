@@ -19,6 +19,7 @@ interface GitDirtyBadgeProps {
   added: number
   removed: number
   untracked: number
+  untrackedLines?: number
   className?: string
 }
 
@@ -26,11 +27,15 @@ export function GitDirtyBadge({
   added,
   removed,
   untracked,
+  untrackedLines = 0,
   className,
 }: GitDirtyBadgeProps) {
+  const totalAdded = added + untrackedLines
   return (
     <div className={cn('font-mono flex gap-1 items-center', className)}>
-      {added > 0 && <span className="text-green-500/80">+{added}</span>}
+      {totalAdded > 0 && (
+        <span className="text-green-500/80">+{totalAdded}</span>
+      )}
       {removed > 0 && <span className="text-red-400/80">-{removed}</span>}
       {untracked > 0 && (
         <span className="text-yellow-500/80">?{untracked}</span>

@@ -449,7 +449,7 @@ function stopGlobalProcessPolling() {
 let gitDirtyPollingId: NodeJS.Timeout | null = null
 const lastDirtyStatus = new Map<
   number,
-  { added: number; removed: number; untracked: number }
+  { added: number; removed: number; untracked: number; untrackedLines: number }
 >()
 const lastRemoteSyncStatus = new Map<
   number,
@@ -526,8 +526,13 @@ async function checkLastCommit(
 async function checkGitDirty(
   cwd: string,
   sshHost?: string | null,
-): Promise<{ added: number; removed: number; untracked: number }> {
-  const zero = { added: 0, removed: 0, untracked: 0 }
+): Promise<{
+  added: number
+  removed: number
+  untracked: number
+  untrackedLines: number
+}> {
+  const zero = { added: 0, removed: 0, untracked: 0, untrackedLines: 0 }
   try {
     if (sshHost) {
       const [diffResult, untrackedResult, untrackedLinesResult] =
@@ -552,15 +557,17 @@ async function checkGitDirty(
       const untrackedLines =
         Number.parseInt(untrackedLinesResult.stdout.trim(), 10) || 0
       return {
-        added: diff.added + untrackedLines,
+        added: diff.added,
         removed: diff.removed,
         untracked: countUntracked(untrackedResult.stdout),
+        untrackedLines,
       }
     }
     return await new Promise<{
       added: number
       removed: number
       untracked: number
+      untrackedLines: number
     }>((resolve) => {
       let diff = { added: 0, removed: 0 }
       let untracked = 0
@@ -569,9 +576,10 @@ async function checkGitDirty(
       const checkDone = () => {
         if (++completed === 3)
           resolve({
-            added: diff.added + untrackedLines,
+            added: diff.added,
             removed: diff.removed,
             untracked,
+            untrackedLines,
           })
       }
 
@@ -752,7 +760,12 @@ function countRemoteSync(
 async function scanAndEmitGitDirty() {
   const currentStatus: Record<
     number,
-    { added: number; removed: number; untracked: number }
+    {
+      added: number
+      removed: number
+      untracked: number
+      untrackedLines: number
+    }
   > = {}
   const currentSyncStatus: Record<
     number,
@@ -871,7 +884,8 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       !prevDirty ||
       prevDirty.added !== stat.added ||
       prevDirty.removed !== stat.removed ||
-      prevDirty.untracked !== stat.untracked
+      prevDirty.untracked !== stat.untracked ||
+      prevDirty.untrackedLines !== stat.untrackedLines
     const commitChanged = commit
       ? !prevCommit || prevCommit.hash !== commit.hash
       : false
@@ -881,7 +895,12 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       if (commit) lastCommitStatus.set(terminalId, commit)
       const dirtyStatus: Record<
         number,
-        { added: number; removed: number; untracked: number }
+        {
+          added: number
+          removed: number
+          untracked: number
+          untrackedLines: number
+        }
       > = {}
       for (const [id, s] of lastDirtyStatus) {
         dirtyStatus[id] = s

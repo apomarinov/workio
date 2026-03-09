@@ -250,18 +250,20 @@ export function createBranchActionsMode(
   const items: PaletteItem[] = []
 
   // Checkout
-  const canCheckout = !branch.isCurrent && !isDirty && !isLoading
+  const canCheckout = !branch.isCurrent && !isLoading
   items.push({
     id: 'action:checkout',
     label: 'Checkout',
     icon: <GitBranch className="h-4 w-4 shrink-0 text-zinc-400" />,
     disabled: !canCheckout,
-    disabledReason:
-      !branch.isCurrent && isDirty ? 'uncommitted changes' : undefined,
     loading: loadingStates.checkingOut === branch.name,
     onSelect: () => {
       if (canCheckout) {
-        actions.checkoutBranch(branch.name, branch.isRemote)
+        if (isDirty) {
+          actions.requestCheckoutBranch(branch.name, branch.isRemote)
+        } else {
+          actions.checkoutBranch(branch.name, branch.isRemote)
+        }
       }
     },
   })
@@ -365,7 +367,7 @@ export function createBranchActionsMode(
       loading: loadingStates.renaming === branch.name,
       onSelect: () => {
         if (canRename) {
-          actions.requestRenameBranch(terminal.id, branch.name)
+          actions.requestRenameBranch(terminal.id, branch.name, hasRemote)
         }
       },
     })
@@ -373,13 +375,12 @@ export function createBranchActionsMode(
 
   // Delete (for local non-current branches when not dirty)
   if (!branch.isRemote && !branch.isCurrent) {
-    const canDelete = !isDirty && !isLoading
+    const canDelete = !isLoading
     items.push({
       id: 'action:delete',
       label: 'Delete',
       icon: <Trash2 className="h-4 w-4 shrink-0 text-red-400" />,
       disabled: !canDelete,
-      disabledReason: isDirty ? 'uncommitted changes' : undefined,
       loading: loadingStates.deleting === branch.name,
       onSelect: () => {
         if (canDelete) {

@@ -102,6 +102,14 @@ export function CommandPalette() {
     hasRemote: boolean
   } | null>(null)
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false)
+  const [checkoutConfirm, setCheckoutConfirm] = useState<{
+    name: string
+    isRemote: boolean
+  } | null>(null)
+  const [checkoutPRConfirm, setCheckoutPRConfirm] = useState<{
+    terminalId: number
+    branch: string
+  } | null>(null)
 
   // PR action modals
   const [mergeModal, setMergeModal] = useState<PRCheckStatus | null>(null)
@@ -114,7 +122,9 @@ export function CommandPalette() {
   const [renameBranchTarget, setRenameBranchTarget] = useState<{
     terminalId: number
     branch: string
+    hasRemote: boolean
   } | null>(null)
+  const [renameRemoteBranch, setRenameRemoteBranch] = useState(false)
   const [createBranchFrom, setCreateBranchFrom] = useState<{
     terminalId: number
     branch: string
@@ -914,6 +924,9 @@ export function CommandPalette() {
             })
           })
       },
+      requestCheckoutBranch: (name, isRemote) => {
+        setCheckoutConfirm({ name, isRemote })
+      },
       checkoutBranch: async (name, isRemote) => {
         const terminal = currentLevel.terminal
         if (!terminal) return
@@ -1026,9 +1039,13 @@ export function CommandPalette() {
         closePalette()
         setTimeout(() => setCreateBranchFrom({ terminalId, branch }), 150)
       },
-      requestRenameBranch: (terminalId, branch) => {
+      requestRenameBranch: (terminalId, branch, hasRemote) => {
         closePalette()
-        setTimeout(() => setRenameBranchTarget({ terminalId, branch }), 150)
+        setRenameRemoteBranch(false)
+        setTimeout(
+          () => setRenameBranchTarget({ terminalId, branch, hasRemote }),
+          150,
+        )
       },
 
       // PR actions
@@ -1068,6 +1085,9 @@ export function CommandPalette() {
       },
       openRerunAllModal: (pr) => {
         setRerunAllModal(pr)
+      },
+      requestCheckoutPRBranch: (terminalId, branch) => {
+        setCheckoutPRConfirm({ terminalId, branch })
       },
       checkoutPRBranch: async (terminalId, branch) => {
         api.updateLevel((l) => ({
@@ -1463,6 +1483,38 @@ export function CommandPalette() {
         </ConfirmModal>
       )}
 
+      {checkoutConfirm && (
+        <ConfirmModal
+          open={!!checkoutConfirm}
+          title="Uncommitted Changes"
+          message={`You have uncommitted changes. Are you sure you want to checkout "${checkoutConfirm.name}"? Your changes may be lost.`}
+          confirmLabel="Checkout"
+          variant="danger"
+          onConfirm={() => {
+            const { name, isRemote } = checkoutConfirm
+            setCheckoutConfirm(null)
+            appActions.checkoutBranch(name, isRemote)
+          }}
+          onCancel={() => setCheckoutConfirm(null)}
+        />
+      )}
+
+      {checkoutPRConfirm && (
+        <ConfirmModal
+          open={!!checkoutPRConfirm}
+          title="Uncommitted Changes"
+          message={`You have uncommitted changes. Are you sure you want to checkout "${checkoutPRConfirm.branch}"? Your changes may be lost.`}
+          confirmLabel="Checkout"
+          variant="danger"
+          onConfirm={() => {
+            const { terminalId, branch } = checkoutPRConfirm
+            setCheckoutPRConfirm(null)
+            appActions.checkoutPRBranch(terminalId, branch)
+          }}
+          onCancel={() => setCheckoutPRConfirm(null)}
+        />
+      )}
+
       {forcePushConfirm && (
         <ConfirmModal
           open={!!forcePushConfirm}
@@ -1569,18 +1621,31 @@ export function CommandPalette() {
           placeholder="Branch name"
           currentName={renameBranchTarget.branch}
           onSave={async (newName) => {
-            await renameBranch(
+            const result = await renameBranch(
               renameBranchTarget.terminalId,
               renameBranchTarget.branch,
               newName,
+              renameRemoteBranch,
             )
-            toast.success(
-              `Renamed branch ${renameBranchTarget.branch} to ${newName}`,
-            )
+            const msg = result.renamedRemote
+              ? `Renamed branch ${renameBranchTarget.branch} to ${newName} (local and remote)`
+              : `Renamed branch ${renameBranchTarget.branch} to ${newName}`
+            toast.success(msg)
             setRenameBranchTarget(null)
           }}
           onCancel={() => setRenameBranchTarget(null)}
-        />
+        >
+          {renameBranchTarget.hasRemote && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer mt-3">
+              <Checkbox
+                checked={renameRemoteBranch}
+                onCheckedChange={(v) => setRenameRemoteBranch(v === true)}
+                className="w-5 h-5"
+              />
+              Also rename remote branch
+            </label>
+          )}
+        </RenameModal>
       )}
 
       {rerunAllModal && (

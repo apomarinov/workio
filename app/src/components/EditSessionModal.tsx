@@ -18,6 +18,7 @@ interface RenameModalProps {
   onCancel: () => void
   title?: string
   placeholder?: string
+  children?: React.ReactNode
 }
 
 export function RenameModal({
@@ -27,6 +28,7 @@ export function RenameModal({
   onCancel,
   title = 'Rename Session',
   placeholder = 'Session name',
+  children,
 }: RenameModalProps) {
   const [name, setName] = useState(currentName)
   const [saving, setSaving] = useState(false)
@@ -56,6 +58,7 @@ export function RenameModal({
             placeholder={placeholder}
             disabled={saving}
           />
+          {children}
           <DialogFooter className="mt-4">
             <Button
               type="button"

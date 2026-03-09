@@ -6,10 +6,10 @@ export const STATUS_CONFIG: Record<
   { label: string; className: string }
 > = {
   added: { label: 'A', className: 'bg-green-900/50 text-green-400' },
-  modified: { label: 'M', className: 'bg-blue-900/50 text-blue-400' },
+  modified: { label: 'M', className: 'bg-amber-900/50 text-amber-400' },
   deleted: { label: 'D', className: 'bg-red-900/50 text-red-400' },
   renamed: { label: 'R', className: 'bg-yellow-900/50 text-yellow-400' },
-  untracked: { label: 'U', className: 'bg-zinc-700/50 text-zinc-400' },
+  untracked: { label: 'U', className: 'bg-green-900/50 text-green-400' },
 }
 
 export function FileStatusBadge({ status }: { status: FileStatus }) {

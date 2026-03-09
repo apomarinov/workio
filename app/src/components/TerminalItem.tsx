@@ -489,6 +489,7 @@ export const TerminalItem = memo(function TerminalItem({
                           added={diffStat.added}
                           removed={diffStat.removed}
                           untracked={diffStat.untracked}
+                          untrackedLines={diffStat.untrackedLines}
                         />
                       </button>
                     )}

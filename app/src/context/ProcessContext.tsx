@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { resolveNotification } from '../../shared/notifications'
 import type {
   ActiveProcess,
+  GitDiffStat,
   GitDirtyPayload,
   GitLastCommit,
   GitRemoteSyncPayload,
@@ -14,10 +15,7 @@ interface ProcessContextValue {
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
   shellPorts: Record<number, number[]>
-  gitDirtyStatus: Record<
-    number,
-    { added: number; removed: number; untracked: number }
-  >
+  gitDirtyStatus: Record<number, GitDiffStat>
   gitRemoteSyncStatus: Record<
     number,
     { behind: number; ahead: number; noRemote: boolean }
@@ -45,7 +43,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
   )
   const [shellPorts, setShellPorts] = useState<Record<number, number[]>>({})
   const [gitDirtyStatus, setGitDirtyStatus] = useState<
-    Record<number, { added: number; removed: number; untracked: number }>
+    Record<number, GitDiffStat>
   >({})
   const [gitRemoteSyncStatus, setGitRemoteSyncStatus] = useState<
     Record<number, { behind: number; ahead: number; noRemote: boolean }>
