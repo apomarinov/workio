@@ -17,6 +17,7 @@ import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getBranches, searchSessionMessages } from '@/lib/api'
 import { contextExcerpt, highlightMatch } from '@/lib/search-utils'
+import { formatDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import type { SessionSearchMatch } from '../types'
 import { SessionChat } from './SessionChat'
@@ -299,41 +300,46 @@ export function SessionSearchPanel({
           const sessionNavIndex = navIndex++
           return (
             <div key={match.session_id} className="mb-1">
-              <button
-                type="button"
-                data-nav-index={sessionNavIndex}
-                onClick={() =>
-                  selectItem({
-                    type: 'session',
-                    sessionId: match.session_id,
-                  })
-                }
-                className={cn(
-                  'w-full text-left px-3 py-1.5 cursor-pointer transition-colors',
-                  highlightedIndex === sessionNavIndex
-                    ? 'bg-zinc-800'
-                    : isSessionSelected && !selectedMessageId
-                      ? 'bg-zinc-800/70'
-                      : 'hover:bg-zinc-800/50',
-                )}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-zinc-200 break-all">
-                    {sessionTitle}
-                  </span>
+              <div>
+                <div className="ml-3 text-[11px] text-zinc-500">
+                  {formatDate(match.updated_at)}
                 </div>
-                {match.terminal_name && (
-                  <div className="mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
-                    {match.terminal_name}
+                <button
+                  type="button"
+                  data-nav-index={sessionNavIndex}
+                  onClick={() =>
+                    selectItem({
+                      type: 'session',
+                      sessionId: match.session_id,
+                    })
+                  }
+                  className={cn(
+                    'w-full text-left px-3 pb-1.5 cursor-pointer transition-colors',
+                    highlightedIndex === sessionNavIndex
+                      ? 'bg-zinc-800'
+                      : isSessionSelected && !selectedMessageId
+                        ? 'bg-zinc-800/70'
+                        : 'hover:bg-zinc-800/50',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-zinc-200 break-all">
+                      {sessionTitle}
+                    </span>
                   </div>
-                )}
-                {match.data?.branch && (
-                  <div className="flex items-center gap-0.5 mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
-                    <GitBranch className="w-2.5 h-2.5 shrink-0" />
-                    {match.data.branch}
-                  </div>
-                )}
-              </button>
+                  {match.terminal_name && (
+                    <div className="mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
+                      {match.terminal_name}
+                    </div>
+                  )}
+                  {match.data?.branch && (
+                    <div className="flex items-center gap-0.5 mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
+                      <GitBranch className="w-2.5 h-2.5 shrink-0" />
+                      {match.data.branch}
+                    </div>
+                  )}
+                </button>
+              </div>
               {match.messages.map((msg) => {
                 const prefix = msg.is_user ? 'User: ' : 'Claude: '
                 const excerpt = contextExcerpt(msg.body, query)

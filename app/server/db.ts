@@ -528,6 +528,7 @@ function buildResults(
     terminal_name: info.terminal_name,
     project_path: info.project_path,
     status: info.status,
+    updated_at: info.updated_at,
     data: info.data ?? null,
     messages: sessionMessages.get(info.session_id) ?? [],
   }))

@@ -91,6 +91,7 @@ export interface SessionSearchMatch {
   terminal_name: string | null
   project_path: string
   status: string
+  updated_at: string
   data: SessionData | null
   messages: { id: number; body: string; is_user: boolean }[]
 }
