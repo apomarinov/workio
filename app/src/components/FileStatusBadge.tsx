@@ -17,7 +17,7 @@ export function FileStatusBadge({ status }: { status: FileStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex h-5 w-5 items-center justify-center rounded text-xs font-mono font-semibold',
+        'inline-flex h-4.5 w-4.5 items-center justify-center rounded text-xs font-mono font-semibold',
         config.className,
       )}
     >

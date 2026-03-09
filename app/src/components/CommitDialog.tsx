@@ -344,9 +344,7 @@ export function CommitDialog({
         >
           <GitCommitHorizontal className="w-4 h-4 text-zinc-400" />
           <span className="text-sm font-medium text-zinc-200 truncate">
-            {viewOnly && pr
-              ? `${pr.prTitle} #${pr.prNumber}`
-              : 'Commit Changes'}
+            {viewOnly && pr ? `${pr.prTitle} #${pr.prNumber}` : ''}
           </span>
           {fileCount > 0 && (
             <span className="text-xs text-zinc-500 ml-1">
@@ -371,10 +369,6 @@ export function CommitDialog({
             <>
               <div className="px-2 pb-2 sm:px-0">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium">
-                    {pr.prTitle}{' '}
-                    <span className="text-zinc-500">#{pr.prNumber}</span>
-                  </span>
                   <span className="text-xs text-zinc-500 font-mono">
                     {pr.baseBranch} ← {pr.branch}
                   </span>

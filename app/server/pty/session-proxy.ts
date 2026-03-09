@@ -573,6 +573,7 @@ export function destroySession(shellId: number): boolean {
     handle.timeoutId = null
   }
 
+  log.info(`[ws] shell=${shellId} session timeout ended, killing`)
   handle.process.send({ type: 'kill' })
 
   // Force kill after 2s if worker doesn't exit

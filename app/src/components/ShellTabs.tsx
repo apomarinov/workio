@@ -79,7 +79,13 @@ interface ShellTabsProps {
   rightExtra?: React.ReactNode
 }
 
-function ShellSessionIcon({ session }: { session: SessionWithProject }) {
+function ShellSessionIcon({
+  session,
+  className,
+}: {
+  session: SessionWithProject
+  className: string
+}) {
   const s = 'w-3.5 h-3.5 shrink-0'
   if (session.status === 'ended') {
     return null
@@ -124,6 +130,7 @@ function ShellSessionIcon({ session }: { session: SessionWithProject }) {
           ? 'text-gray-500'
           : 'text-[#D97757]',
         'mr-0.5',
+        className,
       )}
     />
   )
@@ -501,14 +508,19 @@ function SortableShellPill({
     >
       <ShellClientsBadge shellId={shell.id} />
       {shellSession ? (
-        <ShellSessionIcon session={shellSession} />
+        <ShellSessionIcon
+          session={shellSession}
+          className={cn(!isActive && 'group-hover/tab:opacity-100 opacity-60')}
+        />
       ) : bellSubscribed ? (
         <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
       ) : hasActivity ? (
         <Activity
           className={cn(
             'w-3 h-3 shrink-0',
-            isActive ? 'text-green-500' : 'text-green-500/60',
+            isActive
+              ? 'text-green-500'
+              : 'group-hover/tab:text-green-500 text-green-500/60',
           )}
         />
       ) : null}
@@ -622,14 +634,19 @@ function SortableShellTab({
     >
       <ShellClientsBadge shellId={shell.id} />
       {shellSession ? (
-        <ShellSessionIcon session={shellSession} />
+        <ShellSessionIcon
+          session={shellSession}
+          className={cn(!isActive && 'group-hover/tab:opacity-100 opacity-60')}
+        />
       ) : bellSubscribed ? (
         <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
       ) : hasActivity ? (
         <Activity
           className={cn(
             'w-3 h-3 shrink-0',
-            isActive ? 'text-green-500' : 'text-green-500/60',
+            isActive
+              ? 'text-green-500'
+              : 'group-hover/tab:text-green-500 text-green-500/60',
           )}
         />
       ) : null}
