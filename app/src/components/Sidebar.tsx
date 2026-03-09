@@ -661,16 +661,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                 </button>
               </PopoverContent>
             </Popover>
-            {onDismiss && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={onDismiss}
-              >
-                <SidebarClose className="w-4 h-4" />
-              </Button>
-            )}
           </div>
         ) : (
           <div className="flex items-center gap-1">
@@ -738,16 +728,6 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
               )}
             </Button>
-            {onDismiss && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={onDismiss}
-              >
-                <SidebarClose className="w-4 h-4" />
-              </Button>
-            )}
           </div>
         )}
       </div>

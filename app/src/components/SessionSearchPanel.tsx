@@ -470,15 +470,6 @@ export function SessionSearchPanel({
       >
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
-          {isMobile && (
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="sm:hidden text-zinc-500 hover:text-zinc-300 cursor-pointer"
-            >
-              <PanelRightOpen className="w-4 h-4" />
-            </button>
-          )}
           {!query && <Search className="w-4 h-4 text-zinc-500 shrink-0" />}
           {query && (
             <button

@@ -19,7 +19,6 @@ export function SessionChat({
   hideHeader,
   hideAvatars,
   isMaximizedInPip,
-  onOpenSidebar,
   scrollToMessageId,
   loadAll,
 }: {
@@ -27,7 +26,6 @@ export function SessionChat({
   hideHeader?: boolean
   hideAvatars?: boolean
   isMaximizedInPip?: boolean
-  onOpenSidebar?: () => void
   scrollToMessageId?: number | null
   loadAll?: boolean
 } = {}) {
@@ -198,16 +196,6 @@ export function SessionChat({
         {/* Header */}
         {!hideHeader && (
           <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
-            {onOpenSidebar && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground flex-shrink-0"
-                onClick={onOpenSidebar}
-              >
-                <SidebarOpen className="w-4 h-4" />
-              </Button>
-            )}
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-medium text-zinc-100 truncate">
                 {session?.name || 'Untitled'}

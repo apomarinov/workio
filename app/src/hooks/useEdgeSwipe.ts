@@ -37,6 +37,7 @@ export function useEdgeSwipe(options: {
     let tracking = false
     let swiping = false
     let edgeOffset = 0
+    let initialTx = 0
     let pendingTimer = 0
     // Track recent positions over a time window for reliable velocity
     const history: { x: number; t: number }[] = []
@@ -101,6 +102,15 @@ export function useEdgeSwipe(options: {
           tracking = false
           return
         }
+        // Opening gesture requires starting from the screen edge
+        if (direction === 'left' && dx > 0 && !fromEdge) {
+          tracking = false
+          return
+        }
+        if (direction === 'right' && dx < 0 && !fromEdge) {
+          tracking = false
+          return
+        }
         swiping = true
         // Read visual position BEFORE overriding CSS translate
         const rect = el.getBoundingClientRect()
@@ -112,10 +122,12 @@ export function useEdgeSwipe(options: {
         el.style.transition = 'none'
         el.style.translate = 'none'
         if (direction === 'left') {
-          el.style.transform = `translateX(${rect.left}px)`
+          initialTx = rect.left
+          el.style.transform = `translateX(${initialTx}px)`
         } else {
           const naturalLeft = window.innerWidth - el.offsetWidth
-          el.style.transform = `translateX(${rect.left - naturalLeft}px)`
+          initialTx = rect.left - naturalLeft
+          el.style.transform = `translateX(${initialTx}px)`
         }
       }
 
@@ -175,7 +187,7 @@ export function useEdgeSwipe(options: {
             callback = onLeft
             finalPx = -W
           } else {
-            finalPx = dx > 0 ? -W : 0
+            finalPx = initialTx
           }
         } else {
           if (dx < 0 && fromEdge && onLeft && completing) {
@@ -185,7 +197,7 @@ export function useEdgeSwipe(options: {
             callback = onRight
             finalPx = W
           } else {
-            finalPx = dx < 0 ? W : 0
+            finalPx = initialTx
           }
         }
 
