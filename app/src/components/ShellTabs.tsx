@@ -24,6 +24,7 @@ import {
   Bell,
   BellRing,
   ChevronDown,
+  ChevronUp,
   FolderOpen,
   Globe,
   Laptop,
@@ -862,6 +863,8 @@ export function ShellTabs({
     }
   }
 
+  const ChevronElement = position === 'top' ? ChevronDown : ChevronUp
+
   const menuButton = (
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
       <PopoverTrigger asChild>
@@ -870,7 +873,7 @@ export function ShellTabs({
           size="icon"
           className="h-5 w-5 flex-shrink-0 text-muted-foreground/60 group-hover/tabs:text-muted-foreground"
         >
-          <ChevronDown className="w-3 h-3" />
+          <ChevronElement className="w-3 h-3" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-0" align="start" side="bottom">

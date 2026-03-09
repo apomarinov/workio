@@ -207,7 +207,7 @@ function NotificationItem({
             {read ? (
               <Undo2 className="w-3.5 h-3.5" />
             ) : (
-              <Check className="w-3.5 h-3.5 text-green-500" />
+              <MailCheck className="w-3.5 h-3.5" />
             )}
           </div>
           <div

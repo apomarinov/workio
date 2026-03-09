@@ -159,8 +159,8 @@ function PRSection({
           )
         }}
         className={cn(
-          'absolute right-0 inset-y-0 items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-r',
-          !isMobile && 'hidden group-hover/pr:flex',
+          'absolute right-0 inset-y-0 items-center px-1 bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer',
+          !isMobile ? 'hidden group-hover/pr:flex' : '!bg-accent/50',
         )}
       >
         <MoreVertical className="w-3.5 h-3.5" />
@@ -628,7 +628,14 @@ export function StatusBar({ position }: StatusBarProps) {
           </SortableContext>
         </DndContext>
       </div>
-      <div className="px-1 mr-1">
+      <div className="px-1 relative mr-1">
+        {isMobile && (
+          <div
+            className={cn(
+              'absolute left-0 top-[-2px] w-[0.02rem] h-[calc(100%+3px)] bg-zinc-400/30 z-1',
+            )}
+          ></div>
+        )}
         <StatusBarMenu statusBar={statusBar} updateSettings={updateSettings} />
       </div>
     </div>

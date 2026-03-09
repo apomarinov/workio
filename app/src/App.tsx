@@ -928,7 +928,7 @@ function AppContent() {
                       position="bottom"
                       className="pr-2 bg-[#1a1a1a]"
                       rightExtra={
-                        <div className="flex items-center gap-0.5">
+                        <div className="flex items-center gap-0.5 max-sm:border-l-[1px] pl-1">
                           {mobileKeyboardMode === 'input' && (
                             <>
                               <button
