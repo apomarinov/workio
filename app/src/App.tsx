@@ -375,12 +375,23 @@ function AppContent() {
   useKeyboardShortcuts({
     goToTab: (index) => {
       // Use render order: repo-grouped terminals first, then ungrouped
+      // Skip terminals whose repo group is collapsed in the sidebar
       const all = terminalsRef.current
+      let collapsedRepos: string[] = []
+      try {
+        const raw = localStorage.getItem('sidebar-collapsed-project-repos')
+        if (raw) collapsedRepos = JSON.parse(raw)
+      } catch {}
+      const collapsed = new Set(collapsedRepos)
+
       const grouped: typeof all = []
       const ungrouped: typeof all = []
       for (const t of all) {
-        if (t.git_repo?.repo) grouped.push(t)
-        else ungrouped.push(t)
+        if (t.git_repo?.repo) {
+          if (!collapsed.has(t.git_repo.repo)) grouped.push(t)
+        } else {
+          ungrouped.push(t)
+        }
       }
       const ordered = [...grouped, ...ungrouped]
       const terminal = ordered[index - 1]

@@ -199,11 +199,18 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
     return { repoGroups, ungrouped }
   }, [terminals])
 
+  const collapsedProjectReposSet = useMemo(
+    () => new Set(collapsedProjectRepos),
+    [collapsedProjectRepos],
+  )
+
   // Compute render-order shortcut indices: repo-grouped first, then ungrouped
+  // Skip terminals whose repo group is collapsed (they're not visible)
   const terminalShortcutMap = useMemo(() => {
     const map = new Map<number, number>()
     let idx = 1
-    for (const group of repoGroupedTerminals.repoGroups.values()) {
+    for (const [repo, group] of repoGroupedTerminals.repoGroups.entries()) {
+      if (collapsedProjectReposSet.has(repo)) continue
       for (const t of group) {
         map.set(t.id, idx++)
       }
@@ -212,12 +219,7 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
       map.set(t.id, idx++)
     }
     return map
-  }, [repoGroupedTerminals])
-
-  const collapsedProjectReposSet = useMemo(
-    () => new Set(collapsedProjectRepos),
-    [collapsedProjectRepos],
-  )
+  }, [repoGroupedTerminals, collapsedProjectReposSet])
 
   const toggleProjectRepo = useCallback(
     (repo: string) => {
