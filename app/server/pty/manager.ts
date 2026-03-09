@@ -307,12 +307,20 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
             `[pty] t=${terminalId} s=${h.shell.id} stale scan ${h.staleScanCount}/3 for "${h.currentCommand}"`,
           )
           if (h.staleScanCount >= 3) {
-            log.info(
-              `[pty] t=${terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
-            )
-            h.currentCommand = null
-            h.staleScanCount = 0
-            emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
+            // Only clear if the shell process itself is dead.
+            // If the shell is alive, trust shell integration to send command_end.
+            const shellAlive =
+              h.ptyPid > 0 && (await getProcessComm(h.ptyPid)) !== null
+            if (shellAlive) {
+              h.staleScanCount = 0
+            } else {
+              log.info(
+                `[pty] t=${terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
+              )
+              h.currentCommand = null
+              h.staleScanCount = 0
+              emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
+            }
           }
         }
       }
@@ -372,12 +380,18 @@ async function scanAndEmitAllProcesses() {
             `[pty] t=${h.terminalId} s=${h.shell.id} stale scan ${h.staleScanCount}/3 for "${h.currentCommand}"`,
           )
           if (h.staleScanCount >= 3) {
-            log.info(
-              `[pty] t=${h.terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
-            )
-            h.currentCommand = null
-            h.staleScanCount = 0
-            emitShellUpdate(h.terminalId, h.shell.id, { active_cmd: null })
+            const shellAlive =
+              h.ptyPid > 0 && (await getProcessComm(h.ptyPid)) !== null
+            if (shellAlive) {
+              h.staleScanCount = 0
+            } else {
+              log.info(
+                `[pty] t=${h.terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
+              )
+              h.currentCommand = null
+              h.staleScanCount = 0
+              emitShellUpdate(h.terminalId, h.shell.id, { active_cmd: null })
+            }
           }
         }
       }
