@@ -58,7 +58,7 @@ const MobileKeyboard = lazy(() =>
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
 import { useNotifications } from './context/NotificationContext'
-import { ProcessProvider } from './context/ProcessContext'
+import { ProcessProvider, useProcessContext } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
 import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
 import { useEdgeSwipe } from './hooks/useEdgeSwipe'
@@ -109,6 +109,9 @@ function AppContent() {
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
   const pullingRef = useRef(false)
+  const { gitDirtyStatus } = useProcessContext()
+  const gitDirtyStatusRef = useRef(gitDirtyStatus)
+  gitDirtyStatusRef.current = gitDirtyStatus
   const sidebarPanelRef = usePanelRef()
 
   // Shell DnD order — read from settings (persisted to DB)
@@ -519,6 +522,11 @@ function AppContent() {
       if (pullingRef.current) return
       const t = activeTerminalRef.current
       if (!t?.git_branch) return
+      const dirtyStatus = gitDirtyStatusRef.current[t.id]
+      if (dirtyStatus && (dirtyStatus.added > 0 || dirtyStatus.removed > 0)) {
+        toast.warning('Commit or stash your changes before pulling')
+        return
+      }
       pullingRef.current = true
       const toastId = toast.loading(`Pulling ${t.git_branch}...`)
       pullBranch(t.id, t.git_branch)

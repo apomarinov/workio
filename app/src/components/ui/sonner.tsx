@@ -1,4 +1,10 @@
-import { CircleAlert, CircleCheck, Info, LoaderCircle } from 'lucide-react'
+import {
+  CircleAlert,
+  CircleCheck,
+  Info,
+  LoaderCircle,
+  TriangleAlert,
+} from 'lucide-react'
 import { Toaster as Sonner, toast } from 'sonner'
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
@@ -14,6 +20,7 @@ function Toaster({ ...props }: ToasterProps) {
         success: <CircleCheck className="w-4 h-4 text-emerald-400" />,
         error: <CircleAlert className="w-4 h-4 text-red-400" />,
         info: <Info className="w-4 h-4 text-blue-400" />,
+        warning: <TriangleAlert className="w-4 h-4 text-amber-400" />,
         loading: (
           <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin" />
         ),
@@ -32,6 +39,8 @@ function Toaster({ ...props }: ToasterProps) {
           error:
             'group-[.toaster]:!bg-red-950 group-[.toaster]:!border-red-900 group-[.toaster]:!text-red-50',
           info: 'group-[.toaster]:!bg-blue-950 group-[.toaster]:!border-blue-900 group-[.toaster]:!text-blue-50',
+          warning:
+            'group-[.toaster]:!bg-amber-950 group-[.toaster]:!border-amber-900 group-[.toaster]:!text-amber-50',
           loading:
             'group-[.toaster]:!bg-violet-950 group-[.toaster]:!border-violet-900 group-[.toaster]:!text-violet-50',
         },

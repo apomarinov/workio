@@ -549,7 +549,7 @@ export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
 ]
 
 export const DEFAULT_STATUS_BAR: StatusBarConfig = {
-  enabled: false,
+  enabled: true,
   onTop: false,
   sections: DEFAULT_STATUS_BAR_SECTIONS,
 }
