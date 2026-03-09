@@ -94,7 +94,7 @@ Access everything with `Cmd+K` — multiple modes:
 | Layer | Technologies |
 |-------|-------------|
 | Frontend | React 19, TypeScript, Vite, TailwindCSS, shadcn/ui |
-| Terminal | xterm.js, node-pty, WebGL renderer |
+| Terminal | xterm.js, node-pty (forked worker per shell), WebGL renderer |
 | Backend | Fastify, Socket.IO |
 | Database | PostgreSQL (direct SQL, no ORM) |
 | Hooks | Python daemon for Claude Code lifecycle events |
@@ -167,21 +167,17 @@ npm start           # Start the production server
 
 ## Architecture
 
-```
-┌─────────────┐    Socket.IO     ┌──────────────┐     SQL      ┌────────────┐
-│   React UI  │ ◄──────────────► │   Fastify    │ ◄──────────► │ PostgreSQL │
-│  (Vite PWA) │    WebSocket     │   Server     │              └────────────┘
-└─────────────┘   (PTY I/O)      └──────┬───────┘                    ▲
-                                        │                            │
-                                        │ spawns                     │
-                                        ▼                            │
-                                 ┌──────────────┐    NOTIFY          │
-                                 │ Python Daemon │ ──────────────────┘
-                                 │ (Claude Hooks)│
-                                 └──────────────┘
+```mermaid
+graph LR
+    UI["React UI<br/>(Vite PWA)"] <-->|"Socket.IO<br/>WebSocket (PTY I/O)"| Server["Fastify<br/>Server"]
+    Server <-->|SQL| DB[(PostgreSQL)]
+    Server -->|"fork · IPC<br/>(per shell)"| Workers["PTY Workers<br/>(one per shell)"]
+    Daemon["Python Daemon<br/>(Claude Hooks)"] -->|NOTIFY| DB
+    Server -.->|spawns| Daemon
 ```
 
 - **React frontend** communicates with the Fastify backend over Socket.IO for real-time events (git status, processes, PR checks, Claude hooks) and a dedicated WebSocket per shell for terminal I/O.
-- **Fastify backend** manages PTY sessions, runs git/gh commands, and serves the API.
+- **Fastify backend** manages shell sessions, runs git/gh commands, and serves the API. Each shell PTY is forked into its own child process to prevent event loop starvation.
+- **PTY workers** — one Node.js child process per shell, spawned via `fork()`. Each worker owns a `node-pty` instance (or SSH session), handles OSC parsing for command detection, maintains an output buffer, and communicates with the master over IPC.
 - **Python monitor daemon** listens for Claude Code hook events via a Unix socket, processes tool calls, and writes to PostgreSQL. The server is notified of changes via `NOTIFY`/`LISTEN`.
 - **ngrok tunnel** (optional) exposes a webhook endpoint for real-time GitHub PR updates.
