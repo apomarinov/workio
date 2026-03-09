@@ -730,8 +730,11 @@ function AppContent() {
   // Edge swipe to open/close mobile sidebar
   const mobileSidebarOpenRef = useRef(mobileSidebarOpen)
   mobileSidebarOpenRef.current = mobileSidebarOpen
+  const mobileSidebarRef = useRef<HTMLDivElement>(null)
   useEdgeSwipe({
-    enabled: isMobile,
+    enabled: isMobile && !sessionSearchOpen,
+    ref: mobileSidebarRef,
+    direction: 'left',
     onSwipeRight: () => {
       if (!mobileSidebarOpenRef.current) setMobileSidebarOpen(true)
     },
@@ -1035,6 +1038,7 @@ function AppContent() {
             />
             {/* Sidebar panel */}
             <div
+              ref={mobileSidebarRef}
               className={cn(
                 'fixed inset-y-0 left-0 w-full bg-sidebar transition-transform duration-300 ease-in-out pt-[env(safe-area-inset-top)]',
                 mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',

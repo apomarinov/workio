@@ -122,8 +122,11 @@ export function SessionSearchPanel({
     requestAnimationFrame(() => setMounted(true))
   }, [])
 
+  const searchPanelRef = useRef<HTMLDivElement>(null)
   useEdgeSwipe({
     enabled: isMobile && open,
+    ref: searchPanelRef,
+    direction: 'right',
     onSwipeRight: () => {
       if (selectedSessionId != null) {
         setSelectedSessionId(null)
@@ -459,6 +462,7 @@ export function SessionSearchPanel({
 
       {/* Panel */}
       <div
+        ref={searchPanelRef}
         className={cn(
           'fixed inset-y-0 right-0 z-50 w-[100vw] min-w-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:w-[75%] sm:min-w-[600px] sm:pt-0 bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out',
           open && mounted ? 'translate-x-0' : 'translate-x-full',
