@@ -102,8 +102,13 @@ export function useShellLastActive(terminals: Terminal[]) {
     })
   }
 
-  const shouldMount = (shellId: number, isActive: boolean): boolean => {
+  const shouldMount = (
+    shellId: number,
+    isActive: boolean,
+    hasActivity?: boolean,
+  ): boolean => {
     if (isActive) return true
+    if (hasActivity) return true
     const lastActiveAt = timestamps[shellId]
     if (lastActiveAt === undefined) return false // no timestamp = never activated
     return Date.now() - lastActiveAt < MOUNT_WINDOW

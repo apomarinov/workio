@@ -109,7 +109,7 @@ function AppContent() {
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
   const pullingRef = useRef(false)
-  const { gitDirtyStatus } = useProcessContext()
+  const { gitDirtyStatus, processes } = useProcessContext()
   const gitDirtyStatusRef = useRef(gitDirtyStatus)
   gitDirtyStatusRef.current = gitDirtyStatus
   const sidebarPanelRef = usePanelRef()
@@ -833,7 +833,14 @@ function AppContent() {
             )}
             <div className="relative flex-1 min-h-0">
               {t.shells.map((shell) => {
-                if (!shouldMountShell(shell.id, shell.id === activeShellId))
+                if (
+                  !shouldMountShell(
+                    shell.id,
+                    shell.id === activeShellId,
+                    !!shell.active_cmd ||
+                      processes.some((p) => p.shellId === shell.id),
+                  )
+                )
                   return null
                 return (
                   <Terminal

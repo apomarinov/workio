@@ -30,7 +30,11 @@ import { useNotifications } from './NotificationContext'
 
 interface TerminalContextValue {
   terminals: Terminal[]
-  shouldMountShell: (shellId: number, isActive: boolean) => boolean
+  shouldMountShell: (
+    shellId: number,
+    isActive: boolean,
+    hasActivity?: boolean,
+  ) => boolean
   loading: boolean
   activeTerminal: Terminal | null
   selectTerminal: (id: number) => void
