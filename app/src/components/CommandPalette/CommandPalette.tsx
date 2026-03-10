@@ -1100,7 +1100,12 @@ export function CommandPalette() {
         try {
           await checkoutBranch(terminalId, branch, true)
           toast.success(`Checked out ${branch}`)
+          selectTerminal(terminalId)
+          clearSession()
           closePalette()
+          window.dispatchEvent(
+            new CustomEvent('reveal-terminal', { detail: { id: terminalId } }),
+          )
         } catch (err) {
           toast.error(
             err instanceof Error ? err.message : 'Failed to checkout branch',
