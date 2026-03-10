@@ -936,6 +936,44 @@ export async function getBranchCommits(
   return res.json()
 }
 
+export async function undoCommit(
+  terminalId: number,
+  commitHash: string,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/undo-commit`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commitHash }),
+    },
+  )
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to undo commit')
+  }
+  return data
+}
+
+export async function dropCommit(
+  terminalId: number,
+  commitHash: string,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/drop-commit`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commitHash }),
+    },
+  )
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to drop commit')
+  }
+  return data
+}
+
 export async function getChangedFiles(
   terminalId: number,
   base?: string,

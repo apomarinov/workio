@@ -234,6 +234,14 @@ interface DeleteBranchBody {
   deleteRemote?: boolean
 }
 
+interface UndoCommitBody {
+  commitHash: string
+}
+
+interface DropCommitBody {
+  commitHash: string
+}
+
 interface BranchInfo {
   name: string
   current: boolean
@@ -2366,6 +2374,240 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({
           success: false,
           branch,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
+  // Undo the most recent commit (soft reset)
+  fastify.post<{ Params: TerminalParams; Body: UndoCommitBody }>(
+    '/api/terminals/:id/undo-commit',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { commitHash } = request.body
+      if (!commitHash) {
+        return reply.status(400).send({ error: 'commitHash is required' })
+      }
+
+      try {
+        // Verify commitHash matches HEAD
+        let headHash: string
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(
+            terminal.ssh_host,
+            'git rev-parse HEAD',
+            { cwd: terminal.cwd },
+          )
+          headHash = result.stdout.trim()
+        } else {
+          headHash = await new Promise<string>((resolve, reject) => {
+            execFile(
+              'git',
+              ['rev-parse', 'HEAD'],
+              { cwd: expandPath(terminal.cwd), timeout: 5000 },
+              (err, stdout) => {
+                if (err) reject(err)
+                else resolve(stdout.trim())
+              },
+            )
+          })
+        }
+
+        if (
+          !headHash.startsWith(commitHash) &&
+          !commitHash.startsWith(headHash.slice(0, commitHash.length))
+        ) {
+          return reply.status(400).send({
+            error: 'Commit is not the current HEAD',
+          })
+        }
+
+        // git reset --soft HEAD~1
+        const resetCmd = 'git reset --soft HEAD~1'
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, resetCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: resetCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['reset', '--soft', 'HEAD~1'],
+              { cwd: expandPath(terminal.cwd), timeout: 10000 },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: resetCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        detectGitBranch(id)
+        checkAndEmitSingleGitDirty(id)
+
+        return { success: true }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to undo commit'
+        return reply.status(400).send({
+          success: false,
+          error: errorMessage,
+        })
+      }
+    },
+  )
+
+  // Drop a specific commit via non-interactive rebase
+  fastify.post<{ Params: TerminalParams; Body: DropCommitBody }>(
+    '/api/terminals/:id/drop-commit',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+
+      if (!terminal.git_repo) {
+        return reply.status(400).send({ error: 'Terminal has no git repo' })
+      }
+
+      const { commitHash } = request.body
+      if (!commitHash) {
+        return reply.status(400).send({ error: 'commitHash is required' })
+      }
+
+      try {
+        // Get parent of the commit to drop
+        let parentHash: string
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(
+            terminal.ssh_host,
+            `git rev-parse ${commitHash}~1`,
+            { cwd: terminal.cwd },
+          )
+          parentHash = result.stdout.trim()
+        } else {
+          parentHash = await new Promise<string>((resolve, reject) => {
+            execFile(
+              'git',
+              ['rev-parse', `${commitHash}~1`],
+              { cwd: expandPath(terminal.cwd), timeout: 5000 },
+              (err, stdout) => {
+                if (err) reject(err)
+                else resolve(stdout.trim())
+              },
+            )
+          })
+        }
+
+        // Use sed to change "pick <hash>" to "drop <hash>" for this commit
+        const shortHash = commitHash.slice(0, 7)
+        const sedScript = `sed -i.bak 's/^pick ${shortHash}/drop ${shortHash}/'`
+
+        const rebaseCmd = `GIT_SEQUENCE_EDITOR="${sedScript}" git rebase -i --no-autosquash ${parentHash}`
+        if (terminal.ssh_host) {
+          const result = await execSSHCommand(terminal.ssh_host, rebaseCmd, {
+            cwd: terminal.cwd,
+          })
+          logCommand({
+            terminalId: id,
+            category: 'git',
+            command: rebaseCmd,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'git',
+              ['rebase', '-i', '--no-autosquash', parentHash],
+              {
+                cwd: expandPath(terminal.cwd),
+                timeout: 60000,
+                env: {
+                  ...process.env,
+                  GIT_SEQUENCE_EDITOR: `sed -i.bak 's/^pick ${shortHash}/drop ${shortHash}/'`,
+                },
+              },
+              (err, stdout, stderr) => {
+                logCommand({
+                  terminalId: id,
+                  category: 'git',
+                  command: rebaseCmd,
+                  stdout,
+                  stderr: err ? err.message : stderr,
+                  failed: !!err,
+                })
+                if (err) reject(err)
+                else resolve()
+              },
+            )
+          })
+        }
+
+        detectGitBranch(id)
+        checkAndEmitSingleGitDirty(id)
+
+        return { success: true }
+      } catch (err) {
+        // Abort the rebase to leave repo in clean state
+        const abortCmd = 'git rebase --abort'
+        try {
+          if (terminal.ssh_host) {
+            await execSSHCommand(terminal.ssh_host, abortCmd, {
+              cwd: terminal.cwd,
+            })
+          } else {
+            await new Promise<void>((resolve) => {
+              execFile(
+                'git',
+                ['rebase', '--abort'],
+                { cwd: expandPath(terminal.cwd), timeout: 10000 },
+                () => resolve(),
+              )
+            })
+          }
+        } catch {
+          // Ignore abort errors
+        }
+
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to drop commit'
+        return reply.status(400).send({
+          success: false,
           error: errorMessage,
         })
       }

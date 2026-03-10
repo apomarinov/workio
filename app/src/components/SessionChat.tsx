@@ -189,7 +189,7 @@ export function SessionChat({
       <div className="absolute inset-0 flex flex-col bg-sidebar">
         {/* Header */}
         {!hideHeader && (
-          <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-sidebar-border w-full">
+          <div className="flex items-center justify-between gap-2 px-4 py-1.5 border-b border-sidebar-border w-full">
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-medium text-zinc-100 truncate">
                 {session?.name || 'Untitled'}

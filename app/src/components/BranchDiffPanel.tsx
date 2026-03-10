@@ -1,4 +1,4 @@
-import { GitCommitHorizontal, Loader2 } from 'lucide-react'
+import { GitCommitHorizontal, Loader2, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Group,
@@ -10,9 +10,16 @@ import useSWR from 'swr'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import { getBranchCommits, getCommitsBetween, type PRCommit } from '@/lib/api'
+import {
+  dropCommit,
+  getBranchCommits,
+  getCommitsBetween,
+  type PRCommit,
+  undoCommit,
+} from '@/lib/api'
 import { formatDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel } from './DiffViewerPanel'
 import { MobileSlidePanel } from './MobileSlidePanel'
 
@@ -51,6 +58,11 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
 
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
   const [mobileCommitsOpen, setMobileCommitsOpen] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'undo' | 'drop'
+    hash: string
+    message: string
+  } | null>(null)
 
   // ── Mode A: SWR fetch for base..head comparison ──
   const { data: compareData, isLoading: loadingCompare } = useSWR(
@@ -84,8 +96,8 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef(0)
 
-  // Initial fetch for branch mode
-  useEffect(() => {
+  // Refresh branch commits (reusable after mutations)
+  function refreshBranchCommits() {
     if (!isBranchMode) return
     setBranchCommits([])
     setMergeBase(undefined)
@@ -107,6 +119,11 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
       })
       .catch(() => toast.error('Failed to load commits'))
       .finally(() => setLoadingBranch(false))
+  }
+
+  // Initial fetch for branch mode
+  useEffect(() => {
+    refreshBranchCommits()
   }, [isBranchMode, terminalId, props.branch])
 
   // Intersection observer for infinite scroll (branch mode)
@@ -194,12 +211,19 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
         <div className="py-4 text-center text-sm text-zinc-500">No commits</div>
       )
     }
+    // Find the index of the merge-base commit to know which commits are local
+    const mergeBaseIndex = mergeBase
+      ? commits.findIndex((c) => c.hash === mergeBase)
+      : -1
     return (
       <>
-        {commits.map((commit) => {
+        {commits.map((commit, index) => {
           const isMergeBaseCommit = mergeBase && commit.hash === mergeBase
+          // Commits above merge-base are local (editable)
+          const isAboveMergeBase =
+            isBranchMode && mergeBaseIndex > 0 && index < mergeBaseIndex
           return (
-            <div key={commit.hash}>
+            <div key={commit.hash} className="group">
               {isMergeBaseCommit && (
                 <div className="flex items-center gap-2 px-2 py-1">
                   <div className="flex-1 border-t border-zinc-600" />
@@ -238,6 +262,42 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
                     {formatDate(commit.date)} · {commit.author}
                   </div>
                 </div>
+                {isAboveMergeBase && (
+                  <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 pt-0.5">
+                    {index === 0 && (
+                      <button
+                        type="button"
+                        className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-orange-400"
+                        title="Undo commit (soft reset)"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmAction({
+                            type: 'undo',
+                            hash: commit.hash,
+                            message: commit.message,
+                          })
+                        }}
+                      >
+                        <Undo2 className="size-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-red-400"
+                      title="Drop commit"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfirmAction({
+                          type: 'drop',
+                          hash: commit.hash,
+                          message: commit.message,
+                        })
+                      }}
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -264,6 +324,42 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const commitButtonLabel = selectedCommitObj
     ? `${selectedCommitObj.hash.slice(0, 7)} ${selectedCommitObj.message.length > 30 ? `${selectedCommitObj.message.slice(0, 30)}...` : selectedCommitObj.message}`
     : `All changes (${commits.length} commits)`
+
+  // ── Confirm modal handler ──
+  async function handleConfirmAction() {
+    if (!confirmAction) return
+    try {
+      if (confirmAction.type === 'undo') {
+        await undoCommit(terminalId, confirmAction.hash)
+        toast.success('Commit undone — changes are staged')
+      } else {
+        await dropCommit(terminalId, confirmAction.hash)
+        toast.success('Commit dropped')
+      }
+      setConfirmAction(null)
+      refreshBranchCommits()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to modify commit',
+      )
+    }
+  }
+
+  const confirmModal = (
+    <ConfirmModal
+      open={confirmAction != null}
+      title={confirmAction?.type === 'undo' ? 'Undo commit?' : 'Drop commit?'}
+      message={
+        confirmAction?.type === 'undo'
+          ? `This will soft-reset the last commit. Changes will remain staged.\n\n${confirmAction.hash.slice(0, 7)} ${confirmAction.message}`
+          : `This will permanently remove this commit via rebase.\n\n${confirmAction?.hash.slice(0, 7)} ${confirmAction?.message}`
+      }
+      confirmLabel={confirmAction?.type === 'undo' ? 'Undo' : 'Drop'}
+      variant="danger"
+      onConfirm={handleConfirmAction}
+      onCancel={() => setConfirmAction(null)}
+    />
+  )
 
   if (isMobile) {
     return (
@@ -305,57 +401,61 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
             {renderCommitList()}
           </div>
         </MobileSlidePanel>
+        {confirmModal}
       </div>
     )
   }
 
   return (
-    <Group
-      orientation="horizontal"
-      className="flex-1 min-h-0 overflow-hidden rounded-md border border-zinc-700"
-      defaultLayout={defaultLayout}
-      onLayoutChanged={onLayoutChanged}
-    >
-      {/* Left column: commit list */}
-      <Panel
-        id="branch-commits"
-        defaultSize="220px"
-        minSize="150px"
-        maxSize="50%"
+    <>
+      <Group
+        orientation="horizontal"
+        className="flex-1 min-h-0 overflow-hidden rounded-md border border-zinc-700"
+        defaultLayout={defaultLayout}
+        onLayoutChanged={onLayoutChanged}
       >
-        <div className="flex flex-col overflow-hidden h-full">
-          <div className="px-2 py-1.5 border-b border-zinc-700">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider">
-              Commits ({commits.length})
-            </span>
-          </div>
-          <div
-            className="flex-1 overflow-y-auto"
-            ref={isBranchMode ? scrollRef : undefined}
-          >
-            {renderCommitList()}
-          </div>
-        </div>
-      </Panel>
-      <Separator className="panel-resize-handle" />
-      {/* Right: diff viewer panel */}
-      <Panel id="branch-diff">
-        <div className="min-w-0 min-h-0 overflow-hidden h-full">
-          {diffBase ? (
-            <DiffViewerPanel
-              integrated
-              terminalId={terminalId}
-              base={diffBase}
-              readOnly
-              cacheKey={commitsCacheKey}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-sm text-zinc-500">
-              Select a commit to view changes
+        {/* Left column: commit list */}
+        <Panel
+          id="branch-commits"
+          defaultSize="220px"
+          minSize="150px"
+          maxSize="50%"
+        >
+          <div className="flex flex-col overflow-hidden h-full">
+            <div className="px-2 py-1.5 border-b border-zinc-700">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">
+                Commits ({commits.length})
+              </span>
             </div>
-          )}
-        </div>
-      </Panel>
-    </Group>
+            <div
+              className="flex-1 overflow-y-auto"
+              ref={isBranchMode ? scrollRef : undefined}
+            >
+              {renderCommitList()}
+            </div>
+          </div>
+        </Panel>
+        <Separator className="panel-resize-handle" />
+        {/* Right: diff viewer panel */}
+        <Panel id="branch-diff">
+          <div className="min-w-0 min-h-0 overflow-hidden h-full">
+            {diffBase ? (
+              <DiffViewerPanel
+                integrated
+                terminalId={terminalId}
+                base={diffBase}
+                readOnly
+                cacheKey={commitsCacheKey}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-sm text-zinc-500">
+                Select a commit to view changes
+              </div>
+            )}
+          </div>
+        </Panel>
+      </Group>
+      {confirmModal}
+    </>
   )
 }
