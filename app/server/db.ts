@@ -27,14 +27,45 @@ const pool = new pg.Pool({
 
 // Initialize database from schema.sql
 export async function initDb() {
-  if (fs.existsSync(SCHEMA_PATH)) {
-    const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8')
-    await pool.query(schema)
-    log.info('[db] Database initialized from schema.sql')
-  } else {
+  if (!fs.existsSync(SCHEMA_PATH)) {
     log.error(`[db] Schema file not found: ${SCHEMA_PATH}`)
     process.exit(1)
   }
+
+  const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8')
+
+  try {
+    await pool.query(schema)
+  } catch (err: unknown) {
+    // In dev mode, auto-create the database if it doesn't exist (code 3D000)
+    if (
+      env.NODE_ENV === 'development' &&
+      err instanceof Error &&
+      (err as { code?: string }).code === '3D000'
+    ) {
+      const dbUrl = new URL(env.DATABASE_URL)
+      const dbName = dbUrl.pathname.slice(1)
+      log.info(`[db] Database "${dbName}" does not exist, creating...`)
+
+      dbUrl.pathname = '/postgres'
+      const adminClient = new pg.Client({ connectionString: dbUrl.toString() })
+      try {
+        await adminClient.connect()
+        await adminClient.query(
+          `CREATE DATABASE "${dbName.replace(/"/g, '""')}"`,
+        )
+        log.info(`[db] Created database "${dbName}"`)
+      } finally {
+        await adminClient.end()
+      }
+
+      await pool.query(schema)
+    } else {
+      throw err
+    }
+  }
+
+  log.info('[db] Database initialized from schema.sql')
 
   // Cleanup orphaned command_logs older than 1 week (terminal no longer exists)
   const orphanedResult = await pool.query(`

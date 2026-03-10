@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "node -e \"const fs=require('fs'),p=require('path'),d='node_modules/node-pty/prebuilds';if(fs.existsSync(d)){fs.readdirSync(d).filter(f=>f.startsWith('darwin')||f.startsWith('linux')).forEach(f=>{const h=p.join(d,f,'spawn-helper');if(fs.existsSync(h))fs.chmodSync(h,0o755)})}\"",
+    "predev": "bash -c 'export NVM_DIR=\"${NVM_DIR:-$HOME/.nvm}\"; [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\" && nvm use'",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
