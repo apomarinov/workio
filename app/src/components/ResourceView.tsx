@@ -1,10 +1,13 @@
 import { Cpu, MemoryStick } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+export type ResourceViewMode = 'bar' | 'percent' | 'actual'
+
 interface ResourceViewProps {
   cpuPercent: number
   memPercent: number
-  mode: 'bar' | 'percent'
+  memRssKb?: number
+  mode: ResourceViewMode
   className?: string
 }
 
@@ -38,12 +41,44 @@ function Bar({ percent }: { percent: number }) {
   )
 }
 
+function formatRssKb(kb: number): string {
+  const mb = kb / 1024
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`
+}
+
 export function ResourceView({
   cpuPercent,
   memPercent,
+  memRssKb,
   mode,
   className,
 }: ResourceViewProps) {
+  if (mode === 'actual') {
+    const cpuColor = getColor(cpuPercent, 'percent')
+    const memColor = getColor(memPercent, 'percent')
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-3 text-xs font-mono flex-wrap',
+          className,
+        )}
+      >
+        <span className="flex items-center gap-1">
+          <Cpu className="w-3 h-3 text-muted-foreground" />
+          <span className={cpuColor.text}>{cpuPercent.toFixed(1)}%</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <MemoryStick className="w-3 h-3 text-muted-foreground" />
+          <span className={memColor.text}>
+            {memRssKb !== undefined
+              ? formatRssKb(memRssKb)
+              : `${memPercent.toFixed(1)}%`}
+          </span>
+        </span>
+      </div>
+    )
+  }
+
   if (mode === 'percent') {
     const cpuColor = getColor(cpuPercent, 'percent')
     const memColor = getColor(memPercent, 'percent')

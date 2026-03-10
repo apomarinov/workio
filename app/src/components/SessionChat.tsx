@@ -1,10 +1,4 @@
-import {
-  AlertTriangle,
-  Folder,
-  Loader2,
-  MoreVertical,
-  SidebarOpen,
-} from 'lucide-react'
+import { AlertTriangle, Folder, Loader2, MoreVertical } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSessionContext } from '../context/SessionContext'
 import { useSessionMessages } from '../hooks/useSessionMessages'

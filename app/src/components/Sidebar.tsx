@@ -28,7 +28,6 @@ import {
   Plus,
   Search,
   Settings,
-  SidebarClose,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -72,7 +71,7 @@ interface SidebarProps {
   onDismiss?: () => void
 }
 
-export function Sidebar({ width, onDismiss }: SidebarProps) {
+export function Sidebar({ width }: SidebarProps) {
   const pip = useDocumentPip()
   const { terminals, activeTerminal, selectTerminal, setTerminalOrder } =
     useTerminalContext()
@@ -838,8 +837,8 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
               className={cn(
                 'border-t border-sidebar-border my-2',
                 terminals.length === 0 &&
-                orphanSessionGroups.size === 0 &&
-                'border-none',
+                  orphanSessionGroups.size === 0 &&
+                  'border-none',
               )}
             />
             <button
@@ -1029,8 +1028,8 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
         )}
       </div>
 
-      <div className="border-t border-sidebar-border pl-4 pr-2 flex items-center w-full justify-center">
-        <ResourceInfo className="hover:opacity-80 py-[0.45rem]" />
+      <div className="border-t border-sidebar-border pl-4 pr-2 flex items-center w-full justify-center min-h-[28px]">
+        <ResourceInfo className="hover:opacity-80 py-[0.35rem]" />
       </div>
 
       <SettingsModal
@@ -1054,202 +1053,202 @@ export function Sidebar({ width, onDismiss }: SidebarProps) {
             {(settings?.silence_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <BellOff className="w-3 h-3" />
-                    Silenced Authors
-                  </p>
-                  {(settings?.silence_gh_authors ?? [])
-                    .filter((h) => h.repo === hiddenPRsModalRepo)
-                    .map((entry) => (
-                      <div
-                        key={entry.author}
-                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <BellOff className="w-3 h-3" />
+                  Silenced Authors
+                </p>
+                {(settings?.silence_gh_authors ?? [])
+                  .filter((h) => h.repo === hiddenPRsModalRepo)
+                  .map((entry) => (
+                    <div
+                      key={entry.author}
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                    >
+                      <span className="text-sm">{entry.author}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRemovingSilencedAuthor(entry.author)
+                          try {
+                            const current = settings?.silence_gh_authors ?? []
+                            const updated = current.filter(
+                              (e) =>
+                                !(
+                                  e.repo === hiddenPRsModalRepo &&
+                                  e.author === entry.author
+                                ),
+                            )
+                            await updateSettings({
+                              silence_gh_authors: updated,
+                            })
+                          } finally {
+                            setRemovingSilencedAuthor(null)
+                          }
+                        }}
+                        disabled={removingSilencedAuthor === entry.author}
+                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
                       >
-                        <span className="text-sm">{entry.author}</span>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setRemovingSilencedAuthor(entry.author)
-                            try {
-                              const current = settings?.silence_gh_authors ?? []
-                              const updated = current.filter(
-                                (e) =>
-                                  !(
-                                    e.repo === hiddenPRsModalRepo &&
-                                    e.author === entry.author
-                                  ),
-                              )
-                              await updateSettings({
-                                silence_gh_authors: updated,
-                              })
-                            } finally {
-                              setRemovingSilencedAuthor(null)
-                            }
-                          }}
-                          disabled={removingSilencedAuthor === entry.author}
-                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                        >
-                          {removingSilencedAuthor === entry.author ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              )}
+                        {removingSilencedAuthor === entry.author ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
             {(settings?.collapse_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <ChevronsDownUp className="w-3 h-3" />
-                    Collapsed Authors
-                  </p>
-                  {(settings?.collapse_gh_authors ?? [])
-                    .filter((h) => h.repo === hiddenPRsModalRepo)
-                    .map((entry) => (
-                      <div
-                        key={entry.author}
-                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <ChevronsDownUp className="w-3 h-3" />
+                  Collapsed Authors
+                </p>
+                {(settings?.collapse_gh_authors ?? [])
+                  .filter((h) => h.repo === hiddenPRsModalRepo)
+                  .map((entry) => (
+                    <div
+                      key={entry.author}
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                    >
+                      <span className="text-sm">{entry.author}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRemovingCollapsedAuthor(entry.author)
+                          try {
+                            const current = settings?.collapse_gh_authors ?? []
+                            const updated = current.filter(
+                              (e) =>
+                                !(
+                                  e.repo === hiddenPRsModalRepo &&
+                                  e.author === entry.author
+                                ),
+                            )
+                            await updateSettings({
+                              collapse_gh_authors: updated,
+                            })
+                          } finally {
+                            setRemovingCollapsedAuthor(null)
+                          }
+                        }}
+                        disabled={removingCollapsedAuthor === entry.author}
+                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
                       >
-                        <span className="text-sm">{entry.author}</span>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setRemovingCollapsedAuthor(entry.author)
-                            try {
-                              const current = settings?.collapse_gh_authors ?? []
-                              const updated = current.filter(
-                                (e) =>
-                                  !(
-                                    e.repo === hiddenPRsModalRepo &&
-                                    e.author === entry.author
-                                  ),
-                              )
-                              await updateSettings({
-                                collapse_gh_authors: updated,
-                              })
-                            } finally {
-                              setRemovingCollapsedAuthor(null)
-                            }
-                          }}
-                          disabled={removingCollapsedAuthor === entry.author}
-                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                        >
-                          {removingCollapsedAuthor === entry.author ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              )}
+                        {removingCollapsedAuthor === entry.author ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
             {(settings?.hide_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <EyeOff className="w-3 h-3" />
-                    Hidden Comment Authors
-                  </p>
-                  {(settings?.hide_gh_authors ?? [])
-                    .filter((h) => h.repo === hiddenPRsModalRepo)
-                    .map((entry) => (
-                      <div
-                        key={entry.author}
-                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <EyeOff className="w-3 h-3" />
+                  Hidden Comment Authors
+                </p>
+                {(settings?.hide_gh_authors ?? [])
+                  .filter((h) => h.repo === hiddenPRsModalRepo)
+                  .map((entry) => (
+                    <div
+                      key={entry.author}
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                    >
+                      <span className="text-sm">{entry.author}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRemovingAuthor(entry.author)
+                          try {
+                            const current = settings?.hide_gh_authors ?? []
+                            const updated = current.filter(
+                              (e) =>
+                                !(
+                                  e.repo === hiddenPRsModalRepo &&
+                                  e.author === entry.author
+                                ),
+                            )
+                            await updateSettings({ hide_gh_authors: updated })
+                          } finally {
+                            setRemovingAuthor(null)
+                          }
+                        }}
+                        disabled={removingAuthor === entry.author}
+                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
                       >
-                        <span className="text-sm">{entry.author}</span>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setRemovingAuthor(entry.author)
-                            try {
-                              const current = settings?.hide_gh_authors ?? []
-                              const updated = current.filter(
-                                (e) =>
-                                  !(
-                                    e.repo === hiddenPRsModalRepo &&
-                                    e.author === entry.author
-                                  ),
-                              )
-                              await updateSettings({ hide_gh_authors: updated })
-                            } finally {
-                              setRemovingAuthor(null)
-                            }
-                          }}
-                          disabled={removingAuthor === entry.author}
-                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                        >
-                          {removingAuthor === entry.author ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              )}
+                        {removingAuthor === entry.author ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
             {(settings?.hidden_prs ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <EyeOff className="w-3 h-3" />
-                    Hidden Pull Requests
-                  </p>
-                  {(settings?.hidden_prs ?? [])
-                    .filter((h) => h.repo === hiddenPRsModalRepo)
-                    .map((entry) => (
-                      <div
-                        key={entry.prNumber}
-                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm truncate block">
-                            {entry.title}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            #{entry.prNumber}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setRemovingPR(entry.prNumber)
-                            try {
-                              const current = settings?.hidden_prs ?? []
-                              const updated = current.filter(
-                                (e) =>
-                                  !(
-                                    e.repo === hiddenPRsModalRepo &&
-                                    e.prNumber === entry.prNumber
-                                  ),
-                              )
-                              await updateSettings({ hidden_prs: updated })
-                            } finally {
-                              setRemovingPR(null)
-                            }
-                          }}
-                          disabled={removingPR === entry.prNumber}
-                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                        >
-                          {removingPR === entry.prNumber ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <EyeOff className="w-3 h-3" />
+                  Hidden Pull Requests
+                </p>
+                {(settings?.hidden_prs ?? [])
+                  .filter((h) => h.repo === hiddenPRsModalRepo)
+                  .map((entry) => (
+                    <div
+                      key={entry.prNumber}
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm truncate block">
+                          {entry.title}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          #{entry.prNumber}
+                        </span>
                       </div>
-                    ))}
-                </div>
-              )}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setRemovingPR(entry.prNumber)
+                          try {
+                            const current = settings?.hidden_prs ?? []
+                            const updated = current.filter(
+                              (e) =>
+                                !(
+                                  e.repo === hiddenPRsModalRepo &&
+                                  e.prNumber === entry.prNumber
+                                ),
+                            )
+                            await updateSettings({ hidden_prs: updated })
+                          } finally {
+                            setRemovingPR(null)
+                          }
+                        }}
+                        disabled={removingPR === entry.prNumber}
+                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                      >
+                        {removingPR === entry.prNumber ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

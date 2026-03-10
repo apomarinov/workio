@@ -215,7 +215,7 @@ function ResourcesSection({
 }) {
   return (
     <SortableStatusSection section={section}>
-      <ResourceInfo terminalId={terminalId} className='p-0.5' />
+      <ResourceInfo terminalId={terminalId} />
     </SortableStatusSection>
   )
 }
@@ -349,27 +349,12 @@ function LastCommitSection({
 }
 
 function SpacerSection({ section }: { section: StatusBarSection }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: section.name })
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0.7 : undefined,
-  }
+  const isMobile = useIsMobile()
+  if (isMobile) return null
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="flex-1 min-w-2"
-    />
+    <SortableStatusSection section={section} className="flex-1 min-w-2 !p-0">
+      {null}
+    </SortableStatusSection>
   )
 }
 
@@ -507,8 +492,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-    ) ??
+        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+      ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))

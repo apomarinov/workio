@@ -2,7 +2,6 @@ import {
   LayoutGrid,
   Plus,
   Settings,
-  SidebarOpen,
   Terminal as TerminalNoBorder,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'

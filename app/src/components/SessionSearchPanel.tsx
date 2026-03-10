@@ -6,7 +6,6 @@ import {
   GitBranch,
   Loader2,
   MoreVertical,
-  PanelRightOpen,
   Search,
   X,
 } from 'lucide-react'

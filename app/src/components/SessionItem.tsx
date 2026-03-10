@@ -255,7 +255,9 @@ export const SessionItem = memo(function SessionItem({
           <Pin className="w-3 h-3 text-muted-foreground" />
         </div>
       )}
-      <div className="absolute invisible group-hover:visible top-1 right-1">
+      <div
+        className={cn('absolute invisible group-hover:visible top-1 right-1')}
+      >
         {popoverContainer ? (
           <Popover open={showMenu} onOpenChange={setShowMenu}>
             <PopoverTrigger asChild>

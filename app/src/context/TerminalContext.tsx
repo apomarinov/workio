@@ -113,6 +113,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     '/api/terminals',
     api.getTerminals,
   )
+  const hasEverLoaded = useRef(false)
+  if (data) hasEverLoaded.current = true
 
   const { settings, updateSettings } = useSettings()
   const terminalOrder = settings?.terminal_order ?? []
@@ -1080,7 +1082,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     () => ({
       terminals,
       shouldMountShell,
-      loading: isLoading,
+      loading: isLoading && !hasEverLoaded.current,
       activeTerminal,
       selectTerminal,
       clearTerminal,

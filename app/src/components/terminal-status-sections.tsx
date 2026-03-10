@@ -53,12 +53,14 @@ interface ProcessItemProps {
   }
   terminalId: number
   compact?: boolean
+  truncate?: boolean
 }
 
 export function ProcessItem({
   process,
   terminalId,
   compact,
+  truncate = true,
 }: ProcessItemProps) {
   const { emit } = useSocket()
   const isMobile = useIsMobile()
@@ -71,7 +73,9 @@ export function ProcessItem({
       )}
     >
       <Activity className="w-3 h-3 flex-shrink-0 text-green-500/70" />
-      <span className="text-xs truncate w-fit">{process.command}</span>
+      <span className={cn('text-xs w-fit', truncate && 'truncate')}>
+        {process.command}
+      </span>
       <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
         {process.startedAt && (
           <span

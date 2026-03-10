@@ -1,15 +1,18 @@
-import { Percent, Unplug } from 'lucide-react'
+import { BarChart3, ChevronDown, Hash, Percent, Unplug } from 'lucide-react'
+import { useState } from 'react'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { Switch } from '@/components/ui/switch'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
-import { ResourceView } from './ResourceView'
+import type { ActiveProcess } from '../../shared/types'
+import { ResourceView, type ResourceViewMode } from './ResourceView'
+import { ProcessItem } from './terminal-status-sections'
 
 interface ResourceInfoProps {
   terminalId?: number
@@ -34,7 +37,7 @@ function computeUsage(
   }
   const memPercent = totalRam > 0 ? ((totalRss * 1024) / totalRam) * 100 : 0
   const cpuPercent = totalCpu > 0 ? totalCpuUsage / totalCpu : 0
-  return { cpuPercent, memPercent }
+  return { cpuPercent, memPercent, rssKb: totalRss }
 }
 
 export function ResourceInfo({
@@ -42,9 +45,9 @@ export function ResourceInfo({
   shellId,
   className,
 }: ResourceInfoProps) {
-  const { resourceInfo } = useProcessContext()
+  const { resourceInfo, processes } = useProcessContext()
   const { terminals } = useTerminalContext()
-  const [mode, setMode] = useLocalStorage<'bar' | 'percent'>(
+  const [mode, setMode] = useLocalStorage<ResourceViewMode>(
     'resource-view-mode',
     'bar',
   )
@@ -75,6 +78,16 @@ export function ResourceInfo({
       ? terminals.filter((t) => t.id === terminalId)
       : terminals
 
+  // Index processes by shellId
+  const processesByShell = new Map<number, ActiveProcess[]>()
+  for (const p of processes) {
+    if (p.shellId !== undefined) {
+      const arr = processesByShell.get(p.shellId)
+      if (arr) arr.push(p)
+      else processesByShell.set(p.shellId, [p])
+    }
+  }
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -82,33 +95,48 @@ export function ResourceInfo({
           <ResourceView
             cpuPercent={aggregated.cpuPercent}
             memPercent={aggregated.memPercent}
+            memRssKb={aggregated.rssKb}
             mode={mode}
           />
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-fit max-w-[95vw] max-h-[90vh] pt-[env(safe-area-inset-top)] p-3"
+        className="w-fit max-w-[95vw] min-w-[250px] max-h-[90vh] pt-[env(safe-area-inset-top)] p-3"
         align="center"
       >
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-medium text-muted-foreground">
             Resource Usage
           </span>
-          <div className="flex items-center gap-1.5">
-            <Percent className="w-3 h-3 text-muted-foreground" />
-            <Switch
-              checked={mode === 'percent'}
-              onCheckedChange={(checked) =>
-                setMode(checked ? 'percent' : 'bar')
-              }
-            />
-          </div>
+          <ToggleGroup
+            type="single"
+            size="sm"
+            variant="outline"
+            value={mode}
+            onValueChange={(v) => {
+              if (v) setMode(v as ResourceViewMode)
+            }}
+          >
+            <ToggleGroupItem value="bar" className="h-6 px-1.5">
+              <BarChart3 className="w-3 h-3" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="percent" className="h-6 px-1.5">
+              <Percent className="w-3 h-3" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="actual" className="h-6 px-1.5">
+              <Hash className="w-3 h-3" />
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         <div className="space-y-2">
           {shellId !== undefined ? (
             <ShellRow
               shellId={shellId}
+              terminalId={
+                terminals.find((t) => t.shells.some((s) => s.id === shellId))
+                  ?.id ?? 0
+              }
               label={
                 terminals.flatMap((t) => t.shells).find((s) => s.id === shellId)
                   ?.name ?? `shell-${shellId}`
@@ -117,6 +145,7 @@ export function ResourceInfo({
               totalRam={totalRam}
               totalCpu={totalCpu}
               mode={mode}
+              processes={processesByShell.get(shellId) ?? []}
             />
           ) : (
             scopeTerminals.map((terminal) => {
@@ -136,6 +165,7 @@ export function ResourceInfo({
                     <ResourceView
                       cpuPercent={termUsage.cpuPercent}
                       memPercent={termUsage.memPercent}
+                      memRssKb={termUsage.rssKb}
                       mode={mode}
                       className="scale-90 origin-right"
                     />
@@ -144,11 +174,13 @@ export function ResourceInfo({
                     <ShellRow
                       key={shell.id}
                       shellId={shell.id}
+                      terminalId={terminal.id}
                       label={shell.name}
                       usage={usage}
                       totalRam={totalRam}
                       totalCpu={totalCpu}
                       mode={mode}
+                      processes={processesByShell.get(shell.id) ?? []}
                     />
                   ))}
                 </div>
@@ -163,43 +195,82 @@ export function ResourceInfo({
 
 function ShellRow({
   shellId,
+  terminalId,
   label,
   usage,
   totalRam,
   totalCpu,
   mode,
+  processes,
 }: {
   shellId: number
+  terminalId: number
   label: string
   usage: Record<number, { rss: number; cpu: number }>
   totalRam: number
   totalCpu: number
-  mode: 'bar' | 'percent'
+  mode: ResourceViewMode
+  processes: ActiveProcess[]
 }) {
+  const [expanded, setExpanded] = useState(false)
   const connected = shellId in usage
   const shellUsage = computeUsage(usage, [shellId], totalRam, totalCpu)
+  const hasProcesses = processes.length > 0
+
   return (
-    <div className="flex items-center justify-between py-0.5 pl-3">
-      <span
+    <div>
+      <div
         className={cn(
-          'text-xs truncate max-w-[180px]',
-          connected ? 'text-muted-foreground' : 'text-muted-foreground/40',
+          'flex items-center justify-between py-0.5 pl-3',
+          hasProcesses && 'cursor-pointer',
         )}
+        onClick={hasProcesses ? () => setExpanded(!expanded) : undefined}
       >
-        {label}
-      </span>
-      {connected ? (
-        <ResourceView
-          cpuPercent={shellUsage.cpuPercent}
-          memPercent={shellUsage.memPercent}
-          mode={mode}
-          className="scale-90 origin-right"
-        />
-      ) : (
-        <span className="flex items-center gap-1 text-[10px] text-muted-foreground/40">
-          <Unplug className="w-3 h-3" />
+        <span
+          className={cn(
+            'text-xs truncate max-w-[180px] flex items-center gap-1',
+            connected ? 'text-muted-foreground' : 'text-muted-foreground/40',
+            hasProcesses && '-translate-x-4',
+          )}
+        >
+          {hasProcesses && (
+            <ChevronDown
+              className={cn(
+                'w-3 h-3 transition-transform flex-shrink-0',
+                !expanded && '-rotate-90',
+              )}
+            />
+          )}
+          {label}
         </span>
-      )}
+        {connected ? (
+          <ResourceView
+            cpuPercent={shellUsage.cpuPercent}
+            memPercent={shellUsage.memPercent}
+            memRssKb={shellUsage.rssKb}
+            mode={mode}
+            className="scale-90 origin-right"
+          />
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/40">
+            <Unplug className="w-3 h-3" />
+          </span>
+        )}
+      </div>
+      {expanded &&
+        processes.map((p) => (
+          <div
+            key={`${p.pid}-${p.command}`}
+            className="pl-2 max-w-[500px] break-all"
+          >
+            <ProcessItem
+              process={p}
+              terminalId={terminalId}
+              compact
+              truncate={false}
+            />
+          </div>
+        ))}
     </div>
   )
 }
