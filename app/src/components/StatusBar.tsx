@@ -214,8 +214,8 @@ function ResourcesSection({
   terminalId: number
 }) {
   return (
-    <SortableStatusSection section={section}>
-      <ResourceInfo terminalId={terminalId} />
+    <SortableStatusSection section={section} className='p-0'>
+      <ResourceInfo terminalId={terminalId} className='h-full py-2 px-2' />
     </SortableStatusSection>
   )
 }
@@ -492,8 +492,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))

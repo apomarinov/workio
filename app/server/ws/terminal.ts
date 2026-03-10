@@ -181,12 +181,16 @@ function broadcastShellClients(shellId: number): void {
   const state = shells.get(shellId)
   const clients: ShellClient[] = []
   if (state) {
+    const seen = new Set<string>()
     for (const ws of state.clients) {
       if (ws.readyState !== WebSocket.OPEN) continue
       const info = wsInfo.get(ws)
       if (!info) continue
       // Only include clients that have this shell as their active shell
       if (info.activeShellId !== shellId) continue
+      // Deduplicate by IP — a reconnecting device can briefly have two WS
+      if (seen.has(info.ip)) continue
+      seen.add(info.ip)
       clients.push({
         device: info.device,
         browser: info.browser,
@@ -299,22 +303,24 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         shellId = message.shellId
         const state = getOrCreateShell(shellId)
 
-        // Reject duplicate connection from the same device (IP) for the same shell
+        // Handle duplicate connection from the same device (IP) for the same shell
         const existingDeviceWs = state.devices.get(clientIP)
-        if (
-          existingDeviceWs &&
-          existingDeviceWs.readyState === WebSocket.OPEN
-        ) {
-          log.info(
-            `[ws] Rejecting duplicate connection for shell=${shellId} from device=${clientIP}`,
-          )
-          sendMessage(ws, {
-            type: 'error',
-            code: 'already_connected',
-            message: 'This shell is already open on your device',
-          })
-          ws.close()
-          return
+        if (existingDeviceWs) {
+          if (existingDeviceWs.readyState === WebSocket.OPEN) {
+            log.info(
+              `[ws] Rejecting duplicate connection for shell=${shellId} from device=${clientIP}`,
+            )
+            sendMessage(ws, {
+              type: 'error',
+              code: 'already_connected',
+              message: 'This shell is already open on your device',
+            })
+            ws.close()
+            return
+          }
+          // Stale WS (CLOSING/CLOSED) — clean it up so the new connection can proceed
+          state.clients.delete(existingDeviceWs)
+          wsInfo.delete(existingDeviceWs)
         }
 
         // Register this connection
