@@ -510,6 +510,7 @@ export interface PushSubscriptionRecord {
 
 export type StatusBarSectionName =
   | 'pr'
+  | 'resources'
   | 'processes'
   | 'ports'
   | 'gitDirty'
@@ -531,6 +532,7 @@ export interface StatusBarConfig {
 
 export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
   pr: 'Pull Request',
+  resources: 'Resources',
   processes: 'Processes',
   ports: 'Ports',
   gitDirty: 'Git Changes',
@@ -544,9 +546,10 @@ export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
   { name: 'gitDirty', visible: true, order: 1 },
   { name: 'lastCommit', visible: true, order: 2 },
   { name: 'spacer', visible: true, order: 3 },
-  { name: 'processes', visible: true, order: 4 },
-  { name: 'ports', visible: true, order: 5 },
-  { name: 'pr', visible: true, order: 6 },
+  { name: 'resources', visible: true, order: 4 },
+  { name: 'processes', visible: true, order: 5 },
+  { name: 'ports', visible: true, order: 6 },
+  { name: 'pr', visible: true, order: 7 },
 ]
 
 export const DEFAULT_STATUS_BAR: StatusBarConfig = {

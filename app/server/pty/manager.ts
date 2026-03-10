@@ -4,7 +4,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotification } from '../../shared/notifications'
-import type { ActiveProcess, GitLastCommit } from '../../shared/types'
+import type {
+  ActiveProcess,
+  GitLastCommit,
+  ResourceUsage,
+} from '../../shared/types'
 import {
   getAllTerminals,
   getTerminalById,
@@ -25,9 +29,11 @@ import type { CommandEvent } from './osc-parser'
 import {
   getActiveZellijSessionNames,
   getChildPids,
+  getDescendantPids,
   getListeningPortsForTerminal,
   getProcessComm,
   getSystemListeningPorts,
+  getSystemResourceUsage,
   getZellijSessionProcesses,
 } from './process-tree'
 import {
@@ -94,6 +100,9 @@ export function flushPendingCommand(shellId: number): string | undefined {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+const SYSTEM_MEMORY = os.totalmem()
+const CPU_COUNT = os.cpus().length
 
 const COMMAND_IGNORE_LIST: string[] = []
 
@@ -275,9 +284,13 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
   if (handles.length === 0) return
 
   const allProcesses: ActiveProcess[] = []
-  const systemPorts = await getSystemListeningPorts()
+  const [systemPorts, systemResources] = await Promise.all([
+    getSystemListeningPorts(),
+    getSystemResourceUsage(),
+  ])
   const allPorts: number[] = []
   const shellPorts: Record<number, number[]> = {}
+  const resourceUsage: Record<number, ResourceUsage> = {}
 
   await Promise.all(
     handles.map(async (h) => {
@@ -295,6 +308,29 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
       allPorts.push(...ports)
       if (ports.length > 0) {
         shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+      }
+
+      // Compute resource usage for this shell
+      if (h.ptyPid > 0) {
+        const descendants = await getDescendantPids(h.ptyPid)
+        // Include the shell process itself
+        descendants.add(h.ptyPid)
+        let rss = 0
+        let cpu = 0
+        let pidCount = 0
+        for (const pid of descendants) {
+          const usage = systemResources.get(pid)
+          if (usage) {
+            rss += usage.rss
+            cpu += usage.cpu
+            pidCount++
+          }
+        }
+        resourceUsage[h.shell.id] = {
+          rss,
+          cpu: Math.round(cpu * 10) / 10,
+          pidCount,
+        }
       }
 
       // Clear stale active_cmd if no actual process found after multiple scans
@@ -338,15 +374,22 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
     processes: allProcesses,
     ports: terminalPorts,
     shellPorts,
+    resourceUsage,
+    systemMemory: SYSTEM_MEMORY,
+    cpuCount: CPU_COUNT,
   })
 }
 
 async function scanAndEmitAllProcesses() {
   const workers = getAllWorkers()
   const allProcesses: ActiveProcess[] = []
-  const systemPorts = await getSystemListeningPorts()
+  const [systemPorts, systemResources] = await Promise.all([
+    getSystemListeningPorts(),
+    getSystemResourceUsage(),
+  ])
   const terminalPorts: Record<number, number[]> = {}
   const shellPorts: Record<number, number[]> = {}
+  const resourceUsage: Record<number, ResourceUsage> = {}
 
   await Promise.all(
     [...workers.values()].map(async (h) => {
@@ -368,6 +411,28 @@ async function scanAndEmitAllProcesses() {
           ...new Set([...existing, ...ports]),
         ].sort((a, b) => a - b)
         shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+      }
+
+      // Compute resource usage for this shell
+      if (h.ptyPid > 0) {
+        const descendants = await getDescendantPids(h.ptyPid)
+        descendants.add(h.ptyPid)
+        let rss = 0
+        let cpu = 0
+        let pidCount = 0
+        for (const pid of descendants) {
+          const usage = systemResources.get(pid)
+          if (usage) {
+            rss += usage.rss
+            cpu += usage.cpu
+            pidCount++
+          }
+        }
+        resourceUsage[h.shell.id] = {
+          rss,
+          cpu: Math.round(cpu * 10) / 10,
+          pidCount,
+        }
       }
 
       // Clear stale active_cmd if no actual process found after multiple scans
@@ -443,6 +508,9 @@ async function scanAndEmitAllProcesses() {
     processes: allProcesses,
     ports: terminalPorts,
     shellPorts,
+    resourceUsage,
+    systemMemory: SYSTEM_MEMORY,
+    cpuCount: CPU_COUNT,
   })
 }
 

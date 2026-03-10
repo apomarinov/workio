@@ -30,6 +30,7 @@ import { useTerminalContext } from '../context/TerminalContext'
 import type { SessionWithProject, Terminal } from '../types'
 import { TerminalIcon2 } from './icons'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'
+import { ResourceInfo } from './ResourceInfo'
 import { SessionItem } from './SessionItem'
 import { ShellTabs } from './ShellTabs'
 import { TruncatedPath } from './TruncatedPath'
@@ -442,6 +443,12 @@ export const TerminalItem = memo(function TerminalItem({
                       />
                     )}
                     {hasProcesses && (
+                      <ResourceInfo
+                        terminalId={terminal.id}
+                        className="py-0.5 scale-[90%]"
+                      />
+                    )}
+                    {hasProcesses && (
                       <button
                         type="button"
                         onClick={() => setActiveTab('processes')}
@@ -572,6 +579,7 @@ export const TerminalItem = memo(function TerminalItem({
                           pr={prForBranch}
                           expanded={true}
                           hasNewActivity={prForBranch.hasUnreadNotifications}
+                          onToggle={() => {}}
                         />
                       </div>
                     )}

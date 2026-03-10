@@ -7,14 +7,22 @@ import type {
   GitLastCommit,
   GitRemoteSyncPayload,
   ProcessesPayload,
+  ResourceUsage,
 } from '../../shared/types'
 import { useSocket } from '../hooks/useSocket'
 import { useNotifications } from './NotificationContext'
+
+export interface ResourceInfo {
+  totalRam: number
+  totalCpu: number
+  usage: Record<number, ResourceUsage>
+}
 
 interface ProcessContextValue {
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
   shellPorts: Record<number, number[]>
+  resourceInfo: ResourceInfo
   gitDirtyStatus: Record<number, GitDiffStat>
   gitRemoteSyncStatus: Record<
     number,
@@ -33,6 +41,12 @@ interface ProcessContextValue {
 
 const ProcessContext = createContext<ProcessContextValue | null>(null)
 
+const EMPTY_RESOURCE_INFO: ResourceInfo = {
+  totalRam: 0,
+  totalCpu: 0,
+  usage: {},
+}
+
 export function ProcessProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, emit } = useSocket()
   const { sendNotification } = useNotifications()
@@ -42,6 +56,8 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     {},
   )
   const [shellPorts, setShellPorts] = useState<Record<number, number[]>>({})
+  const [resourceInfo, setResourceInfo] =
+    useState<ResourceInfo>(EMPTY_RESOURCE_INFO)
   const [gitDirtyStatus, setGitDirtyStatus] = useState<
     Record<number, GitDiffStat>
   >({})
@@ -161,6 +177,28 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
           return data.shellPorts ?? {}
         })
       }
+
+      if (data.resourceUsage || data.systemMemory || data.cpuCount) {
+        setResourceInfo((prev) => {
+          const totalRam = data.systemMemory ?? prev.totalRam
+          const totalCpu = data.cpuCount ?? prev.totalCpu
+          let usage: Record<number, ResourceUsage>
+          if (data.resourceUsage) {
+            if (data.terminalId !== undefined) {
+              // Partial update: merge resource usage for this terminal's shells
+              usage = { ...prev.usage }
+              for (const [shellId, u] of Object.entries(data.resourceUsage)) {
+                usage[Number(shellId)] = u
+              }
+            } else {
+              usage = data.resourceUsage
+            }
+          } else {
+            usage = prev.usage
+          }
+          return { totalRam, totalCpu, usage }
+        })
+      }
     })
   }, [subscribe])
 
@@ -222,6 +260,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       processes,
       terminalPorts,
       shellPorts,
+      resourceInfo,
       gitDirtyStatus,
       gitRemoteSyncStatus,
       gitLastCommit,
@@ -233,6 +272,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       processes,
       terminalPorts,
       shellPorts,
+      resourceInfo,
       gitDirtyStatus,
       gitRemoteSyncStatus,
       gitLastCommit,

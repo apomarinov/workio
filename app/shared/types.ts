@@ -9,11 +9,20 @@ export interface ActiveProcess {
   startedAt?: number
 }
 
+export interface ResourceUsage {
+  rss: number
+  cpu: number
+  pidCount: number
+}
+
 export interface ProcessesPayload {
   terminalId?: number
   processes: ActiveProcess[]
   ports?: Record<number, number[]>
   shellPorts?: Record<number, number[]>
+  resourceUsage?: Record<number, ResourceUsage>
+  systemMemory?: number // total system RAM in bytes (os.totalmem)
+  cpuCount?: number // number of logical CPU cores (os.cpus().length)
 }
 
 export interface FailedPRCheck {

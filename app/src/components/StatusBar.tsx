@@ -52,6 +52,7 @@ import {
   type StatusBarSection,
   type StatusBarSectionName,
 } from '../types'
+import { ResourceInfo } from './ResourceInfo'
 import {
   GitDirtyBadge,
   PortsList,
@@ -202,6 +203,20 @@ function ProcessesSection({
         />
       </PopoverContent>
     </Popover>
+  )
+}
+
+function ResourcesSection({
+  section,
+  terminalId,
+}: {
+  section: StatusBarSection
+  terminalId: number
+}) {
+  return (
+    <SortableStatusSection section={section}>
+      <ResourceInfo terminalId={terminalId} className='p-0.5' />
+    </SortableStatusSection>
   )
 }
 
@@ -446,6 +461,7 @@ export function StatusBar({ position }: StatusBarProps) {
     processes: allProcesses,
     terminalPorts,
     shellPorts,
+    resourceInfo,
     gitDirtyStatus,
     gitLastCommit,
   } = useProcessContext()
@@ -464,6 +480,12 @@ export function StatusBar({ position }: StatusBarProps) {
     sections = [
       ...sections,
       { name: 'lastCommit' as const, visible: true, order: sections.length },
+    ]
+  }
+  if (!sections.some((s) => s.name === 'resources')) {
+    sections = [
+      ...sections,
+      { name: 'resources' as const, visible: true, order: sections.length },
     ]
   }
   const statusBar = { ...rawStatusBar, sections }
@@ -485,8 +507,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))
@@ -502,6 +524,12 @@ export function StatusBar({ position }: StatusBarProps) {
     switch (name) {
       case 'pr':
         return !!prForBranch
+      case 'resources':
+        return (
+          resourceInfo.totalRam > 0 &&
+          resourceInfo.totalCpu > 0 &&
+          Object.keys(resourceInfo.usage).length > 0
+        )
       case 'processes':
         return processes.length > 0
       case 'ports':
@@ -548,6 +576,14 @@ export function StatusBar({ position }: StatusBarProps) {
         return prForBranch ? (
           <PRSection key={section.name} section={section} pr={prForBranch} />
         ) : null
+      case 'resources':
+        return (
+          <ResourcesSection
+            key={section.name}
+            section={section}
+            terminalId={terminal.id}
+          />
+        )
       case 'processes':
         return processes.length > 0 ? (
           <ProcessesSection

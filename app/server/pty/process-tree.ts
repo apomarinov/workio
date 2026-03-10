@@ -309,6 +309,37 @@ export async function getDescendantPids(pid: number): Promise<Set<number>> {
   return descendants
 }
 
+// Get system-wide RSS (KB) and CPU% for every process in a single ps call
+// Returns Map<pid, { rss, cpu }>
+export async function getSystemResourceUsage(): Promise<
+  Map<number, { rss: number; cpu: number }>
+> {
+  const result = new Map<number, { rss: number; cpu: number }>()
+  try {
+    const { stdout } = await execFileAsync(
+      'ps',
+      ['-o', 'pid,rss,%cpu', '-ax'],
+      { encoding: 'utf8', timeout: 3000 },
+    )
+    // Skip the header line
+    for (const line of stdout.split('\n').slice(1)) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      const parts = trimmed.split(/\s+/)
+      if (parts.length < 3) continue
+      const pid = Number.parseInt(parts[0], 10)
+      const rss = Number.parseInt(parts[1], 10)
+      const cpu = Number.parseFloat(parts[2])
+      if (pid > 0) {
+        result.set(pid, { rss, cpu })
+      }
+    }
+  } catch (err) {
+    log.error({ err }, '[pty] Failed to get system resource usage')
+  }
+  return result
+}
+
 // Get all TCP listening ports on the system, grouped by PID
 // Returns Map<pid, port[]>
 export async function getSystemListeningPorts(): Promise<
