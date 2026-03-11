@@ -543,8 +543,8 @@ export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
 
 export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
   { name: 'branch', visible: true, order: 0 },
-  { name: 'gitDirty', visible: true, order: 1 },
-  { name: 'lastCommit', visible: true, order: 2 },
+  { name: 'lastCommit', visible: true, order: 1 },
+  { name: 'gitDirty', visible: true, order: 2 },
   { name: 'spacer', visible: true, order: 3 },
   { name: 'resources', visible: true, order: 4 },
   { name: 'processes', visible: true, order: 5 },

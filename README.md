@@ -139,6 +139,13 @@ Before running WorkIO, make sure the following are installed on your machine:
 - **GitHub CLI (`gh`)** — install from [cli.github.com](https://cli.github.com/) (optional, for PR features)
 - **Git** and **SSH** (for repository and remote machine features)
 
+**SSH host setup:** For git features (commit author detection, dirty status) to work properly on remote machines, configure git identity on each SSH host:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
 You also need to set up environment variables. Create a `.env.local` file in the project root:
 
 | Variable | Required | Description |

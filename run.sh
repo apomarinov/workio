@@ -148,6 +148,15 @@ chmod +x "$SCRIPT_DIR/setup_hooks.py"
 echo "Updating Claude hooks..."
 python3 "$SCRIPT_DIR/setup_hooks.py"
 
+# Install wio Claude skill
+WIO_SKILL_SRC="$SCRIPT_DIR/claude-skill/wio"
+WIO_SKILL_DST="$HOME/.claude/skills/wio"
+if [[ -d "$WIO_SKILL_SRC" ]]; then
+    mkdir -p "$WIO_SKILL_DST"
+    cp -f "$WIO_SKILL_SRC/SKILL.md" "$WIO_SKILL_DST/SKILL.md"
+    echo "Installed wio Claude skill"
+fi
+
 # ---- PostgreSQL Setup ----
 
 echo "Setting up PostgreSQL database: $DB_NAME"

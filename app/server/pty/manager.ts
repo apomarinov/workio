@@ -687,7 +687,7 @@ async function checkLastCommit(
     if (sshHost) {
       const [logResult, userResult] = await Promise.all([
         execSSHCommand(sshHost, 'git log -1 --format="%H%n%an%n%aI%n%s"', cwd),
-        execSSHCommand(sshHost, 'git config user.name', cwd),
+        execSSHCommand(sshHost, 'git config user.name || true', cwd),
       ])
       logOut = logResult.stdout
       userName = userResult.stdout.trim()
