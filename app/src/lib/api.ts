@@ -208,6 +208,7 @@ export async function openInIDE(
   path: string,
   ide: 'cursor' | 'vscode',
   terminalId?: number,
+  sshHost?: string,
 ): Promise<void> {
   const res = await apiFetch(`${API_BASE}/open-in-ide`, {
     method: 'POST',
@@ -216,6 +217,7 @@ export async function openInIDE(
       path,
       ide,
       ...(terminalId != null && { terminal_id: terminalId }),
+      ...(sshHost && { ssh_host: sshHost }),
     }),
   })
   if (!res.ok) throw new Error('Failed to open IDE')

@@ -54,7 +54,7 @@ export function CommitDialog({
   const [discardFiles, setDiscardFiles] = useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const handleCommitRef = useRef<() => void>(() => { })
+  const handleCommitRef = useRef<() => void>(() => {})
   const canCommitRef = useRef(false)
   const fileListRef = useRef<FileListHandle>(null)
   const stateRef = useRef(state)

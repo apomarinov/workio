@@ -56,8 +56,8 @@ export function createActionsMode(
 
     const items: PaletteItem[] = []
 
-    // Open in IDE (non-SSH only)
-    if (!terminal.ssh_host) {
+    // Open in IDE
+    {
       const ideLabel = preferredIDE === 'vscode' ? 'VS Code' : 'Cursor'
       const ideIcon =
         preferredIDE === 'vscode' ? (

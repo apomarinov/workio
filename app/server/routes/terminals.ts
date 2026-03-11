@@ -352,9 +352,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       path: string
       ide: 'cursor' | 'vscode'
       terminal_id?: number
+      ssh_host?: string
     }
   }>('/api/open-in-ide', async (request, reply) => {
-    const { path: rawPath, ide, terminal_id } = request.body
+    const { path: rawPath, ide, terminal_id, ssh_host } = request.body
     if (!rawPath) {
       return reply.status(400).send({ error: 'Path is required' })
     }
@@ -368,10 +369,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     // Resolve path against terminal cwd if terminal_id is provided
     let resolvedPath = pathOnly
     let terminalCwd: string | null = null
+    let remoteSshHost: string | undefined = ssh_host
     if (terminal_id != null) {
       const terminal = await getTerminalById(terminal_id)
       if (terminal) {
         terminalCwd = terminal.cwd
+        if (terminal.ssh_host) remoteSshHost = terminal.ssh_host
         // Resolve relative paths against terminal's cwd
         if (!pathOnly.startsWith('/') && !pathOnly.startsWith('~')) {
           resolvedPath = `${terminal.cwd}/${pathOnly}`
@@ -379,24 +382,43 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
     }
 
-    // Check file existence
-    try {
-      await fs.promises.access(expandPath(resolvedPath))
-    } catch {
-      return reply.status(404).send({ error: 'File not found' })
+    // Skip file existence check for SSH remotes (file is on the remote host)
+    if (!remoteSshHost) {
+      try {
+        await fs.promises.access(expandPath(resolvedPath))
+      } catch {
+        return reply.status(404).send({ error: 'File not found' })
+      }
     }
 
     // Build full target path with :line:col for the IDE CLI
-    const targetPath = expandPath(
-      lineColMatch?.[2]
+    const targetPath = remoteSshHost
+      ? lineColMatch?.[2]
         ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
-        : resolvedPath,
-    )
+        : resolvedPath
+      : expandPath(
+          lineColMatch?.[2]
+            ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
+            : resolvedPath,
+        )
 
-    // Include terminal cwd so the IDE opens the correct workspace window
-    const args = terminalCwd
-      ? [terminalCwd, '--goto', targetPath]
-      : ['--goto', targetPath]
+    // Build args — for SSH remotes, use --remote to open via the IDE's SSH extension
+    let args: string[]
+    if (remoteSshHost) {
+      args = terminalCwd
+        ? [
+            '--remote',
+            `ssh-remote+${remoteSshHost}`,
+            terminalCwd,
+            '--goto',
+            targetPath,
+          ]
+        : ['--remote', `ssh-remote+${remoteSshHost}`, '--goto', targetPath]
+    } else {
+      args = terminalCwd
+        ? [terminalCwd, '--goto', targetPath]
+        : ['--goto', targetPath]
+    }
 
     return new Promise<void>((resolve) => {
       execFile(cmd, args, { timeout: 5000 }, (err) => {

@@ -789,9 +789,6 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       /(?:^|[\s'"`({[:])([~.]?\/[\w./@-]+(?:\/[\w./@-]+)*\.\w+(?::\d+(?::\d+)?)?|(?:[\w.@-]+\/)+[\w.@-]+\.\w+(?::\d+(?::\d+)?)?)/g
     terminal.registerLinkProvider({
       provideLinks(bufferLineNumber, callback) {
-        // File path links only work for local terminals
-        if (sshHostRef.current) return callback(undefined)
-
         const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
         if (!line) return callback(undefined)
 

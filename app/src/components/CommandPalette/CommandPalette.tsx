@@ -672,10 +672,19 @@ export function CommandPalette() {
       openInIDE: async (terminal) => {
         closePalette()
         try {
-          await openInIDE(terminal.cwd, preferredIDE)
+          await openInIDE(
+            terminal.cwd,
+            preferredIDE,
+            undefined,
+            terminal.ssh_host ?? undefined,
+          )
         } catch {
           // CLI not available — fall back to URL scheme
-          window.open(`${preferredIDE}://file/${terminal.cwd}`, '_blank')
+          const scheme = preferredIDE === 'vscode' ? 'vscode' : 'cursor'
+          const uri = terminal.ssh_host
+            ? `${scheme}://vscode-remote/ssh-remote+${terminal.ssh_host}${terminal.cwd}`
+            : `${scheme}://file/${terminal.cwd}`
+          window.open(uri, '_blank')
         }
       },
       openInExplorer: async (terminal) => {
