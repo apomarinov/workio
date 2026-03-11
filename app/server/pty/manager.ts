@@ -8,6 +8,7 @@ import type {
   ActiveProcess,
   GitLastCommit,
   HostResourceInfo,
+  PortForwardStatus,
   ResourceUsage,
 } from '../../shared/types'
 import {
@@ -26,6 +27,11 @@ import { log } from '../logger'
 import { sendPushNotification } from '../push'
 import { execSSHCommand } from '../ssh/exec'
 import { closeConnection } from '../ssh/pool'
+import {
+  getTunnelStatuses,
+  reconcileTunnels,
+  stopAllTunnelsForTerminal,
+} from '../ssh/tunnel'
 import { emitWorkspace } from '../workspace/setup'
 import type { CommandEvent } from './osc-parser'
 import {
@@ -542,15 +548,62 @@ async function scanWorkers(handles: WorkerHandle[]) {
   }
 }
 
-async function scanAndEmitProcessesForTerminal(terminalId: number) {
+/** Reconcile SSH tunnels for the given terminal IDs and return portForwardStatus */
+async function reconcileTunnelsForTerminals(
+  terminalIds: number[],
+  ports: Record<number, number[]>,
+): Promise<Record<number, PortForwardStatus[]>> {
+  const portForwardStatus: Record<number, PortForwardStatus[]> = {}
+  // Find SSH terminal IDs from worker handles
+  const allWorkers = getAllWorkers()
+  const sshTerminalIds = new Set<number>()
+  for (const h of allWorkers.values()) {
+    if (h.sshHost && terminalIds.includes(h.terminalId)) {
+      sshTerminalIds.add(h.terminalId)
+    }
+  }
+  for (const terminalId of sshTerminalIds) {
+    try {
+      const terminal = await getTerminalById(terminalId)
+      if (!terminal?.settings?.portMappings?.length) continue
+      const detectedPorts = ports[terminalId] ?? []
+      const sshHost = terminal.ssh_host
+      if (!sshHost) continue
+      reconcileTunnels(
+        terminalId,
+        sshHost,
+        detectedPorts,
+        terminal.settings.portMappings,
+      )
+      const statuses = getTunnelStatuses(terminalId)
+      if (statuses.length > 0) portForwardStatus[terminalId] = statuses
+    } catch (err) {
+      log.error(
+        { err },
+        `[pty] Failed to reconcile tunnels for terminal ${terminalId}`,
+      )
+    }
+  }
+  return portForwardStatus
+}
+
+export async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const handles = getWorkersForTerminal(terminalId)
   if (handles.length === 0) return
 
   const result = await scanWorkers(handles)
   const { remoteProcesses: _, ...payload } = result
+
+  // Reconcile SSH tunnels for this terminal
+  const portForwardStatus = await reconcileTunnelsForTerminals(
+    [terminalId],
+    result.ports,
+  )
+
   getIO()?.emit('processes', {
     terminalId,
     ...payload,
+    ...(Object.keys(portForwardStatus).length > 0 && { portForwardStatus }),
     systemMemory: SYSTEM_MEMORY,
     cpuCount: CPU_COUNT,
   })
@@ -627,9 +680,19 @@ async function scanAndEmitAllProcesses() {
     }
   }
 
+  // Reconcile SSH tunnels for all terminals
+  const allTerminalIds = [
+    ...new Set([...workers.values()].map((h) => h.terminalId)),
+  ]
+  const portForwardStatus = await reconcileTunnelsForTerminals(
+    allTerminalIds,
+    result.ports,
+  )
+
   const { remoteProcesses: _remote, ...globalPayload } = result
   getIO()?.emit('processes', {
     ...globalPayload,
+    ...(Object.keys(portForwardStatus).length > 0 && { portForwardStatus }),
     systemMemory: SYSTEM_MEMORY,
     cpuCount: CPU_COUNT,
   })
@@ -1361,6 +1424,7 @@ export function destroySessionsForTerminal(terminalId: number): boolean {
     lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()
     untrackTerminal(terminalId)
+    stopAllTunnelsForTerminal(terminalId)
 
     // Close SSH pool connection and clear cache if no other terminals use the same host
     if (sshHost) {

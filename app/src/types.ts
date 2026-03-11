@@ -21,6 +21,11 @@ export interface Shell {
   created_at: string
 }
 
+export interface PortMapping {
+  port: number // remote port
+  localPort: number // local port
+}
+
 export interface Terminal {
   id: number
   cwd: string
@@ -32,7 +37,10 @@ export interface Terminal {
   git_branch: string | null
   git_repo: GitRepoStatus | null
   setup: SetupStatus | null
-  settings: { defaultClaudeCommand?: string } | null
+  settings: {
+    defaultClaudeCommand?: string
+    portMappings?: PortMapping[]
+  } | null
   shells: Shell[]
   orphaned?: boolean
   created_at: string

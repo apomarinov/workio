@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
@@ -59,6 +60,20 @@ function expandPath(p: string): string {
     return os.homedir()
   }
   return p
+}
+
+function isLocalPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = net.connect({ port, host: '127.0.0.1' })
+    sock.once('connect', () => {
+      sock.destroy()
+      resolve(false) // something is listening — taken
+    })
+    sock.once('error', () => {
+      sock.destroy()
+      resolve(true) // connection refused — free
+    })
+  })
 }
 
 function parseUntrackedWc(wcOut: string): Map<string, number> {
@@ -175,6 +190,7 @@ import {
   interruptSession,
   killShellChildren,
   renameZellijSession,
+  scanAndEmitProcessesForTerminal,
   updateSessionName,
   waitForSession,
   writeShellNameFile,
@@ -205,7 +221,10 @@ interface CreateTerminalBody {
 
 interface UpdateTerminalBody {
   name?: string
-  settings?: { defaultClaudeCommand?: string } | null
+  settings?: {
+    defaultClaudeCommand?: string
+    portMappings?: { port: number; localPort: number }[]
+  } | null
 }
 
 interface CheckoutBranchBody {
@@ -962,7 +981,40 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           .send({ error: 'A terminal with this name already exists' })
       }
 
+      // Validate new port mappings — check local ports are available
+      const newMappings = request.body.settings?.portMappings
+      const oldMappings = terminal.settings?.portMappings ?? []
+      if (newMappings) {
+        for (const mapping of newMappings) {
+          // Skip ports that are already mapped (no change)
+          if (
+            oldMappings.some(
+              (m) =>
+                m.port === mapping.port && m.localPort === mapping.localPort,
+            )
+          )
+            continue
+          const available = await isLocalPortAvailable(mapping.localPort)
+          if (!available) {
+            return reply.status(409).send({
+              error: `Local port ${mapping.localPort} is already in use`,
+            })
+          }
+        }
+      }
+
       const updated = await updateTerminal(id, request.body)
+
+      // Trigger immediate process scan when port mappings change
+      if (request.body.settings !== undefined) {
+        scanAndEmitProcessesForTerminal(id).catch((err) =>
+          log.error(
+            { err },
+            `[terminals] Failed to scan after settings update for terminal ${id}`,
+          ),
+        )
+      }
+
       return updated
     },
   )

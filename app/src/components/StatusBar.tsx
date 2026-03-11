@@ -222,12 +222,14 @@ function ResourcesSection({
 
 function PortsSection({
   section,
+  terminalId,
   shellPorts,
   terminalPorts,
   shells,
   terminalName,
 }: {
   section: StatusBarSection
+  terminalId: number
   shellPorts: Record<number, number[]>
   terminalPorts: number[]
   shells: Terminal['shells']
@@ -235,18 +237,26 @@ function PortsSection({
 }) {
   const totalPorts = terminalPorts.length
   const [isOpen, setIsOpen] = useState(false)
+  const { portForwardStatus } = useProcessContext()
+  const hasError = portForwardStatus[terminalId]?.some((s) => s.error)
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <div>
           <SortableStatusSection section={section}>
-            <Globe className="w-3 h-3 flex-shrink-0 text-blue-400/80" />{' '}
+            <Globe
+              className={cn(
+                'w-3 h-3 flex-shrink-0',
+                hasError ? 'text-orange-400/80' : 'text-blue-400/80',
+              )}
+            />{' '}
             {totalPorts}
           </SortableStatusSection>
         </div>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-1" align="start" side="bottom">
         <PortsList
+          terminalId={terminalId}
           onClick={() => setIsOpen(false)}
           shellPorts={shellPorts}
           terminalPorts={terminalPorts}
@@ -585,6 +595,7 @@ export function StatusBar({ position }: StatusBarProps) {
           <PortsSection
             key={section.name}
             section={section}
+            terminalId={terminal.id}
             shellPorts={shellPorts}
             terminalPorts={ports}
             shells={terminal.shells}

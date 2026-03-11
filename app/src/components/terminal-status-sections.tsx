@@ -4,15 +4,19 @@ import {
   ExternalLink,
   Globe,
   Link,
+  Link2,
+  Unlink,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { useProcessContext } from '@/context/ProcessContext'
+import { useTerminalContext } from '@/context/TerminalContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSocket } from '@/hooks/useSocket'
 import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import type { ActiveProcess } from '../../shared/types'
+import type { ActiveProcess, PortForwardStatus } from '../../shared/types'
 import type { Shell } from '../types'
 
 interface GitDirtyBadgeProps {
@@ -125,13 +129,128 @@ export function ProcessItem({
 
 interface PortItemProps {
   port: number
+  terminalId: number
   compact?: boolean
   onClick?: () => void
+  isSSH?: boolean
+  forwardStatus?: PortForwardStatus
 }
 
-export function PortItem({ port, compact, onClick }: PortItemProps) {
+export function PortItem({
+  port,
+  terminalId,
+  compact,
+  onClick,
+  isSSH,
+  forwardStatus,
+}: PortItemProps) {
   const isMobile = useIsMobile()
+  const { unmapPort } = useTerminalContext()
 
+  // SSH terminal with active mapping
+  if (isSSH && forwardStatus) {
+    const hasError = !!forwardStatus.error
+    const isConnected = forwardStatus.connected && !hasError
+
+    return (
+      <div
+        className={cn(
+          'flex items-center group/port gap-2 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/30 transition-colors',
+          compact ? 'px-1.5 py-0.5' : 'px-2 py-1',
+        )}
+      >
+        <Globe
+          className={cn(
+            'w-3 h-3 flex-shrink-0',
+            hasError
+              ? 'text-orange-400'
+              : isConnected
+                ? 'text-blue-400'
+                : 'text-yellow-400/60',
+          )}
+        />
+        {isConnected ? (
+          <a
+            href={`http://localhost:${forwardStatus.localPort}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => onClick?.()}
+            className="text-xs hover:underline"
+          >
+            {forwardStatus.localPort}
+          </a>
+        ) : hasError ? (
+          <span className="text-xs text-orange-400/80">
+            {forwardStatus.error}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground/50">
+            Connecting...
+          </span>
+        )}
+        <span className="flex-shrink-0 ml-auto flex items-center gap-0.5">
+          {isConnected && (
+            <ExternalLink
+              className={cn(
+                'w-3 h-3 flex-shrink-0',
+                isMobile ? 'block' : 'hidden group-hover/port:block',
+              )}
+            />
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              unmapPort(terminalId, port).then(
+                () => toast.success(`Unmapped port ${port}`),
+                () => toast.error('Failed to unmap port'),
+              )
+            }}
+            className={cn(
+              isMobile ? 'block' : 'hidden group-hover/port:block',
+              'text-muted-foreground/60 hover:text-red-400/90 transition-colors cursor-pointer',
+            )}
+          >
+            <Unlink className="w-3 h-3" />
+          </button>
+        </span>
+      </div>
+    )
+  }
+
+  // SSH terminal without mapping — whole row opens mapping dialog
+  if (isSSH) {
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          window.dispatchEvent(
+            new CustomEvent('open-port-mapping', {
+              detail: { terminalId, port },
+            }),
+          )
+        }
+        className={cn(
+          'flex items-center group/port gap-2 rounded w-full text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/30 transition-colors cursor-pointer',
+          compact ? 'px-1.5 py-0.5' : 'px-2 py-1',
+        )}
+      >
+        <Globe className="w-3 h-3 flex-shrink-0 text-muted-foreground/40" />
+        <span className="text-xs">{port}</span>
+        <span
+          className={cn(
+            isMobile ? 'flex' : 'hidden group-hover/port:flex',
+            'items-center gap-0.5 ml-auto text-[10px] text-muted-foreground/60',
+          )}
+        >
+          <Link2 className="w-3 h-3" />
+          <span>Map</span>
+        </span>
+      </button>
+    )
+  }
+
+  // Local terminal — existing behavior
   return (
     <a
       href={`http://localhost:${port}`}
@@ -238,6 +357,7 @@ export function ProcessesList({
 }
 
 interface PortsListProps {
+  terminalId: number
   shellPorts: Record<number, number[]>
   terminalPorts: number[]
   shells: Shell[]
@@ -247,6 +367,7 @@ interface PortsListProps {
 }
 
 export function PortsList({
+  terminalId,
   shellPorts,
   terminalPorts,
   shells,
@@ -255,6 +376,15 @@ export function PortsList({
   onClick,
 }: PortsListProps) {
   const [collapsedShells, setCollapsedShells] = useState<Set<number>>(new Set())
+  const { terminals } = useTerminalContext()
+  const { portForwardStatus } = useProcessContext()
+
+  const terminal = terminals.find((t) => t.id === terminalId)
+  const isSSH = !!terminal?.ssh_host
+  const statuses = portForwardStatus[terminalId]
+
+  const getForwardStatus = (port: number) =>
+    statuses?.find((s) => s.remotePort === port)
 
   const shellEntries = shells
     .filter((s) => shellPorts[s.id]?.length > 0)
@@ -274,7 +404,14 @@ export function PortsList({
     return (
       <>
         {terminalPorts.map((port) => (
-          <PortItem key={port} port={port} compact={compact} />
+          <PortItem
+            key={port}
+            port={port}
+            terminalId={terminalId}
+            compact={compact}
+            isSSH={isSSH}
+            forwardStatus={getForwardStatus(port)}
+          />
         ))}
       </>
     )
@@ -303,7 +440,14 @@ export function PortsList({
             {!isCollapsed &&
               sPorts.map((port) => (
                 <div key={port} className="ml-2">
-                  <PortItem port={port} compact={compact} onClick={onClick} />
+                  <PortItem
+                    port={port}
+                    terminalId={terminalId}
+                    compact={compact}
+                    onClick={onClick}
+                    isSSH={isSSH}
+                    forwardStatus={getForwardStatus(port)}
+                  />
                 </div>
               ))}
           </div>

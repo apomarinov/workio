@@ -18,6 +18,7 @@ import { Toaster, toast } from '@/components/ui/sonner'
 import { CommandPalette } from './components/CommandPalette'
 import { CreateTerminalModal } from './components/CreateTerminalModal'
 import { PinnedSessionsPip } from './components/PinnedSessionsPip'
+import { PortMappingModal } from './components/PortMappingModal'
 import { PRModal } from './components/PRModal'
 import { ShellTabs } from './components/ShellTabs'
 import { Sidebar } from './components/Sidebar'
@@ -90,6 +91,7 @@ function AppContent() {
     activeShellsRef,
     setShell,
     orderedTerminals,
+    mapPort,
   } = useTerminalContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe, emit } = useSocket()
@@ -346,6 +348,20 @@ function AppContent() {
     }
     window.addEventListener('open-session-search', handler)
     return () => window.removeEventListener('open-session-search', handler)
+  }, [])
+
+  // Listen for open-port-mapping events (from PortItem SSH "Map" button)
+  const [portMappingTarget, setPortMappingTarget] = useState<{
+    terminalId: number
+    port: number
+  } | null>(null)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminalId: number; port: number }>) => {
+      setPortMappingTarget(e.detail)
+    }
+    window.addEventListener('open-port-mapping', handler as EventListener)
+    return () =>
+      window.removeEventListener('open-port-mapping', handler as EventListener)
   }, [])
 
   // Shell event listeners (dispatched from TerminalItem sidebar)
@@ -1049,6 +1065,30 @@ function AppContent() {
           prNumber={prModalTarget.prNumber}
           repo={prModalTarget.repo}
           onClose={() => setPrModalTarget(null)}
+        />
+      )}
+      {portMappingTarget && (
+        <PortMappingModal
+          open={!!portMappingTarget}
+          remotePort={portMappingTarget.port}
+          onSave={async (localPort) => {
+            try {
+              await mapPort(
+                portMappingTarget.terminalId,
+                portMappingTarget.port,
+                localPort,
+              )
+              toast.success(
+                `Mapped remote port ${portMappingTarget.port} to localhost:${localPort}`,
+              )
+              setPortMappingTarget(null)
+            } catch (err) {
+              toast.error(
+                err instanceof Error ? err.message : 'Failed to map port',
+              )
+            }
+          }}
+          onCancel={() => setPortMappingTarget(null)}
         />
       )}
       <CreateTerminalModal

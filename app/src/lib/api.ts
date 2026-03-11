@@ -139,7 +139,10 @@ export async function updateTerminal(
   id: number,
   updates: {
     name?: string
-    settings?: { defaultClaudeCommand?: string } | null
+    settings?: {
+      defaultClaudeCommand?: string
+      portMappings?: { port: number; localPort: number }[]
+    } | null
   },
 ): Promise<Terminal> {
   const res = await apiFetch(`${API_BASE}/terminals/${id}`, {

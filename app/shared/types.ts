@@ -22,6 +22,13 @@ export interface HostResourceInfo {
   systemRss: number // total RSS in KB
 }
 
+export interface PortForwardStatus {
+  remotePort: number
+  localPort: number
+  connected: boolean
+  error?: string
+}
+
 export interface ProcessesPayload {
   terminalId?: number
   processes: ActiveProcess[]
@@ -33,6 +40,7 @@ export interface ProcessesPayload {
   systemCpu?: number // total system CPU usage (sum of all %cpu)
   systemRss?: number // total system RSS in KB
   hostResources?: Record<string, HostResourceInfo> // sshHost -> system totals
+  portForwardStatus?: Record<number, PortForwardStatus[]> // terminalId -> statuses
 }
 
 export interface FailedPRCheck {

@@ -7,6 +7,7 @@ import type {
   GitLastCommit,
   GitRemoteSyncPayload,
   HostResourceInfo,
+  PortForwardStatus,
   ProcessesPayload,
   ResourceUsage,
 } from '../../shared/types'
@@ -26,6 +27,7 @@ interface ProcessContextValue {
   processes: ActiveProcess[]
   terminalPorts: Record<number, number[]>
   shellPorts: Record<number, number[]>
+  portForwardStatus: Record<number, PortForwardStatus[]>
   resourceInfo: ResourceInfo
   gitDirtyStatus: Record<number, GitDiffStat>
   gitRemoteSyncStatus: Record<
@@ -63,6 +65,9 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
     {},
   )
   const [shellPorts, setShellPorts] = useState<Record<number, number[]>>({})
+  const [portForwardStatus, setPortForwardStatus] = useState<
+    Record<number, PortForwardStatus[]>
+  >({})
   const [resourceInfo, setResourceInfo] =
     useState<ResourceInfo>(EMPTY_RESOURCE_INFO)
   const [gitDirtyStatus, setGitDirtyStatus] = useState<
@@ -185,6 +190,26 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
+      if (data.terminalId !== undefined) {
+        // Per-terminal update: set or clear this terminal's forward status
+        const tid = data.terminalId
+        setPortForwardStatus((prev) => {
+          const statuses = data.portForwardStatus?.[tid]
+          if (statuses && statuses.length > 0) {
+            return { ...prev, [tid]: statuses }
+          }
+          if (prev[tid]) {
+            const next = { ...prev }
+            delete next[tid]
+            return next
+          }
+          return prev
+        })
+      } else if (data.portForwardStatus) {
+        // Full update: replace all
+        setPortForwardStatus(data.portForwardStatus)
+      }
+
       if (
         data.resourceUsage ||
         data.systemMemory ||
@@ -291,6 +316,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       processes,
       terminalPorts,
       shellPorts,
+      portForwardStatus,
       resourceInfo,
       gitDirtyStatus,
       gitRemoteSyncStatus,
@@ -303,6 +329,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       processes,
       terminalPorts,
       shellPorts,
+      portForwardStatus,
       resourceInfo,
       gitDirtyStatus,
       gitRemoteSyncStatus,

@@ -599,6 +599,7 @@ export const TerminalItem = memo(function TerminalItem({
                     )}
                     {activeTab === 'ports' && hasPorts && (
                       <PortsList
+                        terminalId={terminal.id}
                         shellPorts={shellPorts}
                         terminalPorts={ports}
                         shells={terminal.shells}

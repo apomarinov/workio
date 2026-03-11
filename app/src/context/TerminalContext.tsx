@@ -56,9 +56,18 @@ interface TerminalContextValue {
     id: number,
     updates: {
       name?: string
-      settings?: { defaultClaudeCommand?: string } | null
+      settings?: {
+        defaultClaudeCommand?: string
+        portMappings?: { port: number; localPort: number }[]
+      } | null
     },
   ) => Promise<Terminal>
+  mapPort: (
+    terminalId: number,
+    port: number,
+    localPort: number,
+  ) => Promise<void>
+  unmapPort: (terminalId: number, port: number) => Promise<void>
   deleteTerminal: (
     id: number,
     opts?: { deleteDirectory?: boolean },
@@ -1062,7 +1071,10 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       id: number,
       updates: {
         name?: string
-        settings?: { defaultClaudeCommand?: string } | null
+        settings?: {
+          defaultClaudeCommand?: string
+          portMappings?: { port: number; localPort: number }[]
+        } | null
       },
     ) => {
       const updated = await api.updateTerminal(id, updates)
@@ -1070,6 +1082,39 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       return updated
     },
     [mutate],
+  )
+
+  const mapPort = useCallback(
+    async (terminalId: number, port: number, localPort: number) => {
+      const terminal = raw.find((t) => t.id === terminalId)
+      if (!terminal) return
+      const existing = terminal.settings?.portMappings ?? []
+      await updateTerminal(terminalId, {
+        settings: {
+          ...terminal.settings,
+          portMappings: [
+            ...existing.filter((m) => m.port !== port),
+            { port, localPort },
+          ],
+        },
+      })
+    },
+    [raw, updateTerminal],
+  )
+
+  const unmapPort = useCallback(
+    async (terminalId: number, port: number) => {
+      const terminal = raw.find((t) => t.id === terminalId)
+      if (!terminal) return
+      const existing = terminal.settings?.portMappings ?? []
+      await updateTerminal(terminalId, {
+        settings: {
+          ...terminal.settings,
+          portMappings: existing.filter((m) => m.port !== port),
+        },
+      })
+    },
+    [raw, updateTerminal],
   )
 
   const cleanupTerminalOrder = (id: number) => {
@@ -1126,6 +1171,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       selectPreviousTerminal,
       createTerminal,
       updateTerminal,
+      mapPort,
+      unmapPort,
       deleteTerminal,
       setTerminalOrder,
       refetch,
@@ -1167,6 +1214,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       selectPreviousTerminal,
       createTerminal,
       updateTerminal,
+      mapPort,
+      unmapPort,
       deleteTerminal,
       setTerminalOrder,
       refetch,
