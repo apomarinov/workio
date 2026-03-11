@@ -531,7 +531,7 @@ export function SessionSearchPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs font-normal min-w-0 max-w-48"
+                  className="h-7 text-xs font-normal min-w-0 max-w-[90vw] w-fit"
                   disabled={!selectedRepo || branchesLoading}
                 >
                   {branchesLoading ? (

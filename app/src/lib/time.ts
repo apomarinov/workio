@@ -8,13 +8,16 @@ function formatElapsed(timestampMs: number): string {
   return `${Math.floor(hours / 24)}d`
 }
 
-/** Short date: `Mar 5, 2026` */
+/** Short date + time: `Mar 5, 2026, 14:30` */
 export function formatDate(date: string | number): string {
   const d = typeof date === 'number' ? new Date(date) : new Date(date)
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
   })
 }
 

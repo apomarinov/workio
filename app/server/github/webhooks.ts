@@ -170,6 +170,59 @@ async function checkWebhookExists(
   }
 }
 
+/**
+ * Find an existing webhook matching our URL on the repo, update its config, and store it.
+ */
+async function adoptExistingWebhook(
+  repo: string,
+  webhookUrl: string,
+  secret: string,
+): Promise<{ ok: boolean; webhookId?: number } | null> {
+  const [owner, repoName] = repo.split('/')
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'api',
+      `repos/${owner}/${repoName}/hooks`,
+    ])
+    const hooks = JSON.parse(stdout) as {
+      id: number
+      config?: { url?: string }
+    }[]
+    const match = hooks.find((h) => h.config?.url === webhookUrl)
+    if (!match) return null
+
+    // Update the existing hook's secret and events
+    const eventsArgs = WEBHOOK_EVENTS.flatMap((e) => ['-f', `events[]=${e}`])
+    await execFileAsync('gh', [
+      'api',
+      `repos/${owner}/${repoName}/hooks/${match.id}`,
+      '-X',
+      'PATCH',
+      '-f',
+      `config[url]=${webhookUrl}`,
+      '-f',
+      'config[content_type]=json',
+      '-f',
+      `config[secret]=${secret}`,
+      ...eventsArgs,
+    ])
+
+    const settings = await getSettings()
+    await updateSettings({
+      repo_webhooks: {
+        ...settings.repo_webhooks,
+        [repo]: { id: match.id },
+      },
+    } as Record<string, unknown>)
+
+    log.info(`[webhooks] Adopted existing webhook ${match.id} for ${repo}`)
+    return { ok: true, webhookId: match.id }
+  } catch (err) {
+    log.error(err, `[webhooks] Failed to adopt existing webhook for ${repo}`)
+    return null
+  }
+}
+
 export async function createRepoWebhook(
   repo: string,
 ): Promise<{ ok: boolean; error?: string; webhookId?: number }> {
@@ -222,6 +275,17 @@ export async function createRepoWebhook(
     return { ok: true, webhookId: hook.id }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    const stdout = (err as { stdout?: string }).stdout ?? ''
+
+    // Hook already exists on this repo — find it and adopt it
+    if (
+      message.includes('Hook already exists') ||
+      stdout.includes('Hook already exists')
+    ) {
+      const adopted = await adoptExistingWebhook(repo, webhookUrl, secret)
+      if (adopted) return adopted
+    }
+
     log.error(err, `[webhooks] Failed to create webhook for ${repo}`)
     return { ok: false, error: message }
   }
