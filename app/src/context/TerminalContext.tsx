@@ -21,6 +21,7 @@ import type {
   WorkspacePayload,
 } from '../../shared/types'
 import { useActiveShells } from '../hooks/useActiveShells'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
 import { useShellLastActive } from '../hooks/useShellLastActive'
 import { useSocket } from '../hooks/useSocket'
@@ -101,6 +102,11 @@ interface TerminalContextValue {
   activeShells: Record<number, number>
   activeShellsRef: React.RefObject<Record<number, number>>
   setShell: (terminalId: number, shellId: number) => void
+  collapsedProjectRepos: string[]
+  setCollapsedProjectRepos: (
+    value: string[] | ((prev: string[]) => string[]),
+  ) => void
+  orderedTerminals: Terminal[]
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -1000,6 +1006,36 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     markInactive,
   )
 
+  // Collapsed project repo groups (persisted to localStorage)
+  const [collapsedProjectRepos, setCollapsedProjectRepos] = useLocalStorage<
+    string[]
+  >('sidebar-collapsed-project-repos', [])
+
+  // Flat ordered terminal list matching sidebar render order:
+  // repo-grouped first (skipping collapsed), then ungrouped.
+  // Single source of truth for both rendering and keyboard shortcuts.
+  const orderedTerminals = useMemo(() => {
+    const collapsedSet = new Set(collapsedProjectRepos)
+    const repoGroups = new Map<string, Terminal[]>()
+    const ungrouped: Terminal[] = []
+    for (const t of terminals) {
+      const repo = t.git_repo?.repo
+      if (repo) {
+        const existing = repoGroups.get(repo) || []
+        existing.push(t)
+        repoGroups.set(repo, existing)
+      } else {
+        ungrouped.push(t)
+      }
+    }
+    const ordered: Terminal[] = []
+    for (const [repo, group] of repoGroups.entries()) {
+      if (!collapsedSet.has(repo)) ordered.push(...group)
+    }
+    ordered.push(...ungrouped)
+    return ordered
+  }, [terminals, collapsedProjectRepos])
+
   const createTerminal = useCallback(
     async (opts: {
       cwd: string
@@ -1116,6 +1152,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       activeShells,
       activeShellsRef,
       setShell,
+      collapsedProjectRepos,
+      setCollapsedProjectRepos,
+      orderedTerminals,
     }),
     [
       terminals,
@@ -1153,6 +1192,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       activeShells,
       activeShellsRef,
       setShell,
+      collapsedProjectRepos,
+      setCollapsedProjectRepos,
+      orderedTerminals,
     ],
   )
 

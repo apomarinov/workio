@@ -74,8 +74,23 @@ interface SidebarProps {
 
 export function Sidebar({ width }: SidebarProps) {
   const pip = useDocumentPip()
-  const { terminals, activeTerminal, selectTerminal, setTerminalOrder } =
-    useTerminalContext()
+  const {
+    terminals,
+    activeTerminal,
+    selectTerminal,
+    setTerminalOrder,
+    githubPRs,
+    mergedPRs,
+    involvedPRs,
+    hasAnyUnseenPRs,
+    hasNotifications,
+    hasUnreadNotifications,
+    activePR,
+    setActivePR,
+    collapsedProjectRepos,
+    setCollapsedProjectRepos,
+    orderedTerminals,
+  } = useTerminalContext()
   const { selectSession, sessions } = useSessionContext()
   const { allSessions: pipSessions } = usePinnedSessionsData()
   const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(
@@ -115,21 +130,8 @@ export function Sidebar({ width }: SidebarProps) {
   const [collapsedGitHubRepos, setCollapsedGitHubRepos] = useLocalStorage<
     string[]
   >('sidebar-collapsed-github-repos', [])
-  const [collapsedProjectRepos, setCollapsedProjectRepos] = useLocalStorage<
-    string[]
-  >('sidebar-collapsed-project-repos', [])
   const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
     useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
-  const {
-    githubPRs,
-    mergedPRs,
-    involvedPRs,
-    hasAnyUnseenPRs,
-    hasNotifications,
-    hasUnreadNotifications,
-    activePR,
-    setActivePR,
-  } = useTerminalContext()
   const [bellOpen, setBellOpen] = useState(false)
   const [logsModal, setLogsModal] = useState<{
     open: boolean
@@ -206,22 +208,14 @@ export function Sidebar({ width }: SidebarProps) {
     [collapsedProjectRepos],
   )
 
-  // Compute render-order shortcut indices: repo-grouped first, then ungrouped
-  // Skip terminals whose repo group is collapsed (they're not visible)
+  // Derive shortcut index map from the context-provided ordered list
   const terminalShortcutMap = useMemo(() => {
     const map = new Map<number, number>()
-    let idx = 1
-    for (const [repo, group] of repoGroupedTerminals.repoGroups.entries()) {
-      if (collapsedProjectReposSet.has(repo)) continue
-      for (const t of group) {
-        map.set(t.id, idx++)
-      }
-    }
-    for (const t of repoGroupedTerminals.ungrouped) {
-      map.set(t.id, idx++)
+    for (let i = 0; i < orderedTerminals.length; i++) {
+      map.set(orderedTerminals[i].id, i + 1)
     }
     return map
-  }, [repoGroupedTerminals, collapsedProjectReposSet])
+  }, [orderedTerminals])
 
   const toggleProjectRepo = useCallback(
     (repo: string) => {
