@@ -1,4 +1,4 @@
-import { GitCommitHorizontal, Loader2 } from 'lucide-react'
+import { GitCommitHorizontal, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -54,7 +54,7 @@ export function CommitDialog({
   const [discardFiles, setDiscardFiles] = useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const handleCommitRef = useRef<() => void>(() => {})
+  const handleCommitRef = useRef<() => void>(() => { })
   const canCommitRef = useRef(false)
   const fileListRef = useRef<FileListHandle>(null)
   const stateRef = useRef(state)
@@ -330,33 +330,42 @@ export function CommitDialog({
         )}
       >
         {/* Collapsed bar — always rendered at top, clickable to expand */}
-        <button
-          type="button"
-          onClick={() => {
-            if (state === 'collapsed') onExpand()
-          }}
-          className={cn(
-            'flex items-center gap-2 h-12 px-4 flex-shrink-0 text-left transition-colors',
-            state === 'collapsed'
-              ? 'cursor-pointer hover:bg-zinc-800'
-              : 'cursor-default',
-          )}
-        >
-          <GitCommitHorizontal className="w-4 h-4 text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-200 truncate">
-            {viewOnly && pr ? `${pr.prTitle} #${pr.prNumber}` : ''}
-          </span>
-          {fileCount > 0 && (
-            <span className="text-xs text-zinc-500 ml-1">
-              {fileCount} file{fileCount !== 1 ? 's' : ''}
+        <div className="flex items-center h-12 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              if (state === 'collapsed') onExpand()
+            }}
+            className={cn(
+              'flex items-center gap-2 h-full px-4 flex-1 min-w-0 text-left transition-colors',
+              state === 'collapsed'
+                ? 'cursor-pointer hover:bg-zinc-800'
+                : 'cursor-default',
+            )}
+          >
+            <GitCommitHorizontal className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-zinc-200 truncate">
+              {viewOnly && pr ? `${pr.prTitle} #${pr.prNumber}` : ''}
             </span>
-          )}
-          {message.trim() && !viewOnly && (
-            <span className="text-xs text-zinc-500 ml-auto truncate max-w-[200px]">
-              {message.trim().split('\n')[0]}
-            </span>
-          )}
-        </button>
+            {fileCount > 0 && (
+              <span className="text-xs text-zinc-500 ml-1 flex-shrink-0">
+                {fileCount} file{fileCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {message.trim() && !viewOnly && (
+              <span className="text-xs text-zinc-500 ml-auto truncate max-w-[200px]">
+                {message.trim().split('\n')[0]}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-full px-3 flex cursor-pointer items-center text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors flex-shrink-0 sm:rounded-tr-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Content area — inert when collapsed */}
         <div
