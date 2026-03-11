@@ -35,6 +35,8 @@ import {
   getListeningPortsForTerminal,
   getProcessComm,
   getRemoteDescendantPids,
+  getRemoteListeningPorts,
+  getRemoteListeningPortsForTerminal,
   getRemoteProcessList,
   getRemoteZellijSessionProcesses,
   getSystemListeningPorts,
@@ -319,12 +321,29 @@ async function getProcessesForTerminal(
 async function getPortsForTerminal(
   session: ProcessScanSession,
   systemPorts: Map<number, number[]>,
+  remoteProcs?: RemoteProcessInfo[],
+  remotePorts?: Map<number, number[]>,
 ): Promise<number[]> {
-  return await getListeningPortsForTerminal(
-    session.pty.pid,
-    session.sessionName,
-    systemPorts,
-  )
+  if (session.pty.pid > 0) {
+    return await getListeningPortsForTerminal(
+      session.pty.pid,
+      session.sessionName,
+      systemPorts,
+    )
+  }
+  if (session.remotePid > 0 && remotePorts && remoteProcs) {
+    const zellijServerPid = findRemoteZellijServerPid(
+      remoteProcs,
+      session.remotePid,
+    )
+    return getRemoteListeningPortsForTerminal(
+      remoteProcs,
+      session.remotePid,
+      remotePorts,
+      zellijServerPid,
+    )
+  }
+  return []
 }
 
 async function scanWorkers(handles: WorkerHandle[]) {
@@ -338,9 +357,14 @@ async function scanWorkers(handles: WorkerHandle[]) {
     }
   }
   const remoteProcesses = new Map<string, RemoteProcessInfo[]>()
+  const remotePortsMap = new Map<string, Map<number, number[]>>()
   const remotePromises = [...remoteHosts].map(async (host) => {
-    const procs = await getRemoteProcessList(host)
+    const [procs, ports] = await Promise.all([
+      getRemoteProcessList(host),
+      getRemoteListeningPorts(host),
+    ])
     remoteProcesses.set(host, procs)
+    remotePortsMap.set(host, ports)
   })
 
   const [systemPorts, systemResources] = await Promise.all([
@@ -348,7 +372,7 @@ async function scanWorkers(handles: WorkerHandle[]) {
     getSystemResourceUsage(),
     ...remotePromises,
   ])
-  const terminalPorts: Record<number, number[]> = {}
+  const ports: Record<number, number[]> = {}
   const shellPorts: Record<number, number[]> = {}
   const resourceUsage: Record<number, ResourceUsage> = {}
 
@@ -362,18 +386,21 @@ async function scanWorkers(handles: WorkerHandle[]) {
         remotePid: h.remotePid,
       }
       const hostProcs = h.sshHost ? remoteProcesses.get(h.sshHost) : undefined
-      const [procs, ports] = await Promise.all([
+      const hostPorts = h.sshHost ? remotePortsMap.get(h.sshHost) : undefined
+      const [procs, shellPortList] = await Promise.all([
         getProcessesForTerminal(h.terminalId, session, hostProcs),
-        getPortsForTerminal(session, systemPorts),
+        getPortsForTerminal(session, systemPorts, hostProcs, hostPorts),
       ])
       allProcesses.push(...procs)
 
-      if (ports.length > 0) {
-        const existing = terminalPorts[h.terminalId] || []
-        terminalPorts[h.terminalId] = [
-          ...new Set([...existing, ...ports]),
+      if (shellPortList.length > 0) {
+        const existing = ports[h.terminalId] || []
+        ports[h.terminalId] = [
+          ...new Set([...existing, ...shellPortList]),
         ].sort((a, b) => a - b)
-        shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
+        shellPorts[h.shell.id] = [...new Set(shellPortList)].sort(
+          (a, b) => a - b,
+        )
       }
 
       // Compute resource usage for this shell
@@ -465,7 +492,7 @@ async function scanWorkers(handles: WorkerHandle[]) {
 
   return {
     processes: allProcesses,
-    terminalPorts,
+    ports,
     shellPorts,
     resourceUsage,
     systemCpu,
@@ -774,15 +801,17 @@ async function checkGitRemoteSync(
   const noRemote = { behind: 0, ahead: 0, noRemote: true }
   try {
     if (sshHost) {
+      const refCmd =
+        'REF=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || (git rev-parse --abbrev-ref HEAD | xargs -I {} git rev-parse --verify origin/{} >/dev/null 2>&1 && git rev-parse --abbrev-ref HEAD | xargs -I {} echo origin/{}))'
       const [behindResult, aheadResult] = await Promise.all([
         execSSHCommand(
           sshHost,
-          `REF=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || (git rev-parse --abbrev-ref HEAD | xargs -I {} git rev-parse --verify origin/{} >/dev/null 2>&1 && git rev-parse --abbrev-ref HEAD | xargs -I {} echo origin/{})); [ -n "$REF" ] && git rev-list --count HEAD..$REF`,
+          `${refCmd}; [ -n "$REF" ] && git rev-list --count HEAD..$REF || true`,
           cwd,
         ),
         execSSHCommand(
           sshHost,
-          `REF=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || (git rev-parse --abbrev-ref HEAD | xargs -I {} git rev-parse --verify origin/{} >/dev/null 2>&1 && git rev-parse --abbrev-ref HEAD | xargs -I {} echo origin/{})); [ -n "$REF" ] && git rev-list --count $REF..HEAD`,
+          `${refCmd}; [ -n "$REF" ] && git rev-list --count $REF..HEAD || true`,
           cwd,
         ),
       ])

@@ -612,6 +612,92 @@ export function getRemoteZellijSessionProcesses(
   return results
 }
 
+/**
+ * Run `ss -tlnpH` on a remote host via pooled SSH connection.
+ * Returns Map<pid, port[]> — same shape as getSystemListeningPorts().
+ */
+export async function getRemoteListeningPorts(
+  sshHost: string,
+): Promise<Map<number, number[]>> {
+  const pidPorts = new Map<number, number[]>()
+  try {
+    const { stdout } = await poolExecSSHCommand(
+      sshHost,
+      'ss -tlnpH 2>/dev/null',
+      { timeout: 5000 },
+    )
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      // Extract port from Local Address column (format: addr:port or *:port)
+      // Extract PIDs from users: column (format: users:(("name",pid=PID,fd=N),...))
+      const portMatch = trimmed.match(
+        /\s(?:\*|[\d.]+|(?:\[?[:\da-f]+\]?)):(\d+)\s/,
+      )
+      if (!portMatch) continue
+      const port = Number.parseInt(portMatch[1], 10)
+      if (!port) continue
+
+      const usersMatch = trimmed.match(/users:\(\((.+)\)\)/)
+      if (!usersMatch) continue
+      // Can have multiple entries: ("name",pid=123,fd=4),("name",pid=456,fd=5)
+      const pidMatches = usersMatch[1].matchAll(/pid=(\d+)/g)
+      for (const m of pidMatches) {
+        const pid = Number.parseInt(m[1], 10)
+        if (pid > 0) {
+          const existing = pidPorts.get(pid)
+          if (existing) {
+            if (!existing.includes(port)) existing.push(port)
+          } else {
+            pidPorts.set(pid, [port])
+          }
+        }
+      }
+    }
+  } catch (err) {
+    log.error(
+      { err },
+      `[pty] Failed to get remote listening ports from ${sshHost}`,
+    )
+  }
+  return pidPorts
+}
+
+/**
+ * Get listening ports for a remote terminal by intersecting descendant PIDs
+ * with the remote ports map. Pure computation, no I/O.
+ */
+export function getRemoteListeningPortsForTerminal(
+  processes: RemoteProcessInfo[],
+  remotePid: number,
+  remotePorts: Map<number, number[]>,
+  zellijServerPid?: number | null,
+): number[] {
+  if (remotePorts.size === 0) return []
+
+  const allPids = getRemoteDescendantPids(processes, remotePid)
+
+  if (zellijServerPid) {
+    for (const pid of getRemoteDescendantPids(processes, zellijServerPid)) {
+      allPids.add(pid)
+    }
+  }
+
+  if (allPids.size === 0) return []
+
+  const ports = new Set<number>()
+  for (const pid of allPids) {
+    const pidPorts = remotePorts.get(pid)
+    if (pidPorts) {
+      for (const port of pidPorts) {
+        ports.add(port)
+      }
+    }
+  }
+
+  return [...ports].sort((a, b) => a - b)
+}
+
 export async function getChildProcesses(
   shellPid: number,
   terminalId?: number,
