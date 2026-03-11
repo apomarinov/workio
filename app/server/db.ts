@@ -779,18 +779,18 @@ export async function updateTerminal(
   // Handle name change: update file and rename zellij session
   if (updates.name !== undefined) {
     const newName = updates.name
-      // Write new name to file (fire-and-forget async)
-      ; (async () => {
-        try {
-          await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
-          await fs.promises.writeFile(
-            path.join(WORKIO_TERMINALS_DIR, String(id)),
-            newName,
-          )
-        } catch (err) {
-          log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
-        }
-      })()
+    // Write new name to file (fire-and-forget async)
+    ;(async () => {
+      try {
+        await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
+        await fs.promises.writeFile(
+          path.join(WORKIO_TERMINALS_DIR, String(id)),
+          newName,
+        )
+      } catch (err) {
+        log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
+      }
+    })()
     // Rename zellij session if it exists
     if (oldName && oldName !== newName) {
       execFile(
@@ -1194,48 +1194,48 @@ interface LogCommandOptions {
 /** Fire-and-forget command logging - does not await at call sites */
 export function logCommand(opts: LogCommandOptions): void {
   const exitCode = opts.failed ? 1 : 0
-    ; (async () => {
-      let sshHost: string | undefined
-      let terminalName: string | undefined
-      if (opts.terminalId) {
-        const terminal = await getTerminalById(opts.terminalId)
-        if (terminal) {
-          sshHost = terminal.ssh_host ?? undefined
-          terminalName = terminal.name ?? undefined
-        }
+  ;(async () => {
+    let sshHost: string | undefined
+    let terminalName: string | undefined
+    if (opts.terminalId) {
+      const terminal = await getTerminalById(opts.terminalId)
+      if (terminal) {
+        sshHost = terminal.ssh_host ?? undefined
+        terminalName = terminal.name ?? undefined
       }
-      // If not failed, combine stderr into stdout (git often outputs progress to stderr)
-      let stdout = opts.stdout ?? ''
-      let stderr: string | undefined
-      if (opts.failed) {
-        stderr = opts.stderr
-      } else if (opts.stderr) {
-        stdout = stdout ? `${stdout}\n${opts.stderr}` : opts.stderr
-      }
+    }
+    // If not failed, combine stderr into stdout (git often outputs progress to stderr)
+    let stdout = opts.stdout ?? ''
+    let stderr: string | undefined
+    if (opts.failed) {
+      stderr = opts.stderr
+    } else if (opts.stderr) {
+      stdout = stdout ? `${stdout}\n${opts.stderr}` : opts.stderr
+    }
 
-      await pool.query(
-        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
+    await pool.query(
+      `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
        VALUES ($1, $2, $3, $4, $5)`,
-        [
-          opts.terminalId ?? null,
-          opts.prId ?? null,
-          exitCode,
-          opts.category,
-          JSON.stringify({
-            command: opts.command,
-            stdout: stdout.substring(0, 10000) || undefined,
-            stderr: stderr?.substring(0, 5000),
-            sshHost,
-            terminalName,
-          }),
-        ],
-      )
-    })().catch((err) => {
-      log.error(
-        { err, terminalId: opts.terminalId, prId: opts.prId },
-        '[command_logs] Failed to log',
-      )
-    })
+      [
+        opts.terminalId ?? null,
+        opts.prId ?? null,
+        exitCode,
+        opts.category,
+        JSON.stringify({
+          command: opts.command,
+          stdout: stdout.substring(0, 10000) || undefined,
+          stderr: stderr?.substring(0, 5000),
+          sshHost,
+          terminalName,
+        }),
+      ],
+    )
+  })().catch((err) => {
+    log.error(
+      { err, terminalId: opts.terminalId, prId: opts.prId },
+      '[command_logs] Failed to log',
+    )
+  })
 }
 
 // Active permissions query

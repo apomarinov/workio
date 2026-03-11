@@ -23,6 +23,8 @@ export interface ProcessesPayload {
   resourceUsage?: Record<number, ResourceUsage>
   systemMemory?: number // total system RAM in bytes (os.totalmem)
   cpuCount?: number // number of logical CPU cores (os.cpus().length)
+  systemCpu?: number // total system CPU usage (sum of all %cpu)
+  systemRss?: number // total system RSS in KB
 }
 
 export interface FailedPRCheck {

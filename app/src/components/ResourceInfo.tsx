@@ -1,4 +1,12 @@
-import { BarChart3, ChevronDown, Hash, Percent, Unplug } from 'lucide-react'
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Hash,
+  Percent,
+  Unplug,
+} from 'lucide-react'
 import { useState } from 'react'
 import {
   Popover,
@@ -51,13 +59,22 @@ export function ResourceInfo({
     'resource-view-mode',
     'bar',
   )
+  const [expandedTerminals, setExpandedTerminals] = useState<Set<number>>(
+    new Set(),
+  )
 
-  const { totalRam, totalCpu, usage } = resourceInfo
+  const { totalRam, totalCpu, usage, systemCpu, systemRss } = resourceInfo
+  const noScope = terminalId === undefined && shellId === undefined
 
   // No data available (e.g. process tree command errored out)
   if (totalRam === 0 || totalCpu === 0 || Object.keys(usage).length === 0) {
     return null
   }
+
+  // System-wide metrics
+  const systemMemPercent =
+    totalRam > 0 ? ((systemRss * 1024) / totalRam) * 100 : 0
+  const systemCpuPercent = totalCpu > 0 ? systemCpu / totalCpu : 0
 
   // Determine which shell IDs are in scope
   let scopeShellIds: number[]
@@ -88,14 +105,35 @@ export function ResourceInfo({
     }
   }
 
+  const toggleTerminal = (id: number) => {
+    setExpandedTerminals((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const allExpanded =
+    scopeTerminals.length > 0 &&
+    scopeTerminals.every((t) => expandedTerminals.has(t.id))
+
+  const toggleAll = () => {
+    if (allExpanded) {
+      setExpandedTerminals(new Set())
+    } else {
+      setExpandedTerminals(new Set(scopeTerminals.map((t) => t.id)))
+    }
+  }
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button type="button" className={cn('cursor-pointer', className)}>
           <ResourceView
-            cpuPercent={aggregated.cpuPercent}
-            memPercent={aggregated.memPercent}
-            memRssKb={aggregated.rssKb}
+            cpuPercent={noScope ? systemCpuPercent : aggregated.cpuPercent}
+            memPercent={noScope ? systemMemPercent : aggregated.memPercent}
+            memRssKb={noScope ? systemRss : aggregated.rssKb}
             mode={mode}
           />
         </button>
@@ -108,28 +146,60 @@ export function ResourceInfo({
           <span className="text-xs font-medium text-muted-foreground">
             Resource Usage
           </span>
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
-            value={mode}
-            onValueChange={(v) => {
-              if (v) setMode(v as ResourceViewMode)
-            }}
-          >
-            <ToggleGroupItem value="bar" className="h-6 px-1.5">
-              <BarChart3 className="w-3 h-3" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="percent" className="h-6 px-1.5">
-              <Percent className="w-3 h-3" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="actual" className="h-6 px-1.5">
-              <Hash className="w-3 h-3" />
-            </ToggleGroupItem>
-          </ToggleGroup>
+          <div className="flex items-center gap-1">
+            {noScope && scopeTerminals.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="h-6 px-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                {allExpanded ? (
+                  <ChevronsDownUp className="w-3 h-3" />
+                ) : (
+                  <ChevronsUpDown className="w-3 h-3" />
+                )}
+              </button>
+            )}
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              value={mode}
+              onValueChange={(v) => {
+                if (v) setMode(v as ResourceViewMode)
+              }}
+            >
+              <ToggleGroupItem value="bar" className="h-6 px-1.5">
+                <BarChart3 className="w-3 h-3" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="percent" className="h-6 px-1.5">
+                <Percent className="w-3 h-3" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="actual" className="h-6 px-1.5">
+                <Hash className="w-3 h-3" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
         </div>
 
         <div className="space-y-2">
+          {noScope && (
+            <>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-xs font-medium truncate max-w-[180px]">
+                  System
+                </span>
+                <ResourceView
+                  cpuPercent={systemCpuPercent}
+                  memPercent={systemMemPercent}
+                  memRssKb={systemRss}
+                  mode={mode}
+                  className="scale-90 origin-right"
+                />
+              </div>
+              <div className="border-t border-zinc-700/50" />
+            </>
+          )}
           {shellId !== undefined ? (
             <ShellRow
               shellId={shellId}
@@ -147,6 +217,56 @@ export function ResourceInfo({
               mode={mode}
               processes={processesByShell.get(shellId) ?? []}
             />
+          ) : noScope ? (
+            scopeTerminals.map((terminal) => {
+              const termShellIds = terminal.shells.map((s) => s.id)
+              const termUsage = computeUsage(
+                usage,
+                termShellIds,
+                totalRam,
+                totalCpu,
+              )
+              const isExpanded = expandedTerminals.has(terminal.id)
+              return (
+                <div key={terminal.id}>
+                  <div
+                    className="flex items-center justify-between py-1 cursor-pointer"
+                    onClick={() => toggleTerminal(terminal.id)}
+                  >
+                    <span className="text-xs font-medium truncate max-w-[180px] flex items-center gap-1">
+                      <ChevronDown
+                        className={cn(
+                          'w-3 h-3 transition-transform flex-shrink-0',
+                          !isExpanded && '-rotate-90',
+                        )}
+                      />
+                      {terminal.name ?? `terminal-${terminal.id}`}
+                    </span>
+                    <ResourceView
+                      cpuPercent={termUsage.cpuPercent}
+                      memPercent={termUsage.memPercent}
+                      memRssKb={termUsage.rssKb}
+                      mode={mode}
+                      className="scale-90 origin-right"
+                    />
+                  </div>
+                  {isExpanded &&
+                    terminal.shells.map((shell) => (
+                      <ShellRow
+                        key={shell.id}
+                        shellId={shell.id}
+                        terminalId={terminal.id}
+                        label={shell.name}
+                        usage={usage}
+                        totalRam={totalRam}
+                        totalCpu={totalCpu}
+                        mode={mode}
+                        processes={processesByShell.get(shell.id) ?? []}
+                      />
+                    ))}
+                </div>
+              )
+            })
           ) : (
             scopeTerminals.map((terminal) => {
               const termShellIds = terminal.shells.map((s) => s.id)

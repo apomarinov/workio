@@ -363,7 +363,23 @@ async function scanWorkers(handles: WorkerHandle[]) {
 
   stampProcessStartTimes(allProcesses)
 
-  return { processes: allProcesses, terminalPorts, shellPorts, resourceUsage }
+  // Compute total system resource usage from all processes
+  let systemCpu = 0
+  let systemRss = 0
+  for (const { rss, cpu } of systemResources.values()) {
+    systemCpu += cpu
+    systemRss += rss
+  }
+  systemCpu = Math.round(systemCpu * 10) / 10
+
+  return {
+    processes: allProcesses,
+    terminalPorts,
+    shellPorts,
+    resourceUsage,
+    systemCpu,
+    systemRss,
+  }
 }
 
 async function scanAndEmitProcessesForTerminal(terminalId: number) {

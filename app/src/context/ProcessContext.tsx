@@ -16,6 +16,8 @@ export interface ResourceInfo {
   totalRam: number
   totalCpu: number
   usage: Record<number, ResourceUsage>
+  systemCpu: number // total system CPU usage (sum of all %cpu)
+  systemRss: number // total system RSS in KB
 }
 
 interface ProcessContextValue {
@@ -45,6 +47,8 @@ const EMPTY_RESOURCE_INFO: ResourceInfo = {
   totalRam: 0,
   totalCpu: 0,
   usage: {},
+  systemCpu: 0,
+  systemRss: 0,
 }
 
 export function ProcessProvider({ children }: { children: React.ReactNode }) {
@@ -182,6 +186,8 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
         setResourceInfo((prev) => {
           const totalRam = data.systemMemory ?? prev.totalRam
           const totalCpu = data.cpuCount ?? prev.totalCpu
+          const systemCpu = data.systemCpu ?? prev.systemCpu
+          const systemRss = data.systemRss ?? prev.systemRss
           let usage: Record<number, ResourceUsage>
           if (data.resourceUsage) {
             if (data.terminalId !== undefined) {
@@ -196,7 +202,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
           } else {
             usage = prev.usage
           }
-          return { totalRam, totalCpu, usage }
+          return { totalRam, totalCpu, usage, systemCpu, systemRss }
         })
       }
     })
