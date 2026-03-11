@@ -706,6 +706,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
             />
             <ShortcutRow
               label="Pull Current Branch"
+              description="(rebase)"
               binding={bindings.pullBranch}
               isRecording={recording === 'pullBranch'}
               recordingKeys={recording === 'pullBranch' ? recordingKeys : []}
@@ -833,8 +834,10 @@ function ShortcutRow({
   defaultBinding,
   display,
   hasConflict,
+  description,
 }: {
   label: string
+  description?: string
   binding: ShortcutBinding | null
   defaultBinding: ShortcutBinding | null
   isRecording: boolean
@@ -854,6 +857,11 @@ function ShortcutRow({
         {binding && !binding.key && (
           <span className="text-xs font-normal text-muted-foreground">
             Modifier only
+          </span>
+        )}
+        {description && (
+          <span className="text-xs font-normal text-muted-foreground">
+            {description}
           </span>
         )}
       </span>

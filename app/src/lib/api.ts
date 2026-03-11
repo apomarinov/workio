@@ -1259,6 +1259,42 @@ export async function renameShell(
   return res.json()
 }
 
+// Session backfill
+
+export interface BackfillCheckResult {
+  cwd: string
+  encodedPath: string
+  terminalId: number
+  shellId: number
+  totalFiles: number
+  unbackfilledCount: number
+}
+
+export async function backfillCheck(
+  weeksBack?: number,
+): Promise<{ results: BackfillCheckResult[] }> {
+  const params = weeksBack ? `?weeksBack=${weeksBack}` : ''
+  const res = await apiFetch(`${API_BASE}/sessions/backfill-check${params}`)
+  if (!res.ok) throw new Error('Failed to check backfill')
+  return res.json()
+}
+
+export async function backfillSessions(opts: {
+  encodedPath: string
+  cwd: string
+  terminalId: number
+  shellId: number
+  weeksBack: number
+}): Promise<{ backfilled: number }> {
+  const res = await apiFetch(`${API_BASE}/sessions/backfill`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  })
+  if (!res.ok) throw new Error('Failed to backfill sessions')
+  return res.json()
+}
+
 // Session move
 
 import type { MoveTarget } from '../types'

@@ -644,6 +644,15 @@ async function getUniqueTerminalName(
   return `${baseName}-${crypto.randomUUID().slice(0, 4)}`
 }
 
+// Check if a terminal with the given cwd already exists
+export async function terminalCwdExists(cwd: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    'SELECT id FROM terminals WHERE cwd = $1 LIMIT 1',
+    [cwd],
+  )
+  return rows.length > 0
+}
+
 // Check if terminal name already exists (for validation)
 export async function terminalNameExists(
   name: string,
@@ -1128,6 +1137,46 @@ export async function getUnreadPRNotifications(): Promise<
     ...g,
     count: g.items.length,
   }))
+}
+
+// Session backfill queries
+
+export async function getSessionTranscriptPaths(
+  encodedPath: string,
+): Promise<string[]> {
+  const { rows } = await pool.query(
+    `SELECT transcript_path FROM sessions WHERE transcript_path LIKE $1`,
+    [`%${encodedPath}%`],
+  )
+  return rows.map((r: { transcript_path: string }) => r.transcript_path)
+}
+
+export async function insertBackfilledSession(
+  sessionId: string,
+  projectId: number,
+  terminalId: number,
+  shellId: number,
+  transcriptPath: string,
+  timestamp: string | null,
+  client?: pg.PoolClient,
+): Promise<void> {
+  const db = client ?? pool
+  const { rowCount } = await db.query(
+    timestamp
+      ? `INSERT INTO sessions (session_id, project_id, terminal_id, shell_id, status, transcript_path, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'ended', $5, $6, $6)
+         ON CONFLICT (session_id) DO NOTHING`
+      : `INSERT INTO sessions (session_id, project_id, terminal_id, shell_id, status, transcript_path)
+         VALUES ($1, $2, $3, $4, 'ended', $5)
+         ON CONFLICT (session_id) DO NOTHING`,
+    timestamp
+      ? [sessionId, projectId, terminalId, shellId, transcriptPath, timestamp]
+      : [sessionId, projectId, terminalId, shellId, transcriptPath],
+  )
+  // Create a prompt row so worker.py's process_transcript() can attach messages
+  if (rowCount && rowCount > 0) {
+    await db.query(`INSERT INTO prompts (session_id) VALUES ($1)`, [sessionId])
+  }
 }
 
 // Command logging

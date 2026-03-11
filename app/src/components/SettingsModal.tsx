@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
 import type { CustomTerminalAction, PreferredIDE } from '../types'
+import { BackfillSection } from './BackfillModal'
 import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
@@ -384,12 +385,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           />
 
           <div className="flex flex-col gap-3 border-t-[1px] pt-3">
-            <span className="font-semibold">Claude Chat</span>
+            <span className="font-semibold">Claude</span>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Brain className="w-4 h-4 text-muted-foreground" />
                 <label htmlFor="show_thinking" className="text-sm font-medium">
-                  Thinking
+                  Show thinking
                 </label>
               </div>
               <Switch
@@ -403,7 +404,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <div className="flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-muted-foreground" />
                 <label htmlFor="show_tools" className="text-sm font-medium">
-                  Tools
+                  Show tool calls
                 </label>
               </div>
               <Switch
@@ -431,6 +432,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 />
               </div>
             )}
+
+            <BackfillSection />
           </div>
 
           <DialogFooter>

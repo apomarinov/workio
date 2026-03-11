@@ -159,6 +159,7 @@ import {
   getTerminalById,
   logCommand,
   setActiveSessionDone,
+  terminalCwdExists,
   terminalNameExists,
   updateShellName,
   updateTerminal,
@@ -827,6 +828,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply
           .status(403)
           .send({ error: 'Permission denied: cannot access directory' })
+      }
+
+      if (await terminalCwdExists(cwd)) {
+        return reply
+          .status(409)
+          .send({ error: 'A project with this directory already exists' })
       }
 
       const terminal = await createTerminal(cwd, name || null, shell || null)

@@ -54,6 +54,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
+import { useBackfillCheck } from './BackfillModal'
 import { LogsModal } from './LogsModal'
 import { InvolvedPRsList, OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
@@ -83,6 +84,7 @@ export function Sidebar({ width }: SidebarProps) {
   )
   const hasAnySessions = pipSessions.length > 0
   const { hasWarning: hasWebhookWarning } = useWebhookWarning()
+  const { hasBackfill } = useBackfillCheck()
   const isMobile = useIsMobile()
   const { settings, updateSettings } = useSettings()
   const [hiddenPRsModalRepo, setHiddenPRsModalRepo] = useState<string | null>(
@@ -724,7 +726,7 @@ export function Sidebar({ width }: SidebarProps) {
               title="Settings"
             >
               <Settings className="w-4 h-4" />
-              {hasWebhookWarning && (
+              {(hasWebhookWarning || hasBackfill) && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
               )}
             </Button>
