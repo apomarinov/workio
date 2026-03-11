@@ -15,6 +15,13 @@ export interface ResourceUsage {
   pidCount: number
 }
 
+export interface HostResourceInfo {
+  systemMemory: number // total RAM in bytes
+  cpuCount: number // logical CPU cores
+  systemCpu: number // total CPU usage (sum of all %cpu)
+  systemRss: number // total RSS in KB
+}
+
 export interface ProcessesPayload {
   terminalId?: number
   processes: ActiveProcess[]
@@ -25,6 +32,7 @@ export interface ProcessesPayload {
   cpuCount?: number // number of logical CPU cores (os.cpus().length)
   systemCpu?: number // total system CPU usage (sum of all %cpu)
   systemRss?: number // total system RSS in KB
+  hostResources?: Record<string, HostResourceInfo> // sshHost -> system totals
 }
 
 export interface FailedPRCheck {

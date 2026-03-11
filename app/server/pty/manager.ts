@@ -7,6 +7,7 @@ import { resolveNotification } from '../../shared/notifications'
 import type {
   ActiveProcess,
   GitLastCommit,
+  HostResourceInfo,
   ResourceUsage,
 } from '../../shared/types'
 import {
@@ -35,6 +36,7 @@ import {
   getListeningPortsForTerminal,
   getProcessComm,
   getRemoteDescendantPids,
+  getRemoteHostInfo,
   getRemoteListeningPorts,
   getRemoteListeningPortsForTerminal,
   getRemoteProcessList,
@@ -113,6 +115,12 @@ const SYSTEM_MEMORY = os.totalmem()
 const CPU_COUNT = os.cpus().length
 
 const COMMAND_IGNORE_LIST: string[] = []
+
+// Cache static SSH host info (RAM/CPU count) — fetched once per host
+const sshHostInfoCache = new Map<
+  string,
+  { cpuCount: number; systemMemory: number }
+>()
 
 // ── Process start time tracking ─────────────────────────────────────
 
@@ -359,12 +367,23 @@ async function scanWorkers(handles: WorkerHandle[]) {
   const remoteProcesses = new Map<string, RemoteProcessInfo[]>()
   const remotePortsMap = new Map<string, Map<number, number[]>>()
   const remotePromises = [...remoteHosts].map(async (host) => {
-    const [procs, ports] = await Promise.all([
-      getRemoteProcessList(host),
-      getRemoteListeningPorts(host),
-    ])
-    remoteProcesses.set(host, procs)
-    remotePortsMap.set(host, ports)
+    const fetches: Promise<unknown>[] = [
+      getRemoteProcessList(host).then((procs) =>
+        remoteProcesses.set(host, procs),
+      ),
+      getRemoteListeningPorts(host).then((ports) =>
+        remotePortsMap.set(host, ports),
+      ),
+    ]
+    // Fetch static host info (CPU count + RAM) once, then cache
+    if (!sshHostInfoCache.has(host)) {
+      fetches.push(
+        getRemoteHostInfo(host).then((info) => {
+          if (info) sshHostInfoCache.set(host, info)
+        }),
+      )
+    }
+    await Promise.all(fetches)
   })
 
   const [systemPorts, systemResources] = await Promise.all([
@@ -490,6 +509,27 @@ async function scanWorkers(handles: WorkerHandle[]) {
   }
   systemCpu = Math.round(systemCpu * 10) / 10
 
+  // Compute per-SSH-host system totals
+  const hostResources: Record<string, HostResourceInfo> = {}
+  for (const host of remoteHosts) {
+    const cached = sshHostInfoCache.get(host)
+    const procs = remoteProcesses.get(host)
+    if (cached && procs) {
+      let hostCpu = 0
+      let hostRss = 0
+      for (const p of procs) {
+        hostCpu += p.cpu
+        hostRss += p.rss
+      }
+      hostResources[host] = {
+        systemMemory: cached.systemMemory,
+        cpuCount: cached.cpuCount,
+        systemCpu: Math.round(hostCpu * 10) / 10,
+        systemRss: hostRss,
+      }
+    }
+  }
+
   return {
     processes: allProcesses,
     ports,
@@ -498,6 +538,7 @@ async function scanWorkers(handles: WorkerHandle[]) {
     systemCpu,
     systemRss,
     remoteProcesses,
+    hostResources,
   }
 }
 
@@ -506,9 +547,10 @@ async function scanAndEmitProcessesForTerminal(terminalId: number) {
   if (handles.length === 0) return
 
   const result = await scanWorkers(handles)
+  const { remoteProcesses: _, ...payload } = result
   getIO()?.emit('processes', {
     terminalId,
-    ...result,
+    ...payload,
     systemMemory: SYSTEM_MEMORY,
     cpuCount: CPU_COUNT,
   })
@@ -585,8 +627,9 @@ async function scanAndEmitAllProcesses() {
     }
   }
 
+  const { remoteProcesses: _remote, ...globalPayload } = result
   getIO()?.emit('processes', {
-    ...result,
+    ...globalPayload,
     systemMemory: SYSTEM_MEMORY,
     cpuCount: CPU_COUNT,
   })
@@ -1319,7 +1362,7 @@ export function destroySessionsForTerminal(terminalId: number): boolean {
     stopGlobalProcessPolling()
     untrackTerminal(terminalId)
 
-    // Close SSH pool connection if no other terminals use the same host
+    // Close SSH pool connection and clear cache if no other terminals use the same host
     if (sshHost) {
       const allWorkers = getAllWorkers()
       const otherUsesHost = [...allWorkers.values()].some(
@@ -1327,6 +1370,7 @@ export function destroySessionsForTerminal(terminalId: number): boolean {
       )
       if (!otherUsesHost) {
         closeConnection(sshHost)
+        sshHostInfoCache.delete(sshHost)
       }
     }
   }

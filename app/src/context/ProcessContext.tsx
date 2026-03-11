@@ -6,6 +6,7 @@ import type {
   GitDirtyPayload,
   GitLastCommit,
   GitRemoteSyncPayload,
+  HostResourceInfo,
   ProcessesPayload,
   ResourceUsage,
 } from '../../shared/types'
@@ -18,6 +19,7 @@ export interface ResourceInfo {
   usage: Record<number, ResourceUsage>
   systemCpu: number // total system CPU usage (sum of all %cpu)
   systemRss: number // total system RSS in KB
+  hostResources: Record<string, HostResourceInfo> // per SSH host
 }
 
 interface ProcessContextValue {
@@ -49,6 +51,7 @@ const EMPTY_RESOURCE_INFO: ResourceInfo = {
   usage: {},
   systemCpu: 0,
   systemRss: 0,
+  hostResources: {},
 }
 
 export function ProcessProvider({ children }: { children: React.ReactNode }) {
@@ -182,7 +185,12 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
-      if (data.resourceUsage || data.systemMemory || data.cpuCount) {
+      if (
+        data.resourceUsage ||
+        data.systemMemory ||
+        data.cpuCount ||
+        data.hostResources
+      ) {
         setResourceInfo((prev) => {
           const totalRam = data.systemMemory ?? prev.totalRam
           const totalCpu = data.cpuCount ?? prev.totalCpu
@@ -202,7 +210,24 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
           } else {
             usage = prev.usage
           }
-          return { totalRam, totalCpu, usage, systemCpu, systemRss }
+          let hostResources: Record<string, HostResourceInfo>
+          if (data.hostResources) {
+            if (data.terminalId !== undefined) {
+              hostResources = { ...prev.hostResources, ...data.hostResources }
+            } else {
+              hostResources = data.hostResources
+            }
+          } else {
+            hostResources = prev.hostResources
+          }
+          return {
+            totalRam,
+            totalCpu,
+            usage,
+            systemCpu,
+            systemRss,
+            hostResources,
+          }
         })
       }
     })

@@ -7,7 +7,7 @@ import { type ResolvedSSHConfig, validateSSHHost } from './config'
 // Default OpenSSH MaxSessions is 10, and each PTY terminal also uses
 // one session on the same server, so keep this low to avoid hitting
 // the limit. Bump MaxSessions on the server for higher throughput.
-const MAX_CHANNELS = 5
+const MAX_CHANNELS = 10
 
 interface QueuedExec {
   resolve: (conn: Client) => void

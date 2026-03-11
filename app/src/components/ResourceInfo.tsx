@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronsDownUp,
   ChevronsUpDown,
+  Globe,
   Hash,
   Percent,
   Unplug,
@@ -18,7 +19,7 @@ import { useProcessContext } from '@/context/ProcessContext'
 import { useTerminalContext } from '@/context/TerminalContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
-import type { ActiveProcess } from '../../shared/types'
+import type { ActiveProcess, HostResourceInfo } from '../../shared/types'
 import { ResourceView, type ResourceViewMode } from './ResourceView'
 import { ProcessItem } from './terminal-status-sections'
 
@@ -63,7 +64,8 @@ export function ResourceInfo({
     new Set(),
   )
 
-  const { totalRam, totalCpu, usage, systemCpu, systemRss } = resourceInfo
+  const { totalRam, totalCpu, usage, systemCpu, systemRss, hostResources } =
+    resourceInfo
   const noScope = terminalId === undefined && shellId === undefined
 
   // No data available (e.g. process tree command errored out)
@@ -76,6 +78,19 @@ export function ResourceInfo({
     totalRam > 0 ? ((systemRss * 1024) / totalRam) * 100 : 0
   const systemCpuPercent = totalCpu > 0 ? systemCpu / totalCpu : 0
 
+  // Resolve correct totalRam/totalCpu for a terminal (SSH-aware)
+  const getTerminalTotals = (
+    sshHost: string | null,
+  ): { ram: number; cpu: number } => {
+    if (sshHost && hostResources[sshHost]) {
+      return {
+        ram: hostResources[sshHost].systemMemory,
+        cpu: hostResources[sshHost].cpuCount,
+      }
+    }
+    return { ram: totalRam, cpu: totalCpu }
+  }
+
   // Determine which shell IDs are in scope
   let scopeShellIds: number[]
   if (shellId !== undefined) {
@@ -87,13 +102,46 @@ export function ResourceInfo({
     scopeShellIds = Object.keys(usage).map(Number)
   }
 
-  const aggregated = computeUsage(usage, scopeShellIds, totalRam, totalCpu)
+  // For the trigger badge: use SSH host totals if scoped to an SSH terminal
+  const scopedTerminal =
+    terminalId !== undefined
+      ? terminals.find((t) => t.id === terminalId)
+      : undefined
+  const scopeTotals = scopedTerminal
+    ? getTerminalTotals(scopedTerminal.ssh_host)
+    : { ram: totalRam, cpu: totalCpu }
+  const aggregated = computeUsage(
+    usage,
+    scopeShellIds,
+    scopeTotals.ram,
+    scopeTotals.cpu,
+  )
 
   // Build grouped data for popover
   const scopeTerminals =
     terminalId !== undefined
       ? terminals.filter((t) => t.id === terminalId)
       : terminals
+
+  // Group scopeTerminals into local vs SSH host groups
+  const localTerminals = scopeTerminals.filter((t) => !t.ssh_host)
+  const sshHostGroups = new Map<
+    string,
+    { terminals: typeof scopeTerminals; info: HostResourceInfo | undefined }
+  >()
+  for (const t of scopeTerminals) {
+    if (t.ssh_host) {
+      const existing = sshHostGroups.get(t.ssh_host)
+      if (existing) {
+        existing.terminals.push(t)
+      } else {
+        sshHostGroups.set(t.ssh_host, {
+          terminals: [t],
+          info: hostResources[t.ssh_host],
+        })
+      }
+    }
+  }
 
   // Index processes by shellId
   const processesByShell = new Map<number, ActiveProcess[]>()
@@ -212,104 +260,211 @@ export function ResourceInfo({
                   ?.name ?? `shell-${shellId}`
               }
               usage={usage}
-              totalRam={totalRam}
-              totalCpu={totalCpu}
+              totalRam={scopeTotals.ram}
+              totalCpu={scopeTotals.cpu}
               mode={mode}
               processes={processesByShell.get(shellId) ?? []}
             />
           ) : noScope ? (
-            scopeTerminals.map((terminal) => {
-              const termShellIds = terminal.shells.map((s) => s.id)
-              const termUsage = computeUsage(
-                usage,
-                termShellIds,
-                totalRam,
-                totalCpu,
-              )
-              const isExpanded = expandedTerminals.has(terminal.id)
-              return (
-                <div key={terminal.id}>
-                  <div
-                    className="flex items-center justify-between py-1 cursor-pointer"
-                    onClick={() => toggleTerminal(terminal.id)}
-                  >
-                    <span className="text-xs font-medium truncate max-w-[180px] flex items-center gap-1">
-                      <ChevronDown
-                        className={cn(
-                          'w-3 h-3 transition-transform flex-shrink-0',
-                          !isExpanded && '-rotate-90',
-                        )}
-                      />
-                      {terminal.name ?? `terminal-${terminal.id}`}
-                    </span>
-                    <ResourceView
-                      cpuPercent={termUsage.cpuPercent}
-                      memPercent={termUsage.memPercent}
-                      memRssKb={termUsage.rssKb}
-                      mode={mode}
-                      className="scale-90 origin-right"
-                    />
-                  </div>
-                  {isExpanded &&
-                    terminal.shells.map((shell) => (
-                      <ShellRow
-                        key={shell.id}
-                        shellId={shell.id}
-                        terminalId={terminal.id}
-                        label={shell.name}
+            <>
+              {localTerminals.map((terminal) => (
+                <TerminalRow
+                  key={terminal.id}
+                  terminal={terminal}
+                  usage={usage}
+                  totalRam={totalRam}
+                  totalCpu={totalCpu}
+                  mode={mode}
+                  expandedTerminals={expandedTerminals}
+                  toggleTerminal={toggleTerminal}
+                  processesByShell={processesByShell}
+                  collapsible
+                />
+              ))}
+              {[...sshHostGroups].map(([host, group]) => {
+                const info = group.info
+                const hostRam = info?.systemMemory ?? totalRam
+                const hostCpuCount = info?.cpuCount ?? totalCpu
+                return (
+                  <div key={host}>
+                    <div className="border-t border-zinc-700/50 my-1" />
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-xs font-medium truncate max-w-[180px] flex items-center gap-1">
+                        <Globe className="w-3 h-3 flex-shrink-0" />
+                        {host}
+                      </span>
+                      {info && (
+                        <ResourceView
+                          cpuPercent={
+                            info.cpuCount > 0
+                              ? info.systemCpu / info.cpuCount
+                              : 0
+                          }
+                          memPercent={
+                            info.systemMemory > 0
+                              ? ((info.systemRss * 1024) / info.systemMemory) *
+                                100
+                              : 0
+                          }
+                          memRssKb={info.systemRss}
+                          mode={mode}
+                          className="scale-90 origin-right"
+                        />
+                      )}
+                    </div>
+                    {group.terminals.map((terminal) => (
+                      <TerminalRow
+                        key={terminal.id}
+                        terminal={terminal}
                         usage={usage}
-                        totalRam={totalRam}
-                        totalCpu={totalCpu}
+                        totalRam={hostRam}
+                        totalCpu={hostCpuCount}
                         mode={mode}
-                        processes={processesByShell.get(shell.id) ?? []}
+                        expandedTerminals={expandedTerminals}
+                        toggleTerminal={toggleTerminal}
+                        processesByShell={processesByShell}
+                        collapsible
                       />
                     ))}
-                </div>
-              )
-            })
-          ) : (
-            scopeTerminals.map((terminal) => {
-              const termShellIds = terminal.shells.map((s) => s.id)
-              const termUsage = computeUsage(
-                usage,
-                termShellIds,
-                totalRam,
-                totalCpu,
-              )
-              return (
-                <div key={terminal.id}>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-xs font-medium truncate max-w-[180px]">
-                      {terminal.name ?? `terminal-${terminal.id}`}
-                    </span>
-                    <ResourceView
-                      cpuPercent={termUsage.cpuPercent}
-                      memPercent={termUsage.memPercent}
-                      memRssKb={termUsage.rssKb}
-                      mode={mode}
-                      className="scale-90 origin-right"
-                    />
                   </div>
-                  {terminal.shells.map((shell) => (
-                    <ShellRow
-                      key={shell.id}
-                      shellId={shell.id}
-                      terminalId={terminal.id}
-                      label={shell.name}
-                      usage={usage}
-                      totalRam={totalRam}
-                      totalCpu={totalCpu}
-                      mode={mode}
-                      processes={processesByShell.get(shell.id) ?? []}
-                    />
-                  ))}
-                </div>
-              )
-            })
+                )
+              })}
+            </>
+          ) : (
+            <>
+              {scopedTerminal?.ssh_host &&
+                hostResources[scopedTerminal.ssh_host] && (
+                  <>
+                    <div className="flex items-center justify-between py-1">
+                      <span className="text-xs font-medium truncate max-w-[180px] flex items-center gap-1">
+                        <Globe className="w-3 h-3 flex-shrink-0" />
+                        {scopedTerminal.ssh_host}
+                      </span>
+                      <ResourceView
+                        cpuPercent={
+                          hostResources[scopedTerminal.ssh_host].cpuCount > 0
+                            ? hostResources[scopedTerminal.ssh_host].systemCpu /
+                              hostResources[scopedTerminal.ssh_host].cpuCount
+                            : 0
+                        }
+                        memPercent={
+                          hostResources[scopedTerminal.ssh_host].systemMemory >
+                          0
+                            ? ((hostResources[scopedTerminal.ssh_host]
+                                .systemRss *
+                                1024) /
+                                hostResources[scopedTerminal.ssh_host]
+                                  .systemMemory) *
+                              100
+                            : 0
+                        }
+                        memRssKb={
+                          hostResources[scopedTerminal.ssh_host].systemRss
+                        }
+                        mode={mode}
+                        className="scale-90 origin-right"
+                      />
+                    </div>
+                    <div className="border-t border-zinc-700/50" />
+                  </>
+                )}
+              {scopeTerminals.map((terminal) => {
+                const totals = getTerminalTotals(terminal.ssh_host)
+                return (
+                  <TerminalRow
+                    key={terminal.id}
+                    terminal={terminal}
+                    usage={usage}
+                    totalRam={totals.ram}
+                    totalCpu={totals.cpu}
+                    mode={mode}
+                    expandedTerminals={expandedTerminals}
+                    toggleTerminal={toggleTerminal}
+                    processesByShell={processesByShell}
+                    collapsible={false}
+                  />
+                )
+              })}
+            </>
           )}
         </div>
       </PopoverContent>
     </Popover>
+  )
+}
+
+function TerminalRow({
+  terminal,
+  usage,
+  totalRam,
+  totalCpu,
+  mode,
+  expandedTerminals,
+  toggleTerminal,
+  processesByShell,
+  collapsible,
+}: {
+  terminal: {
+    id: number
+    name: string | null
+    shells: { id: number; name: string }[]
+  }
+  usage: Record<number, { rss: number; cpu: number }>
+  totalRam: number
+  totalCpu: number
+  mode: ResourceViewMode
+  expandedTerminals: Set<number>
+  toggleTerminal: (id: number) => void
+  processesByShell: Map<number, ActiveProcess[]>
+  collapsible: boolean
+}) {
+  const termShellIds = terminal.shells.map((s) => s.id)
+  const termUsage = computeUsage(usage, termShellIds, totalRam, totalCpu)
+  const isExpanded = !collapsible || expandedTerminals.has(terminal.id)
+
+  return (
+    <div>
+      <div
+        className={cn(
+          'flex items-center justify-between py-1',
+          collapsible && 'cursor-pointer',
+        )}
+        onClick={collapsible ? () => toggleTerminal(terminal.id) : undefined}
+      >
+        <span className="text-xs font-medium truncate max-w-[180px] flex items-center gap-1">
+          {collapsible && (
+            <ChevronDown
+              className={cn(
+                'w-3 h-3 transition-transform flex-shrink-0',
+                !isExpanded && '-rotate-90',
+              )}
+            />
+          )}
+          {terminal.name ?? `terminal-${terminal.id}`}
+        </span>
+        <ResourceView
+          cpuPercent={termUsage.cpuPercent}
+          memPercent={termUsage.memPercent}
+          memRssKb={termUsage.rssKb}
+          mode={mode}
+          className="scale-90 origin-right"
+        />
+      </div>
+      {isExpanded &&
+        terminal.shells.map((shell) => (
+          <ShellRow
+            key={shell.id}
+            shellId={shell.id}
+            terminalId={terminal.id}
+            label={shell.name}
+            usage={usage}
+            totalRam={totalRam}
+            totalCpu={totalCpu}
+            mode={mode}
+            processes={processesByShell.get(shell.id) ?? []}
+          />
+        ))}
+    </div>
   )
 }
 

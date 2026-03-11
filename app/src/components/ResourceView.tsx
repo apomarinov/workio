@@ -59,7 +59,7 @@ export function ResourceView({
     return (
       <div
         className={cn(
-          'flex items-center gap-3 text-xs font-mono flex-wrap',
+          'flex items-center gap-3 text-xs font-mono leading-none flex-wrap',
           className,
         )}
       >
@@ -85,7 +85,7 @@ export function ResourceView({
     return (
       <div
         className={cn(
-          'flex items-center gap-3 text-xs font-mono flex-wrap',
+          'flex items-center gap-3 text-xs font-mono leading-none flex-wrap',
           className,
         )}
       >

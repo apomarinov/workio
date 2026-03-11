@@ -442,6 +442,35 @@ export async function getActiveZellijSessionNames(): Promise<Set<string>> {
   }
 }
 
+// ── Remote host info (SSH) ──────────────────────────────────────────
+
+/**
+ * Get static host info (CPU count + total RAM) from a remote SSH host.
+ * Runs `nproc` and reads `/proc/meminfo` in a single command.
+ */
+export async function getRemoteHostInfo(
+  sshHost: string,
+): Promise<{ cpuCount: number; systemMemory: number } | null> {
+  try {
+    const { stdout } = await poolExecSSHCommand(
+      sshHost,
+      "nproc && awk '/MemTotal/{print $2}' /proc/meminfo",
+      { timeout: 5000 },
+    )
+    const lines = stdout.trim().split('\n')
+    if (lines.length < 2) return null
+    const cpuCount = Number.parseInt(lines[0], 10)
+    const memKb = Number.parseInt(lines[1], 10)
+    if (cpuCount > 0 && memKb > 0) {
+      return { cpuCount, systemMemory: memKb * 1024 }
+    }
+    return null
+  } catch (err) {
+    log.error({ err }, `[pty] Failed to get remote host info from ${sshHost}`)
+    return null
+  }
+}
+
 // ── Remote process scanning (SSH) ──────────────────────────────────
 
 export interface RemoteProcessInfo {
