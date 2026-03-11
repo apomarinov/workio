@@ -279,120 +279,18 @@ async function getPortsForTerminal(
   )
 }
 
-async function scanAndEmitProcessesForTerminal(terminalId: number) {
-  const handles = getWorkersForTerminal(terminalId)
-  if (handles.length === 0) return
-
+async function scanWorkers(handles: WorkerHandle[]) {
   const allProcesses: ActiveProcess[] = []
   const [systemPorts, systemResources] = await Promise.all([
     getSystemListeningPorts(),
     getSystemResourceUsage(),
   ])
-  const allPorts: number[] = []
+  const terminalPorts: Record<number, number[]> = {}
   const shellPorts: Record<number, number[]> = {}
   const resourceUsage: Record<number, ResourceUsage> = {}
 
   await Promise.all(
     handles.map(async (h) => {
-      const session: ProcessScanSession = {
-        currentCommand: h.currentCommand,
-        pty: { pid: h.ptyPid },
-        sessionName: h.sessionName,
-        shell: h.shell,
-      }
-      const [procs, ports] = await Promise.all([
-        getProcessesForTerminal(terminalId, session),
-        getPortsForTerminal(session, systemPorts),
-      ])
-      allProcesses.push(...procs)
-      allPorts.push(...ports)
-      if (ports.length > 0) {
-        shellPorts[h.shell.id] = [...new Set(ports)].sort((a, b) => a - b)
-      }
-
-      // Compute resource usage for this shell
-      if (h.ptyPid > 0) {
-        const descendants = await getDescendantPids(h.ptyPid)
-        // Include the shell process itself
-        descendants.add(h.ptyPid)
-        let rss = 0
-        let cpu = 0
-        let pidCount = 0
-        for (const pid of descendants) {
-          const usage = systemResources.get(pid)
-          if (usage) {
-            rss += usage.rss
-            cpu += usage.cpu
-            pidCount++
-          }
-        }
-        resourceUsage[h.shell.id] = {
-          rss,
-          cpu: Math.round(cpu * 10) / 10,
-          pidCount,
-        }
-      }
-
-      // Clear stale active_cmd if no actual process found after multiple scans
-      if (h.currentCommand) {
-        if (procs.some((p) => p.source === 'direct' && p.pid > 0)) {
-          h.staleScanCount = 0
-        } else {
-          h.staleScanCount++
-          log.info(
-            `[pty] t=${terminalId} s=${h.shell.id} stale scan ${h.staleScanCount}/3 for "${h.currentCommand}"`,
-          )
-          if (h.staleScanCount >= 3) {
-            // Only clear if the shell process itself is dead.
-            // If the shell is alive, trust shell integration to send command_end.
-            const shellAlive =
-              h.ptyPid > 0 && (await getProcessComm(h.ptyPid)) !== null
-            if (shellAlive) {
-              h.staleScanCount = 0
-            } else {
-              log.info(
-                `[pty] t=${terminalId} s=${h.shell.id} clearing stale active_cmd "${h.currentCommand}"`,
-              )
-              h.currentCommand = null
-              h.staleScanCount = 0
-              emitShellUpdate(terminalId, h.shell.id, { active_cmd: null })
-            }
-          }
-        }
-      }
-    }),
-  )
-
-  stampProcessStartTimes(allProcesses)
-
-  const terminalPorts: Record<number, number[]> = {}
-  if (allPorts.length > 0) {
-    terminalPorts[terminalId] = [...new Set(allPorts)].sort((a, b) => a - b)
-  }
-  getIO()?.emit('processes', {
-    terminalId,
-    processes: allProcesses,
-    ports: terminalPorts,
-    shellPorts,
-    resourceUsage,
-    systemMemory: SYSTEM_MEMORY,
-    cpuCount: CPU_COUNT,
-  })
-}
-
-async function scanAndEmitAllProcesses() {
-  const workers = getAllWorkers()
-  const allProcesses: ActiveProcess[] = []
-  const [systemPorts, systemResources] = await Promise.all([
-    getSystemListeningPorts(),
-    getSystemResourceUsage(),
-  ])
-  const terminalPorts: Record<number, number[]> = {}
-  const shellPorts: Record<number, number[]> = {}
-  const resourceUsage: Record<number, ResourceUsage> = {}
-
-  await Promise.all(
-    [...workers.values()].map(async (h) => {
       const session: ProcessScanSession = {
         currentCommand: h.currentCommand,
         pty: { pid: h.ptyPid },
@@ -463,6 +361,29 @@ async function scanAndEmitAllProcesses() {
     }),
   )
 
+  stampProcessStartTimes(allProcesses)
+
+  return { processes: allProcesses, terminalPorts, shellPorts, resourceUsage }
+}
+
+async function scanAndEmitProcessesForTerminal(terminalId: number) {
+  const handles = getWorkersForTerminal(terminalId)
+  if (handles.length === 0) return
+
+  const result = await scanWorkers(handles)
+  getIO()?.emit('processes', {
+    terminalId,
+    ...result,
+    systemMemory: SYSTEM_MEMORY,
+    cpuCount: CPU_COUNT,
+  })
+}
+
+async function scanAndEmitAllProcesses() {
+  const workers = getAllWorkers()
+  const handles = [...workers.values()]
+  const result = await scanWorkers(handles)
+
   // Check for active zellij sessions
   try {
     const zellijSessions = await getActiveZellijSessionNames()
@@ -471,7 +392,7 @@ async function scanAndEmitAllProcesses() {
       for (const h of workers.values()) {
         sessionTerminalIds.add(h.terminalId)
         if (zellijSessions.has(h.sessionName)) {
-          allProcesses.push({
+          result.processes.push({
             pid: 0,
             name: 'zellij',
             command: 'zellij',
@@ -487,7 +408,7 @@ async function scanAndEmitAllProcesses() {
         if (sessionTerminalIds.has(terminal.id)) continue
         const terminalName = terminal.name || `terminal-${terminal.id}`
         if (zellijSessions.has(terminalName)) {
-          allProcesses.push({
+          result.processes.push({
             pid: 0,
             name: 'zellij',
             command: 'zellij',
@@ -502,13 +423,8 @@ async function scanAndEmitAllProcesses() {
     log.error({ err }, '[pty] Failed to detect zellij sessions')
   }
 
-  stampProcessStartTimes(allProcesses)
-
   getIO()?.emit('processes', {
-    processes: allProcesses,
-    ports: terminalPorts,
-    shellPorts,
-    resourceUsage,
+    ...result,
     systemMemory: SYSTEM_MEMORY,
     cpuCount: CPU_COUNT,
   })
