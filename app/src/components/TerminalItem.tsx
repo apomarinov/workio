@@ -221,12 +221,9 @@ export const TerminalItem = memo(function TerminalItem({
         {!isSettingUp &&
         !isDeleting &&
         (hasSessions ||
+          hasGitHub ||
           (!statusBarEnabled &&
-            (hasProcesses ||
-              hasGitHub ||
-              hasPorts ||
-              isDirty ||
-              showRemoteSync)) ||
+            (hasProcesses || hasPorts || isDirty || showRemoteSync)) ||
           showSidebarShells) ? (
           <Button
             variant="ghost"
