@@ -1021,16 +1021,17 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     for (const t of terminals) {
       const repo = t.git_repo?.repo
       if (repo) {
-        const existing = repoGroups.get(repo) || []
+        const key = `${repo}::${t.ssh_host || 'local'}`
+        const existing = repoGroups.get(key) || []
         existing.push(t)
-        repoGroups.set(repo, existing)
+        repoGroups.set(key, existing)
       } else {
         ungrouped.push(t)
       }
     }
     const ordered: Terminal[] = []
-    for (const [repo, group] of repoGroups.entries()) {
-      if (!collapsedSet.has(repo)) ordered.push(...group)
+    for (const [key, group] of repoGroups.entries()) {
+      if (!collapsedSet.has(key)) ordered.push(...group)
     }
     ordered.push(...ungrouped)
     return ordered

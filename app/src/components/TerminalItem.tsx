@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronRight,
   GitBranch,
-  Globe,
   MoreVertical,
   Pin,
   RotateCw,
@@ -251,9 +250,7 @@ export const TerminalItem = memo(function TerminalItem({
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {terminal.ssh_host ? (
-              <Globe className="w-4 h-4 flex-shrink-0 text-blue-400" />
-            ) : terminal.orphaned ? (
+            {terminal.orphaned ? (
               <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow-500" />
             ) : (
               <TerminalIcon2
@@ -274,15 +271,8 @@ export const TerminalItem = memo(function TerminalItem({
               className="text-sm font-medium truncate"
             />
           </div>
-          {terminal.orphaned ? (
+          {terminal.orphaned && (
             <p className="text-xs truncate text-yellow-500">Path not found</p>
-          ) : (
-            terminal.ssh_host &&
-            terminal.name !== terminal.ssh_host && (
-              <span className="text-xs text-muted-foreground">
-                SSH: {terminal.ssh_host}
-              </span>
-            )
           )}
           {terminal.git_repo?.status === 'setup' && (
             <div className="flex items-center gap-1 text-[10px] text-blue-400">

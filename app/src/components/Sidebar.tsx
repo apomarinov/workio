@@ -23,6 +23,7 @@ import {
   GitMerge,
   GitPullRequest,
   GitPullRequestArrow,
+  Globe,
   Loader2,
   PictureInPicture2,
   Plus,
@@ -123,15 +124,9 @@ export function Sidebar({ width }: SidebarProps) {
     'sidebar-collapsed-sessions',
     [],
   )
-  const [terminalsSectionCollapsed, setTerminalsSectionCollapsed] =
-    useLocalStorage<boolean>('sidebar-section-terminals-collapsed', false)
-  const [githubSectionCollapsed, setGithubSectionCollapsed] =
-    useLocalStorage<boolean>('sidebar-section-github-collapsed', false)
   const [collapsedGitHubRepos, setCollapsedGitHubRepos] = useLocalStorage<
     string[]
   >('sidebar-collapsed-github-repos', [])
-  const [otherSessionsSectionCollapsed, setOtherSessionsSectionCollapsed] =
-    useLocalStorage<boolean>('sidebar-section-other-sessions-collapsed', false)
   const [bellOpen, setBellOpen] = useState(false)
   const [logsModal, setLogsModal] = useState<{
     open: boolean
@@ -193,9 +188,10 @@ export function Sidebar({ width }: SidebarProps) {
     for (const terminal of terminals) {
       const repo = terminal.git_repo?.repo
       if (repo) {
-        const existing = repoGroups.get(repo) || []
+        const key = `${repo}::${terminal.ssh_host || 'local'}`
+        const existing = repoGroups.get(key) || []
         existing.push(terminal)
-        repoGroups.set(repo, existing)
+        repoGroups.set(key, existing)
       } else {
         ungrouped.push(terminal)
       }
@@ -406,8 +402,7 @@ export function Sidebar({ width }: SidebarProps) {
         branch: string
         repo: string
       }
-      // Ensure the GitHub section, repo, and PR are all expanded
-      setGithubSectionCollapsed(false)
+      // Ensure the repo and PR are expanded
       setCollapsedGitHubRepos((prev) => prev.filter((r) => r !== repo))
       setExpandedGitHubPRs((prev) =>
         prev.includes(branch) ? prev : [...prev, branch],
@@ -426,7 +421,7 @@ export function Sidebar({ width }: SidebarProps) {
     }
     window.addEventListener('reveal-pr', handler)
     return () => window.removeEventListener('reveal-pr', handler)
-  }, [setGithubSectionCollapsed, setCollapsedGitHubRepos, setExpandedGitHubPRs])
+  }, [setCollapsedGitHubRepos, setExpandedGitHubPRs])
 
   // Listen for reveal-terminal events from the command palette
   useEffect(() => {
@@ -435,13 +430,11 @@ export function Sidebar({ width }: SidebarProps) {
       const terminal = terminals.find((t) => t.id === id)
       if (!terminal) return
 
-      // Expand the terminals section
-      setTerminalsSectionCollapsed(false)
-
       // If terminal has a repo, uncollapse that repo group
       const repo = terminal.git_repo?.repo
       if (repo) {
-        setCollapsedProjectRepos((prev) => prev.filter((r) => r !== repo))
+        const key = `${repo}::${terminal.ssh_host || 'local'}`
+        setCollapsedProjectRepos((prev) => prev.filter((r) => r !== key))
       }
 
       // Expand the terminal itself
@@ -459,12 +452,7 @@ export function Sidebar({ width }: SidebarProps) {
     }
     window.addEventListener('reveal-terminal', handler)
     return () => window.removeEventListener('reveal-terminal', handler)
-  }, [
-    terminals,
-    setTerminalsSectionCollapsed,
-    setCollapsedProjectRepos,
-    setExpandedTerminalSessions,
-  ])
+  }, [terminals, setCollapsedProjectRepos, setExpandedTerminalSessions])
 
   // Listen for reveal-session events from the command palette
   useEffect(() => {
@@ -481,11 +469,11 @@ export function Sidebar({ width }: SidebarProps) {
 
       if (parentTerminal) {
         selectTerminal(parentTerminal.id)
-        // Session is under a terminal - expand terminals section, repo group, and terminal sessions
-        setTerminalsSectionCollapsed(false)
+        // Session is under a terminal - expand repo group and terminal sessions
         const repo = parentTerminal.git_repo?.repo
         if (repo) {
-          setCollapsedProjectRepos((prev) => prev.filter((r) => r !== repo))
+          const key = `${repo}::${parentTerminal.ssh_host || 'local'}`
+          setCollapsedProjectRepos((prev) => prev.filter((r) => r !== key))
         }
         setExpandedTerminalSessions((prev) =>
           prev.includes(parentTerminal.id)
@@ -494,8 +482,7 @@ export function Sidebar({ width }: SidebarProps) {
         )
       } else {
         selectSession(session.session_id)
-        // Orphan session - expand the "other sessions" section and session group
-        setOtherSessionsSectionCollapsed(false)
+        // Orphan session - expand the session group
         setExpandedSessionGroups((prev) =>
           prev.includes(session.project_path)
             ? prev
@@ -519,10 +506,8 @@ export function Sidebar({ width }: SidebarProps) {
     terminals,
     selectTerminal,
     selectSession,
-    setTerminalsSectionCollapsed,
     setCollapsedProjectRepos,
     setExpandedTerminalSessions,
-    setOtherSessionsSectionCollapsed,
     setExpandedSessionGroups,
   ])
 
@@ -530,19 +515,13 @@ export function Sidebar({ width }: SidebarProps) {
   useEffect(() => {
     if (!activeTerminal) return
     const repo = activeTerminal.git_repo?.repo
-    if (repo && collapsedProjectReposSet.has(repo)) {
-      setCollapsedProjectRepos((prev) => prev.filter((r) => r !== repo))
+    if (repo) {
+      const key = `${repo}::${activeTerminal.ssh_host || 'local'}`
+      if (collapsedProjectReposSet.has(key)) {
+        setCollapsedProjectRepos((prev) => prev.filter((r) => r !== key))
+      }
     }
-    if (terminalsSectionCollapsed) {
-      setTerminalsSectionCollapsed(false)
-    }
-  }, [
-    activeTerminal,
-    collapsedProjectReposSet,
-    setCollapsedProjectRepos,
-    terminalsSectionCollapsed,
-    setTerminalsSectionCollapsed,
-  ])
+  }, [activeTerminal, collapsedProjectReposSet, setCollapsedProjectRepos])
 
   // Auto-expand parent repo group when a PR becomes active
   useEffect(() => {
@@ -550,16 +529,7 @@ export function Sidebar({ width }: SidebarProps) {
     if (collapsedGitHubReposSet.has(activePR.repo)) {
       setCollapsedGitHubRepos((prev) => prev.filter((r) => r !== activePR.repo))
     }
-    if (githubSectionCollapsed) {
-      setGithubSectionCollapsed(false)
-    }
-  }, [
-    activePR,
-    collapsedGitHubReposSet,
-    setCollapsedGitHubRepos,
-    githubSectionCollapsed,
-    setGithubSectionCollapsed,
-  ])
+  }, [activePR, collapsedGitHubReposSet, setCollapsedGitHubRepos])
 
   const hasAnythingExpanded =
     expandedSessionGroups.length > 0 ||
@@ -728,101 +698,93 @@ export function Sidebar({ width }: SidebarProps) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-0 space-y-1 @container/sidebar">
+      <div className="flex-1 overflow-y-auto p-0 space-y-1 pb-2 @container/sidebar">
         {terminals.length > 0 && (
           <>
-            <button
-              type="button"
-              onClick={() =>
-                setTerminalsSectionCollapsed(!terminalsSectionCollapsed)
-              }
-              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 hover:text-muted-foreground transition-colors w-full"
-            >
-              <ChevronDown
-                className={cn(
-                  'w-3 h-3 transition-transform',
-                  terminalsSectionCollapsed && '-rotate-90',
-                )}
-              />
+            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 pt-2 w-full">
               Projects
-            </button>
-            {!terminalsSectionCollapsed && (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-                onDragEnd={handleDragEnd}
-              >
-                {Array.from(repoGroupedTerminals.repoGroups.entries()).map(
-                  ([repo, repoTerminals]) => {
-                    const isCollapsed = collapsedProjectReposSet.has(repo)
-                    const repoName = repo.split('/')[1] || repo
-                    return (
-                      <div key={repo}>
-                        <button
-                          type="button"
-                          onClick={() => toggleProjectRepo(repo)}
-                          className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
-                        >
-                          <ChevronDown
-                            className={cn(
-                              'w-3 h-3 flex-shrink-0 transition-transform',
-                              isCollapsed && '-rotate-90',
-                            )}
-                          />
+            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+              onDragEnd={handleDragEnd}
+            >
+              {Array.from(repoGroupedTerminals.repoGroups.entries()).map(
+                ([groupKey, repoTerminals]) => {
+                  const isCollapsed = collapsedProjectReposSet.has(groupKey)
+                  const [repo, hostPart] = groupKey.split('::')
+                  const isSSH = hostPart !== 'local'
+                  const repoName = repo.split('/')[1] || repo
+                  return (
+                    <div key={groupKey}>
+                      <button
+                        type="button"
+                        onClick={() => toggleProjectRepo(groupKey)}
+                        className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors w-full"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            'w-3 h-3 flex-shrink-0 transition-transform',
+                            isCollapsed && '-rotate-90',
+                          )}
+                        />
+                        {isSSH ? (
+                          <Globe className="w-3 h-3" />
+                        ) : (
                           <Github className="w-3 h-3" />
-                          <span className="truncate">{repoName}</span>
-                        </button>
-                        {!isCollapsed && (
-                          <SortableContext
-                            items={repoTerminals.map((t) => t.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {repoTerminals.map((terminal) => (
-                              <SortableTerminalItem
-                                key={terminal.id}
-                                terminal={terminal}
-                                sessions={
-                                  sessionsForTerminal.get(terminal.id) || []
-                                }
-                                sessionsExpanded={expandedTerminalSessionsSet.has(
-                                  terminal.id,
-                                )}
-                                onToggleTerminalSessions={
-                                  toggleTerminalSessions
-                                }
-                                shortcutIndex={terminalShortcutMap.get(
-                                  terminal.id,
-                                )}
-                              />
-                            ))}
-                          </SortableContext>
                         )}
-                      </div>
-                    )
-                  },
-                )}
-                {repoGroupedTerminals.ungrouped.length > 0 && (
-                  <SortableContext
-                    items={repoGroupedTerminals.ungrouped.map((t) => t.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {repoGroupedTerminals.ungrouped.map((terminal) => (
-                      <SortableTerminalItem
-                        key={terminal.id}
-                        terminal={terminal}
-                        sessions={sessionsForTerminal.get(terminal.id) || []}
-                        sessionsExpanded={expandedTerminalSessionsSet.has(
-                          terminal.id,
-                        )}
-                        onToggleTerminalSessions={toggleTerminalSessions}
-                        shortcutIndex={terminalShortcutMap.get(terminal.id)}
-                      />
-                    ))}
-                  </SortableContext>
-                )}
-              </DndContext>
-            )}
+                        <span className="truncate">
+                          {isSSH ? `${repoName} \u00b7 ${hostPart}` : repoName}
+                        </span>
+                      </button>
+                      {!isCollapsed && (
+                        <SortableContext
+                          items={repoTerminals.map((t) => t.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {repoTerminals.map((terminal) => (
+                            <SortableTerminalItem
+                              key={terminal.id}
+                              terminal={terminal}
+                              sessions={
+                                sessionsForTerminal.get(terminal.id) || []
+                              }
+                              sessionsExpanded={expandedTerminalSessionsSet.has(
+                                terminal.id,
+                              )}
+                              onToggleTerminalSessions={toggleTerminalSessions}
+                              shortcutIndex={terminalShortcutMap.get(
+                                terminal.id,
+                              )}
+                            />
+                          ))}
+                        </SortableContext>
+                      )}
+                    </div>
+                  )
+                },
+              )}
+              {repoGroupedTerminals.ungrouped.length > 0 && (
+                <SortableContext
+                  items={repoGroupedTerminals.ungrouped.map((t) => t.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {repoGroupedTerminals.ungrouped.map((terminal) => (
+                    <SortableTerminalItem
+                      key={terminal.id}
+                      terminal={terminal}
+                      sessions={sessionsForTerminal.get(terminal.id) || []}
+                      sessionsExpanded={expandedTerminalSessionsSet.has(
+                        terminal.id,
+                      )}
+                      onToggleTerminalSessions={toggleTerminalSessions}
+                      shortcutIndex={terminalShortcutMap.get(terminal.id)}
+                    />
+                  ))}
+                </SortableContext>
+              )}
+            </DndContext>
           </>
         )}
 
@@ -833,153 +795,142 @@ export function Sidebar({ width }: SidebarProps) {
               className={cn(
                 'border-t border-sidebar-border my-2',
                 terminals.length === 0 &&
-                  orphanSessionGroups.size === 0 &&
-                  'border-none',
+                orphanSessionGroups.size === 0 &&
+                'border-none',
               )}
             />
-            <button
-              type="button"
-              onClick={() => setGithubSectionCollapsed(!githubSectionCollapsed)}
-              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
-            >
-              <ChevronDown
-                className={cn(
-                  'w-3 h-3 transition-transform',
-                  githubSectionCollapsed && '-rotate-90',
-                )}
-              />
+            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 w-full">
               Pull requests
-            </button>
-            {!githubSectionCollapsed &&
-              Array.from(githubPRsByRepo.keys()).map((repo) => {
-                const repoPRs = githubPRsByRepo.get(repo) ?? []
-                const repoName = repo.split('/')[1] || repo
-                const isCollapsed = collapsedGitHubReposSet.has(repo)
-                const hiddenPRsForRepo = (settings?.hidden_prs ?? []).filter(
-                  (h) => h.repo === repo,
-                )
-                const hiddenAuthorsForRepo = (
-                  settings?.hide_gh_authors ?? []
-                ).filter((h) => h.repo === repo)
-                const silencedAuthorsForRepo = (
-                  settings?.silence_gh_authors ?? []
-                ).filter((h) => h.repo === repo)
-                const collapsedAuthorsForRepo = (
-                  settings?.collapse_gh_authors ?? []
-                ).filter((h) => h.repo === repo)
-                const hasHiddenItems =
-                  hiddenPRsForRepo.length > 0 ||
-                  hiddenAuthorsForRepo.length > 0 ||
-                  silencedAuthorsForRepo.length > 0 ||
-                  collapsedAuthorsForRepo.length > 0
-                return (
-                  <div key={repo}>
-                    <div className="group/repo-header flex items-center">
+            </div>
+            {Array.from(githubPRsByRepo.keys()).map((repo) => {
+              const repoPRs = githubPRsByRepo.get(repo) ?? []
+              const repoName = repo.split('/')[1] || repo
+              const isCollapsed = collapsedGitHubReposSet.has(repo)
+              const hiddenPRsForRepo = (settings?.hidden_prs ?? []).filter(
+                (h) => h.repo === repo,
+              )
+              const hiddenAuthorsForRepo = (
+                settings?.hide_gh_authors ?? []
+              ).filter((h) => h.repo === repo)
+              const silencedAuthorsForRepo = (
+                settings?.silence_gh_authors ?? []
+              ).filter((h) => h.repo === repo)
+              const collapsedAuthorsForRepo = (
+                settings?.collapse_gh_authors ?? []
+              ).filter((h) => h.repo === repo)
+              const hasHiddenItems =
+                hiddenPRsForRepo.length > 0 ||
+                hiddenAuthorsForRepo.length > 0 ||
+                silencedAuthorsForRepo.length > 0 ||
+                collapsedAuthorsForRepo.length > 0
+              return (
+                <div key={repo}>
+                  <div className="group/repo-header flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleGitHubRepo(repo)}
+                      className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          'w-3 h-3 flex-shrink-0 transition-transform',
+                          isCollapsed && '-rotate-90',
+                        )}
+                      />
+                      <Github className="w-3 h-3" />
+                      <span className="truncate">{repoName}</span>
+                    </button>
+                    <div className="mr-2 gap-1 flex">
                       <button
                         type="button"
-                        onClick={() => toggleGitHubRepo(repo)}
-                        className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 px-2 py-0.5 hover:text-muted-foreground transition-colors flex-1"
+                        onClick={() =>
+                          window.open(
+                            `https://github.com/${repo}/pulls?q=is%3Aopen+is%3Apr+author%3A%40me`,
+                            '_blank',
+                          )
+                        }
+                        className={cn(
+                          'mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
+                          isMobile
+                            ? 'opacity-100'
+                            : 'opacity-0 group-hover/repo-header:opacity-100',
+                        )}
+                        title="View my PRs"
                       >
-                        <ChevronDown
-                          className={cn(
-                            'w-3 h-3 flex-shrink-0 transition-transform',
-                            isCollapsed && '-rotate-90',
-                          )}
-                        />
-                        <Github className="w-3 h-3" />
-                        <span className="truncate">{repoName}</span>
+                        <GitPullRequest className="w-3 h-3" />
                       </button>
-                      <div className="mr-2 gap-1 flex">
+                      {hasHiddenItems && (
                         <button
                           type="button"
-                          onClick={() =>
-                            window.open(
-                              `https://github.com/${repo}/pulls?q=is%3Aopen+is%3Apr+author%3A%40me`,
-                              '_blank',
-                            )
-                          }
+                          onClick={() => setHiddenPRsModalRepo(repo)}
                           className={cn(
-                            'mr-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
+                            'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
                             isMobile
                               ? 'opacity-100'
                               : 'opacity-0 group-hover/repo-header:opacity-100',
                           )}
-                          title="View my PRs"
+                          title="Manage hidden items"
                         >
-                          <GitPullRequest className="w-3 h-3" />
+                          <BellOff className="w-3 h-3" />
                         </button>
-                        {hasHiddenItems && (
-                          <button
-                            type="button"
-                            onClick={() => setHiddenPRsModalRepo(repo)}
-                            className={cn(
-                              'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
-                              isMobile
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover/repo-header:opacity-100',
-                            )}
-                            title="Manage hidden items"
-                          >
-                            <BellOff className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    {!isCollapsed && (
-                      <>
-                        {repoPRs.map((pr) => (
-                          <PRStatusGroup
-                            key={`${pr.repo}:${pr.prNumber}`}
-                            pr={pr}
-                            expanded={expandedGitHubPRsSet.has(pr.branch)}
-                            onToggle={() => toggleGitHubPR(pr)}
-                            hasNewActivity={pr.hasUnreadNotifications}
-                            isActive={
-                              activePR?.prNumber === pr.prNumber &&
-                              activePR?.repo === pr.repo
-                            }
-                          />
-                        ))}
-                        {(mergedPRsByRepo.get(repo) ?? [])
-                          .slice(0, 3)
-                          .map((pr) => (
-                            <a
-                              key={pr.prNumber}
-                              href={pr.prUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
-                            >
-                              {pr.state === 'MERGED' ? (
-                                <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
-                              ) : (
-                                <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <span className="text-xs truncate block">
-                                  {pr.prTitle}
-                                </span>
-                                <div className="flex gap-1 items-center">
-                                  <GitBranch className="w-2.5 h-2.5" />
-                                  <span className="text-[11px] text-muted-foreground/50 truncate">
-                                    {pr.branch}
-                                  </span>
-                                </div>
-                              </div>
-                            </a>
-                          ))}
-                        <InvolvedPRsList
-                          prs={involvedPRsByRepo.get(repo) ?? []}
-                        />
-                        <OlderMergedPRsList
-                          olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(3)}
-                        />
-                      </>
-                    )}
                   </div>
-                )
-              })}
+                  {!isCollapsed && (
+                    <>
+                      {repoPRs.map((pr) => (
+                        <PRStatusGroup
+                          key={`${pr.repo}:${pr.prNumber}`}
+                          pr={pr}
+                          expanded={expandedGitHubPRsSet.has(pr.branch)}
+                          onToggle={() => toggleGitHubPR(pr)}
+                          hasNewActivity={pr.hasUnreadNotifications}
+                          isActive={
+                            activePR?.prNumber === pr.prNumber &&
+                            activePR?.repo === pr.repo
+                          }
+                        />
+                      ))}
+                      {(mergedPRsByRepo.get(repo) ?? [])
+                        .slice(0, 3)
+                        .map((pr) => (
+                          <a
+                            key={pr.prNumber}
+                            href={pr.prUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="group/mpr flex items-center cursor-pointer gap-2 pr-3 pl-2 py-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors min-w-0"
+                          >
+                            {pr.state === 'MERGED' ? (
+                              <GitMerge className="w-4 h-4 flex-shrink-0 text-purple-500" />
+                            ) : (
+                              <GitPullRequestArrow className="w-4 h-4 flex-shrink-0 text-red-500" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs truncate block">
+                                {pr.prTitle}
+                              </span>
+                              <div className="flex gap-1 items-center">
+                                <GitBranch className="w-2.5 h-2.5" />
+                                <span className="text-[11px] text-muted-foreground/50 truncate">
+                                  {pr.branch}
+                                </span>
+                              </div>
+                            </div>
+                          </a>
+                        ))}
+                      <InvolvedPRsList
+                        prs={involvedPRsByRepo.get(repo) ?? []}
+                      />
+                      <OlderMergedPRsList
+                        olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(3)}
+                      />
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </>
         )}
 
@@ -992,34 +943,21 @@ export function Sidebar({ width }: SidebarProps) {
                 terminals.length === 0 && 'border-none',
               )}
             />
-            <button
-              type="button"
-              onClick={() =>
-                setOtherSessionsSectionCollapsed(!otherSessionsSectionCollapsed)
-              }
-              className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 hover:text-muted-foreground transition-colors w-full"
-            >
-              <ChevronDown
-                className={cn(
-                  'w-3 h-3 transition-transform',
-                  otherSessionsSectionCollapsed && '-rotate-90',
-                )}
-              />
+            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-0 w-full">
               Claude not in project
-            </button>
-            {!otherSessionsSectionCollapsed &&
-              Array.from(orphanSessionGroups.entries()).map(
-                ([projectPath, groupSessions]) => (
-                  <SessionGroup
-                    key={projectPath}
-                    projectPath={projectPath}
-                    sessions={groupSessions}
-                    expanded={expandedSessionGroupsSet.has(projectPath)}
-                    defaultCollapsed
-                    onToggle={() => toggleSessionGroup(projectPath)}
-                  />
-                ),
-              )}
+            </div>
+            {Array.from(orphanSessionGroups.entries()).map(
+              ([projectPath, groupSessions]) => (
+                <SessionGroup
+                  key={projectPath}
+                  projectPath={projectPath}
+                  sessions={groupSessions}
+                  expanded={expandedSessionGroupsSet.has(projectPath)}
+                  defaultCollapsed
+                  onToggle={() => toggleSessionGroup(projectPath)}
+                />
+              ),
+            )}
           </>
         )}
       </div>
@@ -1049,202 +987,202 @@ export function Sidebar({ width }: SidebarProps) {
             {(settings?.silence_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <BellOff className="w-3 h-3" />
-                  Silenced Authors
-                </p>
-                {(settings?.silence_gh_authors ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.author}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <span className="text-sm">{entry.author}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingSilencedAuthor(entry.author)
-                          try {
-                            const current = settings?.silence_gh_authors ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.author === entry.author
-                                ),
-                            )
-                            await updateSettings({
-                              silence_gh_authors: updated,
-                            })
-                          } finally {
-                            setRemovingSilencedAuthor(null)
-                          }
-                        }}
-                        disabled={removingSilencedAuthor === entry.author}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <BellOff className="w-3 h-3" />
+                    Silenced Authors
+                  </p>
+                  {(settings?.silence_gh_authors ?? [])
+                    .filter((h) => h.repo === hiddenPRsModalRepo)
+                    .map((entry) => (
+                      <div
+                        key={entry.author}
+                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
                       >
-                        {removingSilencedAuthor === entry.author ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                        <span className="text-sm">{entry.author}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRemovingSilencedAuthor(entry.author)
+                            try {
+                              const current = settings?.silence_gh_authors ?? []
+                              const updated = current.filter(
+                                (e) =>
+                                  !(
+                                    e.repo === hiddenPRsModalRepo &&
+                                    e.author === entry.author
+                                  ),
+                              )
+                              await updateSettings({
+                                silence_gh_authors: updated,
+                              })
+                            } finally {
+                              setRemovingSilencedAuthor(null)
+                            }
+                          }}
+                          disabled={removingSilencedAuthor === entry.author}
+                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                        >
+                          {removingSilencedAuthor === entry.author ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
             {(settings?.collapse_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <ChevronsDownUp className="w-3 h-3" />
-                  Collapsed Authors
-                </p>
-                {(settings?.collapse_gh_authors ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.author}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <span className="text-sm">{entry.author}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingCollapsedAuthor(entry.author)
-                          try {
-                            const current = settings?.collapse_gh_authors ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.author === entry.author
-                                ),
-                            )
-                            await updateSettings({
-                              collapse_gh_authors: updated,
-                            })
-                          } finally {
-                            setRemovingCollapsedAuthor(null)
-                          }
-                        }}
-                        disabled={removingCollapsedAuthor === entry.author}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <ChevronsDownUp className="w-3 h-3" />
+                    Collapsed Authors
+                  </p>
+                  {(settings?.collapse_gh_authors ?? [])
+                    .filter((h) => h.repo === hiddenPRsModalRepo)
+                    .map((entry) => (
+                      <div
+                        key={entry.author}
+                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
                       >
-                        {removingCollapsedAuthor === entry.author ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                        <span className="text-sm">{entry.author}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRemovingCollapsedAuthor(entry.author)
+                            try {
+                              const current = settings?.collapse_gh_authors ?? []
+                              const updated = current.filter(
+                                (e) =>
+                                  !(
+                                    e.repo === hiddenPRsModalRepo &&
+                                    e.author === entry.author
+                                  ),
+                              )
+                              await updateSettings({
+                                collapse_gh_authors: updated,
+                              })
+                            } finally {
+                              setRemovingCollapsedAuthor(null)
+                            }
+                          }}
+                          disabled={removingCollapsedAuthor === entry.author}
+                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                        >
+                          {removingCollapsedAuthor === entry.author ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
             {(settings?.hide_gh_authors ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <EyeOff className="w-3 h-3" />
-                  Hidden Comment Authors
-                </p>
-                {(settings?.hide_gh_authors ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.author}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <span className="text-sm">{entry.author}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingAuthor(entry.author)
-                          try {
-                            const current = settings?.hide_gh_authors ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.author === entry.author
-                                ),
-                            )
-                            await updateSettings({ hide_gh_authors: updated })
-                          } finally {
-                            setRemovingAuthor(null)
-                          }
-                        }}
-                        disabled={removingAuthor === entry.author}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <EyeOff className="w-3 h-3" />
+                    Hidden Comment Authors
+                  </p>
+                  {(settings?.hide_gh_authors ?? [])
+                    .filter((h) => h.repo === hiddenPRsModalRepo)
+                    .map((entry) => (
+                      <div
+                        key={entry.author}
+                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
                       >
-                        {removingAuthor === entry.author ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                        <span className="text-sm">{entry.author}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRemovingAuthor(entry.author)
+                            try {
+                              const current = settings?.hide_gh_authors ?? []
+                              const updated = current.filter(
+                                (e) =>
+                                  !(
+                                    e.repo === hiddenPRsModalRepo &&
+                                    e.author === entry.author
+                                  ),
+                              )
+                              await updateSettings({ hide_gh_authors: updated })
+                            } finally {
+                              setRemovingAuthor(null)
+                            }
+                          }}
+                          disabled={removingAuthor === entry.author}
+                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                        >
+                          {removingAuthor === entry.author ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
             {(settings?.hidden_prs ?? []).filter(
               (h) => h.repo === hiddenPRsModalRepo,
             ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <EyeOff className="w-3 h-3" />
-                  Hidden Pull Requests
-                </p>
-                {(settings?.hidden_prs ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.prNumber}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm truncate block">
-                          {entry.title}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          #{entry.prNumber}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingPR(entry.prNumber)
-                          try {
-                            const current = settings?.hidden_prs ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.prNumber === entry.prNumber
-                                ),
-                            )
-                            await updateSettings({ hidden_prs: updated })
-                          } finally {
-                            setRemovingPR(null)
-                          }
-                        }}
-                        disabled={removingPR === entry.prNumber}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <EyeOff className="w-3 h-3" />
+                    Hidden Pull Requests
+                  </p>
+                  {(settings?.hidden_prs ?? [])
+                    .filter((h) => h.repo === hiddenPRsModalRepo)
+                    .map((entry) => (
+                      <div
+                        key={entry.prNumber}
+                        className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
                       >
-                        {removingPR === entry.prNumber ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm truncate block">
+                            {entry.title}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            #{entry.prNumber}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setRemovingPR(entry.prNumber)
+                            try {
+                              const current = settings?.hidden_prs ?? []
+                              const updated = current.filter(
+                                (e) =>
+                                  !(
+                                    e.repo === hiddenPRsModalRepo &&
+                                    e.prNumber === entry.prNumber
+                                  ),
+                              )
+                              await updateSettings({ hidden_prs: updated })
+                            } finally {
+                              setRemovingPR(null)
+                            }
+                          }}
+                          disabled={removingPR === entry.prNumber}
+                          className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
+                        >
+                          {removingPR === entry.prNumber ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
           </div>
           <DialogFooter>
             <Button
