@@ -13,6 +13,7 @@ export interface TerminalAction {
     | 'function'
     | 'custom'
   isModifier?: boolean
+  repeatable?: boolean
 }
 
 // Central registry of all terminal actions
@@ -44,9 +45,21 @@ const actionsArray: TerminalAction[] = [
   { id: 'esc', label: 'Esc', sequence: '\x1b', category: 'special' },
   { id: 'tab', label: 'Tab', sequence: '\t', category: 'special' },
   { id: 'shift-tab', label: '⇧Tab', sequence: '\x1b[Z', category: 'special' },
-  { id: 'backspace', label: '⌫', sequence: '\x7f', category: 'special' },
+  {
+    id: 'backspace',
+    label: '⌫',
+    sequence: '\x7f',
+    category: 'special',
+    repeatable: true,
+  },
   { id: 'ins', label: 'Ins', sequence: '\x1b[2~', category: 'special' },
-  { id: 'del', label: 'Del', sequence: '\x1b[3~', category: 'special' },
+  {
+    id: 'del',
+    label: 'Del',
+    sequence: '\x1b[3~',
+    category: 'special',
+    repeatable: true,
+  },
   { id: 'paste', label: 'Paste', sequence: '', category: 'special' },
   { id: 'enter', label: '↵', sequence: '\r', category: 'special' },
 
@@ -83,10 +96,34 @@ const actionsArray: TerminalAction[] = [
   },
 
   // Navigation
-  { id: 'up', label: '↑', sequence: '\x1b[A', category: 'nav' },
-  { id: 'down', label: '↓', sequence: '\x1b[B', category: 'nav' },
-  { id: 'right', label: '→', sequence: '\x1b[C', category: 'nav' },
-  { id: 'left', label: '←', sequence: '\x1b[D', category: 'nav' },
+  {
+    id: 'up',
+    label: '↑',
+    sequence: '\x1b[A',
+    category: 'nav',
+    repeatable: true,
+  },
+  {
+    id: 'down',
+    label: '↓',
+    sequence: '\x1b[B',
+    category: 'nav',
+    repeatable: true,
+  },
+  {
+    id: 'right',
+    label: '→',
+    sequence: '\x1b[C',
+    category: 'nav',
+    repeatable: true,
+  },
+  {
+    id: 'left',
+    label: '←',
+    sequence: '\x1b[D',
+    category: 'nav',
+    repeatable: true,
+  },
   { id: 'home', label: 'Home', sequence: '\x1b[H', category: 'nav' },
   { id: 'end', label: 'End', sequence: '\x1b[F', category: 'nav' },
   { id: 'pgup', label: 'PgUp', sequence: '\x1b[5~', category: 'nav' },

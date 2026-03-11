@@ -30,6 +30,7 @@ export function MobileKeyboardActions({
                 key={`${row.id}-${actionId}-${i}`}
                 label={action.label}
                 active={isActive}
+                repeatable={action.repeatable}
                 size="lg"
                 preventFocusLoss
                 onTap={() => onActionTap(actionId)}

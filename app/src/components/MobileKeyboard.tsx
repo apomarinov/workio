@@ -171,6 +171,7 @@ export function MobileKeyboard({
                     key={`quick-${row.id}-${actionId}`}
                     label={action.label}
                     active={isActive}
+                    repeatable={action.repeatable}
                     size="lg"
                     preventFocusLoss
                     onTap={() => handleActionTap(actionId)}

@@ -1,4 +1,8 @@
+import { useRef } from 'react'
 import { cn } from '@/lib/utils'
+
+const REPEAT_DELAY = 400
+const REPEAT_INTERVAL = 80
 
 interface ActionButtonProps {
   label?: string
@@ -8,6 +12,7 @@ interface ActionButtonProps {
   withAudio?: boolean
   size?: 'sm' | 'lg'
   preventFocusLoss?: boolean
+  repeatable?: boolean
   onTap?: () => void
   className?: string
 }
@@ -20,9 +25,14 @@ export function ActionButton({
   withAudio: _withAudio,
   size = 'sm',
   preventFocusLoss,
+  repeatable,
   onTap,
   className,
 }: ActionButtonProps) {
+  const delayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const firedRef = useRef(false)
+
   const isLg = size === 'lg'
   const classes = cn(
     'min-w-10 truncate text-center font-semibold',
@@ -52,26 +62,61 @@ export function ActionButton({
     navigator.vibrate?.(10)
   }
 
+  const clearTimers = () => {
+    if (delayRef.current) {
+      clearTimeout(delayRef.current)
+      delayRef.current = null
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (preventFocusLoss) e.preventDefault()
+    playSound()
+
+    if (repeatable) {
+      firedRef.current = true
+      onTap()
+      delayRef.current = setTimeout(() => {
+        intervalRef.current = setInterval(() => {
+          onTap()
+        }, REPEAT_INTERVAL)
+      }, REPEAT_DELAY)
+    }
+  }
+
+  const handlePointerUp = () => {
+    if (repeatable) {
+      clearTimers()
+      return
+    }
+    if (preventFocusLoss) {
+      onTap()
+    }
+  }
+
+  const handlePointerLeave = () => {
+    if (repeatable) clearTimers()
+  }
+
+  const handlePointerCancel = () => {
+    if (repeatable) clearTimers()
+  }
+
   return (
     <button
       type="button"
       onPointerDown={
-        preventFocusLoss
-          ? (e) => {
-              e.preventDefault()
-              playSound()
-            }
-          : undefined
+        preventFocusLoss || repeatable ? handlePointerDown : undefined
       }
-      onPointerUp={
-        preventFocusLoss
-          ? () => {
-              onTap()
-            }
-          : undefined
-      }
+      onPointerUp={preventFocusLoss || repeatable ? handlePointerUp : undefined}
+      onPointerLeave={repeatable ? handlePointerLeave : undefined}
+      onPointerCancel={repeatable ? handlePointerCancel : undefined}
       onClick={
-        preventFocusLoss
+        preventFocusLoss || repeatable
           ? undefined
           : () => {
               playSound()
