@@ -20,9 +20,9 @@ const API_BASE = '/api'
  * Fetch wrapper that attaches the current socket ID header on mutation requests.
  * The server uses this to broadcast refetch events to all clients *except* the sender.
  */
-function apiFetch(
+async function apiFetch(
   input: RequestInfo | URL,
-  init?: RequestInit,
+  init?: RequestInit & { retry?: boolean },
 ): Promise<Response> {
   const method = init?.method?.toUpperCase()
   if (method && method !== 'GET' && method !== 'HEAD') {
@@ -33,6 +33,22 @@ function apiFetch(
       return fetch(input, { ...init, headers })
     }
   }
+
+  if (init?.retry) {
+    let lastError: unknown
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await fetch(input, init)
+      } catch (err) {
+        lastError = err
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
+        }
+      }
+    }
+    throw lastError
+  }
+
   return fetch(input, init)
 }
 
@@ -366,6 +382,7 @@ export async function getClosedPRs(
 ): Promise<MergedPRSummary[]> {
   const res = await apiFetch(
     `${API_BASE}/github/closed-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
+    { retry: true },
   )
   if (!res.ok) throw new Error('Failed to fetch closed PRs')
   const data: { prs: MergedPRSummary[] } = await res.json()
@@ -378,6 +395,7 @@ export async function getInvolvedPRs(
 ): Promise<InvolvedPRSummary[]> {
   const res = await apiFetch(
     `${API_BASE}/github/involved-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
+    { retry: true },
   )
   if (!res.ok) throw new Error('Failed to fetch involved PRs')
   const data: { prs: InvolvedPRSummary[] } = await res.json()
