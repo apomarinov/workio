@@ -186,6 +186,7 @@ import {
   cancelWorkspaceOperation,
   deleteTerminalWorkspace,
   emitWorkspace,
+  rerunSetupScript,
   rmrf,
   setupTerminalWorkspace,
 } from '../workspace/setup'
@@ -619,6 +620,62 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     return listSSHHosts()
   })
 
+  // Audit SSH host MaxSessions setting
+  fastify.get<{ Querystring: { host: string } }>(
+    '/api/ssh/audit',
+    async (request, reply) => {
+      const { host } = request.query
+      if (!host) {
+        return reply.status(400).send({ error: 'host is required' })
+      }
+      const validation = validateSSHHost(host)
+      if (!validation.valid) {
+        return reply.status(400).send({ error: validation.error })
+      }
+      try {
+        const { stdout } = await execSSHCommand(
+          host,
+          "sshd -T 2>/dev/null | grep -i '^maxsessions'",
+          { timeout: 5000 },
+        )
+        const match = stdout.trim().match(/^maxsessions\s+(\d+)$/i)
+        return { maxSessions: match ? Number(match[1]) : null }
+      } catch {
+        return { maxSessions: null }
+      }
+    },
+  )
+
+  // Fix SSH host MaxSessions by bumping to 64
+  fastify.post<{ Body: { host: string } }>(
+    '/api/ssh/fix-max-sessions',
+    async (request, reply) => {
+      const { host } = request.body
+      if (!host) {
+        return reply.status(400).send({ error: 'host is required' })
+      }
+      const validation = validateSSHHost(host)
+      if (!validation.valid) {
+        return reply.status(400).send({ error: validation.error })
+      }
+      try {
+        const cmd = [
+          "sudo sed -i '/^MaxSessions/Id' /etc/ssh/sshd_config",
+          "echo 'MaxSessions 64' | sudo tee -a /etc/ssh/sshd_config",
+          'sudo sshd -t',
+          'sudo systemctl restart sshd 2>/dev/null || sudo systemctl restart ssh 2>/dev/null || sudo service sshd restart 2>/dev/null || sudo service ssh restart',
+        ].join(' && ')
+        await execSSHCommand(host, cmd, { timeout: 10000 })
+        return { success: true }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Failed to fix MaxSessions'
+        log.error(`Failed to fix MaxSessions for ${host}: ${message}`)
+        return reply.status(500).send({ success: false, error: message })
+      }
+    },
+  )
+
   // List all terminals
   fastify.get('/api/terminals', async () => {
     const terminals = await getAllTerminals()
@@ -976,6 +1033,57 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       return { cancelled: true }
+    },
+  )
+
+  // Rerun a failed setup script
+  fastify.post<{ Params: TerminalParams }>(
+    '/api/terminals/:id/rerun-setup',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+      if (terminal.setup?.status !== 'failed') {
+        return reply.status(409).send({ error: 'Setup is not in failed state' })
+      }
+
+      // Fire-and-forget
+      rerunSetupScript(id)
+      return { ok: true }
+    },
+  )
+
+  // Clear a failed setup error (mark as done)
+  fastify.post<{ Params: TerminalParams }>(
+    '/api/terminals/:id/clear-setup-error',
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10)
+      if (Number.isNaN(id)) {
+        return reply.status(400).send({ error: 'Invalid terminal id' })
+      }
+
+      const terminal = await getTerminalById(id)
+      if (!terminal) {
+        return reply.status(404).send({ error: 'Terminal not found' })
+      }
+      if (terminal.setup?.status !== 'failed') {
+        return reply.status(409).send({ error: 'Setup is not in failed state' })
+      }
+
+      const doneSetup = {
+        ...terminal.setup,
+        status: 'done' as const,
+        error: undefined,
+      }
+      await updateTerminal(id, { setup: doneSetup })
+      await emitWorkspace(id, { name: terminal.name, setup: doneSetup })
+      return { ok: true }
     },
   )
 

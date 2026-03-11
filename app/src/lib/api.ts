@@ -70,6 +70,27 @@ export async function getSSHHosts(): Promise<SSHHostEntry[]> {
   return res.json()
 }
 
+export async function auditSSHHost(
+  host: string,
+): Promise<{ maxSessions: number | null }> {
+  const res = await apiFetch(
+    `${API_BASE}/ssh/audit?host=${encodeURIComponent(host)}`,
+  )
+  if (!res.ok) return { maxSessions: null }
+  return res.json()
+}
+
+export async function fixSSHMaxSessions(
+  host: string,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await apiFetch(`${API_BASE}/ssh/fix-max-sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ host }),
+  })
+  return res.json()
+}
+
 export async function getGitHubRepos(query?: string): Promise<string[]> {
   const params = query ? `?q=${encodeURIComponent(query)}` : ''
   const res = await apiFetch(`${API_BASE}/github/repos${params}`)
@@ -153,6 +174,22 @@ export async function cancelWorkspace(terminalId: number): Promise<void> {
     },
   )
   if (!res.ok) throw new Error('Failed to cancel')
+}
+
+export async function rerunSetup(terminalId: number): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/rerun-setup`,
+    { method: 'POST' },
+  )
+  if (!res.ok) throw new Error('Failed to rerun setup')
+}
+
+export async function clearSetupError(terminalId: number): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE}/terminals/${terminalId}/clear-setup-error`,
+    { method: 'POST' },
+  )
+  if (!res.ok) throw new Error('Failed to clear error')
 }
 
 export async function browseFolder(): Promise<string | null> {

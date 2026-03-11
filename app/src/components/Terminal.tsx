@@ -33,9 +33,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const isMobile = useIsMobile()
   const terminal = terminals.find((t) => t.id === terminalId)
   const isCloning = terminal?.git_repo?.status === 'setup'
-  const isSettingUp = terminal?.setup?.status === 'setup'
-  const isDeleting = terminal?.setup?.status === 'delete'
-  const isBusy = isCloning || isSettingUp || isDeleting
+  const isBusy = isCloning
   const isBusyRef = useRef(isBusy)
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTerm | null>(null)

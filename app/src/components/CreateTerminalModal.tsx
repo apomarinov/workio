@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Check,
   ChevronsUpDown,
   CircleX,
@@ -41,7 +42,9 @@ import { cn } from '@/lib/utils'
 import { useTerminalContext } from '../context/TerminalContext'
 import { useSettings } from '../hooks/useSettings'
 import {
+  auditSSHHost,
   checkConductor,
+  fixSSHMaxSessions,
   getGitHubRepos,
   getSSHHosts,
   type SSHHostEntry,
@@ -126,6 +129,9 @@ export function CreateTerminalModal({
   const [creating, setCreating] = useState(false)
   const [hosts, setHosts] = useState<SSHHostEntry[]>([])
   const [loadingHosts, setLoadingHosts] = useState(false)
+  const [sshMaxSessions, setSSHMaxSessions] = useState<number | null>(null)
+  const [auditingSSH, setAuditingSSH] = useState(false)
+  const [fixingSSH, setFixingSSH] = useState(false)
 
   // Repo picker state
   const [repoPickerOpen, setRepoPickerOpen] = useState(false)
@@ -209,6 +215,9 @@ export function CreateTerminalModal({
       setCheckingConductor(false)
       setSetupScript('')
       setDeleteScript('')
+      setSSHMaxSessions(null)
+      setAuditingSSH(false)
+      setFixingSSH(false)
       setRepos([])
       setRepoSearch('')
       fetchedQueriesRef.current.clear()
@@ -313,10 +322,18 @@ export function CreateTerminalModal({
               onValueChange={(v) => {
                 if (v === 'none') {
                   setSSHHost('')
+                  setSSHMaxSessions(null)
+                  setAuditingSSH(false)
                   return
                 }
                 setCwd('')
                 setSSHHost(v)
+                setSSHMaxSessions(null)
+                setAuditingSSH(true)
+                auditSSHHost(v)
+                  .then((r) => setSSHMaxSessions(r.maxSessions))
+                  .catch(() => setSSHMaxSessions(null))
+                  .finally(() => setAuditingSSH(false))
               }}
             >
               <SelectTrigger
@@ -345,6 +362,64 @@ export function CreateTerminalModal({
             <p className="text-xs text-muted-foreground">
               Hosts from ~/.ssh/config
             </p>
+            {auditingSSH && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Checking MaxSessions...
+              </div>
+            )}
+            {!auditingSSH &&
+              sshMaxSessions !== null &&
+              sshMaxSessions <= 10 && (
+                <div className="flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 mt-1">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div className="flex-1 text-xs">
+                    <span className="text-amber-500 font-medium">
+                      MaxSessions is {sshMaxSessions} (default).
+                    </span>{' '}
+                    <span className="text-muted-foreground">
+                      Bump to 64 for better performance.
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={fixingSSH}
+                    className="h-6 px-2 text-xs shrink-0"
+                    onClick={() => {
+                      setFixingSSH(true)
+                      fixSSHMaxSessions(sshHost)
+                        .then((r) => {
+                          if (r.success) {
+                            toast.success('MaxSessions updated to 64')
+                            setAuditingSSH(true)
+                            auditSSHHost(sshHost)
+                              .then((a) => setSSHMaxSessions(a.maxSessions))
+                              .catch(() => setSSHMaxSessions(null))
+                              .finally(() => setAuditingSSH(false))
+                          } else {
+                            toast.error(r.error || 'Failed to fix MaxSessions')
+                          }
+                        })
+                        .catch((err) =>
+                          toast.error(
+                            err instanceof Error
+                              ? err.message
+                              : 'Failed to fix MaxSessions',
+                          ),
+                        )
+                        .finally(() => setFixingSSH(false))
+                    }}
+                  >
+                    {fixingSSH ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      'Fix'
+                    )}
+                  </Button>
+                </div>
+              )}
           </div>
 
           <div className="border-t-[1px] space-y-2 pt-2">
