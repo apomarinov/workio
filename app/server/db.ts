@@ -920,6 +920,7 @@ const DEFAULT_CONFIG = {
   message_line_clamp: 5,
   preferred_ide: 'cursor' as const,
   keymap: DEFAULT_KEYMAP,
+  ignore_external_sessions: false,
 }
 
 export async function getSettings(): Promise<Settings> {

@@ -4,6 +4,7 @@ import {
   Bell,
   Brain,
   Code,
+  EyeOff,
   Keyboard,
   Smartphone,
   Type,
@@ -55,6 +56,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [showThinking, setShowThinking] = useState(false)
   const [showTools, setShowTools] = useState(true)
   const [showToolOutput, setShowToolOutput] = useState(false)
+  const [ignoreExternalSessions, setIgnoreExternalSessions] = useState(false)
   const [messageLineClamp, setMessageLineClamp] = useState<string>('5')
   const [preferredIDE, setPreferredIDE] = useState<PreferredIDE>('cursor')
   const [saving, setSaving] = useState(false)
@@ -90,6 +92,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       setShowThinking(settings.show_thinking)
       setShowTools(settings.show_tools)
       setShowToolOutput(settings.show_tool_output)
+      setIgnoreExternalSessions(settings.ignore_external_sessions ?? false)
       setMessageLineClamp(settings.message_line_clamp.toString())
       setPreferredIDE(settings.preferred_ide)
     }
@@ -113,6 +116,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         show_thinking: showThinking,
         show_tools: showTools,
         show_tool_output: showTools ? showToolOutput : false,
+        ignore_external_sessions: ignoreExternalSessions,
         message_line_clamp: lineClampValue,
         preferred_ide: preferredIDE,
       })
@@ -432,6 +436,28 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 />
               </div>
             )}
+
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  <label
+                    htmlFor="ignore_external_sessions"
+                    className="text-sm font-medium"
+                  >
+                    Ignore external sessions
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                  Skip sessions launched outside WorkIO terminals
+                </p>
+              </div>
+              <Switch
+                id="ignore_external_sessions"
+                checked={ignoreExternalSessions}
+                onCheckedChange={setIgnoreExternalSessions}
+              />
+            </div>
 
             <BackfillSection />
           </div>

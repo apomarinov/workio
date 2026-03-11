@@ -586,6 +586,7 @@ export interface Settings {
   shell_order?: Record<number, number[]>
   starred_branches?: Record<string, string[]>
   statusBar?: StatusBarConfig
+  ignore_external_sessions?: boolean
   // Push notification settings
   vapid_public_key?: string
   vapid_private_key?: string

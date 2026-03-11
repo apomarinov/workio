@@ -349,6 +349,16 @@ def upsert_todo_message(
     return new_id, todo_hash, True, False
 
 
+def get_ignore_external_sessions(conn) -> bool:
+    """Check if external sessions (not launched from WorkIO) should be ignored."""
+    cur = get_cursor(conn)
+    cur.execute("SELECT config->>'ignore_external_sessions' AS val FROM settings WHERE id = 1")
+    row = cur.fetchone()
+    if row and row['val']:
+        return row['val'].lower() == 'true'
+    return False
+
+
 def get_latest_user_message(conn, prompt_id: int):
     """Get the latest user message for a prompt."""
     cur = get_cursor(conn)
