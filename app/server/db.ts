@@ -785,7 +785,7 @@ export async function updateTerminal(
         await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
         await fs.promises.writeFile(
           path.join(WORKIO_TERMINALS_DIR, String(id)),
-          newName,
+          newName.replace(/\//g, '-'),
         )
       } catch (err) {
         log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
@@ -804,6 +804,18 @@ export async function updateTerminal(
           // Session might not exist or not be running, that's ok - silently ignore errors
         },
       )
+    }
+    // Also write name file on remote host for SSH terminals (fire-and-forget)
+    const terminal = await getTerminalById(id)
+    if (terminal?.ssh_host) {
+      import('./ssh/pool').then(({ poolExecSSHCommand }) => {
+        const escaped = newName.replace(/\//g, '-').replace(/'/g, "'\\''")
+        poolExecSSHCommand(
+          terminal.ssh_host!,
+          `mkdir -p ~/.workio/terminals && printf '%s' '${escaped}' > ~/.workio/terminals/${id}`,
+          { timeout: 5000 },
+        ).catch(() => {})
+      })
     }
   }
 

@@ -481,6 +481,19 @@ export async function createSession(
   writeTerminalNameFile(terminalId, terminalName)
   writeShellNameFile(shellId, shellRecord.name)
 
+  // Also write name files on the remote host for SSH terminals (fire-and-forget)
+  if (terminal.ssh_host) {
+    import('../ssh/pool').then(({ poolExecSSHCommand }) => {
+      const tn = terminalName.replace(/\//g, '-').replace(/'/g, "'\\''")
+      const sn = shellRecord.name.replace(/\//g, '-').replace(/'/g, "'\\''")
+      poolExecSSHCommand(
+        terminal.ssh_host!,
+        `mkdir -p ~/.workio/terminals ~/.workio/shells && printf '%s' '${tn}' > ~/.workio/terminals/${terminalId} && printf '%s' '${sn}' > ~/.workio/shells/${shellId}`,
+        { timeout: 5000 },
+      ).catch(() => {})
+    })
+  }
+
   // Flush any pending command queued before the worker was ready
   const pending = flushPendingCommand(shellId)
   if (pending) {

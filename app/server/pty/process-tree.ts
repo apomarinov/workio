@@ -524,6 +524,94 @@ export function getRemoteDescendantPids(
   return descendants
 }
 
+/**
+ * Find the Zellij server PID associated with a remote shell.
+ * The user launches `zellij` from remotePid's shell, so the client is a
+ * descendant of remotePid. The server is a daemon (ppid=1). We walk down
+ * from remotePid to find the client, then locate the server.
+ * Pure computation, no I/O.
+ */
+export function findRemoteZellijServerPid(
+  processes: RemoteProcessInfo[],
+  remotePid: number,
+): number | null {
+  // Check descendants of remotePid for a zellij client
+  const descendants = getRemoteDescendantPids(processes, remotePid)
+  let foundClient = false
+  for (const pid of descendants) {
+    const proc = processes.find((p) => p.pid === pid)
+    if (!proc) continue
+    const basename = proc.comm.split('/').pop() || proc.comm
+    if (basename === 'zellij') {
+      foundClient = true
+      // If this is the server itself (ppid=1), return directly
+      if (proc.ppid === 1) return proc.pid
+      break
+    }
+  }
+
+  if (!foundClient) return null
+
+  // Found a client — find the server(s) (zellij with ppid=1)
+  const servers: number[] = []
+  for (const p of processes) {
+    const b = p.comm.split('/').pop() || p.comm
+    if (b === 'zellij' && p.ppid === 1) servers.push(p.pid)
+  }
+  // Only return if exactly one server — can't disambiguate multiple
+  return servers.length === 1 ? servers[0] : null
+}
+
+/**
+ * Get running commands in all panes of a remote Zellij session.
+ * Pure computation on already-fetched remote process data — zero SSH calls.
+ */
+export function getRemoteZellijSessionProcesses(
+  processes: RemoteProcessInfo[],
+  remotePid: number,
+  terminalId?: number,
+): ZellijPaneProcess[] {
+  const serverPid = findRemoteZellijServerPid(processes, remotePid)
+  if (!serverPid) return []
+
+  const results: ZellijPaneProcess[] = []
+
+  // Get direct children of server (pane shells)
+  const paneShells = processes.filter((p) => p.ppid === serverPid)
+
+  for (const shell of paneShells) {
+    const children = processes.filter((p) => p.ppid === shell.pid)
+
+    if (children.length > 0) {
+      // Pane shell has children — those are the actual commands
+      for (const child of children) {
+        const basename = child.comm.split('/').pop() || child.comm
+        if (!shouldIgnoreProcess(basename)) {
+          results.push({
+            pid: child.pid,
+            command: child.comm,
+            isIdle: false,
+            terminalId,
+          })
+        }
+      }
+    } else {
+      // No children — auto-started command via zellij layout `command` directive
+      const basename = shell.comm.split('/').pop() || shell.comm
+      if (!shouldIgnoreProcess(basename)) {
+        results.push({
+          pid: shell.pid,
+          command: shell.comm,
+          isIdle: false,
+          terminalId,
+        })
+      }
+    }
+  }
+
+  return results
+}
+
 export async function getChildProcesses(
   shellPid: number,
   terminalId?: number,

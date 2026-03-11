@@ -159,6 +159,9 @@ async function init(config: WorkerInitConfig) {
   // Inject shell integration
   if (config.sshHost && config.sshInlineScript) {
     setTimeout(() => {
+      backend?.write(
+        `export WORKIO_TERMINAL_ID=${config.terminalId} WORKIO_SHELL_ID=${shellId}\n`,
+      )
       const injection = `eval "$(cat <<'__SHELL_INTEGRATION_EOF__'\n${config.sshInlineScript}\n__SHELL_INTEGRATION_EOF__\n)"\n`
       backend?.write(injection)
       if (config.cwd && config.cwd !== '~') {

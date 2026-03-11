@@ -28,6 +28,7 @@ import { closeConnection } from '../ssh/pool'
 import { emitWorkspace } from '../workspace/setup'
 import type { CommandEvent } from './osc-parser'
 import {
+  findRemoteZellijServerPid,
   getActiveZellijSessionNames,
   getChildPids,
   getDescendantPids,
@@ -35,6 +36,7 @@ import {
   getProcessComm,
   getRemoteDescendantPids,
   getRemoteProcessList,
+  getRemoteZellijSessionProcesses,
   getSystemListeningPorts,
   getSystemResourceUsage,
   getZellijSessionProcesses,
@@ -259,8 +261,8 @@ async function getProcessesForTerminal(
       })
     }
 
-    // Skip zellij scanning for SSH terminals (no local PID)
     if (session.pty.pid > 0) {
+      // Local zellij scanning
       let zellijProcs = await getZellijSessionProcesses(
         session.sessionName,
         terminalId,
@@ -279,6 +281,23 @@ async function getProcessesForTerminal(
           )
         }
       }
+      for (const p of zellijProcs.filter((p) => !p.isIdle)) {
+        processes.push({
+          pid: p.pid,
+          name: p.command.split(' ')[0] || '',
+          command: p.command,
+          terminalId: p.terminalId,
+          shellId: session.shell.id,
+          source: 'zellij',
+        })
+      }
+    } else if (session.remotePid > 0 && remoteProcs) {
+      // Remote zellij scanning via already-fetched process data
+      const zellijProcs = getRemoteZellijSessionProcesses(
+        remoteProcs,
+        session.remotePid,
+        terminalId,
+      )
       for (const p of zellijProcs.filter((p) => !p.isIdle)) {
         processes.push({
           pid: p.pid,
@@ -451,6 +470,7 @@ async function scanWorkers(handles: WorkerHandle[]) {
     resourceUsage,
     systemCpu,
     systemRss,
+    remoteProcesses,
   }
 }
 
@@ -472,14 +492,17 @@ async function scanAndEmitAllProcesses() {
   const handles = [...workers.values()]
   const result = await scanWorkers(handles)
 
-  // Check for active zellij sessions
+  // Check for active zellij sessions (local)
   try {
     const zellijSessions = await getActiveZellijSessionNames()
     if (zellijSessions.size > 0) {
       const sessionTerminalIds = new Set<number>()
       for (const h of workers.values()) {
         sessionTerminalIds.add(h.terminalId)
-        if (zellijSessions.has(h.sessionName)) {
+        if (
+          zellijSessions.has(h.sessionName) ||
+          zellijSessions.has(h.sessionName.replace(/\//g, '-'))
+        ) {
           result.processes.push({
             pid: 0,
             name: 'zellij',
@@ -495,7 +518,10 @@ async function scanAndEmitAllProcesses() {
       for (const terminal of terminals) {
         if (sessionTerminalIds.has(terminal.id)) continue
         const terminalName = terminal.name || `terminal-${terminal.id}`
-        if (zellijSessions.has(terminalName)) {
+        if (
+          zellijSessions.has(terminalName) ||
+          zellijSessions.has(terminalName.replace(/\//g, '-'))
+        ) {
           result.processes.push({
             pid: 0,
             name: 'zellij',
@@ -509,6 +535,27 @@ async function scanAndEmitAllProcesses() {
     }
   } catch (err) {
     log.error({ err }, '[pty] Failed to detect zellij sessions')
+  }
+
+  // Check for active zellij sessions (remote SSH)
+  for (const h of workers.values()) {
+    if (h.sshHost && h.remotePid > 0) {
+      const hostProcs = result.remoteProcesses.get(h.sshHost)
+      if (hostProcs) {
+        const serverPid = findRemoteZellijServerPid(hostProcs, h.remotePid)
+        if (serverPid) {
+          result.processes.push({
+            pid: 0,
+            name: 'zellij',
+            command: 'zellij',
+            terminalId: h.terminalId,
+            shellId: h.shell.id,
+            source: 'zellij',
+            isZellij: true,
+          })
+        }
+      }
+    }
   }
 
   getIO()?.emit('processes', {
@@ -1179,7 +1226,7 @@ export async function writeTerminalNameFile(
     await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
     await fs.promises.writeFile(
       path.join(WORKIO_TERMINALS_DIR, String(terminalId)),
-      name,
+      name.replace(/\//g, '-'),
     )
   } catch (err) {
     log.error(
@@ -1197,7 +1244,7 @@ export async function writeShellNameFile(
     await fs.promises.mkdir(WORKIO_SHELLS_DIR, { recursive: true })
     await fs.promises.writeFile(
       path.join(WORKIO_SHELLS_DIR, String(shellId)),
-      name,
+      name.replace(/\//g, '-'),
     )
   } catch (err) {
     log.error({ err }, `[pty] Failed to write shell name file for ${shellId}`)

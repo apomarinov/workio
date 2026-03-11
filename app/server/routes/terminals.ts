@@ -3220,6 +3220,16 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       updateSessionName(id, newSessionName)
       writeShellNameFile(id, trimmedName)
 
+      // Also write on remote host for SSH terminals (fire-and-forget)
+      if (terminal.ssh_host) {
+        const sn = trimmedName.replace(/\//g, '-').replace(/'/g, "'\\''")
+        execSSHCommand(
+          terminal.ssh_host,
+          `mkdir -p ~/.workio/shells && printf '%s' '${sn}' > ~/.workio/shells/${id}`,
+          { timeout: 5000 },
+        ).catch(() => {})
+      }
+
       return reply.send(updated)
     },
   )
