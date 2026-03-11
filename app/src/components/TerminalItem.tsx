@@ -8,9 +8,16 @@ import {
   Globe,
   MoreVertical,
   Pin,
+  RotateCw,
+  X,
 } from 'lucide-react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
 import {
   Tooltip,
@@ -22,7 +29,7 @@ import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
-import { cancelWorkspace } from '@/lib/api'
+import { cancelWorkspace, clearSetupError, rerunSetup } from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import { useProcessContext } from '../context/ProcessContext'
@@ -366,9 +373,47 @@ export const TerminalItem = memo(function TerminalItem({
         )}
       </div>
       {terminal.setup?.status === 'failed' && (
-        <div className="ml-5 text-[11px] text-destructive break-all">
-          {terminal.setup.error}
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="ml-5 text-[11px] text-destructive break-all text-left hover:underline cursor-pointer"
+            >
+              {terminal.setup.error}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="bottom"
+            align="start"
+            className="w-auto p-1 flex flex-col gap-0.5"
+          >
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer"
+              onClick={() => {
+                rerunSetup(terminal.id).catch(() =>
+                  toast.error('Failed to rerun setup'),
+                )
+              }}
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              Rerun Setup
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer"
+              onClick={() => {
+                clearSetupError(terminal.id).catch(() =>
+                  toast.error('Failed to clear error'),
+                )
+              }}
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Error
+            </button>
+          </PopoverContent>
+        </Popover>
       )}
       {terminal.git_repo?.status === 'failed' && (
         <div className="ml-5 text-[11px] text-destructive break-all">

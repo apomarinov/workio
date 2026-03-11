@@ -122,6 +122,9 @@ async function init(config: WorkerInitConfig) {
         case 'command_end':
           send({ type: 'command-event', event })
           break
+        case 'remote_pid':
+          send({ type: 'command-event', event })
+          break
       }
     },
     // Bell callback — ID by buffer chunk position

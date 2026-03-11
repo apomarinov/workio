@@ -45,6 +45,9 @@ export interface WorkerHandle {
   process: ChildProcess
   ready: boolean
   ptyPid: number
+  // SSH-specific fields
+  sshHost: string | null // SSH host alias, null for local
+  remotePid: number // Remote shell PID from OSC, 0 for local
   // Callbacks registered by terminal.ts
   onData: ((data: string) => void) | null
   onExit: ((code: number) => void) | null
@@ -395,6 +398,8 @@ export async function createSession(
     process: child,
     ready: false,
     ptyPid: 0,
+    sshHost: terminal.ssh_host || null,
+    remotePid: 0,
     onData,
     onExit,
     onCommandEvent: onCommandEvent || null,
@@ -746,13 +751,15 @@ export function waitForSession(
   timeoutMs: number,
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    if (workers.has(shellId)) {
+    const handle = workers.get(shellId)
+    if (handle?.ready) {
       resolve(true)
       return
     }
     const start = Date.now()
     const interval = setInterval(() => {
-      if (workers.has(shellId)) {
+      const h = workers.get(shellId)
+      if (h?.ready) {
         clearInterval(interval)
         resolve(true)
         return

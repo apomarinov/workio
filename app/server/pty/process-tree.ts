@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import { promisify } from 'node:util'
 import type { ActiveProcess } from '../../shared/types'
 import { log } from '../logger'
+import { poolExecSSHCommand } from '../ssh/pool'
 
 const execFileAsync = promisify(execFileCb)
 
@@ -439,6 +440,88 @@ export async function getActiveZellijSessionNames(): Promise<Set<string>> {
   } catch {
     return new Set()
   }
+}
+
+// ── Remote process scanning (SSH) ──────────────────────────────────
+
+export interface RemoteProcessInfo {
+  pid: number
+  ppid: number
+  rss: number
+  cpu: number
+  comm: string
+}
+
+/**
+ * Run a single `ps` on a remote host via pooled SSH connection.
+ * Returns all processes with pid, ppid, rss, cpu%, and command name.
+ */
+export async function getRemoteProcessList(
+  sshHost: string,
+): Promise<RemoteProcessInfo[]> {
+  const processes: RemoteProcessInfo[] = []
+  try {
+    const { stdout } = await poolExecSSHCommand(
+      sshHost,
+      'ps -axo pid=,ppid=,rss=,%cpu=,comm=',
+      { timeout: 5000 },
+    )
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      const parts = trimmed.split(/\s+/)
+      if (parts.length < 5) continue
+      const pid = Number.parseInt(parts[0], 10)
+      const ppid = Number.parseInt(parts[1], 10)
+      const rss = Number.parseInt(parts[2], 10)
+      const cpu = Number.parseFloat(parts[3])
+      const comm = parts.slice(4).join(' ')
+      if (pid > 0) {
+        processes.push({ pid, ppid, rss, cpu, comm })
+      }
+    }
+  } catch (err) {
+    log.error(
+      { err },
+      `[pty] Failed to get remote process list from ${sshHost}`,
+    )
+  }
+  return processes
+}
+
+/**
+ * Walk the ppid tree from rootPid to find all descendant PIDs.
+ * Pure computation — no I/O.
+ */
+export function getRemoteDescendantPids(
+  processes: RemoteProcessInfo[],
+  rootPid: number,
+): Set<number> {
+  // Build ppid → children lookup
+  const childrenMap = new Map<number, number[]>()
+  for (const p of processes) {
+    const existing = childrenMap.get(p.ppid)
+    if (existing) {
+      existing.push(p.pid)
+    } else {
+      childrenMap.set(p.ppid, [p.pid])
+    }
+  }
+
+  const descendants = new Set<number>()
+  const queue = childrenMap.get(rootPid) || []
+  while (queue.length > 0) {
+    const pid = queue.pop()!
+    if (descendants.has(pid)) continue
+    descendants.add(pid)
+    const children = childrenMap.get(pid)
+    if (children) {
+      for (const child of children) {
+        queue.push(child)
+      }
+    }
+  }
+  return descendants
 }
 
 export async function getChildProcesses(

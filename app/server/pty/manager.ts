@@ -24,6 +24,7 @@ import { getIO } from '../io'
 import { log } from '../logger'
 import { sendPushNotification } from '../push'
 import { execSSHCommand } from '../ssh/exec'
+import { closeConnection } from '../ssh/pool'
 import { emitWorkspace } from '../workspace/setup'
 import type { CommandEvent } from './osc-parser'
 import {
@@ -32,9 +33,12 @@ import {
   getDescendantPids,
   getListeningPortsForTerminal,
   getProcessComm,
+  getRemoteDescendantPids,
+  getRemoteProcessList,
   getSystemListeningPorts,
   getSystemResourceUsage,
   getZellijSessionProcesses,
+  type RemoteProcessInfo,
 } from './process-tree'
 import {
   getAllWorkers,
@@ -188,11 +192,13 @@ interface ProcessScanSession {
   pty: { pid: number }
   sessionName: string
   shell: { id: number; name: string }
+  remotePid: number
 }
 
 async function getProcessesForTerminal(
   terminalId: number,
   session: ProcessScanSession,
+  remoteProcs?: RemoteProcessInfo[],
 ): Promise<ActiveProcess[]> {
   const processes: ActiveProcess[] = []
 
@@ -225,6 +231,23 @@ async function getProcessesForTerminal(
         } catch {
           // Fall back to pid 0
         }
+      } else if (session.remotePid > 0 && remoteProcs) {
+        // SSH terminal: find direct process via remote process tree
+        const descendants = getRemoteDescendantPids(
+          remoteProcs,
+          session.remotePid,
+        )
+        const cmdName = session.currentCommand.split(' ')[0] || ''
+        for (const desc of descendants) {
+          const proc = remoteProcs.find((p) => p.pid === desc)
+          if (proc) {
+            const basename = proc.comm.split('/').pop() || proc.comm
+            if (basename === cmdName || proc.comm === cmdName) {
+              directPid = proc.pid
+              break
+            }
+          }
+        }
       }
       processes.push({
         pid: directPid,
@@ -236,33 +259,39 @@ async function getProcessesForTerminal(
       })
     }
 
-    let zellijProcs = await getZellijSessionProcesses(
-      session.sessionName,
-      terminalId,
-    )
-    if (zellijProcs.length === 0) {
-      const terminal = await getTerminalById(terminalId)
-      const currentName = terminal?.name || `terminal-${terminalId}`
-      const expectedName =
-        session.shell.name === 'main'
-          ? currentName
-          : `${currentName}-${session.shell.name}`
-      if (expectedName !== session.sessionName) {
-        zellijProcs = await getZellijSessionProcesses(expectedName, terminalId)
+    // Skip zellij scanning for SSH terminals (no local PID)
+    if (session.pty.pid > 0) {
+      let zellijProcs = await getZellijSessionProcesses(
+        session.sessionName,
+        terminalId,
+      )
+      if (zellijProcs.length === 0) {
+        const terminal = await getTerminalById(terminalId)
+        const currentName = terminal?.name || `terminal-${terminalId}`
+        const expectedName =
+          session.shell.name === 'main'
+            ? currentName
+            : `${currentName}-${session.shell.name}`
+        if (expectedName !== session.sessionName) {
+          zellijProcs = await getZellijSessionProcesses(
+            expectedName,
+            terminalId,
+          )
+        }
+      }
+      for (const p of zellijProcs.filter((p) => !p.isIdle)) {
+        processes.push({
+          pid: p.pid,
+          name: p.command.split(' ')[0] || '',
+          command: p.command,
+          terminalId: p.terminalId,
+          shellId: session.shell.id,
+          source: 'zellij',
+        })
       }
     }
-    for (const p of zellijProcs.filter((p) => !p.isIdle)) {
-      processes.push({
-        pid: p.pid,
-        name: p.command.split(' ')[0] || '',
-        command: p.command,
-        terminalId: p.terminalId,
-        shellId: session.shell.id,
-        source: 'zellij',
-      })
-    }
   } catch (err) {
-    log.error({ err }, '[pty] Failed to get zellij processes')
+    log.error({ err }, '[pty] Failed to get processes for terminal')
   }
 
   return processes
@@ -281,9 +310,24 @@ async function getPortsForTerminal(
 
 async function scanWorkers(handles: WorkerHandle[]) {
   const allProcesses: ActiveProcess[] = []
+
+  // Batch remote ps per SSH host (before per-handle loop)
+  const remoteHosts = new Set<string>()
+  for (const h of handles) {
+    if (h.sshHost && h.remotePid > 0) {
+      remoteHosts.add(h.sshHost)
+    }
+  }
+  const remoteProcesses = new Map<string, RemoteProcessInfo[]>()
+  const remotePromises = [...remoteHosts].map(async (host) => {
+    const procs = await getRemoteProcessList(host)
+    remoteProcesses.set(host, procs)
+  })
+
   const [systemPorts, systemResources] = await Promise.all([
     getSystemListeningPorts(),
     getSystemResourceUsage(),
+    ...remotePromises,
   ])
   const terminalPorts: Record<number, number[]> = {}
   const shellPorts: Record<number, number[]> = {}
@@ -296,9 +340,11 @@ async function scanWorkers(handles: WorkerHandle[]) {
         pty: { pid: h.ptyPid },
         sessionName: h.sessionName,
         shell: h.shell,
+        remotePid: h.remotePid,
       }
+      const hostProcs = h.sshHost ? remoteProcesses.get(h.sshHost) : undefined
       const [procs, ports] = await Promise.all([
-        getProcessesForTerminal(h.terminalId, session),
+        getProcessesForTerminal(h.terminalId, session, hostProcs),
         getPortsForTerminal(session, systemPorts),
       ])
       allProcesses.push(...procs)
@@ -331,6 +377,26 @@ async function scanWorkers(handles: WorkerHandle[]) {
           cpu: Math.round(cpu * 10) / 10,
           pidCount,
         }
+      } else if (h.sshHost && h.remotePid > 0 && hostProcs) {
+        // Remote resource usage from already-fetched process data
+        const descendants = getRemoteDescendantPids(hostProcs, h.remotePid)
+        descendants.add(h.remotePid)
+        let rss = 0
+        let cpu = 0
+        let pidCount = 0
+        for (const desc of descendants) {
+          const proc = hostProcs.find((p) => p.pid === desc)
+          if (proc) {
+            rss += proc.rss
+            cpu += proc.cpu
+            pidCount++
+          }
+        }
+        resourceUsage[h.shell.id] = {
+          rss,
+          cpu: Math.round(cpu * 10) / 10,
+          pidCount,
+        }
       }
 
       // Clear stale active_cmd if no actual process found after multiple scans
@@ -343,8 +409,14 @@ async function scanWorkers(handles: WorkerHandle[]) {
             `[pty] t=${h.terminalId} s=${h.shell.id} stale scan ${h.staleScanCount}/3 for "${h.currentCommand}"`,
           )
           if (h.staleScanCount >= 3) {
-            const shellAlive =
-              h.ptyPid > 0 && (await getProcessComm(h.ptyPid)) !== null
+            let shellAlive = false
+            if (h.ptyPid > 0) {
+              shellAlive = (await getProcessComm(h.ptyPid)) !== null
+            } else if (h.sshHost && h.remotePid > 0) {
+              // Check if remote shell PID exists in already-fetched data
+              shellAlive =
+                hostProcs?.some((p) => p.pid === h.remotePid) ?? false
+            }
             if (shellAlive) {
               h.staleScanCount = 0
             } else {
@@ -363,7 +435,7 @@ async function scanWorkers(handles: WorkerHandle[]) {
 
   stampProcessStartTimes(allProcesses)
 
-  // Compute total system resource usage from all processes
+  // Compute total system resource usage from all local processes only
   let systemCpu = 0
   let systemRss = 0
   for (const { rss, cpu } of systemResources.values()) {
@@ -1159,6 +1231,8 @@ export function destroySession(shellId: number): boolean {
 export function destroySessionsForTerminal(terminalId: number): boolean {
   // Get the shell IDs before destroying so we can clean up bell subs
   const handles = getWorkersForTerminal(terminalId)
+  // Check if this terminal's SSH host is used by other terminals
+  const sshHost = handles.find((h) => h.sshHost)?.sshHost
   const result = proxyDestroySessionsForTerminal(terminalId)
   if (result) {
     for (const h of handles) {
@@ -1168,6 +1242,17 @@ export function destroySessionsForTerminal(terminalId: number): boolean {
     lastRemoteSyncStatus.delete(terminalId)
     stopGlobalProcessPolling()
     untrackTerminal(terminalId)
+
+    // Close SSH pool connection if no other terminals use the same host
+    if (sshHost) {
+      const allWorkers = getAllWorkers()
+      const otherUsesHost = [...allWorkers.values()].some(
+        (w) => w.sshHost === sshHost,
+      )
+      if (!otherUsesHost) {
+        closeConnection(sshHost)
+      }
+    }
   }
   return result
 }
@@ -1247,6 +1332,15 @@ function handleWorkerCommandEvent(
       }
       break
     }
+
+    case 'remote_pid':
+      if (event.remotePid && event.remotePid > 0) {
+        handle.remotePid = event.remotePid
+        log.info(
+          `[pty] t=${terminalId} s=${shellId} Remote PID: ${event.remotePid}`,
+        )
+      }
+      break
 
     case 'done_marker':
       // done_marker is handled by the proxy's onDoneMarker callback

@@ -6,6 +6,9 @@
 [ -n "$__TERMINAL_INTEGRATION" ] && return 0 2>/dev/null
 __TERMINAL_INTEGRATION=1
 
+# Emit remote shell PID so the server can track processes on this host
+printf '\e]133;P;%d\e\\' "$$"
+
 # OSC 133 sequences:
 # A - Prompt start (shell is idle, waiting for input)
 # C - Command start (user pressed enter, command about to run)

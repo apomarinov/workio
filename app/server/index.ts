@@ -82,6 +82,7 @@ import notificationRoutes from './routes/notifications'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
+import { closeAllConnections } from './ssh/pool'
 import { handleUpgrade } from './ws/terminal'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -1089,12 +1090,14 @@ function stopDaemon() {
 process.on('exit', stopDaemon)
 process.on('SIGTERM', () => {
   destroyAllSessions()
+  closeAllConnections()
   stopNgrok()
   stopDaemon()
   process.exit(0)
 })
 process.on('SIGINT', () => {
   destroyAllSessions()
+  closeAllConnections()
   stopNgrok()
   stopDaemon()
   process.exit(0)

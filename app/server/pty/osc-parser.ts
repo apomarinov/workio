@@ -2,9 +2,15 @@
 // Parses OSC escape sequences from terminal output to extract command events
 
 export interface CommandEvent {
-  type: 'prompt' | 'command_start' | 'command_end' | 'done_marker'
+  type:
+    | 'prompt'
+    | 'command_start'
+    | 'command_end'
+    | 'done_marker'
+    | 'remote_pid'
   command?: string // For command_start
   exitCode?: number // For command_end
+  remotePid?: number // For remote_pid
 }
 
 export type CommandEventCallback = (event: CommandEvent) => void
@@ -79,6 +85,7 @@ export function createOscParser(
         typeChar !== 'A' &&
         typeChar !== 'C' &&
         typeChar !== 'D' &&
+        typeChar !== 'P' &&
         typeChar !== 'Z'
       ) {
         pos = escPos + 1
@@ -143,6 +150,12 @@ export function createOscParser(
           onCommandEvent({
             type: 'command_end',
             exitCode: payload ? Number.parseInt(payload, 10) : 0,
+          })
+          break
+        case 'P':
+          onCommandEvent({
+            type: 'remote_pid',
+            remotePid: payload ? Number.parseInt(payload, 10) : 0,
           })
           break
         case 'Z':

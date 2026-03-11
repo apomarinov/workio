@@ -652,7 +652,13 @@ export async function setupTerminalWorkspace(
 
     // Auto-detect conductor.json if no setup was explicitly configured
     if (!setupObj) {
+      log.info(
+        `[workspace] t=${terminalId} Reading conductor.json from ${targetPath}`,
+      )
       const conductorConfig = await readConductorJson(targetPath, sshHost)
+      log.info(
+        `[workspace] t=${terminalId} conductor.json result: ${conductorConfig ? 'found' : 'not found'}`,
+      )
       if (conductorConfig) {
         setupObj = { conductor: true }
         const setupWithStatus = { ...setupObj, status: 'setup' as const }
@@ -668,36 +674,13 @@ export async function setupTerminalWorkspace(
 
     // Run setup script if configured — inject into PTY so output is visible
     if (setupObj) {
-      const { setupScript } = await resolveScripts(
+      await executeSetupScript(
+        terminalId,
         setupObj,
         targetPath,
         sshHost,
+        signal,
       )
-      if (setupScript) {
-        const setupCmd = `bash "${setupScript}"`
-        const mainShell = await getMainShellForTerminal(terminalId)
-        const shellId = mainShell?.id ?? 0
-        const hasSession = await waitForSession(shellId, 30_000)
-        if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
-        if (hasSession) {
-          writeToSession(
-            shellId,
-            `cd "${targetPath}" && bash "${setupScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
-          )
-          const exitCode = await waitForMarker(shellId)
-          if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
-          logCommand({
-            terminalId,
-            category: 'workspace',
-            command: setupCmd,
-            stderr: exitCode !== 0 ? `Exit code: ${exitCode}` : undefined,
-            failed: exitCode !== 0,
-          })
-          if (exitCode !== 0) {
-            throw new Error(`Setup script exited with code ${exitCode}`)
-          }
-        }
-      }
       const doneSetup = { ...setupObj, status: 'done' as const }
       await updateTerminal(terminalId, { setup: doneSetup })
       await emitWorkspace(terminalId, { name: terminalName, setup: doneSetup })
@@ -755,6 +738,124 @@ export async function setupTerminalWorkspace(
         setup: failedSetup,
       })
     }
+  } finally {
+    activeOperations.delete(terminalId)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Execute setup script helper (shared between initial setup and rerun)
+// ---------------------------------------------------------------------------
+
+async function executeSetupScript(
+  terminalId: number,
+  setupObj: SetupObj,
+  cwd: string,
+  sshHost: string | null,
+  signal: AbortSignal,
+): Promise<void> {
+  log.info(`[workspace] t=${terminalId} executeSetupScript: resolving scripts`)
+  const { setupScript } = await resolveScripts(setupObj, cwd, sshHost)
+  log.info(
+    `[workspace] t=${terminalId} executeSetupScript: setupScript=${setupScript}`,
+  )
+  if (!setupScript) return
+
+  const setupCmd = `bash "${setupScript}"`
+  const mainShell = await getMainShellForTerminal(terminalId)
+  const shellId = mainShell?.id ?? 0
+  log.info(
+    `[workspace] t=${terminalId} executeSetupScript: shellId=${shellId}, waiting for session`,
+  )
+  const hasSession = await waitForSession(shellId, 30_000)
+  log.info(
+    `[workspace] t=${terminalId} executeSetupScript: hasSession=${hasSession}`,
+  )
+  if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
+  if (hasSession) {
+    log.info(
+      `[workspace] t=${terminalId} executeSetupScript: writing setup command to shell ${shellId}`,
+    )
+    writeToSession(
+      shellId,
+      `cd "${cwd}" && bash "${setupScript}"; printf '\\e]133;Z;%d\\e\\\\' $?\n`,
+    )
+    log.info(
+      `[workspace] t=${terminalId} executeSetupScript: waiting for marker`,
+    )
+    const exitCode = await waitForMarker(shellId)
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
+    logCommand({
+      terminalId,
+      category: 'workspace',
+      command: setupCmd,
+      stderr: exitCode !== 0 ? `Exit code: ${exitCode}` : undefined,
+      failed: exitCode !== 0,
+    })
+    if (exitCode !== 0) {
+      throw new Error(`Setup script exited with code ${exitCode}`)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rerun setup script (fire-and-forget from route handler)
+// ---------------------------------------------------------------------------
+
+export async function rerunSetupScript(terminalId: number): Promise<void> {
+  const terminal = await getTerminalById(terminalId)
+  if (!terminal) return
+
+  const setupObj = terminal.setup as SetupObj | null
+  if (!setupObj) return
+
+  const sshHost = terminal.ssh_host ?? null
+  const cwd = terminal.cwd
+
+  const controller = new AbortController()
+  const { signal } = controller
+  activeOperations.set(terminalId, controller)
+
+  try {
+    // Mark as running setup
+    const runningSetup = {
+      ...setupObj,
+      status: 'setup' as const,
+      error: undefined,
+    }
+    await updateTerminal(terminalId, { setup: runningSetup })
+    await emitWorkspace(terminalId, {
+      name: terminal.name,
+      setup: runningSetup,
+    })
+
+    await executeSetupScript(terminalId, setupObj, cwd, sshHost, signal)
+
+    // Success
+    const doneSetup = { ...setupObj, status: 'done' as const }
+    await updateTerminal(terminalId, { setup: doneSetup })
+    await emitWorkspace(terminalId, { name: terminal.name, setup: doneSetup })
+  } catch (err) {
+    if (signal.aborted) {
+      // Cancelled — mark as done
+      log.info(`[workspace] Setup rerun cancelled for terminal ${terminalId}`)
+      const doneSetup = { ...setupObj, status: 'done' as const }
+      await updateTerminal(terminalId, { setup: doneSetup })
+      await emitWorkspace(terminalId, { name: terminal.name, setup: doneSetup })
+      return
+    }
+
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    log.error(
+      `[workspace] Setup rerun failed for terminal ${terminalId}: ${errorMsg}`,
+    )
+    const failedSetup = {
+      ...setupObj,
+      status: 'failed' as const,
+      error: errorMsg,
+    }
+    await updateTerminal(terminalId, { setup: failedSetup })
+    await emitWorkspace(terminalId, { name: terminal.name, setup: failedSetup })
   } finally {
     activeOperations.delete(terminalId)
   }
