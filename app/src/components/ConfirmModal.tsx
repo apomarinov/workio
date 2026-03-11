@@ -27,7 +27,7 @@ interface ConfirmModalProps {
   loading?: boolean
   onConfirm: () => void | Promise<void>
   onCancel: () => void
-  secondaryAction?: SecondaryAction
+  secondaryAction?: SecondaryAction | SecondaryAction[]
   children?: React.ReactNode
 }
 
@@ -47,8 +47,14 @@ export function ConfirmModal({
   const confirmedRef = useRef(false)
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
   const [internalLoading, setInternalLoading] = useState(false)
-  const [secondaryLoading, setSecondaryLoading] = useState(false)
-  const loading = externalLoading || internalLoading || secondaryLoading
+  const [secondaryLoading, setSecondaryLoading] = useState<number | null>(null)
+  const loading =
+    externalLoading || internalLoading || secondaryLoading !== null
+  const secondaryActions = secondaryAction
+    ? Array.isArray(secondaryAction)
+      ? secondaryAction
+      : [secondaryAction]
+    : []
 
   useEffect(() => {
     if (open) {
@@ -75,19 +81,20 @@ export function ConfirmModal({
     }
   }
 
-  const handleSecondary = async (e: React.MouseEvent) => {
+  const handleSecondary = async (e: React.MouseEvent, index: number) => {
     e.preventDefault()
-    if (!secondaryAction) return
+    const action = secondaryActions[index]
+    if (!action) return
     confirmedRef.current = true
-    const result = secondaryAction.onAction()
+    const result = action.onAction()
     if (result instanceof Promise) {
-      setSecondaryLoading(true)
+      setSecondaryLoading(index)
       try {
         await result
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Something went wrong')
       } finally {
-        setSecondaryLoading(false)
+        setSecondaryLoading(null)
         confirmedRef.current = false
       }
     }
@@ -114,19 +121,20 @@ export function ConfirmModal({
           <AlertDialogCancel disabled={loading}>
             {cancelLabel}
           </AlertDialogCancel>
-          {secondaryAction && (
+          {secondaryActions.map((action, i) => (
             <AlertDialogAction
-              onClick={handleSecondary}
+              key={action.label}
+              onClick={(e) => handleSecondary(e, i)}
               variant="outline"
               disabled={loading}
               autoFocus={false}
             >
-              {secondaryLoading && (
+              {secondaryLoading === i && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {secondaryAction.label}
+              {action.label}
             </AlertDialogAction>
-          )}
+          ))}
           <AlertDialogAction
             ref={confirmButtonRef}
             onClick={handleConfirm}

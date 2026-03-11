@@ -1398,16 +1398,26 @@ export function CommandPalette() {
             setRunConfirm(null)
             doRunInShell(terminalId, shellId, command)
           }}
-          secondaryAction={{
-            label: 'Run in New Shell',
-            onAction: async () => {
-              const { terminalId, command } = runConfirm
-              const shell = await createShellForTerminal(terminalId)
-              await refetch()
-              setRunConfirm(null)
-              doRunInShell(terminalId, shell.id, command)
+          secondaryAction={[
+            {
+              label: 'Run Anyway',
+              onAction: () => {
+                const { terminalId, shellId, command } = runConfirm
+                setRunConfirm(null)
+                doRunInShell(terminalId, shellId, command)
+              },
             },
-          }}
+            {
+              label: 'Run in New Shell',
+              onAction: async () => {
+                const { terminalId, command } = runConfirm
+                const shell = await createShellForTerminal(terminalId)
+                await refetch()
+                setRunConfirm(null)
+                doRunInShell(terminalId, shell.id, command)
+              },
+            },
+          ]}
           onCancel={() => setRunConfirm(null)}
         />
       )}

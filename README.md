@@ -78,6 +78,32 @@ Access everything with `Cmd+K` — multiple modes:
 - Edge swipe gesture to open/close sidebar
 - Installable as a PWA
 
+### Process & Port Detection
+
+**Local terminals:**
+- Uses `ps` to walk the process tree from the shell PID downward
+- Active command detected via OSC 133 shell integration sequences
+- Listening ports detected via `lsof` — matches ports to terminals by checking if the listening PID is a descendant of the shell
+- Resource usage (CPU/memory) aggregated from all descendant processes
+
+**SSH terminals:**
+- Fetches the full process list from each SSH host once per scan cycle via `ps` over SSH (batched per host — one SSH call regardless of how many shells are on that host)
+- Walks the remote process tree from the reported remote shell PID
+- Resource usage computed from the same fetched data
+- Port detection is local-only — listening ports on remote hosts are not detected
+
+**Zellij (local):**
+- Finds the Zellij server PID by matching unix socket paths via `lsof`
+- Gets direct children of the server (pane shells) and their children (running commands)
+- Matches sessions to terminals via `zellij list-sessions`
+
+**Zellij (SSH):**
+- Uses the already-fetched remote process list — zero extra SSH calls
+- Walks down from the remote shell PID to find the Zellij client process, then locates the Zellij server (daemonized, ppid=1) from the full process list
+- Gets pane processes the same way as local (server → pane shells → commands)
+- Session naming uses `wiosession` shell helper which reads from `~/.workio/terminals/` and `~/.workio/shells/` on the remote host (written automatically on session creation)
+- Limited to one Zellij server per SSH host — multiple concurrent Zellij servers on the same host cannot be disambiguated
+
 ### Zellij Integration
 - Copy to clipboard for multi-page selections in panes
 - Detect running processes in tabs
@@ -181,3 +207,9 @@ graph LR
 - **PTY workers** — one Node.js child process per shell, spawned via `fork()`. Each worker owns a `node-pty` instance (or SSH session), handles OSC parsing for command detection, maintains an output buffer, and communicates with the master over IPC.
 - **Python monitor daemon** listens for Claude Code hook events via a Unix socket, processes tool calls, and writes to PostgreSQL. The server is notified of changes via `NOTIFY`/`LISTEN`.
 - **ngrok tunnel** (optional) exposes a webhook endpoint for real-time GitHub PR updates.
+
+---
+
+## Platform Support
+
+WorkIO has been tested on **macOS** for local terminals and **Ubuntu (Linux)** for SSH remote terminals. Other platforms may work but are untested.
