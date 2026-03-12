@@ -1731,6 +1731,45 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           return { files }
         }
 
+        // When base is provided for SSH, diff between two refs remotely
+        if (base && terminal.ssh_host) {
+          // Fetch the relevant branches first
+          const parts = base.split('...')
+          const refs = parts
+            .map((p) => p.replace(/^origin\//, '').replace(/\^$/, ''))
+            .filter((r) => !/^[0-9a-f]{6,}$/i.test(r))
+          if (refs.length > 0) {
+            const refspecs = refs
+              .map((r) => `+refs/heads/${r}:refs/remotes/origin/${r}`)
+              .join(' ')
+            await execSSHCommand(
+              terminal.ssh_host,
+              `git fetch origin ${refspecs} 2>/dev/null || true`,
+              { cwd: terminal.cwd, timeout: 15000 },
+            )
+          }
+
+          const [numstatResult, nameStatusResult] = await Promise.all([
+            execSSHCommand(terminal.ssh_host, `git diff --numstat ${base}`, {
+              cwd: terminal.cwd,
+              timeout: 10000,
+            }),
+            execSSHCommand(
+              terminal.ssh_host,
+              `git diff --name-status ${base}`,
+              { cwd: terminal.cwd, timeout: 10000 },
+            ),
+          ])
+
+          const files = parseChangedFiles(
+            numstatResult.stdout,
+            nameStatusResult.stdout,
+            '',
+            '',
+          )
+          return { files }
+        }
+
         if (terminal.ssh_host) {
           const [
             numstatResult,
@@ -1884,6 +1923,21 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           )
         })
         return { diff }
+      }
+
+      // When base is provided for SSH, diff between two refs remotely
+      if (base && terminal.ssh_host) {
+        const escapedBase = base.replace(/'/g, "'\\''")
+        let cmd = `git diff -U${context} '${escapedBase}'`
+        if (filePath) {
+          const escapedPath = filePath.replace(/'/g, "'\\''")
+          cmd += ` -- '${escapedPath}'`
+        }
+        const result = await execSSHCommand(terminal.ssh_host, cmd, {
+          cwd: terminal.cwd,
+          timeout: 10000,
+        })
+        return { diff: result.stdout }
       }
 
       if (terminal.ssh_host) {
@@ -3514,17 +3568,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return { commits: [], noRemote: true }
       }
 
-      const gitArgs = [
-        'log',
-        '--format=%H|%s|%an|%aI',
-        `origin/${base}..origin/${head}`,
-      ]
+      const gitFormat = '--format=%H|%s|%an|%aI'
+      const gitArgs = ['log', gitFormat, `origin/${base}..origin/${head}`]
 
       let stdout: string
       if (terminal.ssh_host) {
         const result = await execSSHCommand(
           terminal.ssh_host,
-          `git ${gitArgs.join(' ')}`,
+          `git log '${gitFormat}' 'origin/${base}..origin/${head}'`,
           { cwd: terminal.cwd },
         )
         stdout = result.stdout
@@ -3580,9 +3631,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     try {
       const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
 
+      const gitFormat = '--format=%H|%s|%an|%aI'
       const gitArgs = [
         'log',
-        '--format=%H|%s|%an|%aI',
+        gitFormat,
         `--max-count=${limit + 1}`,
         `--skip=${offset}`,
         branch,
@@ -3590,9 +3642,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       let stdout: string
       if (terminal.ssh_host) {
+        const escapedBranch = branch.replace(/'/g, "'\\''")
         const result = await execSSHCommand(
           terminal.ssh_host,
-          `git ${gitArgs.join(' ')}`,
+          `git log '${gitFormat}' --max-count=${limit + 1} --skip=${offset} '${escapedBranch}'`,
           { cwd: terminal.cwd },
         )
         stdout = result.stdout

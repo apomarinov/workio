@@ -65,8 +65,10 @@ export function createPRActionsMode(
   })
 
   // View Changes (only for open PRs with a base branch and a matching terminal)
+  // Prefer non-SSH terminals so we can diff locally
+  const repoTerminals = terminals.filter((t) => t.git_repo?.repo === pr.repo)
   const matchingTerminal =
-    terminal ?? terminals.find((t) => t.git_repo?.repo === pr.repo)
+    terminal ?? repoTerminals.find((t) => !t.ssh_host) ?? repoTerminals[0]
   if (isOpen && pr.baseBranch && matchingTerminal) {
     items.push({
       id: 'action:view-changes',
