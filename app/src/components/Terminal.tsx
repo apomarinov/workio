@@ -1,7 +1,6 @@
 import '@xterm/xterm/css/xterm.css'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
-import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import {
@@ -409,20 +408,20 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
         brightWhite: '#ffffff',
       },
       allowProposedApi: true,
+      linkHandler: {
+        activate: (event, text) => {
+          if (event instanceof MouseEvent && event.altKey) {
+            navigator.clipboard.writeText(text)
+            toast.success('Copied URL to clipboard')
+          } else {
+            window.open(text, '_blank')
+          }
+        },
+      },
     })
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
-
-    const webLinksAddon = new WebLinksAddon((event, uri) => {
-      if (event.altKey) {
-        navigator.clipboard.writeText(uri)
-        toast.success('Copied URL to clipboard')
-      } else {
-        window.open(uri, '_blank')
-      }
-    })
-    terminal.loadAddon(webLinksAddon)
 
     const searchAddon = new SearchAddon()
     terminal.loadAddon(searchAddon)
@@ -836,6 +835,45 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
                       : 'Failed to open in IDE',
                   )
                 })
+              }
+            },
+          })
+        }
+
+        callback(links.length > 0 ? links : undefined)
+      },
+    })
+
+    // URL link provider — detect http(s) URLs and open in browser on click, Alt+Click to copy
+    const urlRegex =
+      /(https?):\/\/[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/g
+    terminal.registerLinkProvider({
+      provideLinks(bufferLineNumber, callback) {
+        const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
+        if (!line) return callback(undefined)
+
+        const text = line.translateToString(true)
+        const links: import('@xterm/xterm').ILink[] = []
+
+        for (const match of text.matchAll(urlRegex)) {
+          const url = match[0]
+          const matchStart = match.index
+
+          links.push({
+            range: {
+              start: { x: matchStart + 1, y: bufferLineNumber },
+              end: {
+                x: matchStart + url.length + 1,
+                y: bufferLineNumber,
+              },
+            },
+            text: url,
+            activate: (event, linkText) => {
+              if (event instanceof MouseEvent && event.altKey) {
+                navigator.clipboard.writeText(linkText)
+                toast.success('Copied URL to clipboard')
+              } else {
+                window.open(linkText, '_blank')
               }
             },
           })
