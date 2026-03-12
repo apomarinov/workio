@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { toast } from '@/components/ui/sonner'
 import { resolveNotification } from '../../shared/notifications'
 import type {
@@ -124,6 +124,7 @@ const RECENT_PR_THRESHOLD_MS = 15 * 60 * 1000 // 5 minutes
 
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, emit } = useSocket()
+  const { mutate: globalMutate } = useSWRConfig()
   const { data, isLoading, mutate } = useSWR<Terminal[]>(
     '/api/terminals',
     api.getTerminals,
@@ -533,6 +534,25 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       if (group === 'notifications') mutateNotifications()
     })
   }, [subscribe, mutate, mutateNotifications])
+
+  // Detect sleep/wake via timer gap and revalidate SWR data
+  useEffect(() => {
+    const TICK_INTERVAL = 5_000
+    const WAKE_THRESHOLD = 10_000
+    let lastTick = Date.now()
+    console.log('[wake] sleep detector mounted')
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const gap = now - lastTick
+      lastTick = now
+      if (gap > TICK_INTERVAL + WAKE_THRESHOLD) {
+        console.log(`[wake] detected wake after ~${Math.round(gap / 1000)}s`)
+        console.log('[wake] revalidating all SWR data')
+        globalMutate(() => true)
+      }
+    }, TICK_INTERVAL)
+    return () => clearInterval(interval)
+  }, [globalMutate])
 
   const hasNotifications = notifications.length > 0
 
