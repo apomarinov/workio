@@ -729,14 +729,18 @@ export function Sidebar({ width }: SidebarProps) {
                             isCollapsed && '-rotate-90',
                           )}
                         />
-                        {isSSH ? (
-                          <Globe className="w-3 h-3" />
-                        ) : (
-                          <Github className="w-3 h-3" />
-                        )}
-                        <span className="truncate">
-                          {isSSH ? `${repoName} \u00b7 ${hostPart}` : repoName}
-                        </span>
+                        <Github className="w-3 h-3" />
+                        <div className="flex items-center gap-1.5">
+                          {isSSH ? (
+                            <>
+                              <span className="truncate">{repoName}</span>{' '}
+                              {`\u00b7`} <Globe className="w-3 h-3" />{' '}
+                              <span className="truncate">{hostPart}</span>
+                            </>
+                          ) : (
+                            repoName
+                          )}
+                        </div>
                       </button>
                       {!isCollapsed && (
                         <SortableContext

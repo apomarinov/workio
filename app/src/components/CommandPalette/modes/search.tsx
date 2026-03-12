@@ -114,7 +114,7 @@ export function createSearchMode(
       icon: prInfo ? (
         prInfo.icon()
       ) : t.ssh_host ? (
-        <Globe className="h-4 w-4 shrink-0 text-blue-400" />
+        <Globe className="h-4 w-4 shrink-0" />
       ) : (
         <TerminalIcon2 className="h-4 w-4 shrink-0 fill-zinc-400" />
       ),
