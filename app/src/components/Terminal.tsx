@@ -417,6 +417,13 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
             window.open(text, '_blank')
           }
         },
+        hover: (event) => {
+          showLinkTooltip(event, [
+            'Click → Open in browser',
+            '⌥ Click → Copy URL',
+          ])
+        },
+        leave: () => hideLinkTooltip(),
       },
     })
 
@@ -783,6 +790,44 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       )
     }
 
+    // Shared link tooltip helper — creates a small hint near the cursor
+    function showLinkTooltip(event: MouseEvent, lines: string[]) {
+      hideLinkTooltip()
+      const container = terminal.element
+      if (!container) return
+      const div = document.createElement('div')
+      div.className = 'xterm-hover'
+      Object.assign(div.style, {
+        position: 'absolute',
+        zIndex: '10',
+        padding: '4px 8px',
+        background: '#252526',
+        border: '1px solid #454545',
+        borderRadius: '4px',
+        fontSize: '12px',
+        lineHeight: '1.4',
+        color: '#cccccc',
+        pointerEvents: 'none',
+        whiteSpace: 'pre',
+        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+      })
+      div.textContent = lines.join('\n')
+      container.appendChild(div)
+      const rect = container.getBoundingClientRect()
+      let left = event.clientX - rect.left + 4
+      let top = event.clientY - rect.top - div.offsetHeight - 8
+      if (top < 0) top = event.clientY - rect.top + 16
+      if (left + div.offsetWidth > rect.width)
+        left = rect.width - div.offsetWidth - 4
+      div.style.left = `${left}px`
+      div.style.top = `${top}px`
+    }
+
+    function hideLinkTooltip() {
+      const existing = terminal.element?.querySelector('.xterm-hover')
+      if (existing) existing.remove()
+    }
+
     // File path link provider — detect file paths in terminal output and open in IDE on click
     const filePathRegex =
       /(?:^|[\s'"`({[:])([~.]?\/[\w./@-]+(?:\/[\w./@-]+)*\.\w+(?::\d+(?::\d+)?)?|(?:[\w.@-]+\/)+[\w.@-]+\.\w+(?::\d+(?::\d+)?)?)/g
@@ -837,6 +882,14 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
                 })
               }
             },
+            hover: (event) => {
+              showLinkTooltip(event, [
+                'Click → Open in IDE',
+                '⌥ Click → Copy path',
+                '⌘ Click → Open in Finder',
+              ])
+            },
+            leave: () => hideLinkTooltip(),
           })
         }
 
@@ -876,6 +929,13 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
                 window.open(linkText, '_blank')
               }
             },
+            hover: (event) => {
+              showLinkTooltip(event, [
+                'Click → Open in browser',
+                '⌥ Click → Copy URL',
+              ])
+            },
+            leave: () => hideLinkTooltip(),
           })
         }
 
