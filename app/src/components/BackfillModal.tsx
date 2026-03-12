@@ -185,7 +185,7 @@ export function BackfillSection() {
                     {backfillingCwd === r.cwd ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      'Backfill'
+                      'Import'
                     )}
                   </Button>
                 </div>

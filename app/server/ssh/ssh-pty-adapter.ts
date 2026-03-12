@@ -129,6 +129,8 @@ export function createSSHSession(
       username: config.user,
       privateKey,
       readyTimeout: 10000,
+      keepaliveInterval: 15000,
+      keepaliveCountMax: 3,
       // Fallback to SSH agent if key doesn't work
       agent: process.env.SSH_AUTH_SOCK,
     })

@@ -127,6 +127,8 @@ function createConnection(
       username: config.user,
       privateKey,
       readyTimeout: 10_000,
+      keepaliveInterval: 15_000,
+      keepaliveCountMax: 3,
       agent: process.env.SSH_AUTH_SOCK,
     })
   })
