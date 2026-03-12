@@ -194,7 +194,9 @@ function ShellPopover({
             closing && 'invisible',
           )}
         >
-          <ChevronDown className="w-3.5 h-3.5" />
+          <div className="p-0.5 bg-accent rounded-sm">
+            <ChevronDown className="w-3.5 h-3.5 min-w-3.5" />
+          </div>
         </div>
       </PopoverTrigger>
       <PopoverContent className="w-fit p-1" align="start" side="bottom">
@@ -651,7 +653,7 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center relative gap-1.5 pl-2 pr-1 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
+        'group/tab flex items-center relative gap-1.5 px-2 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
         hasActivity
           ? isActive
             ? 'border-t-green-500/90'
@@ -690,7 +692,7 @@ function SortableShellTab({
             '--truncate-fade-from': isShown ? '78%' : '80%',
           } as React.CSSProperties
         }
-        className="truncate-fade-custom relative w-full text-center"
+        className="truncate-fade-custom relative w-full text-left"
       >
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}

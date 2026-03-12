@@ -299,17 +299,16 @@ export const SessionItem = memo(function SessionItem({
             </PopoverContent>
           </Popover>
         ) : (
-          <Button
-            variant={'secondary'}
-            size="icon"
+          <div
+            role="button"
             onClick={handleOpenActions}
             className={cn(
-              'h-7 w-7 text-muted-foreground !w-[20px]',
-              isSmall && 'w-3.5 h-3.5 rounded-sm !py-[10px]',
+              'h-7 w-4 text-muted-foreground flex items-center justify-center bg-accent/60 hover:bg-accent rounded-sm',
+              isSmall && 'w-3.5 h-5',
             )}
           >
-            <MoreVertical className="w-3 h-3" />
-          </Button>
+            <MoreVertical className="w-4 h-4" />
+          </div>
         )}
       </div>
     </div>
