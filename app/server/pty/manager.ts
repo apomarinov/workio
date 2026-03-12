@@ -1135,7 +1135,10 @@ async function scanAndEmitGitDirty() {
   getIO()?.emit('git:remote-sync', { syncStatus: currentSyncStatus })
 }
 
-export async function checkAndEmitSingleGitDirty(terminalId: number) {
+export async function checkAndEmitSingleGitDirty(
+  terminalId: number,
+  force?: boolean,
+) {
   try {
     const terminal = await getTerminalById(terminalId)
     if (!terminal || !terminal.git_branch) return
@@ -1158,7 +1161,7 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       ? !prevCommit || prevCommit.hash !== commit.hash
       : false
 
-    if (dirtyChanged || commitChanged) {
+    if (force || dirtyChanged || commitChanged) {
       lastDirtyStatus.set(terminalId, stat)
       if (commit) lastCommitStatus.set(terminalId, commit)
       const dirtyStatus: Record<
@@ -1187,7 +1190,7 @@ export async function checkAndEmitSingleGitDirty(terminalId: number) {
       prevSync.ahead !== syncStat.ahead ||
       prevSync.noRemote !== syncStat.noRemote
 
-    if (syncChanged) {
+    if (force || syncChanged) {
       lastRemoteSyncStatus.set(terminalId, syncStat)
       const syncStatus: Record<
         number,

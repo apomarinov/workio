@@ -2270,7 +2270,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       detectGitBranch(id).catch((err) =>
         log.error({ err, terminalId: id }, '[git] Failed to detect branch'),
       )
-      checkAndEmitSingleGitDirty(id)
+      checkAndEmitSingleGitDirty(id, true)
 
       return { success: true }
     } catch (err) {
@@ -2500,7 +2500,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       // Refresh dirty state
-      checkAndEmitSingleGitDirty(id)
+      checkAndEmitSingleGitDirty(id, true)
 
       return { success: true }
     } catch (err) {
