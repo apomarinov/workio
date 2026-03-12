@@ -34,10 +34,10 @@ remote → local data flow by:
 
 -   Opening a persistent SSH connection:
 
-        ssh -R 18765:127.0.0.1:18765 user@remote
+        ssh -R 18765:127.0.0.1:<SERVER_PORT> <host-alias>
 
 -   This makes `127.0.0.1:18765` on the remote actually point to **your
-    local machine**.
+    local WorkIO server** (e.g. port 5176 in dev).
 
 Remote scripts can now safely POST events to:
 
@@ -92,13 +92,50 @@ update detection (see Remote Bootstrap below).
 
 For each Claude hook:
 
+    enrich(event)
     enqueue(event)
     try_flush()
+
+#### enrich()
+
+The forwarder enriches the hook event **on the remote** before
+enqueueing, because the remote has access to files that the local
+machine doesn't:
+
+1.  **Resolve project path** — same logic as `resolve_project_path()`
+    in `monitor_daemon.py`: read `~/.claude.json`, match the encoded
+    dir from `transcript_path` to the real project path. Overwrite
+    `cwd` in the event with the resolved path. This way the local
+    pipeline receives a correct `cwd` without needing to resolve it.
+
+2.  **Transcript delta** — track a byte offset per session transcript
+    file. On each hook, read from last offset to EOF, include the new
+    JSONL lines in the payload as `transcript_delta`. Hooks fire
+    frequently (every tool use, every prompt), so deltas are typically
+    a few KB.
+
+3.  **Session index entry** — read the relevant entry from
+    `~/.claude/projects/{encoded_path}/sessions-index.json` and
+    include it as `session_index`. This is tiny (name, message count).
+
+4.  **Host alias** — read from `~/.workio/config.json` (written by
+    bootstrap). Included in every payload so the local side knows
+    which SSH host the event came from.
+
+Enriched payload structure:
+
+    {
+      "event": { ...original hook with corrected cwd... },
+      "host_alias": "dev-server",
+      "transcript_delta": "...new JSONL lines since last hook...",
+      "transcript_offset": 48230,
+      "session_index": { "name": "...", "message_count": 12 }
+    }
 
 #### enqueue()
 
 -   Assign UUID if missing
--   Write JSON file
+-   Write enriched JSON file to queue
 -   Enforce disk cap (default ~200MB)
 -   Drop oldest if necessary
 
@@ -108,6 +145,25 @@ For each Claude hook:
 -   POST to local ingest endpoint
 -   If HTTP 200 → delete file
 -   If failure → stop (connection likely down)
+
+------------------------------------------------------------------------
+
+### Transcript Mirroring (Local Side)
+
+The `/claude-hook` route extracts `transcript_delta` from the payload
+and appends it to a local mirror file:
+
+    ~/.workio/mirrors/<host-alias>/<session_id>.jsonl
+
+It then rewrites `transcript_path` in the event to point at the mirror
+before forwarding to the daemon. This way:
+
+-   `process_transcript()` in `worker.py` reads the mirror file —
+    no change needed
+-   `read_last_assistant_message()` reads the mirror file —
+    no change needed
+-   `session_index` from the payload is used directly instead of
+    looking up the local `~/.claude` index
 
 ------------------------------------------------------------------------
 
@@ -143,14 +199,47 @@ pipeline.
 
 Responsibilities:
 
-1.  Authenticate request (per-host shared token)
-2.  Validate payload (max body size, rate limit)
-3.  Reject events outside timestamp window (unless queued backlog)
-4.  Deduplicate using deterministic key
-5.  Forward to `process_event` pipeline
-6.  Respond with ACK (HTTP 200)
+1.  Validate payload (max body size, rate limit)
+2.  Reject events outside timestamp window (unless queued backlog)
+3.  Deduplicate using deterministic key
+4.  Forward to `process_event` pipeline
+5.  Respond with ACK (HTTP 200)
 
 If processing fails → return error → remote retries later.
+
+### Remote-Specific Local Behavior
+
+#### Branch Detection
+
+`detectSessionBranch()` in `app/server/listen.ts` already handles SSH
+terminals — when `terminal.ssh_host` is set, it runs `git rev-parse`
+on the remote via `execSSHCommand`. This works for remote hooks as
+long as `WORKIO_TERMINAL_ID` is forwarded in the payload.
+
+If a remote hook arrives **without a `terminal_id`**, the fallback
+tries to run `git` locally with the remote project path, which fails.
+For remote hooks without `terminal_id`: skip branch detection entirely.
+
+#### Project Identity
+
+`upsert_project()` currently uses `path TEXT UNIQUE` to identify
+projects. This breaks across hosts — `/Users/apo/code/project` (local)
+and `/home/user/project` (remote) are different paths but may be the
+same codebase.
+
+Add `host` column to the projects table. Unique key becomes
+`(host, path)`:
+
+    CREATE TABLE IF NOT EXISTS projects (
+        id SERIAL PRIMARY KEY,
+        host VARCHAR(255) NOT NULL DEFAULT 'local',
+        path TEXT,
+        UNIQUE(host, path)
+    );
+
+-   Local projects: `host = 'local'`
+-   Remote projects: `host = '<host-alias>'` (from forwarder payload)
+-   `upsert_project()` updated to accept `host` parameter
 
 ------------------------------------------------------------------------
 
@@ -167,85 +256,149 @@ pipeline:
 -   `start_debounced_worker()` spawns extra cleanup workers
 -   `notify("hook", ...)` sends duplicate UI/event-stream notifications
 
-### v1 Approach: App-Layer Dedupe (No Schema Migration)
+### Approach: Unique Constraint on Hooks Table
 
-Dedupe at the application layer in `process_event` before processing:
+Add a `dedupe_key` column with a `UNIQUE` constraint to the hooks
+table:
 
-1.  **Deterministic dedupe key:** Hash of `session_id + timestamp +
-    event_type` from the hook payload. This combination is unique per
-    event across all hook types.
-2.  **Check existing hooks table:** Before processing, look up whether
-    this dedupe key already exists. If it does, return ACK without
-    re-processing.
-3.  **In-process lock map with short TTL:** Prevents concurrent
-    duplicate deliveries from both passing the "exists?" check
-    simultaneously. The lock is per-dedupe-key with a short expiry.
-4.  **Transaction ordering:** check → insert hook marker → process side
-    effects → commit. This ensures the dedupe check and insert are
-    atomic within a single transaction.
+    CREATE TABLE IF NOT EXISTS hooks (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(100),
+        hook_type VARCHAR(30),
+        payload JSONB,
+        dedupe_key VARCHAR(128) UNIQUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
 
-**Known limitation:** The hooks table lookup is unindexed for the dedupe
-key. Acceptable at v1 volume.
+**Key computation:** `hash(session_id + hook_type + event_timestamp)`
+where `event_timestamp` comes from the hook payload. This combination
+is unique per event across all hook types.
 
-### Future: DB Unique Constraint
+**Insert behavior:** `save_hook()` computes the dedupe key and inserts
+with it. If the unique constraint is violated → duplicate, return ACK
+without processing.
 
-Add a `dedupe_key` column with a unique constraint to the hooks table.
-This makes dedupe fully atomic at the DB level and removes the need for
-the in-process lock map. Deferred to avoid schema migration in v1.
-
-------------------------------------------------------------------------
-
-## Reverse Tunnel Management
-
-### Separate Subsystem (Not Terminal-Scoped)
-
-The reverse tunnel manager is a **new host-scoped subsystem**, separate
-from the terminal-scan-driven forwarding in `app/server/pty/manager.ts`.
-
-Current tunnel machinery in `manager.ts` is driven by terminal/worker
-lifecycle and 3-second process scans. Reusing it for reverse tunnels
-would accidentally couple tunnel lifetime to terminal sessions.
-
-The reverse tunnel must stay up as long as the SSH host is connected,
-regardless of whether any terminal sessions are active on that host.
-
-### Per-Host Tunnel Process
-
-Each host gets a lightweight tunnel process managed by WorkIO:
-
-    ssh -N \
-      -o ExitOnForwardFailure=yes \
-      -o ServerAliveInterval=15 \
-      -o ServerAliveCountMax=3 \
-      -R 18765:127.0.0.1:18765 \
-      user@remote
-
-If it dies → restart automatically.
-
-This tunnel is separate from your interactive PTY session.
+This is fully atomic at the DB level. No in-memory state, no lock
+maps, survives server restarts. No migration needed — just update
+`schema.sql` directly.
 
 ------------------------------------------------------------------------
 
-## Remote Bootstrap
+## Bootstrap & Tunnel Management
 
-### SCP-Based Deployment
+### Single Bootstrap Function Per Host
 
-On first SSH connect to a host, WorkIO:
+One function: `bootstrapRemoteHost(hostAlias)`. Called from
+`app/server/pty/session-proxy.ts` after the SSH worker is ready and
+the terminal is updated (~line 484), alongside the existing
+fire-and-forget SSH setup (name file writes). The call site:
 
-1.  Checks if the remote forwarder script exists at
-    `~/.workio/claude_forwarder.py`
-2.  If missing or outdated version → SCP the current version
-3.  Configures Claude hooks on the remote to call the forwarder
+    // session-proxy.ts, after worker ready + terminal update
+    if (terminal.ssh_host) {
+      bootstrapRemoteHost(terminal.ssh_host)  // no-ops if already setup/done
+      // ...existing name file writes...
+    }
 
-### Version Detection
+The bootstrap function and its in-memory state map live in their own
+module (e.g. `app/server/ssh/claude-forwarding.ts`), imported by
+`session-proxy.ts`. Fire-and-forget — does not block the shell session.
 
-The forwarder script has an embedded version string:
+### In-Memory Server State
 
-    FORWARDER_VERSION = "1.0.0"
+    Map<hostAlias, { status: 'setup' | 'done', tunnel?: ChildProcess }>
 
-On connect, WorkIO reads the remote version and compares against the
-local copy. If outdated, SCP overwrites. No package manager or complex
-update protocol needed.
+-   **`setup`** — bootstrap is running. Additional client connections
+    to the same host are ignored (no-op).
+-   **`done`** — bootstrap completed, tunnel is running.
+-   **No entry** — host has never been bootstrapped this server
+    session. First client connection triggers it.
+
+### Bootstrap Flow
+
+After a client's SSH shell is successfully established, if the host
+has no entry in the state map:
+
+    bootstrapRemoteHost(hostAlias):
+
+      1. Set status → 'setup'
+
+      2. Check if ~/.claude/settings.json exists on remote
+         - If not → early return (Claude not installed, remove entry)
+         - If yes → continue
+
+      3. Write host config to remote
+         - Write ~/.workio/config.json with { "host_alias": "<host-alias>" }
+         - The forwarder reads this and includes host_alias in every
+           hook payload, so the local side can identify which SSH host
+           the event came from (needed for project identity)
+
+      4. Setup hooks on remote
+         - Read remote ~/.claude/settings.json
+         - Merge workio forwarder hooks (append-if-missing, same logic
+           as setup_hooks.py)
+         - All 7 event types: SessionStart, UserPromptSubmit,
+           PreToolUse (*), PostToolUse (*), Notification (*), Stop,
+           SessionEnd
+         - Command = absolute path: $HOME/.workio/claude_forwarder.py
+           (resolve $HOME on remote)
+         - Write back merged settings.json
+
+      5. Copy forwarder to remote
+         - SCP claude_forwarder.py → ~/.workio/claude_forwarder.py
+         - Version check: read embedded FORWARDER_VERSION from remote,
+           compare to local copy. SCP if missing or outdated.
+         - chmod +x
+
+      5b. Install wio Claude skill on remote
+         - SCP claude-skill/wio/SKILL.md → ~/.claude/skills/wio/SKILL.md
+         - Same as run.sh does locally: mkdir -p ~/.claude/skills/wio,
+           then copy SKILL.md
+
+      6. Start reverse tunnel
+         - ssh -N \
+             -o ExitOnForwardFailure=yes \
+             -o ServerAliveInterval=15 \
+             -o ServerAliveCountMax=3 \
+             -R 18765:127.0.0.1:<SERVER_PORT> \
+             <host-alias>
+         - Store ChildProcess reference in state
+         - On tunnel exit → restart automatically (unless server is
+           shutting down)
+
+      7. Set status → 'done'
+
+### Concurrency Guard
+
+If `status === 'setup'` when another client connects to the same
+host → skip. The first connection handles it.
+
+### Server Shutdown
+
+On server kill / graceful shutdown:
+
+-   Iterate all entries in the host state map
+-   Kill every tunnel `ChildProcess`
+-   Clear state
+
+### Why Re-Bootstrap Every Session
+
+The bootstrap runs the full sequence each server start (no persistent
+state across restarts). This keeps it simple:
+
+-   Hooks may have been removed on the remote
+-   Forwarder may have been updated locally
+-   Tunnel process doesn't survive server restart anyway
+
+### Notes
+
+-   The tunnel is a separate SSH connection from the interactive PTY
+    session — it uses `ssh -N` (no shell)
+-   The tunnel is host-scoped, not terminal/shell-scoped. One tunnel
+    per host regardless of how many shells are open
+-   Forwarder command path stays the same across version updates, so
+    hooks survive SCP overwrites
+-   Bootstrap should verify `python3` 3.10+ exists on remote before
+    step 3 (forwarder may use union type hints like `str | None`)
 
 ------------------------------------------------------------------------
 
@@ -274,8 +427,9 @@ Not required but improves recovery speed.
 ## Security Properties
 
 -   No inbound ports opened
--   Traffic only flows inside SSH
--   Per-host shared token validation on `/claude-hook` route
+-   Traffic only flows inside SSH tunnel (already authenticated)
+-   No additional tokens needed — only processes on the remote's
+    localhost can reach the tunnel port
 -   Timestamp window rejection (reject stale events unless queued
     backlog)
 -   Rate limiting + max body size on ingest route
@@ -288,11 +442,11 @@ Not required but improves recovery speed.
 | Scenario | Outcome |
 |---|---|
 | SSH drops | Events buffered in file queue |
-| Local restarts | Remote retries; in-process lock rebuilds on boot |
+| Local restarts | Remote retries; dedupe key prevents reprocessing |
 | Remote crash | File queue survives on disk |
 | Duplicate send | Rejected via dedupe key lookup + in-process lock |
 | Disk fills | Oldest events trimmed (200MB cap) |
-| Concurrent duplicates | In-process lock prevents race condition |
+| Concurrent duplicates | DB unique constraint rejects at insert |
 
 ------------------------------------------------------------------------
 
@@ -317,8 +471,6 @@ This solution behaves like a purpose-built telemetry relay.
 
 ## Future Extensions
 
--   DB unique constraint on dedupe key (removes need for in-process
-    lock)
 -   Compression (gzip over tunnel)
 -   Unified agent for processes/ports/Claude telemetry
 -   Batched Python processing
@@ -334,7 +486,7 @@ This design gives you:
 -   No network exposure
 -   Minimal moving parts
 -   Easy deployment (one Python file + SSH tunnel)
--   Persistent dedupe against existing hooks table
+-   DB-level dedupe via unique constraint on hooks table
 -   Clean integration with existing `process_event` pipeline
 
 It is essentially a lightweight, SSH-backed event transport tailored to
