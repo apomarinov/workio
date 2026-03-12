@@ -153,13 +153,27 @@ function ShellPopover({
   onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
   const { subscribeToBell, unsubscribeFromBell, isBellSubscribed } =
     useProcessContext()
   const bellSubscribed = isBellSubscribed(shell.id)
   const hasActiveCmd = !!shell.active_cmd
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) {
+          setClosing(true)
+          setTimeout(() => {
+            setClosing(false)
+          }, 150)
+        } else {
+          setClosing(false)
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <div
           role="button"
@@ -174,12 +188,13 @@ function ShellPopover({
             }
           }}
           className={cn(
-            'flex-shrink-0 p-2 flex items-center relative text-muted-foreground hover:text-foreground cursor-pointer transition-colors rounded hover:bg-zinc-500/30',
+            'flex-shrink-0 h-full w-4 absolute right-1 items-center cursor-pointer transition-colors text-muted-foreground rounded sm:hidden max-sm:flex group-hover/tab:flex group-hover/pill:flex justify-center hover:text-foreground',
             isPill && 'rounded-full',
-            open && 'text-foreground bg-zinc-500/30',
+            (open || closing) && 'text-foreground !flex',
+            closing && 'invisible',
           )}
         >
-          <ChevronDown className="w-3.5 h-3.5 absolute top-0.5 left-[1px]" />
+          <ChevronDown className="w-3.5 h-3.5" />
         </div>
       </PopoverTrigger>
       <PopoverContent className="w-fit p-1" align="start" side="bottom">
@@ -463,6 +478,9 @@ function SortableShellPill({
   shellSession?: SessionWithProject
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
+  const [isHovering, setIsHovering] = useState(false)
+  const isMobile = useIsMobile()
+  const isShown = isHovering || isMobile
   const {
     attributes,
     listeners,
@@ -495,13 +513,15 @@ function SortableShellPill({
       {...attributes}
       {...rest}
       {...listeners}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
       style={style}
       key={shell.id}
       type="button"
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/pill flex max-w-[150px] min-w-[80px] items-center gap-1 pl-2 pr-0.5 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
+        'group/pill flex relative max-w-[150px] min-w-[80px] items-center gap-1 px-1 py-0.5 rounded-full text-xs transition-colors cursor-pointer flex-shrink-0',
         isActive
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
@@ -527,7 +547,13 @@ function SortableShellPill({
       ) : null}
       <span
         ref={overflowRef}
-        className="truncate-fade relative w-full text-center"
+        style={
+          {
+            '--truncate-fade-to': isShown ? '85%' : '98%',
+            '--truncate-fade-from': isShown ? '70%' : '85%',
+          } as React.CSSProperties
+        }
+        className="truncate-fade-custom relative w-full text-center"
       >
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}
@@ -582,6 +608,9 @@ function SortableShellTab({
   position?: 'top' | 'bottom'
   ref?: React.Ref<HTMLButtonElement>
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'>) {
+  const [isHovering, setIsHovering] = useState(false)
+  const isMobile = useIsMobile()
+  const isShown = isHovering || isMobile
   const {
     attributes,
     listeners,
@@ -614,13 +643,15 @@ function SortableShellTab({
       {...attributes}
       {...rest}
       {...listeners}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
       style={style}
       key={shell.id}
       type="button"
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center gap-1.5 pl-2 pr-1 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
+        'group/tab flex items-center relative gap-1.5 pl-2 pr-1 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
         hasActivity
           ? isActive
             ? 'border-t-green-500/90'
@@ -653,7 +684,13 @@ function SortableShellTab({
       ) : null}
       <span
         ref={overflowRef}
-        className="truncate-fade relative w-full text-center"
+        style={
+          {
+            '--truncate-fade-to': isShown ? '90%' : '98%',
+            '--truncate-fade-from': isShown ? '78%' : '80%',
+          } as React.CSSProperties
+        }
+        className="truncate-fade-custom relative w-full text-center"
       >
         <span className={shortcutHint ? 'invisible' : undefined}>
           {displayName}

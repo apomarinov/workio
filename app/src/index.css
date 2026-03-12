@@ -174,13 +174,22 @@ body {
 }
 
 /* Truncate with a fade instead of ellipsis (only when overflowing) */
-.truncate-fade {
+.truncate-fade, .truncate-fade-custom {
   overflow: hidden;
   white-space: nowrap;
 }
 .truncate-fade.is-overflowing {
   mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
+}
+
+.truncate-fade-custom {
+  --truncate-fade-from: 80%;
+  --truncate-fade-to: 98%;
+}
+.truncate-fade-custom.is-overflowing {
+  mask-image: linear-gradient(to right, black var(--truncate-fade-from), transparent var(--truncate-fade-to));
+  -webkit-mask-image: linear-gradient(to right, black var(--truncate-fade-from), transparent var(--truncate-fade-to));
 }
 
 /* Hide scrollbars (iOS + Safari + Chrome + Firefox) */
