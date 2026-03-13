@@ -24,6 +24,7 @@ import { getIO } from '../io'
 import { log } from '../logger'
 import { emitNotification } from '../notify'
 import { detectGitBranch } from '../pty/manager'
+import { updateGithubGraphql, updateGithubRest } from '../services/status'
 import { execSSHCommand } from '../ssh/exec'
 
 // Cache: cwd -> { owner, repo } or null
@@ -1260,6 +1261,19 @@ async function pollAllPRChecks(force = false): Promise<void> {
         `[github] REST rate limit: used=${restUsed} remaining=${data.rest.remaining}/${data.rest.limit} resets_in=${restResetMin}m`,
       )
       lastRESTRateRemaining = data.rest.remaining
+      updateGithubRest({
+        status:
+          data.rest.remaining === 0
+            ? 'error'
+            : data.rest.remaining / data.rest.limit < 0.2
+              ? 'degraded'
+              : 'healthy',
+        error: null,
+        remaining: data.rest.remaining,
+        limit: data.rest.limit,
+        reset: data.rest.reset,
+        usedLastCycle: typeof restUsed === 'number' ? restUsed : null,
+      })
 
       const gqlResetMin = Math.ceil(
         (data.graphql.reset * 1000 - Date.now()) / 60000,
@@ -1272,9 +1286,24 @@ async function pollAllPRChecks(force = false): Promise<void> {
         `[github] GraphQL rate limit: used=${gqlUsed} remaining=${data.graphql.remaining}/${data.graphql.limit} resets_in=${gqlResetMin}m`,
       )
       lastGraphQLRateRemaining = data.graphql.remaining
+      updateGithubGraphql({
+        status:
+          data.graphql.remaining === 0
+            ? 'error'
+            : data.graphql.remaining / data.graphql.limit < 0.2
+              ? 'degraded'
+              : 'healthy',
+        error: null,
+        remaining: data.graphql.remaining,
+        limit: data.graphql.limit,
+        reset: data.graphql.reset,
+        usedLastCycle: typeof gqlUsed === 'number' ? gqlUsed : null,
+      })
     }
   } catch (err) {
     log.error({ err }, '[github] Failed to check rate limit')
+    updateGithubRest({ status: 'error', error: String(err) })
+    updateGithubGraphql({ status: 'error', error: String(err) })
   }
 }
 
@@ -2457,7 +2486,11 @@ export async function detectAllTerminalBranches(): Promise<void> {
 
 export async function initGitHubChecks(): Promise<void> {
   ghAvailable = await checkGhAvailable()
-  if (!ghAvailable) return
+  if (!ghAvailable) {
+    updateGithubRest({ status: 'inactive', error: 'gh CLI not available' })
+    updateGithubGraphql({ status: 'inactive', error: 'gh CLI not available' })
+    return
+  }
 
   const terminals = await getAllTerminals()
   for (const terminal of terminals) {

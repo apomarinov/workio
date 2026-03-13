@@ -63,6 +63,7 @@ import { NotificationList } from './NotificationList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
 import { PRStatusGroup } from './PRStatusGroup'
 import { ResourceInfo } from './ResourceInfo'
+import { ServiceStatusIndicator } from './ServiceStatusIndicator'
 import { SessionGroup } from './SessionGroup'
 import { SettingsModal } from './SettingsModal'
 import { MultiClientIndicator } from './ShellTabs'
@@ -966,8 +967,9 @@ export function Sidebar({ width }: SidebarProps) {
         )}
       </div>
 
-      <div className="border-t border-sidebar-border pl-4 pr-2 flex items-center w-full justify-center min-h-[28px]">
+      <div className="border-t border-sidebar-border pl-4 pr-2 flex items-center w-full justify-between min-h-[28px]">
         <ResourceInfo className="hover:opacity-80 py-[0.35rem]" />
+        <ServiceStatusIndicator className="hover:opacity-100 py-[0.35rem] px-1" />
       </div>
 
       <SettingsModal

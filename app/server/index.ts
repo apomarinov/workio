@@ -83,6 +83,7 @@ import notificationRoutes from './routes/notifications'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
+import { getServicesStatus, updateNgrokStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
 import { handleUpgrade } from './ws/terminal'
@@ -279,6 +280,7 @@ io.on('connection', (socket) => {
   emitCachedPRChecks(socket)
   refreshPRChecks()
   startGitDirtyPolling()
+  socket.emit('services:status', getServicesStatus())
 
   // Bell subscriptions
   socket.emit('bell:subscriptions', getBellSubscribedShellIds())
@@ -1144,6 +1146,7 @@ const start = async () => {
       startWebhookValidationPolling()
     } catch (err) {
       log.error({ err }, 'Failed to initialize ngrok')
+      updateNgrokStatus({ status: 'error', error: String(err) })
     }
   } catch (err) {
     log.error({ err }, 'Server startup failed')

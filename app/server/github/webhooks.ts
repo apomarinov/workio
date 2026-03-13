@@ -5,6 +5,7 @@ import { WEBHOOK_EVENTS } from '../../shared/types'
 import { getSettings, updateSettings } from '../db'
 import { env } from '../env'
 import { log } from '../logger'
+import { updateNgrokStatus } from '../services/status'
 
 const execFileAsync = promisify(execFile)
 
@@ -51,6 +52,7 @@ export async function initNgrok(
     args.push('--upstream-tls-verify=false')
   }
 
+  updateNgrokStatus({ status: 'starting' })
   const ngrokUrl = await new Promise<string>((resolve, reject) => {
     ngrokProcess = spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
@@ -76,14 +78,22 @@ export async function initNgrok(
 
     ngrokProcess.on('error', (err) => {
       clearTimeout(timeout)
+      updateNgrokStatus({ status: 'error', error: String(err) })
       reject(err)
     })
 
     ngrokProcess.on('exit', (code) => {
       clearTimeout(timeout)
-      if (code) reject(new Error(`ngrok exited with code ${code}`))
+      if (code) {
+        updateNgrokStatus({
+          status: 'error',
+          error: `exited with code ${code}`,
+        })
+        reject(new Error(`ngrok exited with code ${code}`))
+      }
     })
   })
+  updateNgrokStatus({ status: 'healthy', error: null, url: ngrokUrl })
   log.info(
     `[webhooks] ngrok tunnel started: ${ngrokUrl}${domain ? ' (static)' : ''}`,
   )
@@ -391,6 +401,7 @@ export function stopNgrok(): void {
     ngrokProcess.kill('SIGTERM')
     ngrokProcess = null
   }
+  updateNgrokStatus({ status: 'inactive', error: null, url: null })
 }
 
 async function validateStoredWebhooks(): Promise<void> {

@@ -225,6 +225,39 @@ export interface ShellClientsPayload {
   clients: ShellClient[]
 }
 
+// Service status types
+export type ServiceStatus = 'inactive' | 'starting' | 'healthy' | 'degraded' | 'error'
+
+export interface GitHubApiStatus {
+  status: ServiceStatus
+  error: string | null
+  remaining: number | null
+  limit: number | null
+  reset: number | null
+  usedLastCycle: number | null
+}
+
+export interface NgrokStatus {
+  status: ServiceStatus
+  error: string | null
+  url: string | null
+}
+
+export interface ClaudeTunnelStatus {
+  status: ServiceStatus
+  error: string | null
+  alias: string
+  bootstrapRetries: number
+  tunnelRetries: number
+}
+
+export interface ServicesStatus {
+  githubRest: GitHubApiStatus
+  githubGraphql: GitHubApiStatus
+  ngrok: NgrokStatus
+  claudeTunnels: Record<string, ClaudeTunnelStatus>
+}
+
 // GitHub webhook events we subscribe to
 export const WEBHOOK_EVENTS = [
   'pull_request',

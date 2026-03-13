@@ -16,6 +16,7 @@ import type {
   PRCheckStatus,
   PRChecksPayload,
   PRReaction,
+  ServicesStatus,
   ShellClient,
   ShellClientsPayload,
   WorkspacePayload,
@@ -116,6 +117,7 @@ interface TerminalContextValue {
     value: string[] | ((prev: string[]) => string[]),
   ) => void
   orderedTerminals: Terminal[]
+  servicesStatus: ServicesStatus | null
 }
 
 const TerminalContext = createContext<TerminalContextValue | null>(null)
@@ -318,6 +320,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [githubPRs, prPoll, raw, emit])
+
+  // Service status tracking
+  const [servicesStatus, setServicesStatus] = useState<ServicesStatus | null>(
+    null,
+  )
+  useEffect(() => {
+    return subscribe<ServicesStatus>('services:status', setServicesStatus)
+  }, [subscribe])
 
   // Subscribe to PR checks updates
   useEffect(() => {
@@ -1179,7 +1189,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refetch = useCallback(() => mutate(), [mutate])
-
+  console.log(servicesStatus)
   const value = useMemo(
     () => ({
       terminals,
@@ -1223,6 +1233,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       collapsedProjectRepos,
       setCollapsedProjectRepos,
       orderedTerminals,
+      servicesStatus,
     }),
     [
       terminals,
@@ -1265,6 +1276,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       collapsedProjectRepos,
       setCollapsedProjectRepos,
       orderedTerminals,
+      servicesStatus,
     ],
   )
 
