@@ -137,7 +137,6 @@ export function DirectoryBrowser({
         setInputPath(newPath)
         return updated
       })
-      if (mode === 'file') setSelectedPaths(new Set())
     },
     [mode],
   )
@@ -682,11 +681,7 @@ function BrowserColumn({
             )}
             onClick={(e) => {
               if (entry.isDir) {
-                if (
-                  fileMode &&
-                  (e.metaKey || e.ctrlKey || e.shiftKey) &&
-                  onSelectEntry
-                ) {
+                if (fileMode && onSelectEntry) {
                   onSelectEntry(
                     fullPath,
                     e.metaKey || e.ctrlKey,
@@ -694,7 +689,6 @@ function BrowserColumn({
                     entries,
                     path,
                   )
-                  return
                 }
                 onSelectDir(entry.name)
               } else if (fileMode && onSelectEntry) {
