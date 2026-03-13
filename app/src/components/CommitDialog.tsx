@@ -1,8 +1,15 @@
-import { GitCommitHorizontal, Loader2, X } from 'lucide-react'
+import {
+  ChevronDown,
+  GitCommitHorizontal,
+  Loader2,
+  PenLine,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import {
   commitChanges,
   discardChanges,
@@ -53,6 +60,7 @@ export function CommitDialog({
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [discardFiles, setDiscardFiles] = useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const handleCommitRef = useRef<() => void>(() => {})
   const canCommitRef = useRef(false)
@@ -267,45 +275,47 @@ export function CommitDialog({
 
   const isExpanded = state === 'expanded' && mounted
   const isCollapsed = state === 'collapsed'
+  const isMobile = useIsMobile()
 
   const fileCount = changedFiles.length
 
-  const commitControls = !viewOnly ? (
-    <div className="flex gap-3 flex-shrink-0 p-0.5">
-      <textarea
-        ref={textareaRef}
-        className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
-        rows={4}
-        placeholder="Commit message..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        disabled={amend || loading}
-      />
-      <div className="flex flex-col gap-2 flex-shrink-0 justify-start">
-        <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-          <Checkbox
-            checked={amend}
-            onCheckedChange={(v) => handleAmendChange(v === true)}
-            disabled={loading}
-            className="h-4 w-4"
-          />
-          Amend
-          {fetchingMessage && (
-            <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
-          )}
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-          <Checkbox
-            checked={noVerify}
-            onCheckedChange={(v) => setNoVerify(v === true)}
-            disabled={loading}
-            className="h-4 w-4"
-          />
-          No verify
-        </label>
+  const commitControls =
+    !viewOnly && (!isMobile || mobileControlsOpen) ? (
+      <div className="flex gap-3 flex-shrink-0 p-0.5">
+        <textarea
+          ref={textareaRef}
+          className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 resize-none"
+          rows={4}
+          placeholder="Commit message..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          disabled={amend || loading}
+        />
+        <div className="flex flex-col gap-2 flex-shrink-0 justify-start">
+          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+            <Checkbox
+              checked={amend}
+              onCheckedChange={(v) => handleAmendChange(v === true)}
+              disabled={loading}
+              className="h-4 w-4"
+            />
+            Amend
+            {fetchingMessage && (
+              <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
+            )}
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+            <Checkbox
+              checked={noVerify}
+              onCheckedChange={(v) => setNoVerify(v === true)}
+              disabled={loading}
+              className="h-4 w-4"
+            />
+            No verify
+          </label>
+        </div>
       </div>
-    </div>
-  ) : undefined
+    ) : undefined
 
   return (
     <>
@@ -358,6 +368,22 @@ export function CommitDialog({
               </span>
             )}
           </button>
+          {isMobile && !viewOnly && state === 'expanded' && (
+            <button
+              type="button"
+              onClick={() => setMobileControlsOpen((v) => !v)}
+              className="h-full px-3 flex cursor-pointer items-center gap-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors flex-shrink-0"
+            >
+              <PenLine className="w-3.5 h-3.5" />
+              <span className="text-xs">Commit</span>
+              <ChevronDown
+                className={cn(
+                  'w-3 h-3 transition-transform',
+                  !mobileControlsOpen && '-rotate-90',
+                )}
+              />
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

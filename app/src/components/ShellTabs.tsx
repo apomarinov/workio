@@ -142,12 +142,14 @@ function ShellPopover({
   isMain,
   terminal,
   isPill,
+  isActive,
   onRename,
   onDelete,
 }: {
   shell: Shell
   isMain: boolean
   isPill?: boolean
+  isActive?: boolean
   terminal: Terminal
   onRename: () => void
   onDelete: () => void
@@ -194,7 +196,7 @@ function ShellPopover({
             closing && 'invisible',
           )}
         >
-          <div className="p-0.5 bg-accent rounded-sm">
+          <div className={cn('p-0.5 rounded-sm', isActive && 'bg-accent')}>
             <ChevronDown className="w-3.5 h-3.5 min-w-3.5" />
           </div>
         </div>
@@ -653,7 +655,7 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center relative gap-1.5 px-2 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-r-[1px]',
+        'group/tab flex items-center relative gap-1.5 px-2 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-r-[1px] max-sm:pr-6',
         hasActivity
           ? isActive
             ? 'border-t-green-500/90'
@@ -706,6 +708,7 @@ function SortableShellTab({
       <ShellPopover
         shell={shell}
         isMain={isMain}
+        isActive={isActive}
         terminal={terminal}
         onRename={onRename}
         onDelete={onDelete}

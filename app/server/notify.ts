@@ -36,10 +36,16 @@ export async function emitNotification(
       body = data.body ? `${prLabel}\n${data.body}` : prLabel
     }
 
+    // Check status notifications share a PR-scoped tag so they replace each other
+    const tag =
+      (type === 'checks_passed' || type === 'check_failed') && repo && prNumber
+        ? `pr-checks:${repo}#${prNumber}`
+        : (notification.dedup_hash ?? undefined)
+
     sendPushNotification({
       title,
       body,
-      tag: notification.dedup_hash ?? undefined,
+      tag,
       data: { type, repo, prNumber, ...data },
     })
   }

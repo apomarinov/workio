@@ -56,7 +56,7 @@ export function UnifiedDiffViewer({
     ui.draw()
     ui.highlightCode()
 
-    // Set data-file-path attributes on each file wrapper
+    // Set data-file-path attributes and add collapse toggle on each file wrapper
     const wrappers = el.querySelectorAll('.d2h-file-wrapper')
     for (const wrapper of wrappers) {
       const nameEl = wrapper.querySelector('.d2h-file-name')
@@ -64,6 +64,28 @@ export function UnifiedDiffViewer({
         const path = nameEl.textContent?.trim()
         if (path) wrapper.setAttribute('data-file-path', path)
       }
+
+      const header = wrapper.querySelector(
+        '.d2h-file-header',
+      ) as HTMLElement | null
+      if (!header) continue
+
+      // Add chevron indicator
+      const chevron = document.createElement('span')
+      chevron.className = 'd2h-collapse-chevron'
+      chevron.textContent = '\u25B8' // ▸
+      header.prepend(chevron)
+
+      header.style.cursor = 'pointer'
+      header.addEventListener('click', () => {
+        const diff = wrapper.querySelector(
+          '.d2h-file-diff',
+        ) as HTMLElement | null
+        if (!diff) return
+        const collapsed = diff.style.display === 'none'
+        diff.style.display = collapsed ? '' : 'none'
+        chevron.classList.toggle('collapsed', !collapsed)
+      })
     }
   }, [data?.diff])
 
@@ -74,6 +96,13 @@ export function UnifiedDiffViewer({
       `[data-file-path="${CSS.escape(scrollToFile)}"]`,
     )
     if (wrapper) {
+      // Expand if collapsed
+      const diff = wrapper.querySelector('.d2h-file-diff') as HTMLElement | null
+      if (diff?.style.display === 'none') {
+        diff.style.display = ''
+        const chevron = wrapper.querySelector('.d2h-collapse-chevron')
+        chevron?.classList.remove('collapsed')
+      }
       wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
     onScrollComplete?.()
