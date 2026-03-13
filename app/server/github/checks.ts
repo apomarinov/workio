@@ -11,7 +11,8 @@ import type {
   PRReview,
   PRReviewThread,
 } from '../../shared/types'
-import type { HiddenGHAuthor, HiddenPR } from '../../src/types'
+import type { GHQueryLimits, HiddenGHAuthor, HiddenPR } from '../../src/types'
+import { DEFAULT_GH_QUERY_LIMITS } from '../../src/types'
 import {
   getAllTerminals,
   getSettings,
@@ -181,7 +182,8 @@ function decodeNodeId(nodeId: string): number | null {
 }
 
 // GraphQL fields for enriching open PRs with checks, reviews, comments, etc.
-const PR_DETAIL_FIELDS = `
+function getPRDetailFields(limits: GHQueryLimits): string {
+  return `
 number
 title
 body
@@ -200,7 +202,7 @@ commits(last: 1) {
     commit {
       oid
       statusCheckRollup {
-        contexts(first: 15) {
+        contexts(first: ${limits.checks}) {
           nodes {
             __typename
             ... on CheckRun {
@@ -221,7 +223,7 @@ commits(last: 1) {
     }
   }
 }
-reviews(last: 10) {
+reviews(last: ${limits.reviews}) {
   nodes {
     databaseId
     url
@@ -232,20 +234,20 @@ reviews(last: 10) {
     reactionGroups {
       content
       viewerHasReacted
-      reactors(first: 3) {
+      reactors(first: ${limits.reactors}) {
         nodes { ... on User { login } }
       }
     }
   }
 }
-reviewRequests(first: 10) {
+reviewRequests(first: ${limits.review_requests}) {
   nodes {
     requestedReviewer {
       ... on User { login }
     }
   }
 }
-comments(last: 10) {
+comments(last: ${limits.comments}) {
   nodes {
     databaseId
     url
@@ -255,15 +257,15 @@ comments(last: 10) {
     reactionGroups {
       content
       viewerHasReacted
-      reactors(first: 3) {
+      reactors(first: ${limits.reactors}) {
         nodes { ... on User { login } }
       }
     }
   }
 }
-reviewThreads(last: 10) {
+reviewThreads(last: ${limits.review_threads}) {
   nodes {
-    comments(first: 10) {
+    comments(first: ${limits.thread_comments}) {
       nodes {
         databaseId
         url
@@ -277,7 +279,7 @@ reviewThreads(last: 10) {
         reactionGroups {
           content
           viewerHasReacted
-          reactors(first: 3) {
+          reactors(first: ${limits.reactors}) {
             nodes { ... on User { login } }
           }
         }
@@ -286,6 +288,7 @@ reviewThreads(last: 10) {
   }
 }
 `
+}
 
 interface GraphQLCheckContext {
   __typename: 'CheckRun' | 'StatusContext'
@@ -755,6 +758,12 @@ async function fetchPRsViaRESTAndGraphQL(
   repos: string[],
   trackedBranches: Map<string, Set<string>>,
 ): Promise<{ openPRs: PRCheckStatus[]; closedPRs: PRCheckStatus[] }> {
+  const settings = await getSettings()
+  const limits: GHQueryLimits = {
+    ...DEFAULT_GH_QUERY_LIMITS,
+    ...settings.gh_query_limits,
+  }
+  const prDetailFields = getPRDetailFields(limits)
   const author = ghUsername || 'unknown'
 
   // Step 1: Discover PRs via REST (bypasses broken GitHub search index)
@@ -847,7 +856,7 @@ async function fetchPRsViaRESTAndGraphQL(
     for (const [repoKey, prNumbers] of openPRsByRepo) {
       const [owner, name] = repoKey.split('/')
       const prAliases = prNumbers.map(
-        (n) => `pr_${n}: pullRequest(number: ${n}) {${PR_DETAIL_FIELDS}}`,
+        (n) => `pr_${n}: pullRequest(number: ${n}) {${prDetailFields}}`,
       )
       queryParts.push(
         `repo_${repoIdx}: repository(owner: "${owner}", name: "${name}") {\n${prAliases.join('\n')}\n}`,

@@ -5,10 +5,11 @@ import {
   Brain,
   Code,
   EyeOff,
+  Github,
   Keyboard,
+  Settings,
   Smartphone,
   Type,
-  Webhook,
   Wrench,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -37,11 +38,11 @@ import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
 import type { CustomTerminalAction, PreferredIDE } from '../types'
 import { BackfillSection } from './BackfillModal'
+import { GitHubModal, useWebhookWarning } from './GitHubModal'
 import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 import { PushNotificationModal } from './PushNotificationModal'
-import { useWebhookWarning, WebhooksModal } from './WebhooksModal'
 
 interface SettingsModalProps {
   open: boolean
@@ -64,7 +65,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     'new-action' | boolean
   >(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
-  const [showWebhooksModal, setShowWebhooksModal] = useState(false)
+  const [showGitHubModal, setShowGitHubModal] = useState(false)
   const [showPushModal, setShowPushModal] = useState(false)
   const {
     hasWarning: hasWebhookWarning,
@@ -262,22 +263,23 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
                 onClick={() => setShowKeymapModal(true)}
               >
-                Configure
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Webhook
+                <Github
                   className={cn(
                     'w-4 h-4',
                     hasWebhookWarning && 'text-amber-500',
                   )}
                 />
-                <span className="text-sm font-medium">GitHub Webhooks</span>
+                <span className="text-sm font-medium">GitHub</span>
                 {hasWebhookWarning && (
                   <span className="inline-flex items-center gap-1 text-xs text-amber-500">
                     <AlertTriangle className="w-3 h-3" />
@@ -289,11 +291,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowWebhooksModal(true)}
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setShowGitHubModal(true)}
               >
-                Configure
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -303,9 +306,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             onOpenChange={setShowKeymapModal}
           />
 
-          <WebhooksModal
-            open={showWebhooksModal}
-            onOpenChange={setShowWebhooksModal}
+          <GitHubModal
+            open={showGitHubModal}
+            onOpenChange={setShowGitHubModal}
           />
 
           <div className="flex flex-col gap-3 border-t-[1px] pt-3">
@@ -322,11 +325,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
                 onClick={() => setShowCustomizeKeyboard(true)}
               >
-                Configure
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
             <div className="flex items-center justify-between">
@@ -343,11 +347,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </div>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
                 onClick={() => setShowPushModal(true)}
               >
-                Configure
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -449,7 +454,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   </label>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 ml-6">
-                  Skip sessions launched outside WorkIO terminals
+                  Skip sessions launched outside WorkIO
                 </p>
               </div>
               <Switch

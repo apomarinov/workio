@@ -413,6 +413,26 @@ export function migrateKeymap(keymap: Keymap): Keymap {
   return result
 }
 
+export interface GHQueryLimits {
+  checks: number // contexts(first: N) — CI check runs
+  reviews: number // reviews(last: N)
+  comments: number // comments(last: N)
+  review_threads: number // reviewThreads(last: N)
+  thread_comments: number // reviewThreads.comments(first: N)
+  review_requests: number // reviewRequests(first: N)
+  reactors: number // reactors(first: N)
+}
+
+export const DEFAULT_GH_QUERY_LIMITS: GHQueryLimits = {
+  checks: 5,
+  reviews: 10,
+  comments: 10,
+  review_threads: 10,
+  thread_comments: 10,
+  review_requests: 10,
+  reactors: 3,
+}
+
 export interface RepoWebhookStatus {
   id: number
   missing?: boolean
@@ -599,6 +619,7 @@ export interface Settings {
   vapid_public_key?: string
   vapid_private_key?: string
   push_subscriptions?: PushSubscriptionRecord[]
+  gh_query_limits?: GHQueryLimits
   // Computed webhook warning counts
   missingWebhookCount?: number
   orphanedWebhookCount?: number

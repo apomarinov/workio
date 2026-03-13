@@ -13,7 +13,7 @@ import type {
   Shell,
   Terminal,
 } from '../src/types'
-import { DEFAULT_KEYMAP } from '../src/types'
+import { DEFAULT_GH_QUERY_LIMITS, DEFAULT_KEYMAP } from '../src/types'
 import { env } from './env'
 import { log } from './logger'
 
@@ -920,6 +920,7 @@ const DEFAULT_CONFIG = {
   message_line_clamp: 5,
   preferred_ide: 'cursor' as const,
   keymap: DEFAULT_KEYMAP,
+  gh_query_limits: DEFAULT_GH_QUERY_LIMITS,
   ignore_external_sessions: false,
 }
 

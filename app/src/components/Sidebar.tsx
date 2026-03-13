@@ -56,6 +56,7 @@ import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import type { SessionWithProject, Terminal } from '../types'
 import { useBackfillCheck } from './BackfillModal'
+import { useWebhookWarning } from './GitHubModal'
 import { LogsModal } from './LogsModal'
 import { InvolvedPRsList, OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
@@ -66,7 +67,6 @@ import { SessionGroup } from './SessionGroup'
 import { SettingsModal } from './SettingsModal'
 import { MultiClientIndicator } from './ShellTabs'
 import { SortableTerminalItem } from './SortableTerminalItem'
-import { useWebhookWarning } from './WebhooksModal'
 
 interface SidebarProps {
   width?: number
