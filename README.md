@@ -90,7 +90,8 @@ Access everything with `Cmd+K` — multiple modes:
 - Fetches the full process list from each SSH host once per scan cycle via `ps` over SSH (batched per host — one SSH call regardless of how many shells are on that host)
 - Walks the remote process tree from the reported remote shell PID
 - Resource usage computed from the same fetched data
-- Port detection is local-only — listening ports on remote hosts are not detected
+- Listening ports detected via `ss` on the remote host, matched to terminal process trees
+- Detected remote ports can be forwarded locally via automatic SSH reverse port forwarding
 
 **Zellij (local):**
 - Finds the Zellij server PID by matching unix socket paths via `lsof`

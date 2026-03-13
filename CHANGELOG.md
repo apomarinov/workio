@@ -1,5 +1,50 @@
 # Changelog
 
+## [v0.5.0](../../compare/v0.4.0...v0.5.0) — 2026-03-13
+
+### Features
+- Add SSH connection pool, remote process scanning, and setup rerun support
+- Add per-SSH-host system resource collection and display with system-wide overview
+- Add SSH reverse port forwarding for remote detected ports
+- Enable "Open in IDE" for SSH terminals via `--remote ssh-remote+host`
+- Add SSH MaxSessions audit/fix in create terminal modal, allow input during setup/delete
+- Add remote SSH port detection via `ss` and remote Zellij process scanning
+- Add composite repo+host grouping in sidebar for SSH terminals
+- Add "Ignore external sessions" setting to skip non-WorkIO Claude sessions
+- Add ResourceInfo component with per-shell CPU/RAM usage bars, process list, and 3-mode toggle
+- Add session backfill feature to import untracked JSONL sessions
+- Add undo/drop commit actions to branch commits panel
+- Add hold-to-repeat for repeatable terminal action buttons
+- Add "Run Anyway" option to process running confirm modal
+- Add hover tooltips on terminal links showing available actions
+- Add retry option to apiFetch for network errors on wake from sleep
+- Add interactive edge swipe with element tracking, flick detection, and Tailwind v4 support
+
+### Improvements
+- Replace WebLinksAddon with custom URL link provider and OSC 8 handler
+- Improve shell tab styling: left-align text, accent chevron, symmetric padding
+- Add customizable truncate-fade and improve shell tab overflow behavior
+- Improve sidebar SSH repo label layout with inline host indicator
+- Unify goToTab shortcut with sidebar terminal ordering
+- Extract shared scanWorkers helper to deduplicate process scanning logic
+- Add X close button to commit and PR diff bottom sheets
+- Refactor sidebar button sizes for consistency
+- Select target terminal after successful PR branch checkout
+- Adopt existing webhooks on 422, add hours/minutes to formatDate
+- Add SSH keepalive, rename backfill button, lint fixes
+- Auto-create database in dev mode, add nvm use to dev script
+- Update architecture diagram to Mermaid with PTY worker layer
+
+### Bug Fixes
+- Fix URL and file path link detection across soft-wrapped terminal lines
+- Fix PR diff viewer and branch commits for SSH terminals
+- Fix PR icon not showing on terminal items when status bar is enabled
+- Fix duplicate shell client icons on reconnect
+- Fix edge swipe bugs: block non-edge opens, correct snap-back, remove dead sidebar buttons
+- Force git dirty status emit after commit and discard actions
+- Revalidate all SWR data on wake from sleep via timer gap detection
+- Fix SSH git config user.name failure, reorder status bar
+
 ## [v0.4.0](../../compare/v0.3.0...v0.4.0) — 2026-03-09
 
 ### Features
