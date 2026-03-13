@@ -653,7 +653,7 @@ function SortableShellTab({
       title={shell.active_cmd || undefined}
       onClick={onSelect}
       className={cn(
-        'group/tab flex items-center relative gap-1.5 px-2 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-l-[1px] first:border-l-transparent',
+        'group/tab flex items-center relative gap-1.5 px-2 py-1.5 text-xs transition-colors cursor-pointer flex-shrink-0 min-w-[100px] max-w-[180px] border-t-1 border-r-[1px]',
         hasActivity
           ? isActive
             ? 'border-t-green-500/90'

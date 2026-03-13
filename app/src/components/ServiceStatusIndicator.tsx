@@ -1,4 +1,10 @@
-import { AlertTriangle, Globe, HeartPulse, ServerOff } from 'lucide-react'
+import {
+  AlertTriangle,
+  CircleHelp,
+  Globe,
+  HeartPulse,
+  ServerOff,
+} from 'lucide-react'
 import { useState } from 'react'
 import {
   Dialog,
@@ -79,6 +85,46 @@ function StatusDot({ status }: { status: ServiceStatus }) {
   )
 }
 
+const SERVICE_INFO: Record<string, string> = {
+  'GitHub REST':
+    'The GitHub REST API is used to fetch pull request details, comments, reviews, and manage webhooks. GitHub imposes a rate limit of 5,000 requests per hour per authenticated user.',
+  'GitHub GraphQL':
+    'The GitHub GraphQL API is used for efficient batch queries — fetching PR check statuses, review threads, and repository metadata in a single request. Rate-limited to 5,000 points per hour.',
+  'GitHub Webhooks':
+    "GitHub webhooks deliver real-time notifications when events happen on your repositories (PR updates, comments, check completions). Missing webhooks mean some repos won't get live updates; orphaned webhooks are stale entries that can be cleaned up.",
+  ngrok:
+    'ngrok creates a public tunnel to your local server, making the entire app accessible over the internet (protected by basic auth). This is also how GitHub delivers webhook events to your machine. Without it, webhooks cannot reach you and PR updates will rely on polling instead.',
+  'Claude Tunnels':
+    'Claude tunnels connect remote SSH hosts back to your local WorkIO server via SSH reverse tunnels. Bootstrap sets up the forwarder script and hooks on the remote host. The tunnel keeps the connection alive so Claude hooks on remote machines can forward events back to WorkIO.',
+}
+
+function InfoButton({ label }: { label: string }) {
+  const [open, setOpen] = useState(false)
+  const info = SERVICE_INFO[label]
+  if (!info) return null
+  return (
+    <>
+      <button
+        type="button"
+        className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
+        onClick={() => setOpen(true)}
+      >
+        <CircleHelp className="w-3 h-3" />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm">{label}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {info}
+          </p>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function ErrorText({ error, label }: { error: string; label: string }) {
   const [open, setOpen] = useState(false)
   return (
@@ -118,9 +164,12 @@ function GitHubApiSection({
 
   return (
     <div className="py-1">
-      <div className="flex items-center gap-1.5">
-        <StatusDot status={api.status} />
-        <span className="text-xs font-medium">{label}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <StatusDot status={api.status} />
+          <span className="text-xs font-medium">{label}</span>
+        </div>
+        <InfoButton label={label} />
       </div>
       <div className="pl-3 mt-0.5 space-y-0">
         {api.remaining !== null && api.limit !== null && (
@@ -142,9 +191,12 @@ function GitHubApiSection({
 function NgrokSection({ ngrok }: { ngrok: NgrokStatus }) {
   return (
     <div className="py-1">
-      <div className="flex items-center gap-1.5">
-        <StatusDot status={ngrok.status} />
-        <span className="text-xs font-medium">ngrok</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <StatusDot status={ngrok.status} />
+          <span className="text-xs font-medium">ngrok</span>
+        </div>
+        <InfoButton label="ngrok" />
       </div>
       <div className="pl-3 mt-0.5 space-y-0">
         {ngrok.url && (
@@ -171,9 +223,12 @@ function WebhooksRow({
 
   return (
     <div className="py-1">
-      <div className="flex items-center gap-1.5">
-        <StatusDot status={webhookStatus} />
-        <span className="text-xs font-medium">GitHub Webhooks</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <StatusDot status={webhookStatus} />
+          <span className="text-xs font-medium">GitHub Webhooks</span>
+        </div>
+        <InfoButton label="GitHub Webhooks" />
       </div>
       {hasIssues && (
         <div className="pl-3 mt-0.5 space-y-0">
@@ -309,10 +364,13 @@ export function ServiceStatusIndicator({ className }: { className?: string }) {
         {tunnelEntries.length > 0 && (
           <>
             <div className="border-t border-zinc-700/50 my-2" />
-            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <ClaudeIcon className="w-3 h-3" />
-              Claude Tunnels
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <ClaudeIcon className="w-3 h-3" />
+                Claude Tunnels
+              </span>
+              <InfoButton label="Claude Tunnels" />
+            </div>
             <div className="mt-1.5 space-y-0.5">
               {tunnelEntries.map(([id, tunnel]) => (
                 <TunnelRow key={id} stableId={id} tunnel={tunnel} />
