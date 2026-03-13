@@ -177,7 +177,7 @@ function broadcastExit(shellId: number, code: number): void {
   }
 }
 
-function broadcastShellClients(shellId: number): void {
+function getShellClientsList(shellId: number): ShellClient[] {
   const state = shells.get(shellId)
   const clients: ShellClient[] = []
   if (state) {
@@ -199,8 +199,24 @@ function broadcastShellClients(shellId: number): void {
       })
     }
   }
+  return clients
+}
+
+function broadcastShellClients(shellId: number): void {
   const io = getIO()
-  io?.emit('shell:clients', { shellId, clients })
+  io?.emit('shell:clients', { shellId, clients: getShellClientsList(shellId) })
+}
+
+/** Emit current shell:clients state for all active shells to a specific socket. */
+export function emitAllShellClients(socket: {
+  emit: (ev: string, data: unknown) => void
+}): void {
+  for (const shellId of shells.keys()) {
+    const clients = getShellClientsList(shellId)
+    if (clients.length > 0) {
+      socket.emit('shell:clients', { shellId, clients })
+    }
+  }
 }
 
 /**

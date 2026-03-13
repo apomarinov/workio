@@ -86,7 +86,7 @@ import terminalRoutes from './routes/terminals'
 import { getServicesStatus, updateNgrokStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
-import { handleUpgrade } from './ws/terminal'
+import { emitAllShellClients, handleUpgrade } from './ws/terminal'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -277,6 +277,7 @@ setIO(io)
 
 io.on('connection', (socket) => {
   log.info(`Client connected: ${socket.id}`)
+  emitAllShellClients(socket)
   emitCachedPRChecks(socket)
   refreshPRChecks()
   startGitDirtyPolling()
