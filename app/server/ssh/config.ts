@@ -54,6 +54,13 @@ export function listSSHHosts(): SSHHostEntry[] {
   return hosts
 }
 
+export function resolveStableHostId(alias: string): string | null {
+  const result = validateSSHHost(alias)
+  if (!result.valid) return null
+  const { user, hostname, port } = result.config
+  return port === 22 ? `${user}@${hostname}` : `${user}@${hostname}:${port}`
+}
+
 export function validateSSHHost(
   alias: string,
 ):

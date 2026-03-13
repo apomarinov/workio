@@ -17,6 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { env } from '../env'
 import { log } from '../logger'
+import { resolveStableHostId } from './config'
 import { poolExecSSHCommand } from './pool'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -29,11 +30,14 @@ interface HostState {
   status: 'setup' | 'done' | 'failed'
   tunnel: ChildProcess | null
   retries: number
+  tunnelRetries: number
+  alias: string
 }
 
 const hostStates = new Map<string, HostState>()
 
 const MAX_BOOTSTRAP_RETRIES = 5
+const MAX_TUNNEL_RETRIES = 5
 
 // Whether the server is shutting down (suppress tunnel restarts)
 let shuttingDown = false
@@ -57,13 +61,25 @@ const HOOK_DEFINITIONS: Record<string, { matcher?: string }> = {
  * No-ops if already setup or done.
  */
 export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
-  const existing = hostStates.get(hostAlias)
+  const stableId = resolveStableHostId(hostAlias)
+  if (!stableId) {
+    log.error(`[claude-fwd] Cannot resolve stable host ID for ${hostAlias}`)
+    return
+  }
+
+  const existing = hostStates.get(stableId)
   if (existing && (existing.status === 'setup' || existing.status === 'done')) {
     return
   }
 
   const retries = existing?.retries ?? 0
-  hostStates.set(hostAlias, { status: 'setup', tunnel: null, retries })
+  hostStates.set(stableId, {
+    status: 'setup',
+    tunnel: null,
+    retries,
+    tunnelRetries: 0,
+    alias: hostAlias,
+  })
 
   try {
     // Step 1: Check if Claude is installed on remote
@@ -75,12 +91,18 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
       log.info(
         `[claude-fwd] Claude not installed on ${hostAlias}, skipping bootstrap`,
       )
-      hostStates.set(hostAlias, { status: 'failed', tunnel: null, retries: hostStates.get(hostAlias)?.retries ?? 0 })
+      hostStates.set(stableId, {
+        status: 'failed',
+        tunnel: null,
+        retries: hostStates.get(stableId)?.retries ?? 0,
+        tunnelRetries: 0,
+        alias: hostAlias,
+      })
       return
     }
 
-    // Step 2: Write host config on remote
-    const configJson = JSON.stringify({ host_alias: hostAlias })
+    // Step 2: Write host config on remote (use stable ID so project lookups survive alias renames)
+    const configJson = JSON.stringify({ host_alias: stableId })
     await poolExecSSHCommand(
       hostAlias,
       `mkdir -p ~/.workio && printf '%s' '${configJson.replace(/'/g, "'\\''")}' > ~/.workio/config.json`,
@@ -101,7 +123,13 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
         { err },
         `[claude-fwd] Failed to copy forwarder to ${hostAlias}`,
       )
-      hostStates.set(hostAlias, { status: 'failed', tunnel: null, retries: hostStates.get(hostAlias)?.retries ?? 0 })
+      hostStates.set(stableId, {
+        status: 'failed',
+        tunnel: null,
+        retries: hostStates.get(stableId)?.retries ?? 0,
+        tunnelRetries: 0,
+        alias: hostAlias,
+      })
       return
     }
 
@@ -178,29 +206,47 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
       }
     } catch (err) {
       log.error({ err }, `[claude-fwd] Failed to merge hooks on ${hostAlias}`)
-      hostStates.set(hostAlias, { status: 'failed', tunnel: null, retries: hostStates.get(hostAlias)?.retries ?? 0 })
+      hostStates.set(stableId, {
+        status: 'failed',
+        tunnel: null,
+        retries: hostStates.get(stableId)?.retries ?? 0,
+        tunnelRetries: 0,
+        alias: hostAlias,
+      })
       return
     }
 
-    // Step 6: Start reverse tunnel
-    startTunnel(hostAlias)
+    // Step 6: Start reverse tunnel (uses alias for SSH CLI)
+    await startTunnel(stableId)
 
-    const doneState = hostStates.get(hostAlias)
+    const doneState = hostStates.get(stableId)
     if (doneState) {
       doneState.status = 'done'
       doneState.retries = 0
     }
-    log.info(`[claude-fwd] Bootstrap complete for ${hostAlias}`)
+    log.info(`[claude-fwd] Bootstrap complete for ${hostAlias} (${stableId})`)
   } catch (err) {
     log.error({ err }, `[claude-fwd] Bootstrap failed for ${hostAlias}`)
-    hostStates.set(hostAlias, { status: 'failed', tunnel: null, retries: hostStates.get(hostAlias)?.retries ?? 0 })
+    hostStates.set(stableId, {
+      status: 'failed',
+      tunnel: null,
+      retries: hostStates.get(stableId)?.retries ?? 0,
+      tunnelRetries: 0,
+      alias: hostAlias,
+    })
   }
 
   // Auto-retry if bootstrap failed (any failure path, including inner catches)
-  const state = hostStates.get(hostAlias)
-  if (state?.status === 'failed' && !shuttingDown && state.retries < MAX_BOOTSTRAP_RETRIES) {
+  const state = hostStates.get(stableId)
+  if (
+    state?.status === 'failed' &&
+    !shuttingDown &&
+    state.retries < MAX_BOOTSTRAP_RETRIES
+  ) {
     state.retries++
-    log.info(`[claude-fwd] Retrying bootstrap for ${hostAlias} (${state.retries}/${MAX_BOOTSTRAP_RETRIES})`)
+    log.info(
+      `[claude-fwd] Retrying bootstrap for ${hostAlias} (${state.retries}/${MAX_BOOTSTRAP_RETRIES})`,
+    )
     setTimeout(() => {
       if (!shuttingDown) {
         bootstrapRemoteHost(hostAlias).catch(() => {})
@@ -212,8 +258,25 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
 /**
  * Start an SSH reverse tunnel for a host.
  * Port 18765 on remote → local SERVER_PORT.
+ * Kills any stale listener on the remote port before connecting.
+ * @param stableId - The stable host identifier (user@hostname[:port]) used as map key
  */
-function startTunnel(hostAlias: string): void {
+async function startTunnel(stableId: string): Promise<void> {
+  const state = hostStates.get(stableId)
+  if (!state) return
+  const { alias } = state
+
+  // Kill any stale process holding the tunnel port on the remote
+  try {
+    await poolExecSSHCommand(
+      alias,
+      `fuser -k ${TUNNEL_PORT}/tcp 2>/dev/null || true`,
+      { timeout: 5000 },
+    )
+  } catch {
+    // Best-effort — fuser may not be installed
+  }
+
   const serverPort = env.SERVER_PORT
   const tunnel = spawn(
     'ssh',
@@ -227,7 +290,7 @@ function startTunnel(hostAlias: string): void {
       'ServerAliveCountMax=3',
       '-R',
       `${TUNNEL_PORT}:127.0.0.1:${serverPort}`,
-      hostAlias,
+      alias,
     ],
     {
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -236,31 +299,40 @@ function startTunnel(hostAlias: string): void {
 
   tunnel.stderr?.on('data', (data: Buffer) => {
     const msg = data.toString().trim()
-    if (msg) log.info(`[claude-fwd:tunnel:${hostAlias}] ${msg}`)
+    if (msg) log.info(`[claude-fwd:tunnel:${alias}] ${msg}`)
   })
 
   tunnel.on('exit', (code, signal) => {
     log.info(
-      `[claude-fwd] Tunnel to ${hostAlias} exited (code=${code}, signal=${signal})`,
+      `[claude-fwd] Tunnel to ${alias} exited (code=${code}, signal=${signal})`,
     )
-    const state = hostStates.get(hostAlias)
-    if (state) state.tunnel = null
+    const currentState = hostStates.get(stableId)
+    if (currentState) currentState.tunnel = null
 
-    // Auto-restart unless shutting down
-    if (!shuttingDown && state?.status === 'done') {
-      log.info(`[claude-fwd] Restarting tunnel to ${hostAlias} in 5s`)
+    // Auto-restart unless shutting down or retries exhausted
+    if (!shuttingDown && currentState?.status === 'done') {
+      currentState.tunnelRetries++
+      if (currentState.tunnelRetries > MAX_TUNNEL_RETRIES) {
+        log.error(
+          `[claude-fwd] Tunnel to ${alias} failed ${MAX_TUNNEL_RETRIES} times, giving up`,
+        )
+        return
+      }
+      const delay = Math.min(5000 * currentState.tunnelRetries, 30000)
+      log.info(
+        `[claude-fwd] Restarting tunnel to ${alias} in ${delay / 1000}s (${currentState.tunnelRetries}/${MAX_TUNNEL_RETRIES})`,
+      )
       setTimeout(() => {
-        if (!shuttingDown && hostStates.get(hostAlias)?.status === 'done') {
-          startTunnel(hostAlias)
+        if (!shuttingDown && hostStates.get(stableId)?.status === 'done') {
+          startTunnel(stableId)
         }
-      }, 5000)
+      }, delay)
     }
   })
 
-  const state = hostStates.get(hostAlias)
-  if (state) state.tunnel = tunnel
+  state.tunnel = tunnel
   log.info(
-    `[claude-fwd] Tunnel started: ${hostAlias} -R ${TUNNEL_PORT}:127.0.0.1:${serverPort}`,
+    `[claude-fwd] Tunnel started: ${alias} -R ${TUNNEL_PORT}:127.0.0.1:${serverPort}`,
   )
 }
 
@@ -269,9 +341,9 @@ function startTunnel(hostAlias: string): void {
  */
 export function shutdownAllTunnels(): void {
   shuttingDown = true
-  for (const [hostAlias, state] of hostStates) {
+  for (const [stableId, state] of hostStates) {
     if (state.tunnel) {
-      log.info(`[claude-fwd] Killing tunnel to ${hostAlias}`)
+      log.info(`[claude-fwd] Killing tunnel to ${state.alias} (${stableId})`)
       state.tunnel.kill('SIGTERM')
       state.tunnel = null
     }
