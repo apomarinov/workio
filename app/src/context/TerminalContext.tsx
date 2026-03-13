@@ -325,6 +325,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const [servicesStatus, setServicesStatus] = useState<ServicesStatus | null>(
     null,
   )
+
   useEffect(() => {
     return subscribe<ServicesStatus>('services:status', setServicesStatus)
   }, [subscribe])
@@ -1189,7 +1190,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refetch = useCallback(() => mutate(), [mutate])
-  console.log(servicesStatus)
+
   const value = useMemo(
     () => ({
       terminals,

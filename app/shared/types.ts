@@ -243,12 +243,16 @@ export interface NgrokStatus {
   url: string | null
 }
 
-export interface ClaudeTunnelStatus {
+export interface ClaudeSubStatus {
   status: ServiceStatus
   error: string | null
+  retries: number
+}
+
+export interface ClaudeTunnelStatus {
   alias: string
-  bootstrapRetries: number
-  tunnelRetries: number
+  bootstrap: ClaudeSubStatus
+  tunnel: ClaudeSubStatus
 }
 
 export interface ServicesStatus {

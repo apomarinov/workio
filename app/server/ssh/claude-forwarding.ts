@@ -17,7 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { env } from '../env'
 import { log } from '../logger'
-import { updateClaudeTunnel } from '../services/status'
+import { updateClaudeBootstrap, updateClaudeTunnel } from '../services/status'
 import { resolveStableHostId } from './config'
 import { poolExecSSHCommand } from './pool'
 
@@ -81,12 +81,11 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
     tunnelRetries: 0,
     alias: hostAlias,
   })
-  updateClaudeTunnel(stableId, {
+  updateClaudeBootstrap(stableId, {
     status: 'starting',
     error: null,
     alias: hostAlias,
-    bootstrapRetries: retries,
-    tunnelRetries: 0,
+    retries,
   })
 
   try {
@@ -106,7 +105,7 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
         tunnelRetries: 0,
         alias: hostAlias,
       })
-      updateClaudeTunnel(stableId, {
+      updateClaudeBootstrap(stableId, {
         status: 'inactive',
         error: 'Claude not installed',
       })
@@ -142,7 +141,7 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
         tunnelRetries: 0,
         alias: hostAlias,
       })
-      updateClaudeTunnel(stableId, {
+      updateClaudeBootstrap(stableId, {
         status: 'error',
         error: `Failed to copy forwarder: ${String(err)}`,
       })
@@ -229,7 +228,7 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
         tunnelRetries: 0,
         alias: hostAlias,
       })
-      updateClaudeTunnel(stableId, {
+      updateClaudeBootstrap(stableId, {
         status: 'error',
         error: `Failed to merge hooks: ${String(err)}`,
       })
@@ -244,10 +243,10 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
       doneState.status = 'done'
       doneState.retries = 0
     }
-    updateClaudeTunnel(stableId, {
+    updateClaudeBootstrap(stableId, {
       status: 'healthy',
       error: null,
-      bootstrapRetries: 0,
+      retries: 0,
     })
     log.info(`[claude-fwd] Bootstrap complete for ${hostAlias} (${stableId})`)
   } catch (err) {
@@ -259,7 +258,7 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
       tunnelRetries: 0,
       alias: hostAlias,
     })
-    updateClaudeTunnel(stableId, {
+    updateClaudeBootstrap(stableId, {
       status: 'error',
       error: `Bootstrap failed: ${String(err)}`,
     })
@@ -348,14 +347,14 @@ async function startTunnel(stableId: string): Promise<void> {
         updateClaudeTunnel(stableId, {
           status: 'error',
           error: `Tunnel failed ${MAX_TUNNEL_RETRIES} times`,
-          tunnelRetries: currentState.tunnelRetries,
+          retries: currentState.tunnelRetries,
         })
         return
       }
       updateClaudeTunnel(stableId, {
         status: 'degraded',
         error: `Tunnel exited (code=${code})`,
-        tunnelRetries: currentState.tunnelRetries,
+        retries: currentState.tunnelRetries,
       })
       const delay = Math.min(5000 * currentState.tunnelRetries, 30000)
       log.info(
@@ -374,7 +373,7 @@ async function startTunnel(stableId: string): Promise<void> {
   updateClaudeTunnel(stableId, {
     status: 'healthy',
     error: null,
-    tunnelRetries: 0,
+    retries: 0,
   })
   log.info(
     `[claude-fwd] Tunnel started: ${alias} -R ${TUNNEL_PORT}:127.0.0.1:${serverPort}`,

@@ -1,5 +1,5 @@
 import type {
-  ClaudeTunnelStatus,
+  ClaudeSubStatus,
   GitHubApiStatus,
   NgrokStatus,
   ServicesStatus,
@@ -19,6 +19,12 @@ const defaultNgrokStatus: NgrokStatus = {
   status: 'inactive',
   error: null,
   url: null,
+}
+
+const defaultSubStatus: ClaudeSubStatus = {
+  status: 'inactive',
+  error: null,
+  retries: 0,
 }
 
 const servicesStatus: ServicesStatus = {
@@ -47,23 +53,35 @@ export function updateNgrokStatus(patch: Partial<NgrokStatus>) {
   emit()
 }
 
+function ensureHost(stableId: string, alias?: string) {
+  if (!servicesStatus.claudeTunnels[stableId]) {
+    servicesStatus.claudeTunnels[stableId] = {
+      alias: alias ?? '',
+      bootstrap: { ...defaultSubStatus },
+      tunnel: { ...defaultSubStatus },
+    }
+  } else if (alias) {
+    servicesStatus.claudeTunnels[stableId].alias = alias
+  }
+  return servicesStatus.claudeTunnels[stableId]
+}
+
+export function updateClaudeBootstrap(
+  stableId: string,
+  patch: Partial<ClaudeSubStatus> & { alias?: string },
+) {
+  const host = ensureHost(stableId, patch.alias)
+  const { alias: _, ...subPatch } = patch
+  Object.assign(host.bootstrap, subPatch)
+  emit()
+}
+
 export function updateClaudeTunnel(
   stableId: string,
-  patch: Partial<ClaudeTunnelStatus>,
+  patch: Partial<ClaudeSubStatus>,
 ) {
-  const existing = servicesStatus.claudeTunnels[stableId]
-  if (existing) {
-    Object.assign(existing, patch)
-  } else {
-    servicesStatus.claudeTunnels[stableId] = {
-      status: 'inactive',
-      error: null,
-      alias: '',
-      bootstrapRetries: 0,
-      tunnelRetries: 0,
-      ...patch,
-    }
-  }
+  const host = ensureHost(stableId)
+  Object.assign(host.tunnel, patch)
   emit()
 }
 

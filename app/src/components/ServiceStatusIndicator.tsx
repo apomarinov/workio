@@ -1,4 +1,11 @@
-import { AlertTriangle, HeartPulse, ServerOff } from 'lucide-react'
+import { AlertTriangle, Globe, HeartPulse, ServerOff } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Popover,
   PopoverContent,
@@ -7,6 +14,7 @@ import {
 import { useTerminalContext } from '@/context/TerminalContext'
 import { cn } from '@/lib/utils'
 import type {
+  ClaudeSubStatus,
   ClaudeTunnelStatus,
   GitHubApiStatus,
   NgrokStatus,
@@ -33,9 +41,11 @@ function overallStatus(
     status.githubRest.status,
     status.githubGraphql.status,
     status.ngrok.status,
-    ...Object.values(status.claudeTunnels).map((t) => t.status),
+    ...Object.values(status.claudeTunnels).flatMap((t) => [
+      t.bootstrap.status,
+      t.tunnel.status,
+    ]),
   ]
-  // Factor webhook health into overall status
   if (webhookWarning.missingCount > 0) all.push('error')
   else if (webhookWarning.orphanedCount > 0) all.push('degraded')
   return worstStatus(all)
@@ -69,6 +79,31 @@ function StatusDot({ status }: { status: ServiceStatus }) {
   )
 }
 
+function ErrorText({ error, label }: { error: string; label: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        className="text-[10px] text-red-400 truncate max-w-full text-left cursor-pointer hover:underline"
+        onClick={() => setOpen(true)}
+      >
+        {error}
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-sm">{label} Error</DialogTitle>
+          </DialogHeader>
+          <pre className="text-xs text-red-400 whitespace-pre-wrap break-all bg-zinc-900 rounded p-3 max-h-[60vh] overflow-auto">
+            {error}
+          </pre>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function GitHubApiSection({
   label,
   api,
@@ -98,9 +133,7 @@ function GitHubApiSection({
             Resets in: {resetMin}m
           </div>
         )}
-        {api.error && (
-          <div className="text-[10px] text-red-400">{api.error}</div>
-        )}
+        {api.error && <ErrorText error={api.error} label={label} />}
       </div>
     </div>
   )
@@ -119,9 +152,7 @@ function NgrokSection({ ngrok }: { ngrok: NgrokStatus }) {
             {ngrok.url.replace('https://', '')}
           </div>
         )}
-        {ngrok.error && (
-          <div className="text-[10px] text-red-400">{ngrok.error}</div>
-        )}
+        {ngrok.error && <ErrorText error={ngrok.error} label="ngrok" />}
       </div>
     </div>
   )
@@ -162,6 +193,25 @@ function WebhooksRow({
   )
 }
 
+function SubStatusRow({ label, sub }: { label: string; sub: ClaudeSubStatus }) {
+  if (sub.status === 'inactive') return null
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <StatusDot status={sub.status} />
+        <span className="text-[11px] text-muted-foreground truncate">
+          {label}
+        </span>
+      </div>
+      {sub.retries > 0 && (
+        <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
+          retries: {sub.retries}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function TunnelRow({
   stableId,
   tunnel,
@@ -169,22 +219,27 @@ function TunnelRow({
   stableId: string
   tunnel: ClaudeTunnelStatus
 }) {
+  const hostLabel = tunnel.alias || stableId
   return (
-    <div className="flex items-center justify-between gap-4 py-0.5">
-      <div className="flex items-center gap-1.5 min-w-0">
-        <StatusDot status={tunnel.status} />
-        <span className="text-xs truncate">{tunnel.alias || stableId}</span>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {tunnel.tunnelRetries > 0 && (
-          <span className="text-[10px] text-muted-foreground tabular-nums">
-            retries: {tunnel.tunnelRetries}
-          </span>
+    <div className="py-0.5">
+      <span className="text-xs font-medium truncate flex items-center gap-1">
+        <Globe className="w-3 h-3 flex-shrink-0" />
+        {hostLabel}
+      </span>
+      <div className="pl-3 mt-0.5 space-y-0.5">
+        <SubStatusRow label="Bootstrap" sub={tunnel.bootstrap} />
+        {tunnel.bootstrap.error && (
+          <ErrorText
+            error={tunnel.bootstrap.error}
+            label={`${hostLabel} Bootstrap`}
+          />
         )}
-        {tunnel.error && (
-          <span className="text-[10px] text-red-400 truncate max-w-[120px]">
-            {tunnel.error}
-          </span>
+        <SubStatusRow label="Tunnel" sub={tunnel.tunnel} />
+        {tunnel.tunnel.error && (
+          <ErrorText
+            error={tunnel.tunnel.error}
+            label={`${hostLabel} Tunnel`}
+          />
         )}
       </div>
     </div>
