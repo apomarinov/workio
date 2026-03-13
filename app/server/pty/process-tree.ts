@@ -1,5 +1,6 @@
 import { execFile as execFileCb } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import { promisify } from 'node:util'
 import type { ActiveProcess } from '../../shared/types'
 import { log } from '../logger'
@@ -339,6 +340,56 @@ export async function getSystemResourceUsage(): Promise<
     log.error({ err }, '[pty] Failed to get system resource usage')
   }
   return result
+}
+
+/**
+ * Get system memory used percentage (0-100), matching macOS memory pressure.
+ *
+ * macOS: runs `memory_pressure` → parses "System-wide memory free percentage"
+ * Linux: reads /proc/meminfo → MemTotal - MemAvailable
+ *
+ * Returns { usedKb, usedPercent } or null on failure.
+ */
+export async function getSystemMemoryUsage(): Promise<{
+  usedKb: number
+  usedPercent: number
+} | null> {
+  try {
+    if (process.platform === 'darwin') {
+      const { stdout } = await execFileAsync('memory_pressure', [], {
+        encoding: 'utf8',
+        timeout: 2000,
+      })
+      const match = stdout.match(/memory free percentage:\s*(\d+)%/)
+      if (!match) return null
+      const freePercent = Number.parseInt(match[1], 10)
+      const totalKb = Math.round(os.totalmem() / 1024)
+      const usedPercent = 100 - freePercent
+      return { usedKb: Math.round((totalKb * usedPercent) / 100), usedPercent }
+    }
+
+    // Linux: MemTotal - MemAvailable
+    const meminfo = fs.readFileSync('/proc/meminfo', 'utf8')
+    let total = 0
+    let available = 0
+    for (const line of meminfo.split('\n')) {
+      const m = line.match(/^(MemTotal|MemAvailable):\s+(\d+)\s+kB/)
+      if (m) {
+        if (m[1] === 'MemTotal') total = Number.parseInt(m[2], 10)
+        else available = Number.parseInt(m[2], 10)
+      }
+    }
+    if (total > 0 && available > 0) {
+      return {
+        usedKb: total - available,
+        usedPercent: Math.round(((total - available) / total) * 100),
+      }
+    }
+    return null
+  } catch (err) {
+    log.error({ err }, '[pty] Failed to get system memory usage')
+    return null
+  }
 }
 
 // Get all TCP listening ports on the system, grouped by PID

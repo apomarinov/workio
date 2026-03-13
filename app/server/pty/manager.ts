@@ -48,6 +48,7 @@ import {
   getRemoteProcessList,
   getRemoteZellijSessionProcesses,
   getSystemListeningPorts,
+  getSystemMemoryUsage,
   getSystemResourceUsage,
   getZellijSessionProcesses,
   type RemoteProcessInfo,
@@ -392,9 +393,10 @@ async function scanWorkers(handles: WorkerHandle[]) {
     await Promise.all(fetches)
   })
 
-  const [systemPorts, systemResources] = await Promise.all([
+  const [systemPorts, systemResources, systemMemory] = await Promise.all([
     getSystemListeningPorts(),
     getSystemResourceUsage(),
+    getSystemMemoryUsage(),
     ...remotePromises,
   ])
   const ports: Record<number, number[]> = {}
@@ -506,14 +508,15 @@ async function scanWorkers(handles: WorkerHandle[]) {
 
   stampProcessStartTimes(allProcesses)
 
-  // Compute total system resource usage from all local processes only
+  // Compute total system CPU from all local processes
   let systemCpu = 0
-  let systemRss = 0
-  for (const { rss, cpu } of systemResources.values()) {
+  for (const { cpu } of systemResources.values()) {
     systemCpu += cpu
-    systemRss += rss
   }
   systemCpu = Math.round(systemCpu * 10) / 10
+  // Use OS-level memory stats (memory pressure on macOS, MemAvailable on Linux)
+  // instead of summing per-process RSS which double-counts shared memory
+  const systemRss = systemMemory?.usedKb ?? 0
 
   // Compute per-SSH-host system totals
   const hostResources: Record<string, HostResourceInfo> = {}
