@@ -49,6 +49,7 @@ export interface Terminal {
 
 export interface Project {
   id: number
+  host: string
   path: string
 }
 

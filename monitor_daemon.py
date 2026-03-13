@@ -7,6 +7,7 @@ hook events forwarded by the thin-client monitor.py.
 Started by the Node.js server on startup.
 """
 
+import hashlib
 import json
 import os
 import signal
@@ -212,27 +213,45 @@ def read_last_assistant_message(transcript_path: str, max_bytes: int = 8192) -> 
     return None
 
 
-def process_event(event: dict, env: dict) -> dict:
+def process_event(event: dict, env: dict, host: str = 'local', session_index: dict | None = None) -> dict:
     """Process a single hook event. Returns the response dict."""
+    is_remote = host != 'local'
+
     with _db_lock:
         conn = get_conn()
         try:
             session_id = event.get('session_id', 'unknown')
             transcript_path = event.get('transcript_path', '')
-            project_path = resolve_project_path(transcript_path) or event.get('cwd', '')
             hook_type = event.get('hook_event_name', '')
             terminal_id_str = env.get('WORKIO_TERMINAL_ID')
             terminal_id = int(terminal_id_str) if terminal_id_str else None
             shell_id_str = env.get('WORKIO_SHELL_ID')
             shell_id = int(shell_id_str) if shell_id_str else None
 
+            # Remote hooks: cwd is already resolved by the forwarder
+            # Local hooks: resolve from transcript path
+            if is_remote:
+                project_path = event.get('cwd', '')
+            else:
+                project_path = resolve_project_path(transcript_path) or event.get('cwd', '')
+
             if terminal_id is None and shell_id is None:
                 if get_ignore_external_sessions(conn):
-                    logging.debug("Ignoring external session %s (no WORKIO_TERMINAL_ID/WORKIO_SHELL_ID)", session_id)
                     return {"continue": True}
 
-            log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=terminal_id_str)
-            save_hook(conn, session_id, hook_type, event)
+            log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=terminal_id_str, host=host)
+
+            # Compute dedupe_key for remote hooks
+            dedupe_key = None
+            if is_remote:
+                timestamp = event.get('timestamp', '')
+                dedupe_key = hashlib.sha256(f"{session_id}:{hook_type}:{timestamp}".encode()).hexdigest()[:64]
+
+            inserted = save_hook(conn, session_id, hook_type, event, dedupe_key)
+            if not inserted:
+                # Duplicate remote hook — ACK without processing
+                conn.commit()
+                return {"continue": True}
 
             # Determine session status
             status = None
@@ -251,7 +270,7 @@ def process_event(event: dict, env: dict) -> dict:
                 elif notification_type == 'idle_prompt':
                     status = 'idle'
 
-            project_id = upsert_project(conn, project_path)
+            project_id = upsert_project(conn, project_path, host)
 
             if status:
                 upsert_session(conn, session_id, project_id, status, transcript_path, terminal_id, shell_id)
@@ -264,8 +283,15 @@ def process_event(event: dict, env: dict) -> dict:
                     log(conn, "Created prompt", session_id=session_id)
 
             if hook_type in ('SessionStart', 'UserPromptSubmit'):
-                stored_path = get_session_project_path(conn, session_id) or project_path
-                update_session_from_index(conn, stored_path, session_id)
+                # Remote hooks: use session_index from forwarder payload
+                if is_remote and session_index:
+                    name = session_index.get('customTitle') or session_index.get('firstPrompt') or session_index.get('name')
+                    message_count = session_index.get('messageCount')
+                    if name or message_count:
+                        update_session_metadata(conn, session_id, name, message_count)
+                else:
+                    stored_path = get_session_project_path(conn, session_id) or project_path
+                    update_session_from_index(conn, stored_path, session_id)
 
             if hook_type == 'UserPromptSubmit':
                 prompt_text = event.get('prompt', '')
@@ -273,10 +299,14 @@ def process_event(event: dict, env: dict) -> dict:
                 update_session_name_if_empty(conn, session_id, prompt_text)
                 log(conn, "Created prompt", session_id=session_id, prompt_length=len(prompt_text))
 
-            # Extract last assistant message from transcript for Stop notifications
+            # Extract last assistant message for Stop notifications
             last_message = None
-            if hook_type == 'Stop' and transcript_path:
-                last_message = read_last_assistant_message(transcript_path)
+            if hook_type == 'Stop':
+                if is_remote:
+                    # Remote: use event field (transcript mirror may not have it yet)
+                    last_message = event.get('last_assistant_message')
+                elif transcript_path:
+                    last_message = read_last_assistant_message(transcript_path)
 
             notify(conn, "hook", {
                 "session_id": session_id,
@@ -321,8 +351,10 @@ class HookHandler(socketserver.StreamRequestHandler):
             message = json.loads(line)
             event = message.get('event', {})
             env = message.get('env', {})
+            host = message.get('host', 'local')
+            session_index = message.get('session_index')
 
-            response = process_event(event, env)
+            response = process_event(event, env, host, session_index)
             self.wfile.write(json.dumps(response).encode() + b'\n')
             self.wfile.flush()
 

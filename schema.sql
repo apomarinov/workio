@@ -5,7 +5,9 @@
 -- Projects table
 CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
-    path TEXT UNIQUE
+    host VARCHAR(255) NOT NULL DEFAULT 'local',
+    path TEXT,
+    UNIQUE(host, path)
 );
 
 -- Sessions table
@@ -59,6 +61,7 @@ CREATE TABLE IF NOT EXISTS hooks (
     session_id VARCHAR(100),
     hook_type VARCHAR(30),
     payload JSONB,
+    dedupe_key VARCHAR(128) UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

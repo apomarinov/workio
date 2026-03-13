@@ -91,10 +91,12 @@ export async function initDb() {
 
 export async function getProjectByPath(
   cwd: string,
+  host = 'local',
 ): Promise<Project | undefined> {
-  const { rows } = await pool.query('SELECT * FROM projects WHERE path = $1', [
-    cwd,
-  ])
+  const { rows } = await pool.query(
+    'SELECT * FROM projects WHERE host = $1 AND path = $2',
+    [host, cwd],
+  )
   return rows[0]
 }
 
@@ -107,14 +109,15 @@ export async function getProjectById(id: number): Promise<Project | undefined> {
 
 export async function upsertProject(
   projectPath: string,
+  host = 'local',
   client?: pg.PoolClient,
 ): Promise<number> {
   const db = client ?? pool
   const { rows } = await db.query(
-    `INSERT INTO projects (path) VALUES ($1)
-     ON CONFLICT (path) DO UPDATE SET path = EXCLUDED.path
+    `INSERT INTO projects (host, path) VALUES ($1, $2)
+     ON CONFLICT (host, path) DO UPDATE SET path = EXCLUDED.path
      RETURNING id`,
-    [projectPath],
+    [host, projectPath],
   )
   return rows[0].id
 }

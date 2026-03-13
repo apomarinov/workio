@@ -77,11 +77,13 @@ import {
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
 import { initWebPush, markDesktopActive } from './push'
+import claudeHookRoute from './routes/claude-hook'
 import logsRoutes from './routes/logs'
 import notificationRoutes from './routes/notifications'
 import sessionRoutes from './routes/sessions'
 import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
+import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
 import { handleUpgrade } from './ws/terminal'
 
@@ -1047,6 +1049,7 @@ await fastify.register(settingsRoutes)
 await fastify.register(sessionRoutes)
 await fastify.register(logsRoutes)
 await fastify.register(notificationRoutes)
+await fastify.register(claudeHookRoute)
 
 // Start monitor daemon (persistent Python process for hook events)
 const projectRoot = path.resolve(__dirname, '../..')
@@ -1091,6 +1094,7 @@ process.on('exit', stopDaemon)
 process.on('SIGTERM', () => {
   destroyAllSessions()
   closeAllConnections()
+  shutdownAllTunnels()
   stopNgrok()
   stopDaemon()
   process.exit(0)
@@ -1098,6 +1102,7 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   destroyAllSessions()
   closeAllConnections()
+  shutdownAllTunnels()
   stopNgrok()
   stopDaemon()
   process.exit(0)

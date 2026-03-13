@@ -65,47 +65,37 @@ def log(conn, message: str, **kwargs) -> None:
 
 # Hooks
 
-def save_hook(conn, session_id: str, hook_type: str, payload: dict) -> None:
-    """Save a hook event with its full payload."""
+def save_hook(conn, session_id: str, hook_type: str, payload: dict, dedupe_key: str | None = None) -> bool:
+    """Save a hook event with its full payload.
+
+    Returns True if inserted, False if duplicate (dedupe_key conflict).
+    """
     cur = conn.cursor()
+    if dedupe_key:
+        cur.execute(
+            'INSERT INTO hooks (session_id, hook_type, payload, dedupe_key) VALUES (%s, %s, %s, %s) ON CONFLICT (dedupe_key) DO NOTHING',
+            (session_id, hook_type, json.dumps(payload), dedupe_key)
+        )
+        return cur.rowcount > 0
     cur.execute(
         'INSERT INTO hooks (session_id, hook_type, payload) VALUES (%s, %s, %s)',
         (session_id, hook_type, json.dumps(payload))
     )
+    return True
 
 
 # Projects
 
-def upsert_project(conn, path: str) -> int:
-    """Upsert project by path, returning project ID."""
+def upsert_project(conn, path: str, host: str = 'local') -> int:
+    """Upsert project by (host, path), returning project ID."""
     cur = get_cursor(conn)
-    cur.execute('SELECT id FROM projects WHERE path = %s', (path,))
+    cur.execute('SELECT id FROM projects WHERE host = %s AND path = %s', (host, path))
     row = cur.fetchone()
     if row:
         return row['id']
-    cur.execute('INSERT INTO projects (path) VALUES (%s) RETURNING id', (path,))
+    cur.execute('INSERT INTO projects (host, path) VALUES (%s, %s) RETURNING id', (host, path))
     return cur.fetchone()['id']
 
-
-def update_project_path_by_session(conn, session_id: str, path: str) -> bool:
-    """Update the project path for an existing session. Returns True if updated."""
-    cur = get_cursor(conn)
-    cur.execute(
-        'SELECT project_id FROM sessions WHERE session_id = %s',
-        (session_id,)
-    )
-    row = cur.fetchone()
-    if row:
-        existing = cur.execute(
-            'SELECT id FROM projects WHERE path = %s AND id != %s',
-            (path, row['project_id'])
-        )
-        existing_row = cur.fetchone()
-        if existing_row:
-            return False
-        cur.execute('UPDATE projects SET path = %s WHERE id = %s', (path, row['project_id']))
-        return True
-    return False
 
 
 # Sessions

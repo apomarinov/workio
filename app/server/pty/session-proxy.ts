@@ -492,6 +492,11 @@ export async function createSession(
         { timeout: 5000 },
       ).catch(() => {})
     })
+
+    // Bootstrap Claude hook forwarding for this SSH host (fire-and-forget)
+    import('../ssh/claude-forwarding').then(({ bootstrapRemoteHost }) => {
+      bootstrapRemoteHost(terminal.ssh_host!).catch(() => {})
+    })
   }
 
   // Flush any pending command queued before the worker was ready
