@@ -828,15 +828,68 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       if (existing) existing.remove()
     }
 
+    // Assembles the full logical line from connected wrapped physical lines
+    function getLogicalLine(bufferLineNumber: number) {
+      const buffer = terminal.buffer.active
+      const cols = terminal.cols
+
+      // Walk backward to find the first physical line of this logical line
+      let startLine = bufferLineNumber
+      while (startLine > 1) {
+        const prev = buffer.getLine(startLine - 1)
+        if (!prev?.isWrapped) break
+        startLine--
+      }
+
+      // Walk forward collecting text and line lengths
+      const lineLengths: number[] = []
+      let text = ''
+      let row = startLine
+      while (row <= buffer.length) {
+        const line = buffer.getLine(row - 1)
+        if (!line) break
+        if (row > startLine && !line.isWrapped) break
+
+        const isLast =
+          row + 1 > buffer.length || !buffer.getLine(row)?.isWrapped
+        const lineText = isLast
+          ? line.translateToString(true)
+          : line.translateToString(false, 0, cols)
+        lineLengths.push(lineText.length)
+        text += lineText
+        row++
+      }
+
+      return { text, startLine, lineLengths }
+    }
+
+    // Converts a character offset in concatenated logical line text → { x, y } (1-based)
+    function charOffsetToPosition(
+      offset: number,
+      startLine: number,
+      lineLengths: number[],
+    ) {
+      let remaining = offset
+      for (let i = 0; i < lineLengths.length; i++) {
+        if (remaining < lineLengths[i]) {
+          return { x: remaining + 1, y: startLine + i }
+        }
+        remaining -= lineLengths[i]
+      }
+      // Past end — clamp to end of last line
+      const lastIdx = lineLengths.length - 1
+      return { x: lineLengths[lastIdx] + 1, y: startLine + lastIdx }
+    }
+
     // File path link provider — detect file paths in terminal output and open in IDE on click
     const filePathRegex =
       /(?:^|[\s'"`({[:])([~.]?\/[\w./@-]+(?:\/[\w./@-]+)*\.\w+(?::\d+(?::\d+)?)?|(?:[\w.@-]+\/)+[\w.@-]+\.\w+(?::\d+(?::\d+)?)?)/g
     terminal.registerLinkProvider({
       provideLinks(bufferLineNumber, callback) {
-        const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
-        if (!line) return callback(undefined)
+        const { text, startLine, lineLengths } =
+          getLogicalLine(bufferLineNumber)
+        if (!text) return callback(undefined)
 
-        const text = line.translateToString(true)
         const links: import('@xterm/xterm').ILink[] = []
 
         for (const match of text.matchAll(filePathRegex)) {
@@ -852,11 +905,12 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
 
           links.push({
             range: {
-              start: { x: matchStart + 1, y: bufferLineNumber },
-              end: {
-                x: matchStart + filePath.length + 1,
-                y: bufferLineNumber,
-              },
+              start: charOffsetToPosition(matchStart, startLine, lineLengths),
+              end: charOffsetToPosition(
+                matchStart + filePath.length,
+                startLine,
+                lineLengths,
+              ),
             },
             text: filePath,
             activate: (event, linkText) => {
@@ -902,10 +956,10 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       /(https?):\/\/[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/g
     terminal.registerLinkProvider({
       provideLinks(bufferLineNumber, callback) {
-        const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
-        if (!line) return callback(undefined)
+        const { text, startLine, lineLengths } =
+          getLogicalLine(bufferLineNumber)
+        if (!text) return callback(undefined)
 
-        const text = line.translateToString(true)
         const links: import('@xterm/xterm').ILink[] = []
 
         for (const match of text.matchAll(urlRegex)) {
@@ -914,11 +968,12 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
 
           links.push({
             range: {
-              start: { x: matchStart + 1, y: bufferLineNumber },
-              end: {
-                x: matchStart + url.length + 1,
-                y: bufferLineNumber,
-              },
+              start: charOffsetToPosition(matchStart, startLine, lineLengths),
+              end: charOffsetToPosition(
+                matchStart + url.length,
+                startLine,
+                lineLengths,
+              ),
             },
             text: url,
             activate: (event, linkText) => {
