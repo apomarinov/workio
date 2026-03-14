@@ -138,12 +138,12 @@ function PRSection({
       className="group/pr relative"
     >
       {prInfo.icon({ cls: 'w-3 h-3' })}
-      <span ref={overflowRef} className="truncate-fade max-w-[250px]">
-        {pr.prTitle}
-      </span>
       {pr.hasUnreadNotifications && (
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
       )}
+      <span ref={overflowRef} className="truncate-fade max-w-[250px]">
+        {pr.prTitle}
+      </span>
       <button
         type="button"
         onClick={(e) => {
@@ -502,8 +502,8 @@ export function StatusBar({ position }: StatusBarProps) {
 
   const prForBranch = terminal.git_branch
     ? (githubPRs.find(
-        (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-      ) ??
+      (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+    ) ??
       githubPRs.find(
         (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
       ))

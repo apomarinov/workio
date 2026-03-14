@@ -92,6 +92,7 @@ export function Sidebar({ width }: SidebarProps) {
     collapsedProjectRepos,
     setCollapsedProjectRepos,
     orderedTerminals,
+    refetchNotifications,
   } = useTerminalContext()
   const { selectSession, sessions } = useSessionContext()
   const { allSessions: pipSessions } = usePinnedSessionsData()
@@ -128,7 +129,11 @@ export function Sidebar({ width }: SidebarProps) {
   const [collapsedGitHubRepos, setCollapsedGitHubRepos] = useLocalStorage<
     string[]
   >('sidebar-collapsed-github-repos', [])
-  const [bellOpen, setBellOpen] = useState(false)
+  const [bellOpen, setBellOpenRaw] = useState(false)
+  const setBellOpen = (open: boolean) => {
+    setBellOpenRaw(open)
+    if (!open) setTimeout(refetchNotifications, 200)
+  }
   const [logsModal, setLogsModal] = useState<{
     open: boolean
     initialFilter?: { terminalId?: number; prName?: string }

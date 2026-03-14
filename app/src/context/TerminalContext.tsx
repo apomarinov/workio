@@ -98,6 +98,7 @@ interface TerminalContextValue {
   markPRNotificationsRead: (repo: string, prNumber: number) => Promise<void>
   deleteNotification: (id: number) => Promise<void>
   deleteAllNotifications: () => Promise<void>
+  refetchNotifications: () => void
   reactToPR: (
     repo: string,
     prNumber: number,
@@ -720,6 +721,10 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [mutateNotifications])
 
+  const refetchNotifications = () => {
+    mutateNotifications()
+  }
+
   const updatePRReaction = useCallback(
     (
       repo: string,
@@ -1224,6 +1229,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       markPRNotificationsRead,
       deleteNotification,
       deleteAllNotifications,
+      refetchNotifications,
       reactToPR,
       cleanupShellOrder,
       shellClients,
