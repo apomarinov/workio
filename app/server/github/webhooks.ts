@@ -93,6 +93,27 @@ export async function initNgrok(
       }
     })
   })
+  // Monitor ngrok process after startup — restart if it dies
+  const proc = ngrokProcess
+  if (!proc) return
+  proc.on('exit', (code) => {
+    log.warn(
+      `[ngrok] Process exited with code ${code} after startup, restarting...`,
+    )
+    updateNgrokStatus({
+      status: 'error',
+      error: `exited with code ${code}, restarting...`,
+    })
+    ngrokProcess = null
+    // Restart after a short delay
+    setTimeout(() => {
+      initNgrok(port, useHttps).catch((err) => {
+        log.error(err, '[ngrok] Failed to restart ngrok')
+        updateNgrokStatus({ status: 'error', error: String(err) })
+      })
+    }, 10_000)
+  })
+
   updateNgrokStatus({ status: 'healthy', error: null, url: ngrokUrl })
   log.info(
     `[webhooks] ngrok tunnel started: ${ngrokUrl}${domain ? ' (static)' : ''}`,
@@ -154,11 +175,12 @@ async function updateWebhookUrl(
  * - 'exists' if the webhook is accessible
  * - 'missing' if it was deleted (404)
  * - 'no_access' if the user lacks admin permissions (403)
+ * - 'error' if the check failed due to a transient error (network, timeout, etc.)
  */
 async function checkWebhookExists(
   repo: string,
   hookId: number,
-): Promise<'exists' | 'missing' | 'no_access'> {
+): Promise<'exists' | 'missing' | 'no_access' | 'error'> {
   try {
     const [owner, repoName] = repo.split('/')
     await execFileAsync('gh', [
@@ -176,7 +198,15 @@ async function checkWebhookExists(
     ) {
       return 'no_access'
     }
-    return 'missing'
+    // Actual 404 — webhook was deleted
+    if (message.includes('404') || message.includes('Not Found')) {
+      return 'missing'
+    }
+    // Network errors, timeouts, DNS failures — don't mark as missing
+    log.warn(
+      `[webhooks] Transient error checking webhook ${hookId} for ${repo}: ${message}`,
+    )
+    return 'error'
   }
 }
 
@@ -433,6 +463,11 @@ async function validateStoredWebhooks(): Promise<void> {
           `[webhooks] No admin access for ${repo}, cleared incorrect missing flag`,
         )
       }
+      continue
+    }
+
+    if (result === 'error') {
+      // Transient error (network, timeout, DNS) — don't change webhook state
       continue
     }
 
