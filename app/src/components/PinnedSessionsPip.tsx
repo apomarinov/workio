@@ -1,7 +1,5 @@
 import {
-  AlertTriangle,
   ArrowLeft,
-  CheckIcon,
   Eye,
   Minimize2,
   Minus,
@@ -18,7 +16,7 @@ import {
   useState,
 } from 'react'
 import { createPortal, flushSync } from 'react-dom'
-import { ClaudeIcon } from '@/components/icons'
+import { SessionStatusIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -118,42 +116,7 @@ function PipChatItem({
         )}
         {/* Status icon */}
         <div className="flex-shrink-0 flex items-center gap-1">
-          {session.status === 'done' ? (
-            <CheckIcon className="w-3.5 h-3.5 text-green-500/70" />
-          ) : session.status === 'active' ||
-            session.status === 'permission_needed' ? (
-            <>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 300 150"
-                className="w-3.5 h-3.5"
-              >
-                <path
-                  fill="none"
-                  stroke="#D97757"
-                  strokeWidth="40"
-                  strokeLinecap="round"
-                  strokeDasharray="300 385"
-                  strokeDashoffset="0"
-                  d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
-                >
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    calcMode="spline"
-                    dur="2s"
-                    values="685;-685"
-                    keySplines="0 0 1 1"
-                    repeatCount="indefinite"
-                  />
-                </path>
-              </svg>
-              {session.status === 'permission_needed' && (
-                <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 animate-pulse" />
-              )}
-            </>
-          ) : (
-            <ClaudeIcon className="w-3.5 h-3.5 text-gray-400" />
-          )}
+          <SessionStatusIcon status={session.status} />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-xs font-medium text-zinc-100 truncate">

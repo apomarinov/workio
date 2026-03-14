@@ -1,6 +1,4 @@
 import {
-  AlertTriangle,
-  Check,
   CornerDownLeft,
   GitBranch,
   GitMerge,
@@ -12,9 +10,8 @@ import {
   Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { ClaudeIcon, TerminalIcon2 } from '@/components/icons'
+import { SessionStatusIcon, TerminalIcon2 } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
-import { cn, sessionStatusColor } from '@/lib/utils'
 import type { PRCheckStatus } from '../../../../shared/types'
 import { PRTabButton } from '../../PRStatusContent'
 import type { AppActions, AppData } from '../createPaletteModes'
@@ -25,53 +22,6 @@ import type {
   PaletteLevel,
   PaletteMode,
 } from '../types'
-
-function SessionIcon({ status }: { status: string }) {
-  if (status === 'done')
-    return <Check className="h-4 w-4 shrink-0 text-green-500/70" />
-  if (status === 'active' || status === 'permission_needed')
-    return (
-      <>
-        {(status === 'active' || status === 'permission_needed') && (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 300 150"
-            className="h-4 w-4 shrink-0"
-          >
-            <path
-              fill="none"
-              stroke="#D97757"
-              strokeWidth="40"
-              strokeLinecap="round"
-              strokeDasharray="300 385"
-              strokeDashoffset="0"
-              d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
-            >
-              <animate
-                attributeName="stroke-dashoffset"
-                calcMode="spline"
-                dur="2s"
-                values="685;-685"
-                keySplines="0 0 1 1"
-                repeatCount="indefinite"
-              />
-            </path>
-          </svg>
-        )}
-        {status === 'permission_needed' && (
-          <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-500 animate-pulse" />
-        )}
-      </>
-    )
-  return (
-    <ClaudeIcon
-      className={cn(
-        'h-4 w-4 shrink-0',
-        sessionStatusColor[status] ?? 'text-gray-400',
-      )}
-    />
-  )
-}
 
 export function createSearchMode(
   data: AppData,
@@ -214,7 +164,7 @@ export function createSearchMode(
         )}
       </>
     ),
-    icon: <SessionIcon status={s.status} />,
+    icon: <SessionStatusIcon status={s.status} className="h-4 w-4" />,
     keywords: [
       s.name ?? '',
       s.latest_user_message ?? '',

@@ -1,5 +1,5 @@
-import { RefreshCcw } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { AlertTriangle, RefreshCcw } from 'lucide-react'
+import { cn, sessionStatusColor } from '@/lib/utils'
 
 export function CursorIcon({ className }: { className?: string }) {
   return (
@@ -116,4 +116,59 @@ export function GithubDrafPrIcon({ className }: { className?: string }) {
 
 export function RefreshIcon({ className }: { className?: string }) {
   return <RefreshCcw className={cn('rotate-[-30deg]', className)} />
+}
+
+export function SessionStatusIcon({
+  status,
+  className = 'w-3.5 h-3.5',
+  ended = true,
+}: {
+  status: string
+  ended?: boolean
+  className?: string
+}) {
+  if (status === 'ended' && !ended) return null
+  if (status === 'active' || status === 'permission_needed')
+    return (
+      <>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 300 150"
+          className={cn(className, 'shrink-0')}
+        >
+          <path
+            fill="none"
+            stroke="#D97757"
+            strokeWidth="40"
+            strokeLinecap="round"
+            strokeDasharray="300 385"
+            strokeDashoffset="0"
+            d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              calcMode="spline"
+              dur="2s"
+              values="685;-685"
+              keySplines="0 0 1 1"
+              repeatCount="indefinite"
+            />
+          </path>
+        </svg>
+        {status === 'permission_needed' && (
+          <AlertTriangle
+            className={cn(className, 'shrink-0 text-yellow-500 animate-pulse')}
+          />
+        )}
+      </>
+    )
+  return (
+    <ClaudeIcon
+      className={cn(
+        className,
+        'shrink-0',
+        sessionStatusColor[status] ?? 'text-gray-400',
+      )}
+    />
+  )
 }

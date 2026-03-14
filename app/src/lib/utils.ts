@@ -8,8 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 export const sessionStatusColor: Record<string, string> = {
   started: 'text-[#D97757]',
   active: 'text-[#D97757]',
-  done: 'text-green-400',
+  done: 'text-gray-500',
   ended: 'text-gray-500',
   permission_needed: 'text-[#D97757]',
-  idle: 'text-gray-400',
+  idle: 'text-gray-500',
 }

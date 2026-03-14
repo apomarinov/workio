@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  CheckIcon,
   ChevronDown,
   Folder,
   MoreVertical,
@@ -8,14 +7,14 @@ import {
   PinOff,
 } from 'lucide-react'
 import { memo, useEffect, useState } from 'react'
-import { ClaudeIcon } from '@/components/icons'
+import { SessionStatusIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { cn, sessionStatusColor } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject } from '../types'
@@ -97,8 +96,6 @@ export const SessionItem = memo(function SessionItem({
       window.removeEventListener('flash-session', handleFlash as EventListener)
   }, [session.session_id])
 
-  const statusColor = sessionStatusColor[session.status]
-
   const handleOpenActions = (e: React.MouseEvent) => {
     e.stopPropagation()
     window.dispatchEvent(
@@ -137,51 +134,11 @@ export const SessionItem = memo(function SessionItem({
       )}
     >
       <div className="flex items-start z-[1] gap-1 mt-[1px] relative">
-        <div className="icons group-hover:hidden">
-          {session.status === 'done' && (
-            <CheckIcon className="w-3.5 h-3.5 text-green-500/70" />
-          )}
-          {(session.status === 'active' ||
-            (!isSmall && session.status === 'permission_needed')) && (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 300 150"
-              className="w-3.5 h-3.5"
-            >
-              <path
-                fill="none"
-                stroke="#D97757"
-                strokeWidth="40"
-                strokeLinecap="round"
-                strokeDasharray="300 385"
-                strokeDashoffset="0"
-                d="M275 75c0 31-27 50-50 50-58 0-92-100-150-100-28 0-50 22-50 50s23 50 50 50c58 0 92-100 150-100 24 0 50 19 50 50Z"
-              >
-                <animate
-                  attributeName="stroke-dashoffset"
-                  calcMode="spline"
-                  dur="2s"
-                  values="685;-685"
-                  keySplines="0 0 1 1"
-                  repeatCount="indefinite"
-                />
-              </path>
-            </svg>
-          )}
-          {session.status === 'permission_needed' && (
-            <AlertTriangle
-              className={cn(
-                'w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse',
-              )}
-            />
-          )}
-          {!['active', 'permission_needed', 'done'].includes(
-            session.status,
-          ) && (
-            <ClaudeIcon
-              className={cn('w-3.5 h-3.5 flex-shrink-0', statusColor)}
-              aria-label={session.status}
-            />
+        <div className="icons group-hover:hidden gap-1 flex flex-col">
+          {isSmall && session.status === 'permission_needed' ? (
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-yellow-500 animate-pulse" />
+          ) : (
+            <SessionStatusIcon status={session.status} />
           )}
         </div>
         <button
