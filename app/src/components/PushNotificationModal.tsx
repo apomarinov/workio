@@ -182,7 +182,7 @@ export function PushNotificationModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-sidebar max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Push Notifications</DialogTitle>
+          <DialogTitle>Mobile Notifications</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
