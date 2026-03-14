@@ -344,14 +344,36 @@ export function Sidebar({ width }: SidebarProps) {
     setExpandedSessionGroups([])
     setExpandedTerminalSessions(activeTerminal ? [activeTerminal.id] : [])
     setCollapsedSessions(allSessionIds)
-    setExpandedGitHubPRs([])
+    setExpandedGitHubPRs(activePR ? [activePR.branch] : [])
+
+    // Collapse project repo groups (except the one with the active terminal)
+    const activeRepoKey = activeTerminal?.git_repo?.repo
+      ? `${activeTerminal.git_repo.repo}::${activeTerminal.ssh_host || 'local'}`
+      : null
+    setCollapsedProjectRepos(
+      Array.from(repoGroupedTerminals.repoGroups.keys()).filter(
+        (key) => key !== activeRepoKey,
+      ),
+    )
+
+    // Collapse GitHub repo groups (except the one with the active PR)
+    setCollapsedGitHubRepos(
+      Array.from(githubPRsByRepo.keys()).filter(
+        (key) => key !== activePR?.repo,
+      ),
+    )
   }, [
     activeTerminal,
+    activePR,
     allSessionIds,
+    repoGroupedTerminals.repoGroups,
+    githubPRsByRepo,
     setExpandedSessionGroups,
     setExpandedTerminalSessions,
     setCollapsedSessions,
     setExpandedGitHubPRs,
+    setCollapsedProjectRepos,
+    setCollapsedGitHubRepos,
   ])
 
   const handlePipToggle = useCallback(() => {
@@ -544,7 +566,9 @@ export function Sidebar({ width }: SidebarProps) {
     expandedSessionGroups.length > 0 ||
     expandedTerminalSessions.length > 0 ||
     collapsedSessions.length < allSessionIds.length ||
-    expandedGitHubPRs.length > 0
+    expandedGitHubPRs.length > 0 ||
+    collapsedProjectRepos.length < repoGroupedTerminals.repoGroups.size ||
+    collapsedGitHubRepos.length < githubPRsByRepo.size
 
   return (
     <div

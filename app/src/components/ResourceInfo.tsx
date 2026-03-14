@@ -304,7 +304,7 @@ export function ResourceInfo({
                           memPercent={
                             info.systemMemory > 0
                               ? ((info.systemRss * 1024) / info.systemMemory) *
-                              100
+                                100
                               : 0
                           }
                           memRssKb={info.systemRss}
@@ -345,18 +345,18 @@ export function ResourceInfo({
                         cpuPercent={
                           hostResources[scopedTerminal.ssh_host].cpuCount > 0
                             ? hostResources[scopedTerminal.ssh_host].systemCpu /
-                            hostResources[scopedTerminal.ssh_host].cpuCount
+                              hostResources[scopedTerminal.ssh_host].cpuCount
                             : 0
                         }
                         memPercent={
                           hostResources[scopedTerminal.ssh_host].systemMemory >
-                            0
+                          0
                             ? ((hostResources[scopedTerminal.ssh_host]
-                              .systemRss *
-                              1024) /
-                              hostResources[scopedTerminal.ssh_host]
-                                .systemMemory) *
-                            100
+                                .systemRss *
+                                1024) /
+                                hostResources[scopedTerminal.ssh_host]
+                                  .systemMemory) *
+                              100
                             : 0
                         }
                         memRssKb={
