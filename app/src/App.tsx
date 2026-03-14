@@ -57,15 +57,22 @@ const MobileKeyboard = lazy(() =>
 
 import { Terminal } from './components/Terminal'
 import { DocumentPipProvider } from './context/DocumentPipContext'
+import { GitHubProvider } from './context/GitHubContext'
 import { useNotifications } from './context/NotificationContext'
+import { NotificationDataProvider } from './context/NotificationDataContext'
 import { ProcessProvider, useProcessContext } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
-import { TerminalProvider, useTerminalContext } from './context/TerminalContext'
+import {
+  useWorkspaceContext,
+  WorkspaceProvider,
+} from './context/WorkspaceContext'
 import { useEdgeSwipe } from './hooks/useEdgeSwipe'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useIsMobile } from './hooks/useMediaQuery'
+import { useMountedShells } from './hooks/useMountedShells'
 import { useSettings } from './hooks/useSettings'
+import { useSleepWakeRevalidation } from './hooks/useSleepWakeRevalidation'
 import { useSocket } from './hooks/useSocket'
 import {
   createShellForTerminal,
@@ -91,11 +98,12 @@ function AppContent() {
     setShell,
     orderedTerminals,
     mapPort,
-  } = useTerminalContext()
+  } = useWorkspaceContext()
   const { activeSessionId, selectSession, sessions } = useSessionContext()
   const { subscribe, emit } = useSocket()
   const { sendNotification, hasDevicePushSubscription } = useNotifications()
   const { clearSession } = useSessionContext()
+  useSleepWakeRevalidation()
   const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
   const [createModalOpen, setCreateModalOpen] = useState(false)
 
@@ -110,7 +118,8 @@ function AppContent() {
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
   const pullingRef = useRef(false)
-  const { gitDirtyStatus, mountedShells } = useProcessContext()
+  const { gitDirtyStatus } = useProcessContext()
+  const mountedShells = useMountedShells()
   const gitDirtyStatusRef = useRef(gitDirtyStatus)
   gitDirtyStatusRef.current = gitDirtyStatus
   const sidebarPanelRef = usePanelRef()
@@ -1149,13 +1158,17 @@ function AppContent() {
 function App() {
   return (
     <DocumentPipProvider>
-      <TerminalProvider>
+      <WorkspaceProvider>
         <ProcessProvider>
-          <SessionProvider>
-            <AppContent />
-          </SessionProvider>
+          <GitHubProvider>
+            <NotificationDataProvider>
+              <SessionProvider>
+                <AppContent />
+              </SessionProvider>
+            </NotificationDataProvider>
+          </GitHubProvider>
         </ProcessProvider>
-      </TerminalProvider>
+      </WorkspaceProvider>
     </DocumentPipProvider>
   )
 }

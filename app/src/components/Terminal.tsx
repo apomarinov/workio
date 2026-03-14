@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
-import { useTerminalContext } from '../context/TerminalContext'
+import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
@@ -28,7 +28,7 @@ interface TerminalProps {
 }
 
 export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const isMobile = useIsMobile()
   const terminal = terminals.find((t) => t.id === terminalId)
   const isCloning = terminal?.git_repo?.status === 'setup'

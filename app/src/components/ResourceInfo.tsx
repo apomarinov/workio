@@ -16,8 +16,9 @@ import {
 } from '@/components/ui/popover'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useProcessContext } from '@/context/ProcessContext'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useMountedShells } from '@/hooks/useMountedShells'
 import { cn } from '@/lib/utils'
 import type { ActiveProcess, HostResourceInfo } from '../../shared/types'
 import { ResourceView, type ResourceViewMode } from './ResourceView'
@@ -55,7 +56,7 @@ export function ResourceInfo({
   className,
 }: ResourceInfoProps) {
   const { resourceInfo, processes } = useProcessContext()
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const [mode, setMode] = useLocalStorage<ResourceViewMode>(
     'resource-view-mode',
     'bar',
@@ -303,7 +304,7 @@ export function ResourceInfo({
                           memPercent={
                             info.systemMemory > 0
                               ? ((info.systemRss * 1024) / info.systemMemory) *
-                                100
+                              100
                               : 0
                           }
                           memRssKb={info.systemRss}
@@ -344,18 +345,18 @@ export function ResourceInfo({
                         cpuPercent={
                           hostResources[scopedTerminal.ssh_host].cpuCount > 0
                             ? hostResources[scopedTerminal.ssh_host].systemCpu /
-                              hostResources[scopedTerminal.ssh_host].cpuCount
+                            hostResources[scopedTerminal.ssh_host].cpuCount
                             : 0
                         }
                         memPercent={
                           hostResources[scopedTerminal.ssh_host].systemMemory >
-                          0
+                            0
                             ? ((hostResources[scopedTerminal.ssh_host]
-                                .systemRss *
-                                1024) /
-                                hostResources[scopedTerminal.ssh_host]
-                                  .systemMemory) *
-                              100
+                              .systemRss *
+                              1024) /
+                              hostResources[scopedTerminal.ssh_host]
+                                .systemMemory) *
+                            100
                             : 0
                         }
                         memRssKb={
@@ -418,7 +419,7 @@ function TerminalRow({
   processesByShell: Map<number, ActiveProcess[]>
   collapsible: boolean
 }) {
-  const { mountedShells } = useProcessContext()
+  const mountedShells = useMountedShells()
   const termShellIds = terminal.shells.map((s) => s.id)
   const termUsage = computeUsage(usage, termShellIds, totalRam, totalCpu)
   const isExpanded = !collapsible || expandedTerminals.has(terminal.id)
@@ -428,7 +429,7 @@ function TerminalRow({
     <div>
       <div
         className={cn(
-          'flex items-center justify-between py-1',
+          'flex items-center justify-between',
           collapsible && 'cursor-pointer',
         )}
         onClick={collapsible ? () => toggleTerminal(terminal.id) : undefined}
@@ -504,7 +505,7 @@ function ShellRow({
   mode: ResourceViewMode
   processes: ActiveProcess[]
 }) {
-  const { mountedShells } = useProcessContext()
+  const mountedShells = useMountedShells()
   const [expanded, setExpanded] = useState(false)
   const connected = mountedShells.has(shellId)
   const shellUsage = computeUsage(usage, [shellId], totalRam, totalCpu)

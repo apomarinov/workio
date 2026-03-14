@@ -31,8 +31,9 @@ import { useSettings } from '@/hooks/useSettings'
 import { cancelWorkspace, clearSetupError, rerunSetup } from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
+import { useGitHubContext } from '../context/GitHubContext'
 import { useProcessContext } from '../context/ProcessContext'
-import { useTerminalContext } from '../context/TerminalContext'
+import { useWorkspaceContext } from '../context/WorkspaceContext'
 import type { SessionWithProject, Terminal } from '../types'
 import { TerminalIcon2 } from './icons'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'
@@ -63,13 +64,13 @@ export const TerminalItem = memo(function TerminalItem({
   onToggleTerminalSessions,
   shortcutIndex: shortcutIndexProp,
 }: TerminalItemProps) {
-  const { terminals, activeTerminal, selectTerminal } = useTerminalContext()
+  const { terminals, activeTerminal, selectTerminal } = useWorkspaceContext()
   const { clearSession } = useSessionContext()
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
   const shortcutIndex =
     shortcutIndexProp ?? terminals.findIndex((t) => t.id === terminal.id) + 1
   const isMobile = useIsMobile()
-  const { githubPRs } = useTerminalContext()
+  const { githubPRs } = useGitHubContext()
   const {
     processes: allProcesses,
     terminalPorts,

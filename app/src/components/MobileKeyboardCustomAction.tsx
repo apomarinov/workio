@@ -1,6 +1,6 @@
 import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import type { CustomTerminalAction } from '../types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import {
@@ -24,7 +24,7 @@ export function MobileKeyboardCustomAction({
   onSave,
   onClose,
 }: MobileKeyboardCustomActionProps) {
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const [label, setLabel] = useState('')
   const [command, setCommand] = useState('')
   const [repo, setRepo] = useState('')

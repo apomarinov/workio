@@ -35,7 +35,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useGitHubContext } from '@/context/GitHubContext'
+import { useNotificationDataContext } from '@/context/NotificationDataContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
@@ -80,7 +81,7 @@ function ReactionBadges({
   reactions: PRReaction[]
   onReact?: (content: string, remove: boolean) => void
 }) {
-  const { ghUsername } = useTerminalContext()
+  const { ghUsername } = useGitHubContext()
   if (reactions.length === 0) return null
   return (
     <div className="flex flex-wrap gap-0.5 px-2 py-0.5">
@@ -214,7 +215,7 @@ const ReviewRow = memo(function ReviewRow({
 }) {
   const [bodyOpen, setBodyOpen] = useState(false)
   const isMobile = useIsMobile()
-  const { ghUsername } = useTerminalContext()
+  const { ghUsername } = useGitHubContext()
 
   const handleReReview = useCallback(
     () => onReReview(review.author),
@@ -495,7 +496,7 @@ const CommentItem = memo(function CommentItem({
   const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [modalOpen, setModalOpen] = useState(false)
   const isMobile = useIsMobile()
-  const { ghUsername } = useTerminalContext()
+  const { ghUsername } = useGitHubContext()
 
   const handleHide = useCallback(
     () => onHide(comment.author),
@@ -787,7 +788,7 @@ function ReviewThreadGroup({
   largeText?: boolean
 }) {
   const [showAllReplies, setShowAllReplies] = useState(false)
-  const { markNotificationReadByItem } = useTerminalContext()
+  const { markNotificationReadByItem } = useNotificationDataContext()
   const [root, ...replies] = thread.comments
   if (!root) return null
 
@@ -1058,7 +1059,7 @@ function DiscussionTimeline({
   const [visibleCount, setVisibleCount] = useState(5)
   const [discussionOpen, setDiscussionOpen] = useState(true)
   const { markPRNotificationsRead, markNotificationReadByItem } =
-    useTerminalContext()
+    useNotificationDataContext()
   const [displayMode, setDisplayMode] = useState<'threads' | 'latest'>(() => {
     const stored = localStorage.getItem('discussion-display-mode')
     return stored === 'threads' ? 'threads' : 'latest'
@@ -1412,7 +1413,7 @@ export function PRStatusContent({
     [],
   )
 
-  const { reactToPR } = useTerminalContext()
+  const { reactToPR } = useGitHubContext()
 
   const handleReact = async (
     subjectId: number,

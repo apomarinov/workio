@@ -47,7 +47,7 @@ import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
@@ -267,7 +267,7 @@ export function DeviceIcon({
 
 /** Per-shell client badge — shows clients that have this shell as their active shell. */
 function ShellClientsBadge({ shellId }: { shellId: number }) {
-  const { shellClients, allClients } = useTerminalContext()
+  const { shellClients, allClients } = useWorkspaceContext()
   const [isPrimary, setIsPrimary] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
 
@@ -370,7 +370,7 @@ function ShellClientsBadge({ shellId }: { shellId: number }) {
 
 /** Simple badge for the sidebar — just shows how many clients are connected (no shell-specific controls). */
 export function MultiClientIndicator() {
-  const { allClients } = useTerminalContext()
+  const { allClients } = useWorkspaceContext()
 
   if (allClients.length <= 1) return null
   return (

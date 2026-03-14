@@ -49,8 +49,10 @@ import {
 import { cn } from '@/lib/utils'
 import type { PRCheckStatus } from '../../shared/types'
 import { useDocumentPip } from '../context/DocumentPipContext'
+import { useGitHubContext } from '../context/GitHubContext'
+import { useNotificationDataContext } from '../context/NotificationDataContext'
 import { useSessionContext } from '../context/SessionContext'
-import { useTerminalContext } from '../context/TerminalContext'
+import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
@@ -81,19 +83,20 @@ export function Sidebar({ width }: SidebarProps) {
     activeTerminal,
     selectTerminal,
     setTerminalOrder,
+    collapsedProjectRepos,
+    setCollapsedProjectRepos,
+    orderedTerminals,
+  } = useWorkspaceContext()
+  const {
     githubPRs,
     mergedPRs,
     involvedPRs,
     hasAnyUnseenPRs,
-    hasNotifications,
-    hasUnreadNotifications,
     activePR,
     setActivePR,
-    collapsedProjectRepos,
-    setCollapsedProjectRepos,
-    orderedTerminals,
-    refetchNotifications,
-  } = useTerminalContext()
+  } = useGitHubContext()
+  const { hasNotifications, hasUnreadNotifications, refetchNotifications } =
+    useNotificationDataContext()
   const { selectSession, sessions } = useSessionContext()
   const { allSessions: pipSessions } = usePinnedSessionsData()
   const [pipLayout] = useLocalStorage<'horizontal' | 'vertical'>(

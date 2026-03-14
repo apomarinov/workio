@@ -26,7 +26,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useDocumentPip } from '../context/DocumentPipContext'
 import { useSessionContext } from '../context/SessionContext'
-import { useTerminalContext } from '../context/TerminalContext'
+import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import type { SessionWithProject } from '../types'
 import { SessionItem } from './SessionItem'
@@ -200,7 +200,7 @@ export function getPipDimensions(layout: 'horizontal' | 'vertical'): {
 
 export function usePinnedSessionsData() {
   const { sessions } = useSessionContext()
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const [rawPinnedSessionIds, setRawPinnedSessionIds] = useLocalStorage<
     string[]
   >('sidebar-pinned-sessions', [])
@@ -416,7 +416,7 @@ function SettingsMenu({
 
 export function PinnedSessionsPip() {
   const pip = useDocumentPip()
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const { pinnedSessions, nonPinnedSessions, allSessions } =
     usePinnedSessionsData()
 

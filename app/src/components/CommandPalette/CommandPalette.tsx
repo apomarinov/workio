@@ -9,9 +9,10 @@ import {
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
+import { useGitHubContext } from '@/context/GitHubContext'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
@@ -154,13 +155,12 @@ export function CommandPalette() {
   const {
     terminals,
     selectTerminal,
-    githubPRs,
-    mergedPRs,
     createTerminal,
     updateTerminal,
     deleteTerminal,
     refetch,
-  } = useTerminalContext()
+  } = useWorkspaceContext()
+  const { githubPRs, mergedPRs } = useGitHubContext()
   const {
     sessions,
     selectSession,

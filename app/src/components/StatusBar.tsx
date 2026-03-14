@@ -31,8 +31,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
+import { useGitHubContext } from '@/context/GitHubContext'
 import { useProcessContext } from '@/context/ProcessContext'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
@@ -118,7 +119,7 @@ function PRSection({
   pr,
 }: {
   section: StatusBarSection
-  pr: NonNullable<ReturnType<typeof useTerminalContext>['githubPRs'][number]>
+  pr: NonNullable<ReturnType<typeof useGitHubContext>['githubPRs'][number]>
 }) {
   const overflowRef = useOverflowDetector<HTMLSpanElement>()
   const prInfo = getPRStatusInfo(pr)
@@ -451,7 +452,8 @@ function StatusBarMenu({
 }
 
 export function StatusBar({ position }: StatusBarProps) {
-  const { activeTerminal: terminal, githubPRs } = useTerminalContext()
+  const { activeTerminal: terminal } = useWorkspaceContext()
+  const { githubPRs } = useGitHubContext()
   const {
     processes: allProcesses,
     terminalPorts,

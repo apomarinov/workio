@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useGitHubContext } from '@/context/GitHubContext'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { PRStatusContent } from './PRStatusContent'
 
@@ -19,7 +19,7 @@ export function PRModal({
   onClose: () => void
 }) {
   const [open, setOpen] = useState(true)
-  const { githubPRs } = useTerminalContext()
+  const { githubPRs } = useGitHubContext()
   const pr = githubPRs.find((p) => p.prNumber === prNumber && p.repo === repo)
 
   if (!pr) return null

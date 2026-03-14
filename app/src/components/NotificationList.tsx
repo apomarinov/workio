@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/button'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useNotificationDataContext } from '@/context/NotificationDataContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 import type { Notification } from '@/types'
@@ -258,7 +258,7 @@ export function NotificationList() {
     deleteAllNotifications,
     hasAnyUnseenPRs,
     hasUnreadNotifications,
-  } = useTerminalContext()
+  } = useNotificationDataContext()
   const isMobile = useIsMobile()
 
   return (

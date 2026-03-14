@@ -11,7 +11,7 @@ import {
 import { useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useProcessContext } from '@/context/ProcessContext'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSocket } from '@/hooks/useSocket'
 import { formatTimeAgo } from '@/lib/time'
@@ -145,7 +145,7 @@ export function PortItem({
   forwardStatus,
 }: PortItemProps) {
   const isMobile = useIsMobile()
-  const { unmapPort } = useTerminalContext()
+  const { unmapPort } = useWorkspaceContext()
 
   // SSH terminal with active mapping
   if (isSSH && forwardStatus) {
@@ -376,7 +376,7 @@ export function PortsList({
   onClick,
 }: PortsListProps) {
   const [collapsedShells, setCollapsedShells] = useState<Set<number>>(new Set())
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const { portForwardStatus } = useProcessContext()
 
   const terminal = terminals.find((t) => t.id === terminalId)

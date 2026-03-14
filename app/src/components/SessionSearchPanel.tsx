@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getBranches, searchSessionMessages } from '@/lib/api'
@@ -73,7 +73,7 @@ export function SessionSearchPanel({
   const [branchPickerOpen, setBranchPickerOpen] = useState(false)
   const [recentOnly, setRecentOnly] = useState(true)
 
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
 
   // Extract distinct repos from terminals
   const repos = [

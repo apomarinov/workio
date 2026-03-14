@@ -18,14 +18,14 @@ import {
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
-import { useTerminalContext } from '../context/TerminalContext'
+import { useWorkspaceContext } from '../context/WorkspaceContext'
 
 /**
  * Hook to check for unbackfilled sessions.
  * Uses SWR keyed on terminal IDs so it re-checks when terminals change.
  */
 export function useBackfillCheck() {
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const terminalKey = terminals.map((t) => t.id).join(',')
 
   const { data: results } = useSWR(
@@ -46,7 +46,7 @@ export function useBackfillCheck() {
  * Opens a dialog to configure and run the backfill.
  */
 export function BackfillSection() {
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const { refetch: refetchSessions } = useSessionContext()
   const terminalKey = terminals.map((t) => t.id).join(',')
 

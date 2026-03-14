@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
-import { useTerminalContext } from '../context/TerminalContext'
+import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useSettings } from '../hooks/useSettings'
 import {
   auditSSHHost,
@@ -114,7 +114,7 @@ export function CreateTerminalModal({
   onOpenChange,
   onCreated,
 }: CreateTerminalModalProps) {
-  const { createTerminal } = useTerminalContext()
+  const { createTerminal } = useWorkspaceContext()
   const { settings } = useSettings()
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')

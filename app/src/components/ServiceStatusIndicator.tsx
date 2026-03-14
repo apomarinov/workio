@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { cn } from '@/lib/utils'
 import type {
   ClaudeSubStatus,
@@ -302,7 +302,7 @@ function TunnelRow({
 }
 
 export function ServiceStatusIndicator({ className }: { className?: string }) {
-  const { servicesStatus } = useTerminalContext()
+  const { servicesStatus } = useWorkspaceContext()
   const { missingCount, orphanedCount } = useWebhookWarning()
 
   if (!servicesStatus) return null

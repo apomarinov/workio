@@ -28,7 +28,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useNotifications } from '@/context/NotificationContext'
-import { useTerminalContext } from '@/context/TerminalContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
 import * as api from '@/lib/api'
@@ -63,7 +63,7 @@ const LIMIT_LABELS: Record<keyof GHQueryLimits, string> = {
 
 export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
   const { settings, refetch, updateSettings } = useSettings()
-  const { terminals } = useTerminalContext()
+  const { terminals } = useWorkspaceContext()
   const { subscribe } = useSocket()
   const { sendNotification } = useNotifications()
   const [loading, setLoading] = useState<Record<string, boolean>>({})
