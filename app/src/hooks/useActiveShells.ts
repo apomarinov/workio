@@ -48,8 +48,10 @@ export function useActiveShells(
     const stored = raw[t.id]
     if (stored && t.shells.some((s) => s.id === stored)) {
       activeShells[t.id] = stored
+    } else {
+      const main = t.shells.find((s) => s.name === 'main')
+      if (main) activeShells[t.id] = main.id
     }
-    // If invalid/missing, leave absent — callers already fall back to main
   }
 
   const activeShellsRef = useRef(activeShells)
