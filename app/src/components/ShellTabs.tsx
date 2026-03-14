@@ -191,12 +191,17 @@ function ShellPopover({
           }}
           className={cn(
             'flex-shrink-0 h-full w-4 absolute right-1 items-center cursor-pointer transition-colors text-muted-foreground rounded sm:hidden max-sm:flex group-hover/tab:flex group-hover/pill:flex justify-center hover:text-foreground',
-            isPill && 'rounded-full',
             (open || closing) && 'text-foreground !flex',
             closing && 'invisible',
           )}
         >
-          <div className={cn('p-0.5 rounded-sm', isActive && 'bg-accent')}>
+          <div
+            className={cn(
+              'p-0.5',
+              isActive && 'bg-accent',
+              isPill ? 'rounded-full' : 'rounded-sm',
+            )}
+          >
             <ChevronDown className="w-3.5 h-3.5 min-w-3.5" />
           </div>
         </div>
@@ -572,6 +577,7 @@ function SortableShellPill({
         shell={shell}
         isMain={isMain}
         isPill
+        isActive={isActive}
         terminal={terminal}
         onRename={onRename}
         onDelete={onDelete}
@@ -676,15 +682,6 @@ function SortableShellTab({
         />
       ) : bellSubscribed ? (
         <BellRing className="w-3 h-3 shrink-0 text-yellow-400" />
-      ) : hasActivity ? (
-        <Activity
-          className={cn(
-            'w-3 h-3 shrink-0',
-            isActive
-              ? 'text-green-500'
-              : 'group-hover/tab:text-green-500 text-green-500/60',
-          )}
-        />
       ) : null}
       <span
         ref={overflowRef}
@@ -700,7 +697,7 @@ function SortableShellTab({
           {displayName}
         </span>
         {shortcutHint && (
-          <span className="absolute inset-0 flex items-center justify-center gap-0.5 font-medium tabular-nums font-mono">
+          <span className="absolute inset-0 flex items-center justify-start gap-0.5 font-medium tabular-nums font-mono">
             {shortcutHint}
           </span>
         )}

@@ -58,7 +58,7 @@ function overallStatus(
 }
 
 const STATUS_COLOR: Record<ServiceStatus, string> = {
-  healthy: 'text-green-500',
+  healthy: 'text-muted-foreground',
   degraded: 'text-amber-500',
   error: 'text-red-500',
   starting: 'text-blue-400',

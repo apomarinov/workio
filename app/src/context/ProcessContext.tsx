@@ -13,6 +13,7 @@ import type {
 } from '../../shared/types'
 import { useSocket } from '../hooks/useSocket'
 import { useNotifications } from './NotificationContext'
+import { useTerminalContext } from './TerminalContext'
 
 export interface ResourceInfo {
   totalRam: number
@@ -29,6 +30,7 @@ interface ProcessContextValue {
   shellPorts: Record<number, number[]>
   portForwardStatus: Record<number, PortForwardStatus[]>
   resourceInfo: ResourceInfo
+  mountedShells: Set<number>
   gitDirtyStatus: Record<number, GitDiffStat>
   gitRemoteSyncStatus: Record<
     number,
@@ -82,6 +84,27 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
 
   // Bell subscriptions (server-side, synced via socket)
   const [bellShellIds, setBellShellIds] = useState<Set<number>>(new Set())
+
+  // Centralized mounted-shells computation
+  const { terminals, activeTerminal, activeShells, shouldMountShell } =
+    useTerminalContext()
+
+  const mountedShells = (() => {
+    const set = new Set<number>()
+    for (const terminal of terminals) {
+      const activeShellId = activeShells[terminal.id]
+      for (const shell of terminal.shells) {
+        const isActive =
+          terminal.id === activeTerminal?.id && shell.id === activeShellId
+        const hasActivity =
+          !!shell.active_cmd || processes.some((p) => p.shellId === shell.id)
+        if (shouldMountShell(shell.id, isActive, hasActivity)) {
+          set.add(shell.id)
+        }
+      }
+    }
+    return set
+  })()
 
   useEffect(() => {
     return subscribe<GitDirtyPayload>('git:dirty-status', (data) => {
@@ -318,6 +341,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       shellPorts,
       portForwardStatus,
       resourceInfo,
+      mountedShells,
       gitDirtyStatus,
       gitRemoteSyncStatus,
       gitLastCommit,
@@ -331,6 +355,7 @@ export function ProcessProvider({ children }: { children: React.ReactNode }) {
       shellPorts,
       portForwardStatus,
       resourceInfo,
+      mountedShells,
       gitDirtyStatus,
       gitRemoteSyncStatus,
       gitLastCommit,

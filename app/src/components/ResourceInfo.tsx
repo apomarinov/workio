@@ -418,9 +418,11 @@ function TerminalRow({
   processesByShell: Map<number, ActiveProcess[]>
   collapsible: boolean
 }) {
+  const { mountedShells } = useProcessContext()
   const termShellIds = terminal.shells.map((s) => s.id)
   const termUsage = computeUsage(usage, termShellIds, totalRam, totalCpu)
   const isExpanded = !collapsible || expandedTerminals.has(terminal.id)
+  const hasAnyMounted = termShellIds.some((id) => mountedShells.has(id))
 
   return (
     <div>
@@ -433,8 +435,12 @@ function TerminalRow({
       >
         <span
           className={cn(
-            'text-xs font-medium text-muted-foreground hover:text-foreground truncate max-w-[180px] flex items-center gap-1',
-            isExpanded && 'text-foreground',
+            'text-xs font-medium truncate max-w-[180px] flex items-center gap-1',
+            !hasAnyMounted
+              ? 'text-muted-foreground/40'
+              : isExpanded
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {collapsible && (
@@ -447,13 +453,19 @@ function TerminalRow({
           )}
           {terminal.name ?? `terminal-${terminal.id}`}
         </span>
-        <ResourceView
-          cpuPercent={termUsage.cpuPercent}
-          memPercent={termUsage.memPercent}
-          memRssKb={termUsage.rssKb}
-          mode={mode}
-          className="scale-90 origin-right"
-        />
+        {hasAnyMounted ? (
+          <ResourceView
+            cpuPercent={termUsage.cpuPercent}
+            memPercent={termUsage.memPercent}
+            memRssKb={termUsage.rssKb}
+            mode={mode}
+            className="scale-90 origin-right"
+          />
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/40">
+            <Unplug className="w-3 h-3" />
+          </span>
+        )}
       </div>
       {isExpanded &&
         terminal.shells.map((shell) => (
@@ -492,8 +504,9 @@ function ShellRow({
   mode: ResourceViewMode
   processes: ActiveProcess[]
 }) {
+  const { mountedShells } = useProcessContext()
   const [expanded, setExpanded] = useState(false)
-  const connected = shellId in usage
+  const connected = mountedShells.has(shellId)
   const shellUsage = computeUsage(usage, [shellId], totalRam, totalCpu)
   const hasProcesses = processes.length > 0
 

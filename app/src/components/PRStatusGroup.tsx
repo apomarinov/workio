@@ -64,9 +64,15 @@ export const PRStatusGroup = memo(function PRStatusGroup({
         )}
         <div className="flex-1 min-w-0 flex flex-col">
           <span
-            className={cn('text-xs font-medium block', !expanded && 'truncate')}
+            className={cn(
+              'text-xs font-medium flex items-center gap-1.5',
+              !expanded && 'truncate',
+            )}
           >
-            {pr.prTitle}
+            {hasNewActivity && (
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+            )}
+            <span className={cn(!expanded && 'truncate')}>{pr.prTitle}</span>
           </span>
           <div className="flex gap-1 items-center justify-between min-w-0">
             <div className="flex gap-1 items-center min-w-0">
@@ -120,9 +126,6 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           >
             <MoreVertical className="w-4 h-4" />
           </button>
-        )}
-        {hasNewActivity && (
-          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 group-hover/pr:hidden" />
         )}
       </div>
       {!prInfo.isMerged && expanded && (
