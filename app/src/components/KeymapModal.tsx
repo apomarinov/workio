@@ -722,6 +722,21 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
               display={formatBinding(bindings.pullBranch)}
             />
             <ShortcutRow
+              label="Commit"
+              description="(dirty → commit, clean → log)"
+              binding={bindings.commit}
+              isRecording={recording === 'commit'}
+              recordingKeys={recording === 'commit' ? recordingKeys : []}
+              onRecord={() =>
+                setRecording(recording === 'commit' ? null : 'commit')
+              }
+              onReset={() => setBinding('commit', DEFAULT_KEYMAP.commit)}
+              onUnset={() => setBinding('commit', null)}
+              hasConflict={duplicates.has('commit')}
+              defaultBinding={DEFAULT_KEYMAP.commit}
+              display={formatBinding(bindings.commit)}
+            />
+            <ShortcutRow
               label="Toggle Amend"
               binding={bindings.commitAmend}
               isRecording={recording === 'commitAmend'}

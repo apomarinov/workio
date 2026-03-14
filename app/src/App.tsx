@@ -545,6 +545,29 @@ function AppContent() {
         sidebarPanelRef.current?.collapse()
       }
     },
+    commit: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      const dirtyStatus = gitDirtyStatusRef.current[t.id]
+      const isDirty =
+        dirtyStatus &&
+        (dirtyStatus.added > 0 ||
+          dirtyStatus.removed > 0 ||
+          dirtyStatus.untracked > 0)
+      if (isDirty) {
+        window.dispatchEvent(
+          new CustomEvent('open-commit-dialog', {
+            detail: { terminalId: t.id },
+          }),
+        )
+      } else if (t.git_branch) {
+        window.dispatchEvent(
+          new CustomEvent('open-branch-commits', {
+            detail: { terminalId: t.id, branch: t.git_branch },
+          }),
+        )
+      }
+    },
     pullBranch: () => {
       if (pullingRef.current) return
       const t = activeTerminalRef.current

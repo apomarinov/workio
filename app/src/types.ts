@@ -328,6 +328,7 @@ export interface Keymap {
   branches: ShortcutBinding | null
   pullBranch: ShortcutBinding | null
   toggleSidebar: ShortcutBinding | null
+  commit: ShortcutBinding | null
 }
 
 export const DEFAULT_KEYMAP: Keymap = {
@@ -349,6 +350,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   branches: { ctrlKey: true, shiftKey: true, key: 'enter' },
   pullBranch: { metaKey: true, key: 't' },
   toggleSidebar: { altKey: true, key: 'backquote' },
+  commit: { metaKey: true, shiftKey: true, key: 'k' },
 }
 
 // Map event.code-based key names to display characters

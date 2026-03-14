@@ -170,6 +170,7 @@ interface KeymapHandlers {
   branches?: () => void
   pullBranch?: () => void
   toggleSidebar?: () => void
+  commit?: () => void
 }
 
 function resolveBinding(
@@ -234,6 +235,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const branchesBinding = resolveBinding(keymap, 'branches')
   const pullBranchBinding = resolveBinding(keymap, 'pullBranch')
   const toggleSidebarBinding = resolveBinding(keymap, 'toggleSidebar')
+  const commitBinding = resolveBinding(keymap, 'commit')
 
   // --- Standard key-based shortcuts (one useHotkeys per shortcut) ---
 
@@ -420,6 +422,16 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       if (disabledRef.current) return
       e.stopPropagation()
       handlersRef.current.toggleSidebar?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    commitBinding?.key ? bindingToHotkeyString(commitBinding) : '',
+    (e) => {
+      if (disabledRef.current) return
+      e.stopPropagation()
+      handlersRef.current.commit?.()
     },
     HOTKEY_OPTS,
   )
