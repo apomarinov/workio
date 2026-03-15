@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
-import os from 'node:os'
 import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
+import { execFileAsync } from '../lib/exec'
 
 // Walk up the process tree to find the parent macOS .app (e.g. Terminal, iTerm2, VS Code)
 async function getParentAppName(): Promise<string | null> {
@@ -11,31 +11,19 @@ async function getParentAppName(): Promise<string | null> {
   try {
     let pid = process.ppid
     while (pid > 1) {
-      const comm = await new Promise<string>((resolve, reject) => {
-        execFile(
-          'ps',
-          ['-o', 'comm=', '-p', String(pid)],
-          { encoding: 'utf-8' },
-          (err, stdout) => {
-            if (err) reject(err)
-            else resolve(stdout.trim())
-          },
-        )
-      })
-      const match = comm.match(/\/([^/]+)\.app\//)
+      const { stdout: comm } = await execFileAsync(
+        'ps',
+        ['-o', 'comm=', '-p', String(pid)],
+        { encoding: 'utf-8' },
+      )
+      const match = comm.trim().match(/\/([^/]+)\.app\//)
       if (match) return match[1]
-      const ppidStr = await new Promise<string>((resolve, reject) => {
-        execFile(
-          'ps',
-          ['-o', 'ppid=', '-p', String(pid)],
-          { encoding: 'utf-8' },
-          (err, stdout) => {
-            if (err) reject(err)
-            else resolve(stdout.trim())
-          },
-        )
-      })
-      pid = Number.parseInt(ppidStr, 10)
+      const { stdout: ppidStr } = await execFileAsync(
+        'ps',
+        ['-o', 'ppid=', '-p', String(pid)],
+        { encoding: 'utf-8' },
+      )
+      pid = Number.parseInt(ppidStr.trim(), 10)
       if (Number.isNaN(pid)) break
     }
   } catch {}
@@ -288,7 +276,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   // Key: "cwd\0" + sorted refspecs, Value: timestamp of last fetch
   const fetchCache = new Map<string, number>()
 
-  function fetchOriginIfNeeded(
+  async function fetchOriginIfNeeded(
     cwd: string,
     refspecs: string[],
     ttlMs = 30000,
@@ -298,17 +286,16 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     if (last && Date.now() - last < ttlMs) {
       return Promise.resolve()
     }
-    return new Promise<void>((resolve) => {
-      execFile(
-        'git',
-        ['fetch', 'origin', ...refspecs],
-        { cwd, timeout: 30000 },
-        () => {
-          fetchCache.set(key, Date.now())
-          resolve()
-        },
-      )
-    })
+    try {
+      await execFileAsync('git', ['fetch', 'origin', ...refspecs], {
+        cwd,
+        timeout: 30000,
+      })
+    } catch {
+      // fetch failure is non-fatal
+    } finally {
+      fetchCache.set(key, Date.now())
+    }
   }
 
   // Open native OS folder picker and return selected path

@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import type {
@@ -21,6 +20,7 @@ import {
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'
+import { execFileAsync, getExecStderr } from '../lib/exec'
 import { log } from '../logger'
 import { emitNotification } from '../notify'
 import { detectGitBranch } from '../pty/manager'
@@ -78,29 +78,26 @@ export function parseGitHubRemoteUrl(
   return null
 }
 
-function checkGhAvailable(): Promise<boolean> {
-  return new Promise((resolve) => {
-    execFile('gh', ['--version'], { timeout: 5000 }, (err) => {
-      resolve(!err)
-    })
-  })
+async function checkGhAvailable(): Promise<boolean> {
+  try {
+    await execFileAsync('gh', ['--version'], { timeout: 5000 })
+    return true
+  } catch {
+    return false
+  }
 }
 
-function fetchGhUsername(): Promise<string | null> {
-  return new Promise((resolve) => {
-    execFile(
+async function fetchGhUsername(): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
       'gh',
       ['api', 'user', '--jq', '.login'],
       { timeout: 5000 },
-      (err, stdout) => {
-        if (err || !stdout) {
-          resolve(null)
-          return
-        }
-        resolve(stdout.trim())
-      },
     )
-  })
+    return stdout.trim() || null
+  } catch {
+    return null
+  }
 }
 
 export function getGhUsername(): string | null {
@@ -128,17 +125,12 @@ async function detectGitHubRepo(
       )
       stdout = result.stdout
     } else {
-      stdout = await new Promise<string>((resolve, reject) => {
-        execFile(
-          'git',
-          ['remote', 'get-url', 'origin'],
-          { cwd, timeout: 5000 },
-          (err, out) => {
-            if (err || !out) return reject(err || new Error('No output'))
-            resolve(out)
-          },
-        )
-      })
+      const result = await execFileAsync(
+        'git',
+        ['remote', 'get-url', 'origin'],
+        { cwd, timeout: 5000 },
+      )
+      stdout = result.stdout
     }
 
     const result = parseGitHubRemoteUrl(stdout.trim())
@@ -156,17 +148,18 @@ async function detectGitHubRepo(
   }
 }
 
-// Helper to wrap execFile in a Promise
-function execFileAsync(
+// Run a command and return stdout, or empty string on error (for gh API calls)
+async function ghExec(
   cmd: string,
   args: string[],
   options: { timeout: number; maxBuffer: number },
 ): Promise<string> {
-  return new Promise((resolve) => {
-    execFile(cmd, args, options, (err, stdout) => {
-      resolve(err ? '' : stdout)
-    })
-  })
+  try {
+    const { stdout } = await execFileAsync(cmd, args, options)
+    return stdout
+  } catch {
+    return ''
+  }
 }
 
 /** Decode GitHub GraphQL node ID to extract database ID (last 4 bytes as big-endian uint32) */
@@ -786,12 +779,12 @@ async function fetchPRsViaRESTAndGraphQL(
   await Promise.all(
     repos.map(async (repoKey) => {
       const [openStdout, closedStdout] = await Promise.all([
-        execFileAsync(
+        ghExec(
           'gh',
           ['api', `repos/${repoKey}/pulls?state=open&per_page=100`],
           { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
         ),
-        execFileAsync(
+        ghExec(
           'gh',
           [
             'api',
@@ -870,7 +863,7 @@ async function fetchPRsViaRESTAndGraphQL(
 
     const query = `query {\n${queryParts.join('\n')}\n}`
 
-    const stdout = await execFileAsync(
+    const stdout = await ghExec(
       'gh',
       ['api', 'graphql', '-f', `query=${query}`],
       { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
@@ -975,7 +968,7 @@ export async function fetchAllClosedPRs(
 }`
 
   try {
-    const stdout = await execFileAsync(
+    const stdout = await ghExec(
       'gh',
       [
         'api',
@@ -1038,7 +1031,7 @@ export async function fetchInvolvedPRs(
   await Promise.all(
     repos.map(async (repoKey) => {
       try {
-        const stdout = await execFileAsync(
+        const stdout = await ghExec(
           'gh',
           ['api', `repos/${repoKey}/pulls?state=open&per_page=100`],
           { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
@@ -1083,7 +1076,7 @@ export async function fetchInvolvedPRs(
   // 2. Search for open PRs mentioning the user (across all repos)
   try {
     const repoSet = new Set(repos)
-    const stdout = await execFileAsync(
+    const stdout = await ghExec(
       'gh',
       [
         'api',
@@ -1234,7 +1227,7 @@ async function pollAllPRChecks(force = false): Promise<void> {
 
   // Log API rate limits after all calls are done
   try {
-    const rlStdout = await execFileAsync(
+    const rlStdout = await ghExec(
       'gh',
       [
         'api',
@@ -1452,7 +1445,7 @@ export async function fetchPRComments(
 ): Promise<{ comments: PRComment[]; total: number }> {
   // Fetch both issue comments and code review comments in parallel
   const [issueCommentsStdout, codeCommentsStdout] = await Promise.all([
-    execFileAsync(
+    ghExec(
       'gh',
       [
         'pr',
@@ -1465,7 +1458,7 @@ export async function fetchPRComments(
       ],
       { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
     ),
-    execFileAsync(
+    ghExec(
       'gh',
       [
         'api',
@@ -1544,7 +1537,7 @@ export async function fetchPRComments(
   return { comments: sliced, total }
 }
 
-export function requestPRReview(
+export async function requestPRReview(
   owner: string,
   repo: string,
   prNumber: number,
@@ -1552,9 +1545,9 @@ export function requestPRReview(
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method POST repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers -f reviewers[]=${reviewer}`
-  return new Promise((resolve) => {
+  try {
     // Use REST API to avoid deprecated projectCards GraphQL field in `gh pr edit`
-    execFile(
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -1565,27 +1558,32 @@ export function requestPRReview(
         `reviewers[]=${reviewer}`,
       ],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function mergePR(
+export async function mergePR(
   owner: string,
   repo: string,
   prNumber: number,
@@ -1593,8 +1591,8 @@ export function mergePR(
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method PUT repos/${owner}/${repo}/pulls/${prNumber}/merge -f merge_method=${method}`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -1605,35 +1603,40 @@ export function mergePR(
         `merge_method=${method}`,
       ],
       { timeout: 30000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function closePR(
+export async function closePR(
   owner: string,
   repo: string,
   prNumber: number,
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f state=closed`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -1644,27 +1647,32 @@ export function closePR(
         'state=closed',
       ],
       { timeout: 30000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function renamePR(
+export async function renamePR(
   owner: string,
   repo: string,
   prNumber: number,
@@ -1672,8 +1680,8 @@ export function renamePR(
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=...`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -1684,31 +1692,36 @@ export function renamePR(
         `title=${title}`,
       ],
       { timeout: 30000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        // Directly mutate cache and push to clients
-        const existing = lastFetchedPRs.find(
-          (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
-        )
-        if (existing) {
-          existing.prTitle = title
-        }
-        emitPRChecks(lastFetchedPRs)
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    // Directly mutate cache and push to clients
+    const existing = lastFetchedPRs.find(
+      (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
+    )
+    if (existing) {
+      existing.prTitle = title
+    }
+    emitPRChecks(lastFetchedPRs)
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
 export async function editPR(
@@ -1722,124 +1735,121 @@ export async function editPR(
   const prId = `${owner}/${repo}#${prNumber}`
 
   // Update title + body via REST API
-  const patchResult = await new Promise<{ ok: boolean; error?: string }>(
-    (resolve) => {
-      const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`
-      execFile(
-        'gh',
-        [
-          'api',
-          '--method',
-          'PATCH',
-          `repos/${owner}/${repo}/pulls/${prNumber}`,
-          '-f',
-          `title=${title}`,
-          '-f',
-          `body=${body}`,
-        ],
-        { timeout: 30000 },
-        (err, stdout, stderr) => {
-          logCommand({
-            prId,
-            category: 'github',
-            command: cmd,
-            stdout,
-            stderr,
-            failed: !!err,
-          })
-          if (err) {
-            resolve({ ok: false, error: stderr || err.message })
-            return
-          }
-          resolve({ ok: true })
-        },
-      )
-    },
-  )
-
-  if (!patchResult.ok) return patchResult
+  const patchCmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      'gh',
+      [
+        'api',
+        '--method',
+        'PATCH',
+        `repos/${owner}/${repo}/pulls/${prNumber}`,
+        '-f',
+        `title=${title}`,
+        '-f',
+        `body=${body}`,
+      ],
+      { timeout: 30000 },
+    )
+    logCommand({
+      prId,
+      category: 'github',
+      command: patchCmd,
+      stdout,
+      stderr,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: patchCmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 
   // Draft status requires GraphQL mutations (REST API ignores the draft field)
   if (draft !== undefined) {
-    const draftResult = await new Promise<{ ok: boolean; error?: string }>(
-      (resolve) => {
-        if (draft) {
-          // Convert to draft: need node_id first, then GraphQL mutation
-          execFile(
+    if (draft) {
+      // Convert to draft: need node_id first, then GraphQL mutation
+      try {
+        const { stdout: nodeIdStdout } = await execFileAsync(
+          'gh',
+          [
+            'api',
+            `repos/${owner}/${repo}/pulls/${prNumber}`,
+            '--jq',
+            '.node_id',
+          ],
+          { timeout: 15000 },
+        )
+        const nodeId = nodeIdStdout.trim()
+        const mutation = `mutation { convertPullRequestToDraft(input: {pullRequestId: "${nodeId}"}) { pullRequest { isDraft } } }`
+        try {
+          const { stdout: gqlStdout, stderr: gqlStderr } = await execFileAsync(
             'gh',
-            [
-              'api',
-              `repos/${owner}/${repo}/pulls/${prNumber}`,
-              '--jq',
-              '.node_id',
-            ],
+            ['api', 'graphql', '-f', `query=${mutation}`],
             { timeout: 15000 },
-            (err, stdout, stderr) => {
-              if (err) {
-                resolve({
-                  ok: false,
-                  error: stderr || err.message,
-                })
-                return
-              }
-              const nodeId = stdout.trim()
-              const mutation = `mutation { convertPullRequestToDraft(input: {pullRequestId: "${nodeId}"}) { pullRequest { isDraft } } }`
-              execFile(
-                'gh',
-                ['api', 'graphql', '-f', `query=${mutation}`],
-                { timeout: 15000 },
-                (err2, stdout2, stderr2) => {
-                  logCommand({
-                    prId,
-                    category: 'github',
-                    command: 'gh api graphql convertPullRequestToDraft',
-                    stdout: stdout2,
-                    stderr: stderr2,
-                    failed: !!err2,
-                  })
-                  if (err2) {
-                    resolve({
-                      ok: false,
-                      error: stderr2 || err2.message,
-                    })
-                    return
-                  }
-                  resolve({ ok: true })
-                },
-              )
-            },
           )
-        } else {
-          // Mark as ready for review
-          const cmd = `gh pr ready ${prNumber} -R ${owner}/${repo}`
-          execFile(
-            'gh',
-            ['pr', 'ready', String(prNumber), '-R', `${owner}/${repo}`],
-            { timeout: 15000 },
-            (err, stdout, stderr) => {
-              logCommand({
-                prId,
-                category: 'github',
-                command: cmd,
-                stdout,
-                stderr,
-                failed: !!err,
-              })
-              if (err) {
-                resolve({
-                  ok: false,
-                  error: stderr || err.message,
-                })
-                return
-              }
-              resolve({ ok: true })
-            },
-          )
+          logCommand({
+            prId,
+            category: 'github',
+            command: 'gh api graphql convertPullRequestToDraft',
+            stdout: gqlStdout,
+            stderr: gqlStderr,
+          })
+        } catch (err2) {
+          const message2 = err2 instanceof Error ? err2.message : String(err2)
+          const stderr2 = getExecStderr(err2)
+          logCommand({
+            prId,
+            category: 'github',
+            command: 'gh api graphql convertPullRequestToDraft',
+            stdout: '',
+            stderr: stderr2 || message2,
+            failed: true,
+          })
+          return { ok: false, error: stderr2 || message2 }
         }
-      },
-    )
-
-    if (!draftResult.ok) return draftResult
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const stderr = getExecStderr(err)
+        return { ok: false, error: stderr || message }
+      }
+    } else {
+      // Mark as ready for review
+      const cmd = `gh pr ready ${prNumber} -R ${owner}/${repo}`
+      try {
+        const { stdout, stderr } = await execFileAsync(
+          'gh',
+          ['pr', 'ready', String(prNumber), '-R', `${owner}/${repo}`],
+          { timeout: 15000 },
+        )
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const stderr = getExecStderr(err)
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout: '',
+          stderr: stderr || message,
+          failed: true,
+        })
+        return { ok: false, error: stderr || message }
+      }
+    }
   }
 
   // Directly mutate cache and push to clients
@@ -1855,7 +1865,7 @@ export async function editPR(
   return { ok: true }
 }
 
-export function createPR(
+export async function createPR(
   owner: string,
   repo: string,
   head: string,
@@ -1866,8 +1876,8 @@ export function createPR(
 ): Promise<{ ok: boolean; prNumber?: number; error?: string }> {
   const prId = `${owner}/${repo}`
   const cmd = `gh api --method POST repos/${owner}/${repo}/pulls -f head=... -f base=... -f title=... -f body=... -F draft=...`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -1886,32 +1896,37 @@ export function createPR(
         `draft=${draft}`,
       ],
       { timeout: 30000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        try {
-          const data = JSON.parse(stdout)
-          invalidateChecksCache()
-          resolve({ ok: true, prNumber: data.number })
-        } catch {
-          resolve({ ok: false, error: 'Failed to parse response' })
-        }
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    try {
+      const data = JSON.parse(stdout)
+      invalidateChecksCache()
+      return { ok: true, prNumber: data.number }
+    } catch {
+      return { ok: false, error: 'Failed to parse response' }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function rerunFailedCheck(
+export async function rerunFailedCheck(
   owner: string,
   repo: string,
   checkUrl: string,
@@ -1919,16 +1934,16 @@ export function rerunFailedCheck(
 ): Promise<{ ok: boolean; error?: string }> {
   const runMatch = checkUrl.match(/actions\/runs\/(\d+)/)
   if (!runMatch) {
-    return Promise.resolve({
+    return {
       ok: false,
       error: 'Cannot rerun: unsupported check type',
-    })
+    }
   }
   const runId = runMatch[1]
   const prId = prNumber ? `${owner}/${repo}#${prNumber}` : undefined
   const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -1937,24 +1952,29 @@ export function rerunFailedCheck(
         `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
       ],
       { timeout: 30000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
 /** Re-run all failed checks by extracting unique run IDs and calling rerun-failed-jobs for each. */
@@ -1983,38 +2003,41 @@ export async function rerunAllFailedChecks(
 
   // Rerun each unique workflow run
   await Promise.all(
-    [...runIds].map(
-      (runId) =>
-        new Promise<void>((resolve) => {
-          const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
-          execFile(
-            'gh',
-            [
-              'api',
-              '--method',
-              'POST',
-              `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
-            ],
-            { timeout: 30000 },
-            (err, stdout, stderr) => {
-              logCommand({
-                prId,
-                category: 'github',
-                command: cmd,
-                stdout,
-                stderr,
-                failed: !!err,
-              })
-              if (err) {
-                errors.push(stderr || err.message)
-              } else {
-                successCount++
-              }
-              resolve()
-            },
-          )
-        }),
-    ),
+    [...runIds].map(async (runId) => {
+      const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
+      try {
+        const { stdout, stderr } = await execFileAsync(
+          'gh',
+          [
+            'api',
+            '--method',
+            'POST',
+            `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+          ],
+          { timeout: 30000 },
+        )
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout,
+          stderr,
+        })
+        successCount++
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const stderr = getExecStderr(err)
+        logCommand({
+          prId,
+          category: 'github',
+          command: cmd,
+          stdout: '',
+          stderr: stderr || message,
+          failed: true,
+        })
+        errors.push(stderr || message)
+      }
+    }),
   )
 
   invalidateChecksCache()
@@ -2026,7 +2049,7 @@ export async function rerunAllFailedChecks(
   return { ok: true, rerunCount: successCount }
 }
 
-export function addPRComment(
+export async function addPRComment(
   owner: string,
   repo: string,
   prNumber: number,
@@ -2034,8 +2057,8 @@ export function addPRComment(
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh pr comment ${prNumber} --repo ${owner}/${repo} -b "..."`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'pr',
@@ -2047,27 +2070,32 @@ export function addPRComment(
         body,
       ],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function replyToReviewComment(
+export async function replyToReviewComment(
   owner: string,
   repo: string,
   prNumber: number,
@@ -2076,8 +2104,8 @@ export function replyToReviewComment(
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies -f body="..."`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -2086,35 +2114,40 @@ export function replyToReviewComment(
         `body=${body}`,
       ],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function editIssueComment(
+export async function editIssueComment(
   owner: string,
   repo: string,
   commentId: number,
   body: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const cmd = `gh api repos/${owner}/${repo}/issues/comments/${commentId} -X PATCH -f body="..."`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -2125,35 +2158,40 @@ export function editIssueComment(
         `body=${body}`,
       ],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId: `${owner}/${repo}`,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function editReviewComment(
+export async function editReviewComment(
   owner: string,
   repo: string,
   commentId: number,
   body: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const cmd = `gh api repos/${owner}/${repo}/pulls/comments/${commentId} -X PATCH -f body="..."`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -2164,27 +2202,32 @@ export function editReviewComment(
         `body=${body}`,
       ],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId: `${owner}/${repo}`,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
-export function editReview(
+export async function editReview(
   owner: string,
   repo: string,
   prNumber: number,
@@ -2193,8 +2236,8 @@ export function editReview(
 ): Promise<{ ok: boolean; error?: string }> {
   const prId = `${owner}/${repo}#${prNumber}`
   const cmd = `gh api repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId} -X PUT -f body="..."`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       [
         'api',
@@ -2205,24 +2248,29 @@ export function editReview(
         `body=${body}`,
       ],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
 // GitHub REST API doesn't support reactions on reviews (only review comments).
@@ -2238,14 +2286,14 @@ const REACTION_CONTENT_TO_GRAPHQL: Record<string, string> = {
   eyes: 'EYES',
 }
 
-function getReviewNodeId(
+async function getReviewNodeId(
   owner: string,
   repo: string,
   prNumber: number,
   reviewId: number,
 ): Promise<string | null> {
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout } = await execFileAsync(
       'gh',
       [
         'api',
@@ -2254,18 +2302,15 @@ function getReviewNodeId(
         '.node_id',
       ],
       { timeout: 15000 },
-      (err, stdout) => {
-        if (err || !stdout.trim()) {
-          resolve(null)
-          return
-        }
-        resolve(stdout.trim())
-      },
     )
-  })
+    if (!stdout.trim()) return null
+    return stdout.trim()
+  } catch {
+    return null
+  }
 }
 
-function graphqlReaction(
+async function graphqlReaction(
   nodeId: string,
   content: string,
   remove: boolean,
@@ -2273,32 +2318,29 @@ function graphqlReaction(
   const gqlContent = REACTION_CONTENT_TO_GRAPHQL[content] || content
   const mutation = remove ? 'removeReaction' : 'addReaction'
   const query = `mutation { ${mutation}(input: { subjectId: "${nodeId}", content: ${gqlContent} }) { reaction { content } } }`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout } = await execFileAsync(
       'gh',
       ['api', 'graphql', '-f', `query=${query}`],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        try {
-          const result = JSON.parse(stdout)
-          if (result.errors?.length) {
-            resolve({
-              ok: false,
-              error: result.errors
-                .map((e: { message: string }) => e.message)
-                .join(', '),
-            })
-            return
-          }
-        } catch {}
-        resolve({ ok: true })
-      },
     )
-  })
+    try {
+      const result = JSON.parse(stdout)
+      if (result.errors?.length) {
+        return {
+          ok: false,
+          error: result.errors
+            .map((e: { message: string }) => e.message)
+            .join(', '),
+        }
+      }
+    } catch {}
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    return { ok: false, error: stderr || message }
+  }
 }
 
 export async function addReaction(
@@ -2343,29 +2385,34 @@ export async function addReaction(
   }
 
   const cmd = `gh api --method POST ${endpoint} -f content=${content}`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       ['api', '--method', 'POST', endpoint, '-f', `content=${content}`],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId: `${owner}/${repo}`,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId: `${owner}/${repo}`,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
 export async function removeReaction(
@@ -2410,7 +2457,7 @@ export async function removeReaction(
   }
 
   // List reactions and find ours
-  const listStdout = await execFileAsync(
+  const listStdout = await ghExec(
     'gh',
     ['api', `${listEndpoint}?content=${content}&per_page=100`],
     { timeout: 15000, maxBuffer: 10 * 1024 * 1024 },
@@ -2437,29 +2484,34 @@ export async function removeReaction(
   const deleteEndpoint = `${listEndpoint}/${myReaction.id}`
   const prId = `${owner}/${repo}`
   const cmd = `gh api --method DELETE ${deleteEndpoint}`
-  return new Promise((resolve) => {
-    execFile(
+  try {
+    const { stdout, stderr } = await execFileAsync(
       'gh',
       ['api', '--method', 'DELETE', deleteEndpoint],
       { timeout: 15000 },
-      (err, stdout, stderr) => {
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout,
-          stderr,
-          failed: !!err,
-        })
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        invalidateChecksCache()
-        resolve({ ok: true })
-      },
     )
-  })
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout,
+      stderr,
+    })
+    invalidateChecksCache()
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stderr = getExecStderr(err)
+    logCommand({
+      prId,
+      category: 'github',
+      command: cmd,
+      stdout: '',
+      stderr: stderr || message,
+      failed: true,
+    })
+    return { ok: false, error: stderr || message }
+  }
 }
 
 /** Send the last polled PR data to a specific socket (e.g. on connect). */

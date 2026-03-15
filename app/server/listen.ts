@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
 import { resolveNotification } from '../shared/notifications'
@@ -9,32 +8,29 @@ import {
   getTerminalById,
   updateSessionData,
 } from './db'
+import { execFileAsync } from './lib/exec'
 import { log } from './logger'
 import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
 import { sendPushNotification } from './push'
 import { execSSHCommand } from './ssh/exec'
 
-function detectLocalBranch(cwd: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
+async function detectLocalBranch(cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(
       'git',
       ['rev-parse', '--abbrev-ref', 'HEAD'],
       { cwd, timeout: 5000 },
-      (err, stdout) => {
-        if (!err && stdout.trim()) return resolve(stdout.trim())
-        // Fallback to symbolic-ref (for detached HEAD with a ref)
-        execFile(
-          'git',
-          ['symbolic-ref', '--short', 'HEAD'],
-          { cwd, timeout: 5000 },
-          (err2, stdout2) => {
-            if (err2) return reject(err2)
-            resolve(stdout2.trim())
-          },
-        )
-      },
     )
-  })
+    if (stdout.trim()) return stdout.trim()
+  } catch {
+    // Fall through to symbolic-ref
+  }
+  const { stdout } = await execFileAsync(
+    'git',
+    ['symbolic-ref', '--short', 'HEAD'],
+    { cwd, timeout: 5000 },
+  )
+  return stdout.trim()
 }
 
 async function detectSessionBranch(

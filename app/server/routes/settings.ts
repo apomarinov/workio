@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import type { FastifyInstance } from 'fastify'
 import type { PushSubscriptionRecord, Settings } from '../../src/types'
 import {
@@ -8,6 +7,7 @@ import {
   updateSettings,
 } from '../db'
 import { refreshPRChecks } from '../github/checks'
+import { execFileAsync } from '../lib/exec'
 import { sendPushNotification } from '../push'
 
 type UpdateSettingsBody = Partial<Omit<Settings, 'id'>>
@@ -68,15 +68,13 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
 
       // Verify shell exists if provided
       if (updates.default_shell) {
-        const shellExists = await new Promise<boolean>((resolve) => {
-          execFile(
-            'sh',
-            ['-c', `command -v ${updates.default_shell}`],
-            (err) => {
-              resolve(!err)
-            },
-          )
-        })
+        const shellExists = await execFileAsync('sh', [
+          '-c',
+          `command -v ${updates.default_shell}`,
+        ]).then(
+          () => true,
+          () => false,
+        )
         if (!shellExists) {
           return reply
             .status(400)

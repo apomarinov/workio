@@ -1,13 +1,11 @@
-import { type ChildProcess, execFile, spawn } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
-import { promisify } from 'node:util'
 import { WEBHOOK_EVENTS } from '../../shared/types'
 import { getSettings, updateSettings } from '../db'
 import { env } from '../env'
+import { execFileAsync } from '../lib/exec'
 import { log } from '../logger'
 import { updateNgrokStatus } from '../services/status'
-
-const execFileAsync = promisify(execFile)
 
 let ngrokProcess: ChildProcess | null = null
 

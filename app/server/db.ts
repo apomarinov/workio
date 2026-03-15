@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -15,6 +14,7 @@ import type {
 } from '../src/types'
 import { DEFAULT_GH_QUERY_LIMITS, DEFAULT_KEYMAP } from '../src/types'
 import { env } from './env'
+import { execFileAsync } from './lib/exec'
 import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -796,16 +796,13 @@ export async function updateTerminal(
     })()
     // Rename zellij session if it exists
     if (oldName && oldName !== newName) {
-      execFile(
+      execFileAsync(
         'zellij',
         ['--session', oldName, 'action', 'rename-session', newName],
         { timeout: 5000 },
-        (err) => {
-          if (!err) {
-            log.info(`[db] Renamed zellij session ${oldName} to ${newName}`)
-          }
-          // Session might not exist or not be running, that's ok - silently ignore errors
-        },
+      ).then(
+        () => log.info(`[db] Renamed zellij session ${oldName} to ${newName}`),
+        () => {}, // Session might not exist or not be running, that's ok
       )
     }
     // Also write name file on remote host for SSH terminals (fire-and-forget)

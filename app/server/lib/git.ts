@@ -1,8 +1,8 @@
-import { execFile } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { logCommand } from '../db'
 import { execSSHCommand } from '../ssh/exec'
+import { execFileAsync } from './exec'
 
 /** Shell-escape a string for safe embedding in SSH commands. */
 export function shellEscape(s: string): string {
@@ -54,21 +54,11 @@ export function gitExec(
     })
   }
 
-  return new Promise((resolve, reject) => {
-    execFile(
-      'git',
-      args,
-      {
-        cwd: expandPath(terminal.cwd),
-        timeout,
-        ...(opts?.env && { env: { ...process.env, ...opts.env } }),
-        ...(opts?.maxBuffer && { maxBuffer: opts.maxBuffer }),
-      },
-      (err, stdout, stderr) => {
-        if (err) reject(err)
-        else resolve({ stdout, stderr })
-      },
-    )
+  return execFileAsync('git', args, {
+    cwd: expandPath(terminal.cwd),
+    timeout,
+    ...(opts?.env && { env: { ...process.env, ...opts.env } }),
+    ...(opts?.maxBuffer && { maxBuffer: opts.maxBuffer }),
   })
 }
 

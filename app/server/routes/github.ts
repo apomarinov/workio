@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import type { FastifyInstance } from 'fastify'
 import {
   addPRComment,
@@ -33,9 +31,8 @@ import {
   verifyWebhookSignature,
 } from '../github/webhooks'
 import { getIO } from '../io'
+import { execFileAsync } from '../lib/exec'
 import { log } from '../logger'
-
-const exec = promisify(execFile)
 
 export default async function githubRoutes(fastify: FastifyInstance) {
   // GitHub repos (for repo picker)
@@ -45,7 +42,7 @@ export default async function githubRoutes(fastify: FastifyInstance) {
     const query = request.query.q?.trim().toLowerCase() || ''
 
     try {
-      const { stdout } = await exec(
+      const { stdout } = await execFileAsync(
         'gh',
         [
           'api',
@@ -87,7 +84,7 @@ export default async function githubRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      await exec(
+      await execFileAsync(
         'gh',
         ['api', `repos/${repo}/contents/conductor.json`, '--jq', '.name'],
         { timeout: 10000 },

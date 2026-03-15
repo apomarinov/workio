@@ -1,12 +1,9 @@
-import { execFile as execFileCb } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
-import { promisify } from 'node:util'
 import type { ActiveProcess } from '../../shared/types'
+import { execFileAsync } from '../lib/exec'
 import { log } from '../logger'
 import { poolExecSSHCommand } from '../ssh/pool'
-
-const execFileAsync = promisify(execFileCb)
 
 export async function getChildPids(pid: number): Promise<number[]> {
   try {

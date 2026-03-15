@@ -1,9 +1,7 @@
-import { execFile as execFileCb } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { promisify } from 'node:util'
 import {
   deleteTerminal,
   getMainShellForTerminal,
@@ -12,6 +10,7 @@ import {
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'
+import { execFileAsync } from '../lib/exec'
 import { log } from '../logger'
 import { emitNotification } from '../notify'
 import {
@@ -25,7 +24,6 @@ import {
 } from '../pty/manager'
 import { execSSHCommand } from '../ssh/exec'
 
-const execFile = promisify(execFileCb)
 const LONG_TIMEOUT = 300_000 // 5 min for clone/setup operations
 
 const activeOperations = new Map<number, AbortController>()
@@ -383,7 +381,7 @@ async function runCmd(
   signal?: AbortSignal,
 ): Promise<{ stdout: string; stderr: string }> {
   if (!sshHost) {
-    return execFile(cmd, args, { cwd, timeout, signal })
+    return execFileAsync(cmd, args, { cwd, timeout, signal })
   }
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
   const quoted = [cmd, ...args].map(shellQuote).join(' ')
@@ -615,7 +613,12 @@ export async function setupTerminalWorkspace(
     // Get GitHub username and rename branch
     // gh api runs locally (GitHub API call, gh CLI unlikely on remote)
     try {
-      const { stdout } = await execFile('gh', ['api', 'user', '-q', '.login'])
+      const { stdout } = await execFileAsync('gh', [
+        'api',
+        'user',
+        '-q',
+        '.login',
+      ])
       const ghUser = stdout.trim()
       if (ghUser) {
         if (worktreeSource) {
