@@ -11,6 +11,7 @@ import {
 } from '../db'
 import { getIO } from '../io'
 import { execFileAsync } from '../lib/exec'
+import { shellEscape } from '../lib/git'
 import { log } from '../logger'
 import { emitNotification } from '../notify'
 import {
@@ -282,10 +283,6 @@ export async function emitWorkspace(
 // SSH-aware filesystem helpers
 // ---------------------------------------------------------------------------
 
-function shellQuote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
-}
-
 function joinPath(sshHost: string | null, ...segments: string[]): string {
   if (!sshHost) return path.join(...segments)
   // POSIX join: filter empty, join with /
@@ -325,7 +322,7 @@ async function dirExists(
 ): Promise<boolean> {
   if (!sshHost) return fs.existsSync(dirPath)
   try {
-    await execSSHCommand(sshHost, `test -d ${shellQuote(dirPath)}`)
+    await execSSHCommand(sshHost, `test -d ${shellEscape(dirPath)}`)
     return true
   } catch (err) {
     log.error({ err, dirPath }, '[workspace] Failed to check directory via SSH')
@@ -338,7 +335,7 @@ async function mkdirp(dirPath: string, sshHost: string | null): Promise<void> {
     fs.mkdirSync(dirPath, { recursive: true })
     return
   }
-  await execSSHCommand(sshHost, `mkdir -p ${shellQuote(dirPath)}`)
+  await execSSHCommand(sshHost, `mkdir -p ${shellEscape(dirPath)}`)
 }
 
 export async function rmrf(
@@ -349,7 +346,7 @@ export async function rmrf(
     fs.rmSync(dirPath, { recursive: true, force: true })
     return
   }
-  await execSSHCommand(sshHost, `rm -rf ${shellQuote(dirPath)}`)
+  await execSSHCommand(sshHost, `rm -rf ${shellEscape(dirPath)}`)
 }
 
 async function readFileContent(
@@ -363,7 +360,7 @@ async function readFileContent(
   try {
     const { stdout } = await execSSHCommand(
       sshHost,
-      `cat ${shellQuote(filePath)}`,
+      `cat ${shellEscape(filePath)}`,
     )
     return stdout
   } catch (err) {
@@ -384,7 +381,7 @@ async function runCmd(
     return execFileAsync(cmd, args, { cwd, timeout, signal })
   }
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
-  const quoted = [cmd, ...args].map(shellQuote).join(' ')
+  const quoted = [cmd, ...args].map(shellEscape).join(' ')
   return execSSHCommand(sshHost, quoted, { cwd, timeout })
 }
 

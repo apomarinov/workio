@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_GH_QUERY_LIMITS, DEFAULT_KEYMAP } from '../src/types'
 import { env } from './env'
 import { execFileAsync } from './lib/exec'
+import { sanitizeName, shellEscape } from './lib/git'
 import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -788,7 +789,7 @@ export async function updateTerminal(
         await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
         await fs.promises.writeFile(
           path.join(WORKIO_TERMINALS_DIR, String(id)),
-          newName.replace(/\//g, '-'),
+          sanitizeName(newName),
         )
       } catch (err) {
         log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
@@ -809,10 +810,10 @@ export async function updateTerminal(
     const terminal = await getTerminalById(id)
     if (terminal?.ssh_host) {
       import('./ssh/pool').then(({ poolExecSSHCommand }) => {
-        const escaped = newName.replace(/\//g, '-').replace(/'/g, "'\\''")
+        const escaped = sanitizeName(newName)
         poolExecSSHCommand(
           terminal.ssh_host!,
-          `mkdir -p ~/.workio/terminals && printf '%s' '${escaped}' > ~/.workio/terminals/${id}`,
+          `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(escaped)} > ~/.workio/terminals/${id}`,
           { timeout: 5000 },
         ).catch(() => {})
       })

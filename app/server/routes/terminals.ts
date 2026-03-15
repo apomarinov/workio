@@ -158,7 +158,13 @@ import {
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
-import { expandPath, gitExec, gitExecLogged, shellEscape } from '../lib/git'
+import {
+  expandPath,
+  gitExec,
+  gitExecLogged,
+  sanitizeName,
+  shellEscape,
+} from '../lib/git'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
@@ -509,7 +515,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               const flags = hidden ? '-1ap' : '-1p'
               const { stdout } = await execSSHCommand(
                 ssh_host,
-                `ls ${flags} ${rawPath.replace(/'/g, "'\\''")}`,
+                `ls ${flags} ${shellEscape(rawPath)}`,
               )
               const lines = stdout
                 .split('\n')
@@ -612,10 +618,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             return reply.status(400).send({ error: validation.error })
           }
           const fullPath = `${parentPath}/${name}`
-          await execSSHCommand(
-            ssh_host,
-            `mkdir ${fullPath.replace(/'/g, "'\\''")}`,
-          )
+          await execSSHCommand(ssh_host, `mkdir ${shellEscape(fullPath)}`)
           return { path: fullPath }
         }
 
@@ -2371,10 +2374,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       // Also write on remote host for SSH terminals (fire-and-forget)
       if (terminal.ssh_host) {
-        const sn = trimmedName.replace(/\//g, '-').replace(/'/g, "'\\''")
+        const sn = sanitizeName(trimmedName)
         execSSHCommand(
           terminal.ssh_host,
-          `mkdir -p ~/.workio/shells && printf '%s' '${sn}' > ~/.workio/shells/${id}`,
+          `mkdir -p ~/.workio/shells && printf '%s' ${shellEscape(sn)} > ~/.workio/shells/${id}`,
           { timeout: 5000 },
         ).catch(() => {})
       }

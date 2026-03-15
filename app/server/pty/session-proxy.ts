@@ -20,6 +20,7 @@ import {
 } from '../db'
 import { startChecksPolling, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
+import { sanitizeName, shellEscape } from '../lib/git'
 import { log } from '../logger'
 import { validateSSHHost } from '../ssh/config'
 import type { WorkerInitConfig, WorkerToMasterMessage } from './ipc-types'
@@ -484,11 +485,11 @@ export async function createSession(
   // Also write name files on the remote host for SSH terminals (fire-and-forget)
   if (terminal.ssh_host) {
     import('../ssh/pool').then(({ poolExecSSHCommand }) => {
-      const tn = terminalName.replace(/\//g, '-').replace(/'/g, "'\\''")
-      const sn = shellRecord.name.replace(/\//g, '-').replace(/'/g, "'\\''")
+      const tn = sanitizeName(terminalName)
+      const sn = sanitizeName(shellRecord.name)
       poolExecSSHCommand(
         terminal.ssh_host!,
-        `mkdir -p ~/.workio/terminals ~/.workio/shells && printf '%s' '${tn}' > ~/.workio/terminals/${terminalId} && printf '%s' '${sn}' > ~/.workio/shells/${shellId}`,
+        `mkdir -p ~/.workio/terminals ~/.workio/shells && printf '%s' ${shellEscape(tn)} > ~/.workio/terminals/${terminalId} && printf '%s' ${shellEscape(sn)} > ~/.workio/shells/${shellId}`,
         { timeout: 5000 },
       ).catch(() => {})
     })

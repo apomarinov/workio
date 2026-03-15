@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { Client } from 'ssh2'
+import { shellEscape } from '../lib/git'
 import { log } from '../logger'
 import { type ResolvedSSHConfig, validateSSHHost } from './config'
 
@@ -210,12 +211,11 @@ export function poolExecSSHCommand(
         let fullCommand = command
         if (cwd) {
           if (cwd.startsWith('~/')) {
-            const rest = cwd.slice(2).replace(/'/g, "'\\''")
-            fullCommand = `cd ~/'${rest}' && ${command}`
+            fullCommand = `cd ~/${shellEscape(cwd.slice(2))} && ${command}`
           } else if (cwd === '~') {
             fullCommand = `cd ~ && ${command}`
           } else {
-            fullCommand = `cd '${cwd.replace(/'/g, "'\\''")}' && ${command}`
+            fullCommand = `cd ${shellEscape(cwd)} && ${command}`
           }
         }
 

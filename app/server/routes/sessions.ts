@@ -27,6 +27,7 @@ import {
   upsertProject,
   withTransaction,
 } from '../db'
+import { sanitizeName, shellEscape } from '../lib/git'
 import { log } from '../logger'
 import { execSSHCommand } from '../ssh/exec'
 
@@ -797,7 +798,7 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
 }
 
 function encodeProjectPath(projectPath: string): string {
-  return projectPath.replace(/\//g, '-')
+  return sanitizeName(projectPath)
 }
 
 /** Check if a JSONL file is a real session (reads first 64KB for user/assistant type). */
@@ -867,10 +868,6 @@ async function readLastTimestamp(filePath: string): Promise<string | null> {
     // skip unreadable files
   }
   return null
-}
-
-function shellEscape(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
 }
 
 async function readLocalFile(filePath: string): Promise<string | null> {

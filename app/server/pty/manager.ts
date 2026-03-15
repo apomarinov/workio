@@ -23,6 +23,7 @@ import {
   untrackTerminal,
 } from '../github/checks'
 import { getIO } from '../io'
+import { sanitizeName } from '../lib/git'
 import { log } from '../logger'
 import { sendPushNotification } from '../push'
 import { execSSHCommand } from '../ssh/exec'
@@ -626,7 +627,7 @@ async function scanAndEmitAllProcesses() {
         sessionTerminalIds.add(h.terminalId)
         if (
           zellijSessions.has(h.sessionName) ||
-          zellijSessions.has(h.sessionName.replace(/\//g, '-'))
+          zellijSessions.has(sanitizeName(h.sessionName))
         ) {
           result.processes.push({
             pid: 0,
@@ -645,7 +646,7 @@ async function scanAndEmitAllProcesses() {
         const terminalName = terminal.name || `terminal-${terminal.id}`
         if (
           zellijSessions.has(terminalName) ||
-          zellijSessions.has(terminalName.replace(/\//g, '-'))
+          zellijSessions.has(sanitizeName(terminalName))
         ) {
           result.processes.push({
             pid: 0,
@@ -1367,7 +1368,7 @@ export async function writeTerminalNameFile(
     await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
     await fs.promises.writeFile(
       path.join(WORKIO_TERMINALS_DIR, String(terminalId)),
-      name.replace(/\//g, '-'),
+      sanitizeName(name),
     )
   } catch (err) {
     log.error(
@@ -1385,7 +1386,7 @@ export async function writeShellNameFile(
     await fs.promises.mkdir(WORKIO_SHELLS_DIR, { recursive: true })
     await fs.promises.writeFile(
       path.join(WORKIO_SHELLS_DIR, String(shellId)),
-      name.replace(/\//g, '-'),
+      sanitizeName(name),
     )
   } catch (err) {
     log.error({ err }, `[pty] Failed to write shell name file for ${shellId}`)

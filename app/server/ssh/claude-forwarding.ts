@@ -16,6 +16,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { env } from '../env'
+import { shellEscape } from '../lib/git'
 import { log } from '../logger'
 import { updateClaudeBootstrap, updateClaudeTunnel } from '../services/status'
 import { resolveStableHostId } from './config'
@@ -116,7 +117,7 @@ export async function bootstrapRemoteHost(hostAlias: string): Promise<void> {
     const configJson = JSON.stringify({ host_alias: stableId })
     await poolExecSSHCommand(
       hostAlias,
-      `mkdir -p ~/.workio && printf '%s' '${configJson.replace(/'/g, "'\\''")}' > ~/.workio/config.json`,
+      `mkdir -p ~/.workio && printf '%s' ${shellEscape(configJson)} > ~/.workio/config.json`,
       { timeout: 10000 },
     )
 
