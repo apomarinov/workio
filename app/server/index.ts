@@ -431,22 +431,16 @@ function stopDaemon() {
 }
 
 process.on('exit', stopDaemon)
-process.on('SIGTERM', () => {
+function shutdown() {
   destroyAllSessions()
   closeAllConnections()
   shutdownAllTunnels()
   stopNgrok()
   stopDaemon()
   process.exit(0)
-})
-process.on('SIGINT', () => {
-  destroyAllSessions()
-  closeAllConnections()
-  shutdownAllTunnels()
-  stopNgrok()
-  stopDaemon()
-  process.exit(0)
-})
+}
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
 
 // Start server
 const start = async () => {

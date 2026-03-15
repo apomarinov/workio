@@ -393,11 +393,25 @@ export async function getOldSessionIds(
 
 export async function deleteSessions(sessionIds: string[]): Promise<number> {
   if (sessionIds.length === 0) return 0
-  let deleted = 0
-  for (const sessionId of sessionIds) {
-    if (await deleteSession(sessionId)) deleted++
+
+  // Batch-delete all related rows in dependency order
+  const promptResult = await pool.query(
+    'SELECT id FROM prompts WHERE session_id = ANY($1)',
+    [sessionIds],
+  )
+  if (promptResult.rows.length > 0) {
+    const ids = promptResult.rows.map((p: { id: number }) => p.id)
+    await pool.query('DELETE FROM messages WHERE prompt_id = ANY($1)', [ids])
   }
-  return deleted
+  await pool.query('DELETE FROM prompts WHERE session_id = ANY($1)', [
+    sessionIds,
+  ])
+  await pool.query('DELETE FROM hooks WHERE session_id = ANY($1)', [sessionIds])
+  const result = await pool.query(
+    'DELETE FROM sessions WHERE session_id = ANY($1)',
+    [sessionIds],
+  )
+  return result.rowCount ?? 0
 }
 
 export async function searchSessionMessages(
@@ -954,7 +968,7 @@ export async function updateSettings(
     JSON.stringify(newConfig),
   ])
 
-  return getSettings()
+  return { id: 1, ...DEFAULT_CONFIG, ...newConfig }
 }
 
 // VAPID key management
