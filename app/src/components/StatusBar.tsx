@@ -15,6 +15,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
   Check,
   ChevronDown,
   ChevronUp,
@@ -274,11 +276,19 @@ function GitDirtySection({
   section,
   diffStat,
   terminalId,
+  remoteSyncStat,
 }: {
   section: StatusBarSection
-  diffStat: GitDiffStat
+  diffStat: GitDiffStat | null
   terminalId: number
+  remoteSyncStat?: { behind: number; ahead: number; noRemote: boolean }
 }) {
+  const showRemoteSync =
+    !!remoteSyncStat &&
+    (remoteSyncStat.noRemote ||
+      remoteSyncStat.behind > 0 ||
+      remoteSyncStat.ahead > 0)
+
   return (
     <SortableStatusSection
       section={section}
@@ -290,13 +300,40 @@ function GitDirtySection({
         )
       }
     >
-      <GitDirtyBadge
-        added={diffStat.added}
-        removed={diffStat.removed}
-        untracked={diffStat.untracked}
-        untrackedLines={diffStat.untrackedLines}
-        className="text-[11px]"
-      />
+      {diffStat && (
+        <GitDirtyBadge
+          added={diffStat.added}
+          removed={diffStat.removed}
+          untracked={diffStat.untracked}
+          untrackedLines={diffStat.untrackedLines}
+          className="text-[11px]"
+        />
+      )}
+      {showRemoteSync && remoteSyncStat && (
+        <span className="text-[11px] font-mono flex items-center gap-1">
+          {remoteSyncStat.noRemote ? (
+            <span className="flex gap-0">
+              <ArrowDown className="w-3 h-3 text-yellow-500/80" />
+              <ArrowUp className="w-3 h-3 text-yellow-500/80 translate-x-[-3px]" />
+            </span>
+          ) : (
+            <>
+              {remoteSyncStat.behind > 0 && (
+                <span className="flex items-center text-blue-500/80">
+                  {remoteSyncStat.behind}
+                  <ArrowDown className="w-3 h-3" />
+                </span>
+              )}
+              {remoteSyncStat.ahead > 0 && (
+                <span className="flex items-center text-green-500/80">
+                  {remoteSyncStat.ahead}
+                  <ArrowUp className="w-3 h-3" />
+                </span>
+              )}
+            </>
+          )}
+        </span>
+      )}
     </SortableStatusSection>
   )
 }
@@ -461,6 +498,7 @@ export function StatusBar({ position }: StatusBarProps) {
     resourceInfo,
     gitDirtyStatus,
     gitLastCommit,
+    gitRemoteSyncStatus,
   } = useProcessContext()
   const { settings, updateSettings } = useSettings()
   const isMobile = useIsMobile()
@@ -500,6 +538,12 @@ export function StatusBar({ position }: StatusBarProps) {
   const isDirty =
     !!diffStat &&
     (diffStat.added > 0 || diffStat.removed > 0 || diffStat.untracked > 0)
+  const remoteSyncStat = gitRemoteSyncStatus[terminal.id]
+  const hasDivergence =
+    !!remoteSyncStat &&
+    (remoteSyncStat.noRemote ||
+      remoteSyncStat.behind > 0 ||
+      remoteSyncStat.ahead > 0)
   const lastCommit = gitLastCommit[terminal.id]
 
   const prForBranch = terminal.git_branch
@@ -532,7 +576,7 @@ export function StatusBar({ position }: StatusBarProps) {
       case 'ports':
         return ports.length > 0
       case 'gitDirty':
-        return isDirty
+        return isDirty || hasDivergence
       case 'lastCommit':
         return !!lastCommit
       case 'branch':
@@ -605,12 +649,13 @@ export function StatusBar({ position }: StatusBarProps) {
           />
         ) : null
       case 'gitDirty':
-        return isDirty && diffStat ? (
+        return isDirty || hasDivergence ? (
           <GitDirtySection
             key={section.name}
             section={section}
-            diffStat={diffStat}
+            diffStat={isDirty ? diffStat : null}
             terminalId={terminal.id}
+            remoteSyncStat={remoteSyncStat}
           />
         ) : null
       case 'lastCommit':
