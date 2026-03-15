@@ -38,7 +38,7 @@ async function getParentAppName(): Promise<string | null> {
       pid = Number.parseInt(ppidStr, 10)
       if (Number.isNaN(pid)) break
     }
-  } catch {}
+  } catch { }
   return null
 }
 
@@ -49,17 +49,6 @@ function getParentAppNameCached(): Promise<string | null> {
     parentAppNamePromise = getParentAppName()
   }
   return parentAppNamePromise
-}
-
-// Expand ~ to home directory
-function expandPath(p: string): string {
-  if (p.startsWith('~/')) {
-    return path.join(os.homedir(), p.slice(2))
-  }
-  if (p === '~') {
-    return os.homedir()
-  }
-  return p
 }
 
 function isLocalPortAvailable(port: number): Promise<boolean> {
@@ -181,6 +170,12 @@ import {
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
+import {
+  expandPath,
+  gitExec,
+  gitExecLogged,
+  shellEscape,
+} from '../lib/git'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
@@ -416,22 +411,22 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
         : resolvedPath
       : expandPath(
-          lineColMatch?.[2]
-            ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
-            : resolvedPath,
-        )
+        lineColMatch?.[2]
+          ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
+          : resolvedPath,
+      )
 
     // Build args — for SSH remotes, use --remote to open via the IDE's SSH extension
     let args: string[]
     if (remoteSshHost) {
       args = terminalCwd
         ? [
-            '--remote',
-            `ssh-remote+${remoteSshHost}`,
-            terminalCwd,
-            '--goto',
-            targetPath,
-          ]
+          '--remote',
+          `ssh-remote+${remoteSshHost}`,
+          terminalCwd,
+          '--goto',
+          targetPath,
+        ]
         : ['--remote', `ssh-remote+${remoteSshHost}`, '--goto', targetPath]
     } else {
       args = terminalCwd
@@ -833,12 +828,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const hasSetup = setup_script || delete_script
         const setupObj = hasSetup
           ? {
-              ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
-              ...(delete_script?.trim()
-                ? { delete: delete_script.trim() }
-                : {}),
-              status: 'setup' as const,
-            }
+            ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
+            ...(delete_script?.trim()
+              ? { delete: delete_script.trim() }
+              : {}),
+            status: 'setup' as const,
+          }
           : null
 
         const gitRepoData: Record<string, unknown> = {
@@ -1179,34 +1174,19 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Terminal has no git repo' })
       }
 
-      const gitCmd = `git for-each-ref --sort=-committerdate --format='%(refname:short)|%(HEAD)|%(committerdate:iso8601)' refs/heads refs/remotes/origin`
-
       try {
-        let stdout: string
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
-            cwd: terminal.cwd,
-          })
-          stdout = result.stdout
-        } else {
-          stdout = await new Promise<string>((resolve, reject) => {
-            execFile(
-              'git',
-              [
-                'for-each-ref',
-                '--sort=-committerdate',
-                '--format=%(refname:short)|%(HEAD)|%(committerdate:iso8601)',
-                'refs/heads',
-                'refs/remotes/origin',
-              ],
-              { cwd: expandPath(terminal.cwd), timeout: 10000 },
-              (err, out) => {
-                if (err) reject(err)
-                else resolve(out)
-              },
-            )
-          })
-        }
+        const result = await gitExec(
+          terminal,
+          [
+            'for-each-ref',
+            '--sort=-committerdate',
+            '--format=%(refname:short)|%(HEAD)|%(committerdate:iso8601)',
+            'refs/heads',
+            'refs/remotes/origin',
+          ],
+          { timeout: 10000 },
+        )
+        const stdout = result.stdout
 
         let currentBranch: BranchInfo | null = null
         const local: BranchInfo[] = []
@@ -1270,39 +1250,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(
-            terminal.ssh_host,
-            'git fetch --all',
-            { cwd: terminal.cwd },
-          )
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: 'git fetch --all',
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['fetch', '--all'],
-              { cwd: expandPath(terminal.cwd), timeout: 30000 },
-              (err, stdout, stderr) => {
-                if (err) return reject(err)
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: 'git fetch --all',
-                  stdout,
-                  stderr,
-                })
-                resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['fetch', '--all'], {
+          terminalId: id,
+          timeout: 30000,
+        })
 
         return { success: true }
       } catch (err) {
@@ -1336,60 +1287,18 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Branch is required' })
       }
 
-      const gitCmd = `git checkout ${branch.replace(/'/g, "'\\''")}`
-
       try {
-        const cwd = expandPath(terminal.cwd)
+        // Prune stale worktrees before checkout
+        await gitExec(terminal, ['worktree', 'prune'], {
+          timeout: 5000,
+        }).catch((err) =>
+          log.error({ err, terminalId: id }, '[git] Failed to prune worktrees'),
+        )
 
-        if (terminal.ssh_host) {
-          // Prune stale worktrees before checkout
-          await execSSHCommand(terminal.ssh_host, 'git worktree prune', {
-            cwd: terminal.cwd,
-          }).catch((err) =>
-            log.error(
-              { err, terminalId: id },
-              '[git] Failed to prune worktrees',
-            ),
-          )
-
-          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: gitCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          // Prune stale worktrees before checkout
-          await new Promise<void>((resolve) => {
-            execFile('git', ['worktree', 'prune'], { cwd, timeout: 5000 }, () =>
-              resolve(),
-            )
-          })
-
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['checkout', branch],
-              { cwd, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: gitCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['checkout', branch], {
+          terminalId: id,
+          timeout: 30000,
+        })
 
         // Refresh git branch detection and PR checks
         detectGitBranch(id)
@@ -1437,73 +1346,25 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
         if (isOnTargetBranch) {
           // On target branch: pull with rebase
-          const pullCmd = `git pull --rebase origin ${branch.replace(/'/g, "'\\''")}`
-          if (terminal.ssh_host) {
-            const result = await execSSHCommand(terminal.ssh_host, pullCmd, {
-              cwd: terminal.cwd,
-            })
-            logCommand({
+          await gitExecLogged(
+            terminal,
+            ['pull', '--rebase', 'origin', branch],
+            {
               terminalId: id,
-              category: 'git',
-              command: pullCmd,
-              stdout: result.stdout,
-              stderr: result.stderr,
-            })
-          } else {
-            await new Promise<void>((resolve, reject) => {
-              execFile(
-                'git',
-                ['pull', '--rebase', 'origin', branch],
-                { cwd: expandPath(terminal.cwd), timeout: 60000 },
-                (err, stdout, stderr) => {
-                  logCommand({
-                    terminalId: id,
-                    category: 'git',
-                    command: pullCmd,
-                    stdout,
-                    stderr: err ? err.message : stderr,
-                  })
-                  if (err) reject(err)
-                  else resolve()
-                },
-              )
-            })
-          }
+              timeout: 60000,
+            },
+          )
         } else {
           // On different branch: fetch and fast-forward update the target branch
           // This fails if branches have diverged (which requires manual resolution)
-          const fetchCmd = `git fetch origin ${branch.replace(/'/g, "'\\''")}:${branch.replace(/'/g, "'\\''")}`
-          if (terminal.ssh_host) {
-            const result = await execSSHCommand(terminal.ssh_host, fetchCmd, {
-              cwd: terminal.cwd,
-            })
-            logCommand({
+          await gitExecLogged(
+            terminal,
+            ['fetch', 'origin', `${branch}:${branch}`],
+            {
               terminalId: id,
-              category: 'git',
-              command: fetchCmd,
-              stdout: result.stdout,
-              stderr: result.stderr,
-            })
-          } else {
-            await new Promise<void>((resolve, reject) => {
-              execFile(
-                'git',
-                ['fetch', 'origin', `${branch}:${branch}`],
-                { cwd: expandPath(terminal.cwd), timeout: 60000 },
-                (err, stdout, stderr) => {
-                  logCommand({
-                    terminalId: id,
-                    category: 'git',
-                    command: fetchCmd,
-                    stdout,
-                    stderr: err ? err.message : stderr,
-                  })
-                  if (err) reject(err)
-                  else resolve()
-                },
-              )
-            })
-          }
+              timeout: 60000,
+            },
+          )
         }
 
         // Refresh git branch detection and sync status
@@ -1549,62 +1410,21 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const pushArgs = force
         ? ['push', '-u', '--force', 'origin', branch]
         : ['push', '-u', 'origin', branch]
-      const gitCmd = force
-        ? `git push -u --force origin ${branch.replace(/'/g, "'\\''")}`
-        : `git push -u origin ${branch.replace(/'/g, "'\\''")}`
 
       try {
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: gitCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              pushArgs,
-              { cwd: expandPath(terminal.cwd), timeout: 60000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: gitCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, pushArgs, {
+          terminalId: id,
+          timeout: 60000,
+        })
 
         // Update the local remote-tracking ref to match what we just pushed.
         // This is needed because single-branch clones (--single-branch / --depth)
         // have a narrow fetch refspec and `git push` may not update origin/<branch>.
-        const cwd = expandPath(terminal.cwd)
-        if (terminal.ssh_host) {
-          execSSHCommand(
-            terminal.ssh_host,
-            `git update-ref refs/remotes/origin/${branch.replace(/'/g, "'\\''")} HEAD`,
-            { cwd: terminal.cwd },
-          ).catch(() => {})
-        } else {
-          execFile(
-            'git',
-            ['update-ref', `refs/remotes/origin/${branch}`, 'HEAD'],
-            { cwd, timeout: 5000 },
-            () => {},
-          )
-        }
+        gitExec(
+          terminal,
+          ['update-ref', `refs/remotes/origin/${branch}`, 'HEAD'],
+          { timeout: 5000 },
+        ).catch(() => { })
 
         // Refresh git branch detection and sync status
         detectGitBranch(id)
@@ -1642,28 +1462,11 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        const gitCmd = 'git log -1 --format=%B'
-        let message: string
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
-            cwd: terminal.cwd,
-          })
-          message = result.stdout.trim()
-        } else {
-          message = await new Promise<string>((resolve, reject) => {
-            execFile(
-              'git',
-              ['log', '-1', '--format=%B'],
-              { cwd: expandPath(terminal.cwd), timeout: 10000 },
-              (err, stdout) => {
-                if (err) reject(err)
-                else resolve(stdout.trim())
-              },
-            )
-          })
-        }
+        const result = await gitExec(terminal, ['log', '-1', '--format=%B'], {
+          timeout: 10000,
+        })
 
-        return { message }
+        return { message: result.stdout.trim() }
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to get HEAD message'
@@ -1695,179 +1498,66 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const base = request.query.base
 
         // When base is provided, diff between two refs (for PR view)
-        if (base && !terminal.ssh_host) {
-          // Extract branch names from "origin/base...origin/head" or "hash^..hash" format for fetching
+        if (base) {
+          // Fetch the relevant branches first
           const parts = base.split('...')
           const refs = parts
             .map((p) => p.replace(/^origin\//, '').replace(/\^$/, ''))
             .filter((r) => !/^[0-9a-f]{6,}$/i.test(r)) // skip commit hashes
           if (refs.length > 0) {
-            const refspecs = refs.map(
-              (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
-            )
-            await fetchOriginIfNeeded(cwd, refspecs)
+            if (terminal.ssh_host) {
+              const refspecs = refs
+                .map((r) => `+refs/heads/${r}:refs/remotes/origin/${r}`)
+                .join(' ')
+              await gitExec(terminal, [], {
+                timeout: 15000,
+                sshCmd: `git fetch origin ${refspecs} 2>/dev/null || true`,
+              }).catch(() => { })
+            } else {
+              const refspecs = refs.map(
+                (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
+              )
+              await fetchOriginIfNeeded(cwd, refspecs)
+            }
           }
 
-          const [numstatOut, nameStatusOut] = await Promise.all([
-            new Promise<string>((resolve) => {
-              execFile(
-                'git',
-                ['diff', '--numstat', base],
-                { cwd, timeout: 10000 },
-                (_err, stdout) => resolve(stdout || ''),
-              )
-            }),
-            new Promise<string>((resolve) => {
-              execFile(
-                'git',
-                ['diff', '--name-status', base],
-                { cwd, timeout: 10000 },
-                (_err, stdout) => resolve(stdout || ''),
-              )
-            }),
-          ])
-
-          const files = parseChangedFiles(numstatOut, nameStatusOut, '', '')
-          return { files }
-        }
-
-        // When base is provided for SSH, diff between two refs remotely
-        if (base && terminal.ssh_host) {
-          // Fetch the relevant branches first
-          const parts = base.split('...')
-          const refs = parts
-            .map((p) => p.replace(/^origin\//, '').replace(/\^$/, ''))
-            .filter((r) => !/^[0-9a-f]{6,}$/i.test(r))
-          if (refs.length > 0) {
-            const refspecs = refs
-              .map((r) => `+refs/heads/${r}:refs/remotes/origin/${r}`)
-              .join(' ')
-            await execSSHCommand(
-              terminal.ssh_host,
-              `git fetch origin ${refspecs} 2>/dev/null || true`,
-              { cwd: terminal.cwd, timeout: 15000 },
-            )
-          }
-
-          const [numstatResult, nameStatusResult] = await Promise.all([
-            execSSHCommand(terminal.ssh_host, `git diff --numstat ${base}`, {
-              cwd: terminal.cwd,
+          const [numstat, nameStatus] = await Promise.all([
+            gitExec(terminal, ['diff', '--numstat', base], {
               timeout: 10000,
-            }),
-            execSSHCommand(
-              terminal.ssh_host,
-              `git diff --name-status ${base}`,
-              { cwd: terminal.cwd, timeout: 10000 },
+            }).then(
+              (r) => r.stdout,
+              () => '',
+            ),
+            gitExec(terminal, ['diff', '--name-status', base], {
+              timeout: 10000,
+            }).then(
+              (r) => r.stdout,
+              () => '',
             ),
           ])
-
-          const files = parseChangedFiles(
-            numstatResult.stdout,
-            nameStatusResult.stdout,
-            '',
-            '',
-          )
-          return { files }
+          return { files: parseChangedFiles(numstat, nameStatus, '', '') }
         }
 
-        if (terminal.ssh_host) {
-          const [
-            numstatResult,
-            nameStatusResult,
-            untrackedResult,
-            untrackedWcResult,
-          ] = await Promise.all([
-            execSSHCommand(
-              terminal.ssh_host,
-              'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
-              { cwd: terminal.cwd },
-            ),
-            execSSHCommand(
-              terminal.ssh_host,
-              'git diff --name-status HEAD 2>/dev/null || git diff --name-status',
-              { cwd: terminal.cwd },
-            ),
-            execSSHCommand(
-              terminal.ssh_host,
-              'git ls-files --others --exclude-standard',
-              { cwd: terminal.cwd },
-            ),
-            execSSHCommand(
-              terminal.ssh_host,
-              'git ls-files -z --others --exclude-standard | xargs -0 wc -l 2>/dev/null',
-              { cwd: terminal.cwd },
-            ),
-          ])
-
-          const files = parseChangedFiles(
-            numstatResult.stdout,
-            nameStatusResult.stdout,
-            untrackedResult.stdout,
-            untrackedWcResult.stdout,
+        // No base: diff working tree against HEAD
+        const gitExecSafe = (args: string[], sshCmd?: string) =>
+          gitExec(terminal, args, { timeout: 10000, sshCmd }).then(
+            (r) => r.stdout,
+            () => '',
           )
-          return { files }
-        }
 
-        // Local: run 4 git commands in parallel
         const [numstatOut, nameStatusOut, untrackedOut, untrackedWcOut] =
           await Promise.all([
-            new Promise<string>((resolve) => {
-              execFile(
-                'git',
-                ['diff', '--numstat', 'HEAD'],
-                { cwd, timeout: 10000 },
-                (err, stdout) => {
-                  if (err) {
-                    execFile(
-                      'git',
-                      ['diff', '--numstat'],
-                      { cwd, timeout: 10000 },
-                      (_err2, stdout2) => resolve(stdout2 || ''),
-                    )
-                  } else {
-                    resolve(stdout)
-                  }
-                },
-              )
-            }),
-            new Promise<string>((resolve) => {
-              execFile(
-                'git',
-                ['diff', '--name-status', 'HEAD'],
-                { cwd, timeout: 10000 },
-                (err, stdout) => {
-                  if (err) {
-                    execFile(
-                      'git',
-                      ['diff', '--name-status'],
-                      { cwd, timeout: 10000 },
-                      (_err2, stdout2) => resolve(stdout2 || ''),
-                    )
-                  } else {
-                    resolve(stdout)
-                  }
-                },
-              )
-            }),
-            new Promise<string>((resolve) => {
-              execFile(
-                'git',
-                ['ls-files', '--others', '--exclude-standard'],
-                { cwd, timeout: 10000 },
-                (_err, stdout) => resolve(stdout || ''),
-              )
-            }),
-            new Promise<string>((resolve) => {
-              execFile(
-                'sh',
-                [
-                  '-c',
-                  'git ls-files -z --others --exclude-standard | xargs -0 wc -l 2>/dev/null',
-                ],
-                { cwd, timeout: 10000 },
-                (_err, stdout) => resolve(stdout || ''),
-              )
-            }),
+            gitExecSafe(['diff', '--numstat', 'HEAD']).then(
+              (out) => out || gitExecSafe(['diff', '--numstat']),
+            ),
+            gitExecSafe(['diff', '--name-status', 'HEAD']).then(
+              (out) => out || gitExecSafe(['diff', '--name-status']),
+            ),
+            gitExecSafe(['ls-files', '--others', '--exclude-standard']),
+            gitExecSafe(
+              ['ls-files', '-z', '--others', '--exclude-standard'],
+              'git ls-files -z --others --exclude-standard | xargs -0 wc -l 2>/dev/null',
+            ),
           ])
 
         const files = parseChangedFiles(
@@ -1907,151 +1597,64 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     const filePath = request.query.path
     const context = request.query.context || '5'
     const base = request.query.base
-    const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+    const safe = (
+      args: string[],
+      extraOpts?: { maxBuffer?: number; sshCmd?: string },
+    ) =>
+      gitExec(terminal, args, { timeout: 10000, ...extraOpts }).then(
+        (r) => r.stdout,
+        () => '',
+      )
 
     try {
       // When base is provided, diff between two refs (for PR view)
-      if (base && !terminal.ssh_host) {
+      if (base) {
         const args = ['diff', `-U${context}`, base]
         if (filePath) args.push('--', filePath)
-        const diff = await new Promise<string>((resolve) => {
-          execFile(
-            'git',
-            args,
-            { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
-            (_err, stdout) => resolve(stdout || ''),
-          )
-        })
+        const diff = await safe(args, { maxBuffer: 10 * 1024 * 1024 })
         return { diff }
-      }
-
-      // When base is provided for SSH, diff between two refs remotely
-      if (base && terminal.ssh_host) {
-        const escapedBase = base.replace(/'/g, "'\\''")
-        let cmd = `git diff -U${context} '${escapedBase}'`
-        if (filePath) {
-          const escapedPath = filePath.replace(/'/g, "'\\''")
-          cmd += ` -- '${escapedPath}'`
-        }
-        const result = await execSSHCommand(terminal.ssh_host, cmd, {
-          cwd: terminal.cwd,
-          timeout: 10000,
-        })
-        return { diff: result.stdout }
-      }
-
-      if (terminal.ssh_host) {
-        if (filePath) {
-          // SSH: try tracked file diff first, then untracked
-          const escapedPath = filePath.replace(/'/g, "'\\''")
-          let result = await execSSHCommand(
-            terminal.ssh_host,
-            `git diff -U${context} HEAD -- '${escapedPath}' 2>/dev/null || git diff -U${context} -- '${escapedPath}'`,
-            { cwd: terminal.cwd },
-          )
-          if (!result.stdout.trim()) {
-            // Try untracked file
-            result = await execSSHCommand(
-              terminal.ssh_host,
-              `git diff --no-index -- /dev/null '${escapedPath}' || true`,
-              { cwd: terminal.cwd },
-            )
-          }
-          return { diff: result.stdout }
-        }
-        // SSH: full diff (all files)
-        const result = await execSSHCommand(
-          terminal.ssh_host,
-          `git diff -U${context} HEAD`,
-          { cwd: terminal.cwd },
-        )
-        return { diff: result.stdout }
       }
 
       if (filePath) {
-        // Local: try tracked file diff first
-        let diff = await new Promise<string>((resolve) => {
-          execFile(
-            'git',
-            ['diff', `-U${context}`, 'HEAD', '--', filePath],
-            { cwd, timeout: 10000 },
-            (err, stdout) => {
-              if (err) {
-                // Fallback without HEAD (fresh repo)
-                execFile(
-                  'git',
-                  ['diff', `-U${context}`, '--', filePath],
-                  { cwd, timeout: 10000 },
-                  (_err2, stdout2) => resolve(stdout2 || ''),
-                )
-              } else {
-                resolve(stdout)
-              }
-            },
-          )
-        })
-
-        if (!diff.trim()) {
-          // Try untracked file
-          diff = await new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['diff', '--no-index', '--', '/dev/null', filePath],
-              { cwd, timeout: 10000 },
-              (_err, stdout) => {
-                // exit code 1 is normal for --no-index with differences
-                resolve(stdout || '')
-              },
-            )
-          })
+        // Try tracked file diff first, then fallback for fresh repos
+        let diff = await safe(['diff', `-U${context}`, 'HEAD', '--', filePath])
+        if (!diff) {
+          diff = await safe(['diff', `-U${context}`, '--', filePath])
         }
-
+        if (!diff.trim()) {
+          // Try untracked file (exit code 1 is normal for --no-index)
+          diff = await safe(['diff', '--no-index', '--', '/dev/null', filePath])
+        }
         return { diff }
       }
 
-      // Local: full diff (all files — tracked + untracked)
-      let diff = await new Promise<string>((resolve) => {
-        execFile(
-          'git',
-          ['diff', `-U${context}`, 'HEAD'],
-          { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
-          (err, stdout) => {
-            if (err) {
-              execFile(
-                'git',
-                ['diff', `-U${context}`],
-                { cwd, timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
-                (_err2, stdout2) => resolve(stdout2 || ''),
-              )
-            } else {
-              resolve(stdout)
-            }
-          },
-        )
+      // Full diff (all files — tracked + untracked)
+      let diff = await safe(['diff', `-U${context}`, 'HEAD'], {
+        maxBuffer: 10 * 1024 * 1024,
       })
+      if (!diff) {
+        diff = await safe(['diff', `-U${context}`], {
+          maxBuffer: 10 * 1024 * 1024,
+        })
+      }
 
       // Append untracked files
-      const untrackedFiles = await new Promise<string>((resolve) => {
-        execFile(
-          'git',
-          ['ls-files', '--others', '--exclude-standard'],
-          { cwd, timeout: 5000 },
-          (_err, stdout) => resolve(stdout?.trim() || ''),
-        )
-      })
+      const untrackedFiles = (
+        await safe(['ls-files', '--others', '--exclude-standard'])
+      ).trim()
 
       if (untrackedFiles) {
         const untrackedParts: string[] = []
         for (const file of untrackedFiles.split('\n')) {
           if (!file) continue
-          const part = await new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['diff', '--no-index', '--', '/dev/null', file],
-              { cwd, timeout: 10000 },
-              (_err, stdout) => resolve(stdout || ''),
-            )
-          })
+          const part = await safe([
+            'diff',
+            '--no-index',
+            '--',
+            '/dev/null',
+            file,
+          ])
           if (part) untrackedParts.push(part)
         }
         if (untrackedParts.length > 0) {
@@ -2092,178 +1695,47 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     const { message, amend, noVerify, files } = request.body
-    const cwdPath = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
 
     try {
       // Stage files
       if (files && files.length > 0) {
         // Selective staging: reset then add specific files
-        const resetCmd = 'git reset HEAD'
-        if (terminal.ssh_host) {
-          await execSSHCommand(terminal.ssh_host, resetCmd, {
-            cwd: terminal.cwd,
-          }).catch((err) =>
+        await gitExec(terminal, ['reset', 'HEAD'], { timeout: 30000 }).catch(
+          (err) =>
             log.error(
               { err, terminalId: id },
               '[git] Failed to reset HEAD (may be fresh repo)',
             ),
-          )
-        } else {
-          await new Promise<void>((resolve) => {
-            execFile(
-              'git',
-              ['reset', 'HEAD'],
-              { cwd: cwdPath, timeout: 30000 },
-              () => resolve(), // swallow error on fresh repos
-            )
-          })
-        }
-
-        const addCmd = `git add -- ${files.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
-        if (terminal.ssh_host) {
-          const addResult = await execSSHCommand(terminal.ssh_host, addCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: addCmd,
-            stdout: addResult.stdout,
-            stderr: addResult.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['add', '--', ...files],
-              { cwd: cwdPath, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: addCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        )
+        await gitExecLogged(terminal, ['add', '--', ...files], {
+          terminalId: id,
+          timeout: 30000,
+        })
       } else {
         // Stage all changes (default)
-        const addCmd = 'git add -A'
-        if (terminal.ssh_host) {
-          const addResult = await execSSHCommand(terminal.ssh_host, addCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: addCmd,
-            stdout: addResult.stdout,
-            stderr: addResult.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['add', '-A'],
-              { cwd: cwdPath, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: addCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['add', '-A'], {
+          terminalId: id,
+          timeout: 30000,
+        })
       }
 
       if (amend) {
-        // Amend with no-edit
         const amendArgs = ['commit', '--amend', '--no-edit']
         if (noVerify) amendArgs.push('--no-verify')
-        const amendCmd = `git ${amendArgs.join(' ')}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, amendCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: amendCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              amendArgs,
-              { cwd: cwdPath, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: amendCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, amendArgs, {
+          terminalId: id,
+          timeout: 30000,
+        })
       } else {
         if (!message?.trim()) {
           return reply.status(400).send({ error: 'Commit message is required' })
         }
-
-        // Commit
-        const safeMessage = message.replace(/'/g, "'\\''")
         const commitArgs = ['commit', '-m', message]
         if (noVerify) commitArgs.push('--no-verify')
-        const commitCmd = `git commit${noVerify ? ' --no-verify' : ''} -m '${safeMessage}'`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, commitCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: commitCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              commitArgs,
-              { cwd: cwdPath, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: commitCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, commitArgs, {
+          terminalId: id,
+          timeout: 30000,
+        })
       }
 
       // Refresh git state
@@ -2307,58 +1779,20 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'No files specified' })
     }
 
-    const cwdPath = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
-
     try {
       // Get file statuses to determine which git commands to use
-      let nameStatusOut: string
-      let untrackedOut: string
-      if (terminal.ssh_host) {
-        const [nsResult, utResult] = await Promise.all([
-          execSSHCommand(
-            terminal.ssh_host,
-            'git diff --name-status HEAD 2>/dev/null || git diff --name-status',
-            { cwd: terminal.cwd },
-          ),
-          execSSHCommand(
-            terminal.ssh_host,
-            'git ls-files --others --exclude-standard',
-            { cwd: terminal.cwd },
-          ),
-        ])
-        nameStatusOut = nsResult.stdout
-        untrackedOut = utResult.stdout
-      } else {
-        ;[nameStatusOut, untrackedOut] = await Promise.all([
-          new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['diff', '--name-status', 'HEAD'],
-              { cwd: cwdPath, timeout: 10000 },
-              (err, stdout) => {
-                if (err) {
-                  execFile(
-                    'git',
-                    ['diff', '--name-status'],
-                    { cwd: cwdPath, timeout: 10000 },
-                    (_err2, stdout2) => resolve(stdout2 || ''),
-                  )
-                } else {
-                  resolve(stdout)
-                }
-              },
-            )
-          }),
-          new Promise<string>((resolve) => {
-            execFile(
-              'git',
-              ['ls-files', '--others', '--exclude-standard'],
-              { cwd: cwdPath, timeout: 10000 },
-              (_err, stdout) => resolve(stdout || ''),
-            )
-          }),
-        ])
-      }
+      const safe = (args: string[]) =>
+        gitExec(terminal, args, { timeout: 10000 }).then(
+          (r) => r.stdout,
+          () => '',
+        )
+
+      const [nameStatusOut, untrackedOut] = await Promise.all([
+        safe(['diff', '--name-status', 'HEAD']).then(
+          (out) => out || safe(['diff', '--name-status']),
+        ),
+        safe(['ls-files', '--others', '--exclude-standard']),
+      ])
 
       // Parse statuses
       const untrackedFiles = new Set(
@@ -2390,82 +1824,28 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       // Revert tracked files
       if (trackedToRevert.length > 0) {
-        const checkoutCmd = `git checkout HEAD -- ${trackedToRevert.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, checkoutCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
+        await gitExecLogged(
+          terminal,
+          ['checkout', 'HEAD', '--', ...trackedToRevert],
+          {
             terminalId: id,
-            category: 'git',
-            command: checkoutCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['checkout', 'HEAD', '--', ...trackedToRevert],
-              { cwd: cwdPath, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: checkoutCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+            timeout: 30000,
+          },
+        )
       }
 
       // Remove staged new files
       if (stagedNew.length > 0) {
-        const rmCmd = `git rm -f -- ${stagedNew.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, rmCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: rmCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['rm', '-f', '--', ...stagedNew],
-              { cwd: cwdPath, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: rmCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['rm', '-f', '--', ...stagedNew], {
+          terminalId: id,
+          timeout: 30000,
+        })
       }
 
       // Delete untracked files
       if (untracked.length > 0) {
         if (terminal.ssh_host) {
-          const rmCmd = `rm -f -- ${untracked.map((f) => `'${f.replace(/'/g, "'\\''")}'`).join(' ')}`
+          const rmCmd = `rm -f -- ${untracked.map((f) => shellEscape(f)).join(' ')}`
           await execSSHCommand(terminal.ssh_host, rmCmd, {
             cwd: terminal.cwd,
           })
@@ -2477,6 +1857,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
             stderr: '',
           })
         } else {
+          const cwdPath = expandPath(terminal.cwd)
           await Promise.all(
             untracked.map((f) =>
               fs.promises
@@ -2551,40 +1932,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         // Rebase current branch onto the selected branch
-        // git rebase <selected> rebases current onto selected
-        const rebaseCmd = `git rebase ${branch.replace(/'/g, "'\\''")}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, rebaseCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: rebaseCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['rebase', branch],
-              { cwd: expandPath(terminal.cwd), timeout: 60000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: rebaseCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['rebase', branch], {
+          terminalId: id,
+          timeout: 60000,
+        })
 
         // Refresh git branch detection
         detectGitBranch(id)
@@ -2592,25 +1943,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return { success: true, branch: currentBranch, onto: branch }
       } catch (err) {
         // Abort the rebase to leave repo in clean state
-        const abortCmd = 'git rebase --abort'
-        try {
-          if (terminal.ssh_host) {
-            await execSSHCommand(terminal.ssh_host, abortCmd, {
-              cwd: terminal.cwd,
-            })
-          } else {
-            await new Promise<void>((resolve) => {
-              execFile(
-                'git',
-                ['rebase', '--abort'],
-                { cwd: expandPath(terminal.cwd), timeout: 10000 },
-                () => resolve(), // Ignore errors from abort
-              )
-            })
-          }
-        } catch {
-          // Ignore abort errors
-        }
+        await gitExec(terminal, ['rebase', '--abort'], {
+          timeout: 10000,
+        }).catch(() => { })
 
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to rebase branch'
@@ -2648,27 +1983,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         // Verify commitHash matches HEAD
-        let headHash: string
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(
-            terminal.ssh_host,
-            'git rev-parse HEAD',
-            { cwd: terminal.cwd },
-          )
-          headHash = result.stdout.trim()
-        } else {
-          headHash = await new Promise<string>((resolve, reject) => {
-            execFile(
-              'git',
-              ['rev-parse', 'HEAD'],
-              { cwd: expandPath(terminal.cwd), timeout: 5000 },
-              (err, stdout) => {
-                if (err) reject(err)
-                else resolve(stdout.trim())
-              },
-            )
-          })
-        }
+        const headResult = await gitExec(terminal, ['rev-parse', 'HEAD'], {
+          timeout: 5000,
+        })
+        const headHash = headResult.stdout.trim()
 
         if (
           !headHash.startsWith(commitHash) &&
@@ -2680,39 +1998,10 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         }
 
         // git reset --soft HEAD~1
-        const resetCmd = 'git reset --soft HEAD~1'
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, resetCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: resetCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['reset', '--soft', 'HEAD~1'],
-              { cwd: expandPath(terminal.cwd), timeout: 10000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: resetCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['reset', '--soft', 'HEAD~1'], {
+          terminalId: id,
+          timeout: 10000,
+        })
 
         detectGitBranch(id)
         checkAndEmitSingleGitDirty(id)
@@ -2754,72 +2043,26 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         // Get parent of the commit to drop
-        let parentHash: string
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(
-            terminal.ssh_host,
-            `git rev-parse ${commitHash}~1`,
-            { cwd: terminal.cwd },
-          )
-          parentHash = result.stdout.trim()
-        } else {
-          parentHash = await new Promise<string>((resolve, reject) => {
-            execFile(
-              'git',
-              ['rev-parse', `${commitHash}~1`],
-              { cwd: expandPath(terminal.cwd), timeout: 5000 },
-              (err, stdout) => {
-                if (err) reject(err)
-                else resolve(stdout.trim())
-              },
-            )
-          })
-        }
+        const parentResult = await gitExec(
+          terminal,
+          ['rev-parse', `${commitHash}~1`],
+          { timeout: 5000 },
+        )
+        const parentHash = parentResult.stdout.trim()
 
         // Use sed to change "pick <hash>" to "drop <hash>" for this commit
         const shortHash = commitHash.slice(0, 7)
         const sedScript = `sed -i.bak 's/^pick ${shortHash}/drop ${shortHash}/'`
 
-        const rebaseCmd = `GIT_SEQUENCE_EDITOR="${sedScript}" git rebase -i --no-autosquash ${parentHash}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, rebaseCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
+        await gitExecLogged(
+          terminal,
+          ['rebase', '-i', '--no-autosquash', parentHash],
+          {
             terminalId: id,
-            category: 'git',
-            command: rebaseCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['rebase', '-i', '--no-autosquash', parentHash],
-              {
-                cwd: expandPath(terminal.cwd),
-                timeout: 60000,
-                env: {
-                  ...process.env,
-                  GIT_SEQUENCE_EDITOR: `sed -i.bak 's/^pick ${shortHash}/drop ${shortHash}/'`,
-                },
-              },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: rebaseCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+            timeout: 60000,
+            env: { GIT_SEQUENCE_EDITOR: sedScript },
+          },
+        )
 
         detectGitBranch(id)
         checkAndEmitSingleGitDirty(id)
@@ -2827,25 +2070,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return { success: true }
       } catch (err) {
         // Abort the rebase to leave repo in clean state
-        const abortCmd = 'git rebase --abort'
-        try {
-          if (terminal.ssh_host) {
-            await execSSHCommand(terminal.ssh_host, abortCmd, {
-              cwd: terminal.cwd,
-            })
-          } else {
-            await new Promise<void>((resolve) => {
-              execFile(
-                'git',
-                ['rebase', '--abort'],
-                { cwd: expandPath(terminal.cwd), timeout: 10000 },
-                () => resolve(),
-              )
-            })
-          }
-        } catch {
-          // Ignore abort errors
-        }
+        await gitExec(terminal, ['rebase', '--abort'], {
+          timeout: 10000,
+        }).catch(() => { })
 
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to drop commit'
@@ -2887,76 +2114,21 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         // Delete the local branch with -D (force delete)
-        const deleteCmd = `git branch -D ${branch.replace(/'/g, "'\\''")}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, deleteCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: deleteCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['branch', '-D', branch],
-              { cwd: expandPath(terminal.cwd), timeout: 10000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: deleteCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['branch', '-D', branch], {
+          terminalId: id,
+          timeout: 10000,
+        })
 
         // Delete remote branch if requested
         if (deleteRemote) {
-          const deleteRemoteCmd = `git push origin --delete ${branch.replace(/'/g, "'\\''")}`
-          if (terminal.ssh_host) {
-            const result = await execSSHCommand(
-              terminal.ssh_host,
-              deleteRemoteCmd,
-              { cwd: terminal.cwd },
-            )
-            logCommand({
+          await gitExecLogged(
+            terminal,
+            ['push', 'origin', '--delete', branch],
+            {
               terminalId: id,
-              category: 'git',
-              command: deleteRemoteCmd,
-              stdout: result.stdout,
-              stderr: result.stderr,
-            })
-          } else {
-            await new Promise<void>((resolve, reject) => {
-              execFile(
-                'git',
-                ['push', 'origin', '--delete', branch],
-                { cwd: expandPath(terminal.cwd), timeout: 30000 },
-                (err, stdout, stderr) => {
-                  logCommand({
-                    terminalId: id,
-                    category: 'git',
-                    command: deleteRemoteCmd,
-                    stdout,
-                    stderr: err ? err.message : stderr,
-                  })
-                  if (err) reject(err)
-                  else resolve()
-                },
-              )
-            })
-          }
+              timeout: 30000,
+            },
+          )
         }
 
         return { success: true, branch, deletedRemote: !!deleteRemote }
@@ -3006,145 +2178,44 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
 
       try {
         // Pre-check: ensure target name doesn't already exist
-        if (terminal.ssh_host) {
-          const listResult = await execSSHCommand(
-            terminal.ssh_host,
-            `git branch --list '${newName.replace(/'/g, "'\\''")}'`,
-            { cwd: terminal.cwd },
-          )
-          if (listResult.stdout.trim()) {
-            return reply
-              .status(400)
-              .send({ error: `Branch '${newName}' already exists` })
-          }
-        } else {
-          const exists = await new Promise<boolean>((resolve) => {
-            execFile(
-              'git',
-              ['branch', '--list', newName],
-              { cwd: expandPath(terminal.cwd), timeout: 5000 },
-              (_err, stdout) => {
-                resolve(!!stdout.trim())
-              },
-            )
-          })
-          if (exists) {
-            return reply
-              .status(400)
-              .send({ error: `Branch '${newName}' already exists` })
-          }
+        const listResult = await gitExec(
+          terminal,
+          ['branch', '--list', newName],
+          {
+            timeout: 5000,
+          },
+        ).catch(() => ({ stdout: '', stderr: '' }))
+        if (listResult.stdout.trim()) {
+          return reply
+            .status(400)
+            .send({ error: `Branch '${newName}' already exists` })
         }
 
         // Rename the branch
-        const renameCmd = `git branch -m ${branch.replace(/'/g, "'\\''").replace(/ /g, '\\ ')} ${newName.replace(/'/g, "'\\''").replace(/ /g, '\\ ')}`
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, renameCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: renameCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['branch', '-m', branch, newName],
-              { cwd: expandPath(terminal.cwd), timeout: 10000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: renameCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['branch', '-m', branch, newName], {
+          terminalId: id,
+          timeout: 10000,
+        })
 
         // Rename remote branch if requested
         let renamedRemote = false
         if (renameRemote) {
           try {
             // Delete old remote branch
-            const deleteRemoteCmd = `git push origin --delete ${branch.replace(/'/g, "'\\''")}`
-            if (terminal.ssh_host) {
-              const result = await execSSHCommand(
-                terminal.ssh_host,
-                deleteRemoteCmd,
-                {
-                  cwd: terminal.cwd,
-                },
-              )
-              logCommand({
+            await gitExecLogged(
+              terminal,
+              ['push', 'origin', '--delete', branch],
+              {
                 terminalId: id,
-                category: 'git',
-                command: deleteRemoteCmd,
-                stdout: result.stdout,
-                stderr: result.stderr,
-              })
-            } else {
-              await new Promise<void>((resolve, reject) => {
-                execFile(
-                  'git',
-                  ['push', 'origin', '--delete', branch],
-                  { cwd: expandPath(terminal.cwd), timeout: 30000 },
-                  (err, stdout, stderr) => {
-                    logCommand({
-                      terminalId: id,
-                      category: 'git',
-                      command: deleteRemoteCmd,
-                      stdout,
-                      stderr: err ? err.message : stderr,
-                    })
-                    if (err) reject(err)
-                    else resolve()
-                  },
-                )
-              })
-            }
+                timeout: 30000,
+              },
+            )
 
             // Push new branch with upstream tracking
-            const pushCmd = `git push -u origin ${newName.replace(/'/g, "'\\''")}`
-            if (terminal.ssh_host) {
-              const result = await execSSHCommand(terminal.ssh_host, pushCmd, {
-                cwd: terminal.cwd,
-              })
-              logCommand({
-                terminalId: id,
-                category: 'git',
-                command: pushCmd,
-                stdout: result.stdout,
-                stderr: result.stderr,
-              })
-            } else {
-              await new Promise<void>((resolve, reject) => {
-                execFile(
-                  'git',
-                  ['push', '-u', 'origin', newName],
-                  { cwd: expandPath(terminal.cwd), timeout: 30000 },
-                  (err, stdout, stderr) => {
-                    logCommand({
-                      terminalId: id,
-                      category: 'git',
-                      command: pushCmd,
-                      stdout,
-                      stderr: err ? err.message : stderr,
-                    })
-                    if (err) reject(err)
-                    else resolve()
-                  },
-                )
-              })
-            }
+            await gitExecLogged(terminal, ['push', '-u', 'origin', newName], {
+              terminalId: id,
+              timeout: 30000,
+            })
             renamedRemote = true
           } catch (remoteErr) {
             log.error(
@@ -3195,43 +2266,11 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Source branch is required' })
       }
 
-      const gitCmd = `git checkout -b ${name.replace(/'/g, "'\\''")} ${from.replace(/'/g, "'\\''")}`
-
       try {
-        const cwd = expandPath(terminal.cwd)
-
-        if (terminal.ssh_host) {
-          const result = await execSSHCommand(terminal.ssh_host, gitCmd, {
-            cwd: terminal.cwd,
-          })
-          logCommand({
-            terminalId: id,
-            category: 'git',
-            command: gitCmd,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          })
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            execFile(
-              'git',
-              ['checkout', '-b', name, from],
-              { cwd, timeout: 30000 },
-              (err, stdout, stderr) => {
-                logCommand({
-                  terminalId: id,
-                  category: 'git',
-                  command: gitCmd,
-                  stdout,
-                  stderr: err ? err.message : stderr,
-                  failed: !!err,
-                })
-                if (err) reject(err)
-                else resolve()
-              },
-            )
-          })
-        }
+        await gitExecLogged(terminal, ['checkout', '-b', name, from], {
+          terminalId: id,
+          timeout: 30000,
+        })
 
         // Refresh git branch detection
         detectGitBranch(id)
@@ -3355,7 +2394,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           terminal.ssh_host,
           `mkdir -p ~/.workio/shells && printf '%s' '${sn}' > ~/.workio/shells/${id}`,
           { timeout: 5000 },
-        ).catch(() => {})
+        ).catch(() => { })
       }
 
       return reply.send(updated)
@@ -3478,32 +2517,19 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         await fetchOriginIfNeeded(cwd, refspecs)
       }
 
-      const hasConflicts = await new Promise<boolean>((resolve) => {
-        if (terminal.ssh_host) {
-          execSSHCommand(
-            terminal.ssh_host,
-            `git merge-tree --write-tree --no-messages origin/${base} origin/${head}`,
-            { cwd: terminal.cwd },
-          )
-            .then(() => resolve(false))
-            .catch(() => resolve(true))
-        } else {
-          execFile(
-            'git',
-            [
-              'merge-tree',
-              '--write-tree',
-              '--no-messages',
-              `origin/${base}`,
-              `origin/${head}`,
-            ],
-            { cwd, timeout: 15000 },
-            (err) => {
-              resolve(!!err)
-            },
-          )
-        }
-      })
+      const hasConflicts = await gitExec(
+        terminal,
+        [
+          'merge-tree',
+          '--write-tree',
+          '--no-messages',
+          `origin/${base}`,
+          `origin/${head}`,
+        ],
+        { timeout: 15000 },
+      )
+        .then(() => false)
+        .catch(() => true)
 
       return { hasConflicts }
     } catch (err) {
@@ -3545,50 +2571,26 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
 
       // Verify that the head ref exists on remote
-      const headExists = await new Promise<boolean>((resolve) => {
-        if (terminal.ssh_host) {
-          execSSHCommand(
-            terminal.ssh_host,
-            `git rev-parse --verify origin/${head}`,
-            { cwd: terminal.cwd },
-          )
-            .then(() => resolve(true))
-            .catch(() => resolve(false))
-        } else {
-          execFile(
-            'git',
-            ['rev-parse', '--verify', `origin/${head}`],
-            { cwd, timeout: 5000 },
-            (err) => resolve(!err),
-          )
-        }
-      })
+      const headExists = await gitExec(
+        terminal,
+        ['rev-parse', '--verify', `origin/${head}`],
+        { timeout: 5000 },
+      )
+        .then(() => true)
+        .catch(() => false)
 
       if (!headExists) {
         return { commits: [], noRemote: true }
       }
 
       const gitFormat = '--format=%H|%s|%an|%aI'
-      const gitArgs = ['log', gitFormat, `origin/${base}..origin/${head}`]
+      const result = await gitExec(
+        terminal,
+        ['log', gitFormat, `origin/${base}..origin/${head}`],
+        { timeout: 15000 },
+      )
 
-      let stdout: string
-      if (terminal.ssh_host) {
-        const result = await execSSHCommand(
-          terminal.ssh_host,
-          `git log '${gitFormat}' 'origin/${base}..origin/${head}'`,
-          { cwd: terminal.cwd },
-        )
-        stdout = result.stdout
-      } else {
-        stdout = await new Promise<string>((resolve, reject) => {
-          execFile('git', gitArgs, { cwd, timeout: 15000 }, (err, out) => {
-            if (err) reject(err)
-            else resolve(out)
-          })
-        })
-      }
-
-      const commits = stdout
+      const commits = result.stdout
         .trim()
         .split('\n')
         .filter(Boolean)
@@ -3629,36 +2631,20 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     const offset = parseInt(request.query.offset || '0', 10) || 0
 
     try {
-      const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
-
       const gitFormat = '--format=%H|%s|%an|%aI'
-      const gitArgs = [
-        'log',
-        gitFormat,
-        `--max-count=${limit + 1}`,
-        `--skip=${offset}`,
-        branch,
-      ]
+      const result = await gitExec(
+        terminal,
+        [
+          'log',
+          gitFormat,
+          `--max-count=${limit + 1}`,
+          `--skip=${offset}`,
+          branch,
+        ],
+        { timeout: 15000 },
+      )
 
-      let stdout: string
-      if (terminal.ssh_host) {
-        const escapedBranch = branch.replace(/'/g, "'\\''")
-        const result = await execSSHCommand(
-          terminal.ssh_host,
-          `git log '${gitFormat}' --max-count=${limit + 1} --skip=${offset} '${escapedBranch}'`,
-          { cwd: terminal.cwd },
-        )
-        stdout = result.stdout
-      } else {
-        stdout = await new Promise<string>((resolve, reject) => {
-          execFile('git', gitArgs, { cwd, timeout: 15000 }, (err, out) => {
-            if (err) reject(err)
-            else resolve(out)
-          })
-        })
-      }
-
-      const lines = stdout.trim().split('\n').filter(Boolean)
+      const lines = result.stdout.trim().split('\n').filter(Boolean)
       const hasMore = lines.length > limit
       const commits = lines.slice(0, limit).map((line) => {
         const [hash, message, author, date] = line.split('|')
@@ -3669,25 +2655,14 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       let mergeBase: string | undefined
       let mergeBaseBranch: string | undefined
       if (offset === 0) {
-        const runGit = (args: string[]): Promise<string> => {
-          if (terminal.ssh_host) {
-            return execSSHCommand(terminal.ssh_host, `git ${args.join(' ')}`, {
-              cwd: terminal.cwd,
-            }).then((r) => r.stdout)
-          }
-          return new Promise((resolve, reject) => {
-            execFile('git', args, { cwd, timeout: 5000 }, (err, out) => {
-              if (err) reject(err)
-              else resolve(out)
-            })
-          })
-        }
-
-        // Try main, then master
         for (const defaultBranch of ['main', 'master']) {
           try {
-            const mb = await runGit(['merge-base', defaultBranch, branch])
-            mergeBase = mb.trim()
+            const mb = await gitExec(
+              terminal,
+              ['merge-base', defaultBranch, branch],
+              { timeout: 5000 },
+            )
+            mergeBase = mb.stdout.trim()
             mergeBaseBranch = defaultBranch
             break
           } catch {
