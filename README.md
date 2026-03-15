@@ -32,6 +32,7 @@ A developer dashboard that brings together your projects, terminals, Claude AI s
 - Star/favorite sessions
 - Resume sessions in specific shells
 - Move sessions between projects
+- Hook forwarding — Claude hooks on remote SSH machines are forwarded back to WorkIO via reverse tunnels
 - Pin sessions in an always-on-top Picture-in-Picture window
 - `claude-skill` - add to your global Claude skills for additional functionality
 
@@ -68,7 +69,7 @@ Access everything with `Cmd+K` — multiple modes:
 - Claude permission requests and session completions
 - PR activity (reviews, comments, checks)
 - Project setup status
-- Web push notifications (self-hosted with VAPID keys)
+- Mobile push notifications (self-hosted with VAPID keys)
 - Click to navigate to the relevant terminal/shell
 
 ### Mobile
@@ -109,6 +110,10 @@ Access everything with `Cmd+K` — multiple modes:
 - Copy to clipboard for multi-page selections in panes
 - Detect running processes in tabs
 - Map project to session with `--session-name "$(wiosession)"`
+
+### Service Status
+- At-a-glance health indicator for all backend services (database, ngrok, Claude tunnels, etc.)
+- Per-service info modals with explanations
 
 ### Keyboard Shortcuts
 - Fully customizable key bindings

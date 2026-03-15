@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.6.0](../../compare/v0.5.0...v0.6.0) — 2026-03-15
+
+### Features
+- Add remote Claude hook forwarding via SSH reverse tunnels
+- Add service status backend and UI indicator with info modals per service row
+- Split Claude tunnel status into separate bootstrap and tunnel sub-statuses per host
+- Add configurable GitHub GraphQL query limits
+- Add Commit keyboard shortcut (Shift+Cmd+K)
+- Allow selecting folders in DirectoryBrowser file select mode
+
+### Improvements
+- Refactor App.tsx: extract modals, shortcuts, layout, and shell actions into separate modules
+- Split TerminalContext into WorkspaceContext, GitHubContext, and NotificationDataContext
+- Consolidate session status icons into SessionStatusIcon component
+- Centralize mounted shells state and UI polish
+- Rename CommandPalette directory to command-palette
+- Rename Push Notifications to Mobile Notifications and Webhooks modal to GitHub
+- Use stable SSH host identifiers for projects and fix tunnel restart loop
+- Improve diff viewer UX: scrollable file names, collapsible sections, mobile commit toggle
+- Collapse repo groups on collapse-all, skip groups with active terminal/PR
+
+### Bug Fixes
+- Fix shell not mounting on mobile when clicking terminal in sidebar
+- Fix webhook status falsely showing missing after sleep/wake
+- Fix shell client badges not showing on initial page load
+- Fix system memory usage showing inflated values by using OS-level stats
+- Refetch notifications on bell popover close
+
 ## [v0.5.0](../../compare/v0.4.0...v0.5.0) — 2026-03-13
 
 ### Features
