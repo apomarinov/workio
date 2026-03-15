@@ -6,6 +6,8 @@ import type {
 } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
 import type {
+  MoveTarget,
+  Notification,
   SessionMessagesResponse,
   SessionSearchMatch,
   SessionWithProject,
@@ -16,30 +18,75 @@ import type {
 
 const API_BASE = '/api'
 
+export class ApiError extends Error {
+  status: number
+  data: Record<string, unknown> | null
+
+  constructor(status: number, data: Record<string, unknown> | null) {
+    super(
+      (data?.message || data?.error || `Request failed (${status})`) as string,
+    )
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
+interface ApiInit extends Omit<RequestInit, 'body'> {
+  body?: RequestInit['body'] | Record<string, unknown>
+  retry?: boolean
+}
+
 /**
- * Fetch wrapper that attaches the current socket ID header on mutation requests.
- * The server uses this to broadcast refetch events to all clients *except* the sender.
+ * Low-level fetch wrapper: attaches socket ID on mutations,
+ * handles retries, and throws ApiError on non-OK responses.
+ * Returns the raw Response for callers that need status codes.
+ *
+ * When `body` is a plain object, it is JSON-stringified and the
+ * Content-Type / method headers are set automatically (defaults to POST).
  */
 async function apiFetch(
   input: RequestInfo | URL,
-  init?: RequestInit & { retry?: boolean },
+  init?: ApiInit,
 ): Promise<Response> {
+  // Auto-serialize plain-object bodies as JSON
+  if (
+    init?.body != null &&
+    Object.getPrototypeOf(init.body) === Object.prototype
+  ) {
+    init = {
+      method: 'POST',
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...init.headers },
+      body: JSON.stringify(init.body),
+    }
+  }
+
   const method = init?.method?.toUpperCase()
   if (method && method !== 'GET' && method !== 'HEAD') {
     const socketId = getSocketId()
     if (socketId) {
       const headers = new Headers(init?.headers)
       headers.set('x-socket-id', socketId)
-      return fetch(input, { ...init, headers })
+      init = { ...init, headers }
     }
   }
+
+  // Body is now guaranteed to be serialized; safe to pass to fetch
+  const fetchInit = init as RequestInit | undefined
 
   if (init?.retry) {
     let lastError: unknown
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        return await fetch(input, init)
+        const res = await fetch(input, fetchInit)
+        if (!res.ok) {
+          const data = await res.json().catch(() => null)
+          throw new ApiError(res.status, data)
+        }
+        return res
       } catch (err) {
+        if (err instanceof ApiError) throw err
         lastError = err
         if (attempt < 2) {
           await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
@@ -49,13 +96,31 @@ async function apiFetch(
     throw lastError
   }
 
-  return fetch(input, init)
+  const res = await fetch(input, fetchInit)
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw new ApiError(res.status, data)
+  }
+  return res
 }
 
-export async function getTerminals(): Promise<Terminal[]> {
-  const res = await apiFetch(`${API_BASE}/terminals`)
-  if (!res.ok) throw new Error('Failed to fetch terminals')
+/**
+ * High-level API helper: calls apiFetch and parses JSON.
+ * Handles 204 No Content by returning undefined.
+ */
+async function api<T = void>(
+  input: RequestInfo | URL,
+  init?: ApiInit,
+): Promise<T> {
+  const res = await apiFetch(input, init)
+  if (res.status === 204) return undefined as T
   return res.json()
+}
+
+// --- Terminals ---
+
+export async function getTerminals(): Promise<Terminal[]> {
+  return api(`${API_BASE}/terminals`)
 }
 
 export interface SSHHostEntry {
@@ -65,47 +130,42 @@ export interface SSHHostEntry {
 }
 
 export async function getSSHHosts(): Promise<SSHHostEntry[]> {
-  const res = await apiFetch(`${API_BASE}/ssh/hosts`)
-  if (!res.ok) throw new Error('Failed to fetch SSH hosts')
-  return res.json()
+  return api(`${API_BASE}/ssh/hosts`)
 }
 
 export async function auditSSHHost(
   host: string,
 ): Promise<{ maxSessions: number | null }> {
-  const res = await apiFetch(
-    `${API_BASE}/ssh/audit?host=${encodeURIComponent(host)}`,
-  )
-  if (!res.ok) return { maxSessions: null }
-  return res.json()
+  try {
+    return await api(`${API_BASE}/ssh/audit?host=${encodeURIComponent(host)}`)
+  } catch {
+    return { maxSessions: null }
+  }
 }
 
 export async function fixSSHMaxSessions(
   host: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/ssh/fix-max-sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host }),
-  })
-  return res.json()
+  return api(`${API_BASE}/ssh/fix-max-sessions`, { body: { host } })
 }
 
 export async function getGitHubRepos(query?: string): Promise<string[]> {
-  const params = query ? `?q=${encodeURIComponent(query)}` : ''
-  const res = await apiFetch(`${API_BASE}/github/repos${params}`)
-  if (!res.ok) return []
-  const data = await res.json()
-  return data.repos
+  try {
+    const params = query ? `?q=${encodeURIComponent(query)}` : ''
+    const { repos } = await api<{ repos: string[] }>(
+      `${API_BASE}/github/repos${params}`,
+    )
+    return repos
+  } catch {
+    return []
+  }
 }
 
 export async function checkConductor(repo: string): Promise<boolean> {
   try {
-    const res = await apiFetch(
+    const data = await api<{ hasConductor: boolean }>(
       `${API_BASE}/github/conductor?repo=${encodeURIComponent(repo)}`,
     )
-    if (!res.ok) return false
-    const data = await res.json()
     return data.hasConductor === true
   } catch {
     return false
@@ -123,16 +183,7 @@ export async function createTerminal(opts: {
   delete_script?: string
   source_terminal_id?: number
 }): Promise<Terminal> {
-  const res = await apiFetch(`${API_BASE}/terminals`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(opts),
-  })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to create project')
-  }
-  return res.json()
+  return api(`${API_BASE}/terminals`, { body: opts })
 }
 
 export async function updateTerminal(
@@ -145,16 +196,10 @@ export async function updateTerminal(
     } | null
   },
 ): Promise<Terminal> {
-  const res = await apiFetch(`${API_BASE}/terminals/${id}`, {
+  return api(`${API_BASE}/terminals/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: updates,
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to update terminal')
-  }
-  return res.json()
 }
 
 export async function deleteTerminal(
@@ -165,46 +210,36 @@ export async function deleteTerminal(
     ? `${API_BASE}/terminals/${id}?deleteDirectory=1`
     : `${API_BASE}/terminals/${id}`
   const res = await apiFetch(url, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Failed to delete terminal')
   return res.status === 202
 }
 
 export async function cancelWorkspace(terminalId: number): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/cancel-workspace`,
-    {
-      method: 'POST',
-    },
-  )
-  if (!res.ok) throw new Error('Failed to cancel')
+  await api(`${API_BASE}/terminals/${terminalId}/cancel-workspace`, {
+    method: 'POST',
+  })
 }
 
 export async function rerunSetup(terminalId: number): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/rerun-setup`,
-    { method: 'POST' },
-  )
-  if (!res.ok) throw new Error('Failed to rerun setup')
+  await api(`${API_BASE}/terminals/${terminalId}/rerun-setup`, {
+    method: 'POST',
+  })
 }
 
 export async function clearSetupError(terminalId: number): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/clear-setup-error`,
-    { method: 'POST' },
-  )
-  if (!res.ok) throw new Error('Failed to clear error')
+  await api(`${API_BASE}/terminals/${terminalId}/clear-setup-error`, {
+    method: 'POST',
+  })
 }
 
 export async function browseFolder(): Promise<string | null> {
   const res = await apiFetch(`${API_BASE}/browse-folder`)
   if (res.status === 204) return null
-  if (!res.ok) throw new Error('Failed to open folder picker')
-  const data = await res.json()
+  const data: { path: string } = await res.json()
   return data.path
 }
 
 export async function openFullDiskAccess(): Promise<void> {
-  await apiFetch(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
+  await api(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
 }
 
 export async function openInIDE(
@@ -213,35 +248,26 @@ export async function openInIDE(
   terminalId?: number,
   sshHost?: string,
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/open-in-ide`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  await api(`${API_BASE}/open-in-ide`, {
+    body: {
       path,
       ide,
       ...(terminalId != null && { terminal_id: terminalId }),
       ...(sshHost && { ssh_host: sshHost }),
-    }),
+    },
   })
-  if (!res.ok) throw new Error('Failed to open IDE')
 }
 
 export async function openInExplorer(
   path: string,
   terminalId?: number,
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/open-in-explorer`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  await api(`${API_BASE}/open-in-explorer`, {
+    body: {
       path,
       ...(terminalId != null && { terminal_id: terminalId }),
-    }),
+    },
   })
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    throw new Error(body?.error ?? 'Failed to open file explorer')
-  }
 }
 
 export interface DirEntry {
@@ -271,13 +297,7 @@ export async function listDirectories(
     hidden: hidden ?? false,
   }
   if (sshHost) body.ssh_host = sshHost
-  const res = await apiFetch(`${API_BASE}/list-directories`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error('Failed to list directories')
-  return res.json()
+  return api(`${API_BASE}/list-directories`, { body })
 }
 
 export async function createDirectory(
@@ -287,38 +307,22 @@ export async function createDirectory(
 ): Promise<{ path: string }> {
   const body: Record<string, unknown> = { path: parentPath, name }
   if (sshHost) body.ssh_host = sshHost
-  const res = await apiFetch(`${API_BASE}/create-directory`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to create folder')
-  }
-  return res.json()
+  return api(`${API_BASE}/create-directory`, { body })
 }
 
+// --- Settings ---
+
 export async function getSettings(): Promise<Settings> {
-  const res = await apiFetch(`${API_BASE}/settings`)
-  if (!res.ok) throw new Error('Failed to fetch settings')
-  return res.json()
+  return api(`${API_BASE}/settings`)
 }
 
 export async function updateSettings(
   updates: Partial<Omit<Settings, 'id'>>,
 ): Promise<Settings> {
-  const res = await apiFetch(`${API_BASE}/settings`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to update settings')
-  }
-  return res.json()
+  return api(`${API_BASE}/settings`, { method: 'PATCH', body: updates })
 }
+
+// --- Permissions ---
 
 export interface ActivePermission extends SessionWithProject {
   message_id: number
@@ -327,73 +331,49 @@ export interface ActivePermission extends SessionWithProject {
 }
 
 export async function getActivePermissions(): Promise<ActivePermission[]> {
-  const res = await apiFetch(`${API_BASE}/permissions/active`)
-  if (!res.ok) throw new Error('Failed to fetch active permissions')
-  return res.json()
+  return api(`${API_BASE}/permissions/active`)
 }
 
+// --- Sessions ---
+
 export async function getClaudeSessions(): Promise<SessionWithProject[]> {
-  const res = await apiFetch(`${API_BASE}/sessions`)
-  if (!res.ok) throw new Error('Failed to fetch sessions')
-  return res.json()
+  return api(`${API_BASE}/sessions`)
 }
 
 export async function getClaudeSession(
   sessionId: string,
 ): Promise<SessionWithProject> {
-  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}`)
-  if (!res.ok) throw new Error('Failed to fetch session')
-  return res.json()
+  return api(`${API_BASE}/sessions/${sessionId}`)
 }
 
 export async function updateSession(
   sessionId: string,
   updates: { name?: string },
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}`, {
+  await api(`${API_BASE}/sessions/${sessionId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: updates,
   })
-  if (!res.ok) throw new Error('Failed to update session')
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete session')
+  await api(`${API_BASE}/sessions/${sessionId}`, { method: 'DELETE' })
 }
 
 export async function deleteSessions(ids: string[]): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/sessions`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids }),
-  })
-  if (!res.ok) throw new Error('Failed to delete sessions')
+  await api(`${API_BASE}/sessions`, { method: 'DELETE', body: { ids } })
 }
 
 export async function cleanupOldSessions(
   weeks: number,
 ): Promise<{ deleted: number }> {
-  const res = await apiFetch(`${API_BASE}/sessions/cleanup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ weeks }),
-  })
-  if (!res.ok) throw new Error('Failed to cleanup sessions')
-  return res.json()
+  return api(`${API_BASE}/sessions/cleanup`, { body: { weeks } })
 }
 
 export async function toggleFavoriteSession(
   sessionId: string,
 ): Promise<{ is_favorite: boolean }> {
-  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}/favorite`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to toggle favorite')
-  return res.json()
+  return api(`${API_BASE}/sessions/${sessionId}/favorite`, { method: 'POST' })
 }
 
 export async function searchSessionMessages(
@@ -410,38 +390,43 @@ export async function searchSessionMessages(
   if (opts?.repo) params.set('repo', opts.repo)
   if (opts?.branch) params.set('branch', opts.branch)
   if (opts?.recentOnly === false) params.set('all', '1')
-  const res = await apiFetch(
-    `${API_BASE}/sessions/search?${params.toString()}`,
-    { signal: opts?.signal },
-  )
-  if (!res.ok) throw new Error('Failed to search sessions')
-  return res.json()
+  return api(`${API_BASE}/sessions/search?${params.toString()}`, {
+    signal: opts?.signal,
+  })
 }
+
+export async function getSessionMessages(
+  sessionId: string,
+  limit: number,
+  offset: number,
+): Promise<SessionMessagesResponse> {
+  return api(
+    `${API_BASE}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
+  )
+}
+
+// --- GitHub ---
 
 export async function getClosedPRs(
   repos: string[],
   limit: number,
 ): Promise<MergedPRSummary[]> {
-  const res = await apiFetch(
+  const { prs } = await api<{ prs: MergedPRSummary[] }>(
     `${API_BASE}/github/closed-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
     { retry: true },
   )
-  if (!res.ok) throw new Error('Failed to fetch closed PRs')
-  const data: { prs: MergedPRSummary[] } = await res.json()
-  return data.prs
+  return prs
 }
 
 export async function getInvolvedPRs(
   repos: string[],
   limit: number,
 ): Promise<InvolvedPRSummary[]> {
-  const res = await apiFetch(
+  const { prs } = await api<{ prs: InvolvedPRSummary[] }>(
     `${API_BASE}/github/involved-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
     { retry: true },
   )
-  if (!res.ok) throw new Error('Failed to fetch involved PRs')
-  const data: { prs: InvolvedPRSummary[] } = await res.json()
-  return data.prs
+  return prs
 }
 
 export async function requestPRReview(
@@ -450,18 +435,10 @@ export async function requestPRReview(
   prNumber: number,
   reviewer: string,
 ): Promise<void> {
-  const res = await apiFetch(
+  await api(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/request-review`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviewer }),
-    },
+    { body: { reviewer } },
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to request review')
-  }
 }
 
 export async function mergePR(
@@ -470,18 +447,9 @@ export async function mergePR(
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase' = 'squash',
 ): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/merge`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method }),
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to merge PR')
-  }
+  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/merge`, {
+    body: { method },
+  })
 }
 
 export async function closePR(
@@ -489,14 +457,9 @@ export async function closePR(
   repo: string,
   prNumber: number,
 ): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/close`,
-    { method: 'POST' },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to close PR')
-  }
+  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/close`, {
+    method: 'POST',
+  })
 }
 
 export async function renamePR(
@@ -505,18 +468,9 @@ export async function renamePR(
   prNumber: number,
   title: string,
 ): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rename`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to rename PR')
-  }
+  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rename`, {
+    body: { title },
+  })
 }
 
 export async function editPR(
@@ -527,44 +481,9 @@ export async function editPR(
   body: string,
   draft?: boolean,
 ): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/edit`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body, draft }),
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to edit PR')
-  }
-}
-
-export async function renameBranch(
-  terminalId: number,
-  branch: string,
-  newName: string,
-  renameRemote?: boolean,
-): Promise<{
-  success: boolean
-  branch: string
-  newName: string
-  renamedRemote?: boolean
-}> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/rename-branch`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branch, newName, renameRemote }),
-    },
-  )
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to rename branch')
-  }
-  return data
+  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/edit`, {
+    body: { title, body, draft },
+  })
 }
 
 export async function rerunFailedCheck(
@@ -573,18 +492,9 @@ export async function rerunFailedCheck(
   prNumber: number,
   checkUrl: string,
 ): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-check`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checkUrl }),
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to rerun check')
-  }
+  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-check`, {
+    body: { checkUrl },
+  })
 }
 
 export async function rerunAllFailedChecks(
@@ -593,19 +503,10 @@ export async function rerunAllFailedChecks(
   prNumber: number,
   checkUrls: string[],
 ): Promise<{ rerunCount: number }> {
-  const res = await apiFetch(
+  return api(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-all-checks`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checkUrls }),
-    },
+    { body: { checkUrls } },
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to rerun checks')
-  }
-  return res.json()
 }
 
 export async function addPRComment(
@@ -614,18 +515,9 @@ export async function addPRComment(
   prNumber: number,
   body: string,
 ): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body }),
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to add comment')
-  }
+  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment`, {
+    body: { body },
+  })
 }
 
 export async function replyToReviewComment(
@@ -635,18 +527,10 @@ export async function replyToReviewComment(
   commentId: number,
   body: string,
 ): Promise<void> {
-  const res = await apiFetch(
+  await api(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/reply/${commentId}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body }),
-    },
+    { body: { body } },
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to reply to comment')
-  }
 }
 
 export async function editComment(
@@ -657,18 +541,10 @@ export async function editComment(
   body: string,
   type: 'issue_comment' | 'review_comment' | 'review',
 ): Promise<void> {
-  const res = await apiFetch(
+  await api(
     `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment/${commentId}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body, type }),
-    },
+    { method: 'PATCH', body: { body, type } },
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to edit comment')
-  }
 }
 
 export async function addReaction(
@@ -679,15 +555,9 @@ export async function addReaction(
   content: string,
   prNumber?: number,
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subjectId, subjectType, content, prNumber }),
+  await api(`${API_BASE}/github/${owner}/${repo}/reaction`, {
+    body: { subjectId, subjectType, content, prNumber },
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to add reaction')
-  }
 }
 
 export async function removeReaction(
@@ -698,28 +568,27 @@ export async function removeReaction(
   content: string,
   prNumber?: number,
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/github/${owner}/${repo}/reaction`, {
+  await api(`${API_BASE}/github/${owner}/${repo}/reaction`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subjectId, subjectType, content, prNumber }),
+    body: { subjectId, subjectType, content, prNumber },
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to remove reaction')
-  }
 }
 
-export async function getSessionMessages(
-  sessionId: string,
-  limit: number,
-  offset: number,
-): Promise<SessionMessagesResponse> {
-  const res = await apiFetch(
-    `${API_BASE}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
-  )
-  if (!res.ok) throw new Error('Failed to fetch session messages')
-  return res.json()
+export async function createPR(
+  owner: string,
+  repo: string,
+  head: string,
+  base: string,
+  title: string,
+  body: string,
+  draft: boolean,
+): Promise<{ prNumber: number }> {
+  return api(`${API_BASE}/github/${owner}/${repo}/pr/create`, {
+    body: { head, base, title, body, draft },
+  })
 }
+
+// --- Git operations ---
 
 export interface BranchInfo {
   name: string
@@ -735,25 +604,15 @@ export interface BranchesResponse {
 export async function getBranches(
   terminalId: number,
 ): Promise<BranchesResponse> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/branches`)
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to fetch branches')
-  }
-  return res.json()
+  return api(`${API_BASE}/terminals/${terminalId}/branches`)
 }
 
 export async function fetchAll(
   terminalId: number,
 ): Promise<{ success: boolean }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/fetch-all`, {
+  return api(`${API_BASE}/terminals/${terminalId}/fetch-all`, {
     method: 'POST',
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to fetch')
-  }
-  return res.json()
 }
 
 export async function checkoutBranch(
@@ -761,32 +620,18 @@ export async function checkoutBranch(
   branch: string,
   isRemote: boolean,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/checkout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ branch, isRemote }),
+  return api(`${API_BASE}/terminals/${terminalId}/checkout`, {
+    body: { branch, isRemote },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to checkout branch')
-  }
-  return data
 }
 
 export async function pullBranch(
   terminalId: number,
   branch: string,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/pull`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ branch }),
+  return api(`${API_BASE}/terminals/${terminalId}/pull`, {
+    body: { branch },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to pull branch')
-  }
-  return data
 }
 
 export async function pushBranch(
@@ -794,32 +639,23 @@ export async function pushBranch(
   branch: string,
   force?: boolean,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/push`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ branch, force }),
+  return api(`${API_BASE}/terminals/${terminalId}/push`, {
+    body: { branch, force },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to push branch')
-  }
-  return data
 }
 
 export async function rebaseBranch(
   terminalId: number,
   branch: string,
-): Promise<{ success: boolean; branch: string; onto: string; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/rebase`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ branch }),
+): Promise<{
+  success: boolean
+  branch: string
+  onto: string
+  error?: string
+}> {
+  return api(`${API_BASE}/terminals/${terminalId}/rebase`, {
+    body: { branch },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to rebase branch')
-  }
-  return data
 }
 
 export async function createBranch(
@@ -827,19 +663,9 @@ export async function createBranch(
   name: string,
   from: string,
 ): Promise<{ success: boolean; branch: string; error?: string }> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/create-branch`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, from }),
-    },
-  )
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to create branch')
-  }
-  return data
+  return api(`${API_BASE}/terminals/${terminalId}/create-branch`, {
+    body: { name, from },
+  })
 }
 
 export async function deleteBranch(
@@ -852,16 +678,26 @@ export async function deleteBranch(
   deletedRemote?: boolean
   error?: string
 }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/branch`, {
+  return api(`${API_BASE}/terminals/${terminalId}/branch`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ branch, deleteRemote }),
+    body: { branch, deleteRemote },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to delete branch')
-  }
-  return data
+}
+
+export async function renameBranch(
+  terminalId: number,
+  branch: string,
+  newName: string,
+  renameRemote?: boolean,
+): Promise<{
+  success: boolean
+  branch: string
+  newName: string
+  renamedRemote?: boolean
+}> {
+  return api(`${API_BASE}/terminals/${terminalId}/rename-branch`, {
+    body: { branch, newName, renameRemote },
+  })
 }
 
 export async function commitChanges(
@@ -871,64 +707,24 @@ export async function commitChanges(
   noVerify?: boolean,
   files?: string[],
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/commit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, amend, noVerify, files }),
+  return api(`${API_BASE}/terminals/${terminalId}/commit`, {
+    body: { message, amend, noVerify, files },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to commit')
-  }
-  return data
 }
 
 export async function discardChanges(
   terminalId: number,
   files: string[],
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/discard`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ files }),
+  return api(`${API_BASE}/terminals/${terminalId}/discard`, {
+    body: { files },
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to discard changes')
-  }
-  return data
 }
 
 export async function getHeadMessage(
   terminalId: number,
 ): Promise<{ message: string }> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/head-message`)
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to get HEAD message')
-  }
-  return res.json()
-}
-
-export async function createPR(
-  owner: string,
-  repo: string,
-  head: string,
-  base: string,
-  title: string,
-  body: string,
-  draft: boolean,
-): Promise<{ prNumber: number }> {
-  const res = await apiFetch(`${API_BASE}/github/${owner}/${repo}/pr/create`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ head, base, title, body, draft }),
-  })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to create PR')
-  }
-  return res.json()
+  return api(`${API_BASE}/terminals/${terminalId}/head-message`)
 }
 
 export interface PRCommit {
@@ -944,14 +740,9 @@ export async function checkBranchConflicts(
   base: string,
 ): Promise<{ hasConflicts: boolean }> {
   const params = new URLSearchParams({ head, base })
-  const res = await apiFetch(
+  return api(
     `${API_BASE}/terminals/${terminalId}/branch-conflicts?${params.toString()}`,
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to check conflicts')
-  }
-  return res.json()
 }
 
 export async function getCommitsBetween(
@@ -960,14 +751,7 @@ export async function getCommitsBetween(
   head: string,
 ): Promise<{ commits: PRCommit[]; noRemote?: boolean }> {
   const params = new URLSearchParams({ head, base })
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/commits?${params.toString()}`,
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to get commits')
-  }
-  return res.json()
+  return api(`${API_BASE}/terminals/${terminalId}/commits?${params.toString()}`)
 }
 
 export async function getBranchCommits(
@@ -986,52 +770,27 @@ export async function getBranchCommits(
     limit: String(limit),
     offset: String(offset),
   })
-  const res = await apiFetch(
+  return api(
     `${API_BASE}/terminals/${terminalId}/branch-commits?${params.toString()}`,
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to get branch commits')
-  }
-  return res.json()
 }
 
 export async function undoCommit(
   terminalId: number,
   commitHash: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/undo-commit`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commitHash }),
-    },
-  )
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to undo commit')
-  }
-  return data
+  return api(`${API_BASE}/terminals/${terminalId}/undo-commit`, {
+    body: { commitHash },
+  })
 }
 
 export async function dropCommit(
   terminalId: number,
   commitHash: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/drop-commit`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commitHash }),
-    },
-  )
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to drop commit')
-  }
-  return data
+  return api(`${API_BASE}/terminals/${terminalId}/drop-commit`, {
+    body: { commitHash },
+  })
 }
 
 export async function getChangedFiles(
@@ -1039,14 +798,7 @@ export async function getChangedFiles(
   base?: string,
 ): Promise<{ files: ChangedFile[] }> {
   const params = base ? `?base=${encodeURIComponent(base)}` : ''
-  const res = await apiFetch(
-    `${API_BASE}/terminals/${terminalId}/changed-files${params}`,
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to get changed files')
-  }
-  return res.json()
+  return api(`${API_BASE}/terminals/${terminalId}/changed-files${params}`)
 }
 
 export async function getFileDiff(
@@ -1058,14 +810,9 @@ export async function getFileDiff(
   const context = fullFile ? '99999' : '5'
   const params = new URLSearchParams({ path: filePath, context })
   if (base) params.set('base', base)
-  const res = await apiFetch(
+  return api(
     `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to get file diff')
-  }
-  return res.json()
 }
 
 export async function getAllFilesDiff(
@@ -1074,96 +821,57 @@ export async function getAllFilesDiff(
 ): Promise<{ diff: string }> {
   const params = new URLSearchParams({ context: '5' })
   if (base) params.set('base', base)
-  const res = await apiFetch(
+  return api(
     `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
   )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to get full diff')
-  }
-  return res.json()
 }
 
-// Webhook management
+// --- Webhooks ---
 
 export async function createWebhook(
   owner: string,
   repo: string,
 ): Promise<{ webhookId?: number }> {
-  const res = await apiFetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
+  return api(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
     method: 'POST',
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to create webhook')
-  }
-  return res.json()
 }
 
 export async function deleteWebhook(
   owner: string,
   repo: string,
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
+  await api(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
     method: 'DELETE',
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to delete webhook')
-  }
 }
 
 export async function recreateWebhook(
   owner: string,
   repo: string,
 ): Promise<{ webhookId?: number }> {
-  const res = await apiFetch(
-    `${API_BASE}/github/webhooks/${owner}/${repo}/recreate`,
-    {
-      method: 'POST',
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to recreate webhook')
-  }
-  return res.json()
+  return api(`${API_BASE}/github/webhooks/${owner}/${repo}/recreate`, {
+    method: 'POST',
+  })
 }
 
 export async function testWebhook(owner: string, repo: string): Promise<void> {
-  const res = await apiFetch(
-    `${API_BASE}/github/webhooks/${owner}/${repo}/test`,
-    {
-      method: 'POST',
-    },
-  )
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to test webhook')
-  }
+  await api(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
+    method: 'POST',
+  })
 }
 
-// Notifications
-
-import type { Notification } from '../types'
+// --- Notifications ---
 
 export async function getNotifications(
   limit = 50,
   offset = 0,
 ): Promise<{ notifications: Notification[]; total: number }> {
-  const res = await apiFetch(
-    `${API_BASE}/notifications?limit=${limit}&offset=${offset}`,
-  )
-  if (!res.ok) throw new Error('Failed to fetch notifications')
-  return res.json()
+  return api(`${API_BASE}/notifications?limit=${limit}&offset=${offset}`)
 }
 
 export async function markAllNotificationsRead(): Promise<{ count: number }> {
-  const res = await apiFetch(`${API_BASE}/notifications/mark-all-read`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to mark notifications as read')
-  return res.json()
+  return api(`${API_BASE}/notifications/mark-all-read`, { method: 'POST' })
 }
 
 export async function markNotificationReadByItem(
@@ -1172,154 +880,89 @@ export async function markNotificationReadByItem(
   commentId?: number,
   reviewId?: number,
 ): Promise<{ success: boolean }> {
-  const res = await apiFetch(`${API_BASE}/notifications/item-read`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ repo, prNumber, commentId, reviewId }),
+  return api(`${API_BASE}/notifications/item-read`, {
+    body: { repo, prNumber, commentId, reviewId },
   })
-  if (!res.ok) throw new Error('Failed to mark notification item as read')
-  return res.json()
 }
 
 export async function markPRNotificationsRead(
   repo: string,
   prNumber: number,
 ): Promise<{ count: number }> {
-  const res = await apiFetch(`${API_BASE}/notifications/pr-read`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ repo, prNumber }),
+  return api(`${API_BASE}/notifications/pr-read`, {
+    body: { repo, prNumber },
   })
-  if (!res.ok) throw new Error('Failed to mark PR notifications as read')
-  return res.json()
 }
 
 export async function markNotificationRead(
   id: number,
 ): Promise<{ success: boolean }> {
-  const res = await apiFetch(`${API_BASE}/notifications/${id}/read`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to mark notification as read')
-  return res.json()
+  return api(`${API_BASE}/notifications/${id}/read`, { method: 'POST' })
 }
 
 export async function markNotificationUnread(
   id: number,
 ): Promise<{ success: boolean }> {
-  const res = await apiFetch(`${API_BASE}/notifications/${id}/unread`, {
-    method: 'POST',
-  })
-  if (!res.ok) throw new Error('Failed to mark notification as unread')
-  return res.json()
+  return api(`${API_BASE}/notifications/${id}/unread`, { method: 'POST' })
 }
 
 export async function getUnreadPRNotifications(): Promise<
   UnreadPRNotification[]
 > {
-  const res = await apiFetch(`${API_BASE}/notifications/pr-unread`)
-  if (!res.ok) throw new Error('Failed to fetch unread PR notifications')
-  return res.json()
+  return api(`${API_BASE}/notifications/pr-unread`)
 }
 
 export async function deleteNotification(
   id: number,
 ): Promise<{ success: boolean }> {
-  const res = await apiFetch(`${API_BASE}/notifications/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete notification')
-  return res.json()
+  return api(`${API_BASE}/notifications/${id}`, { method: 'DELETE' })
 }
 
 export async function deleteAllNotifications(): Promise<{ count: number }> {
-  const res = await apiFetch(`${API_BASE}/notifications`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete notifications')
-  return res.json()
+  return api(`${API_BASE}/notifications`, { method: 'DELETE' })
 }
 
-// Shell management
+// --- Shells ---
 
 export async function createShellForTerminal(
   terminalId: number,
   name?: string,
 ): Promise<Shell> {
-  const res = await apiFetch(`${API_BASE}/terminals/${terminalId}/shells`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+  return api(`${API_BASE}/terminals/${terminalId}/shells`, {
+    body: { name },
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to create shell')
-  }
-  return res.json()
 }
 
 export async function deleteShell(shellId: number): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/shells/${shellId}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to delete shell')
-  }
+  await api(`${API_BASE}/shells/${shellId}`, { method: 'DELETE' })
 }
 
 export async function writeToShell(
   shellId: number,
   data: string,
 ): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/shells/${shellId}/write`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data }),
-  })
-  if (!res.ok) {
-    const result = await res.json()
-    throw new Error(result.error || 'Failed to write to shell')
-  }
+  await api(`${API_BASE}/shells/${shellId}/write`, { body: { data } })
 }
 
 export async function interruptShell(shellId: number): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/shells/${shellId}/interrupt`, {
-    method: 'POST',
-  })
-  if (!res.ok) {
-    const result = await res.json()
-    throw new Error(result.error || 'Failed to interrupt shell')
-  }
+  await api(`${API_BASE}/shells/${shellId}/interrupt`, { method: 'POST' })
 }
 
 export async function killShell(shellId: number): Promise<void> {
-  const res = await apiFetch(`${API_BASE}/shells/${shellId}/kill`, {
-    method: 'POST',
-  })
-  if (!res.ok) {
-    const result = await res.json()
-    throw new Error(result.error || 'Failed to kill shell processes')
-  }
+  await api(`${API_BASE}/shells/${shellId}/kill`, { method: 'POST' })
 }
 
 export async function renameShell(
   shellId: number,
   name: string,
 ): Promise<Shell> {
-  const res = await apiFetch(`${API_BASE}/shells/${shellId}`, {
+  return api(`${API_BASE}/shells/${shellId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: { name },
   })
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to rename shell')
-  }
-  return res.json()
 }
 
-// Session backfill
+// --- Session backfill ---
 
 export interface BackfillCheckResult {
   cwd: string
@@ -1334,9 +977,7 @@ export async function backfillCheck(
   weeksBack?: number,
 ): Promise<{ results: BackfillCheckResult[] }> {
   const params = weeksBack ? `?weeksBack=${weeksBack}` : ''
-  const res = await apiFetch(`${API_BASE}/sessions/backfill-check${params}`)
-  if (!res.ok) throw new Error('Failed to check backfill')
-  return res.json()
+  return api(`${API_BASE}/sessions/backfill-check${params}`)
 }
 
 export async function backfillSessions(opts: {
@@ -1346,28 +987,15 @@ export async function backfillSessions(opts: {
   shellId: number
   weeksBack: number
 }): Promise<{ backfilled: number }> {
-  const res = await apiFetch(`${API_BASE}/sessions/backfill`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(opts),
-  })
-  if (!res.ok) throw new Error('Failed to backfill sessions')
-  return res.json()
+  return api(`${API_BASE}/sessions/backfill`, { body: opts })
 }
 
-// Session move
-
-import type { MoveTarget } from '../types'
+// --- Session move ---
 
 export async function getMoveTargets(
   sessionId: string,
 ): Promise<{ targets: MoveTarget[] }> {
-  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}/move-targets`)
-  if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error || 'Failed to fetch move targets')
-  }
-  return res.json()
+  return api(`${API_BASE}/sessions/${sessionId}/move-targets`)
 }
 
 export async function moveSession(
@@ -1375,16 +1003,17 @@ export async function moveSession(
   targetProjectPath: string,
   targetTerminalId: number,
 ): Promise<{ snapshotDir?: string }> {
-  const res = await apiFetch(`${API_BASE}/sessions/${sessionId}/move`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetProjectPath, targetTerminalId }),
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    const err = new Error(data.error || 'Failed to move session')
-    ;(err as Error & { snapshotDir?: string }).snapshotDir = data.snapshotDir
+  try {
+    return await api(`${API_BASE}/sessions/${sessionId}/move`, {
+      body: { targetProjectPath, targetTerminalId },
+    })
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const newErr = new Error(err.message)
+      ;(newErr as Error & { snapshotDir?: string }).snapshotDir = err.data
+        ?.snapshotDir as string
+      throw newErr
+    }
     throw err
   }
-  return { snapshotDir: data.snapshotDir }
 }
