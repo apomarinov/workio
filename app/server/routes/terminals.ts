@@ -38,7 +38,7 @@ async function getParentAppName(): Promise<string | null> {
       pid = Number.parseInt(ppidStr, 10)
       if (Number.isNaN(pid)) break
     }
-  } catch { }
+  } catch {}
   return null
 }
 
@@ -170,12 +170,7 @@ import {
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
-import {
-  expandPath,
-  gitExec,
-  gitExecLogged,
-  shellEscape,
-} from '../lib/git'
+import { expandPath, gitExec, gitExecLogged, shellEscape } from '../lib/git'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
@@ -411,22 +406,22 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
         : resolvedPath
       : expandPath(
-        lineColMatch?.[2]
-          ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
-          : resolvedPath,
-      )
+          lineColMatch?.[2]
+            ? `${resolvedPath}:${lineColMatch[2]}${lineColMatch[3] ? `:${lineColMatch[3]}` : ''}`
+            : resolvedPath,
+        )
 
     // Build args — for SSH remotes, use --remote to open via the IDE's SSH extension
     let args: string[]
     if (remoteSshHost) {
       args = terminalCwd
         ? [
-          '--remote',
-          `ssh-remote+${remoteSshHost}`,
-          terminalCwd,
-          '--goto',
-          targetPath,
-        ]
+            '--remote',
+            `ssh-remote+${remoteSshHost}`,
+            terminalCwd,
+            '--goto',
+            targetPath,
+          ]
         : ['--remote', `ssh-remote+${remoteSshHost}`, '--goto', targetPath]
     } else {
       args = terminalCwd
@@ -828,12 +823,12 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         const hasSetup = setup_script || delete_script
         const setupObj = hasSetup
           ? {
-            ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
-            ...(delete_script?.trim()
-              ? { delete: delete_script.trim() }
-              : {}),
-            status: 'setup' as const,
-          }
+              ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
+              ...(delete_script?.trim()
+                ? { delete: delete_script.trim() }
+                : {}),
+              status: 'setup' as const,
+            }
           : null
 
         const gitRepoData: Record<string, unknown> = {
@@ -1424,7 +1419,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           terminal,
           ['update-ref', `refs/remotes/origin/${branch}`, 'HEAD'],
           { timeout: 5000 },
-        ).catch(() => { })
+        ).catch(() => {})
 
         // Refresh git branch detection and sync status
         detectGitBranch(id)
@@ -1512,7 +1507,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
               await gitExec(terminal, [], {
                 timeout: 15000,
                 sshCmd: `git fetch origin ${refspecs} 2>/dev/null || true`,
-              }).catch(() => { })
+              }).catch(() => {})
             } else {
               const refspecs = refs.map(
                 (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
@@ -1945,7 +1940,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         // Abort the rebase to leave repo in clean state
         await gitExec(terminal, ['rebase', '--abort'], {
           timeout: 10000,
-        }).catch(() => { })
+        }).catch(() => {})
 
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to rebase branch'
@@ -2072,7 +2067,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         // Abort the rebase to leave repo in clean state
         await gitExec(terminal, ['rebase', '--abort'], {
           timeout: 10000,
-        }).catch(() => { })
+        }).catch(() => {})
 
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to drop commit'
@@ -2394,7 +2389,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           terminal.ssh_host,
           `mkdir -p ~/.workio/shells && printf '%s' '${sn}' > ~/.workio/shells/${id}`,
           { timeout: 5000 },
-        ).catch(() => { })
+        ).catch(() => {})
       }
 
       return reply.send(updated)
