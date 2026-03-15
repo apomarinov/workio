@@ -277,6 +277,56 @@ interface DirResult {
 
 const PAGE_SIZE = 100
 
+function parseId(raw: string, label = 'terminal'): number {
+  const id = parseInt(raw, 10)
+  if (Number.isNaN(id)) {
+    const err = new Error(`Invalid ${label} id`) as Error & {
+      statusCode: number
+    }
+    err.statusCode = 400
+    throw err
+  }
+  return id
+}
+
+async function resolveTerminal(params: TerminalParams) {
+  const id = parseId(params.id)
+  const terminal = await getTerminalById(id)
+  if (!terminal) {
+    const err = new Error('Terminal not found') as Error & {
+      statusCode: number
+    }
+    err.statusCode = 404
+    throw err
+  }
+  return terminal
+}
+
+async function resolveGitTerminal(params: TerminalParams) {
+  const terminal = await resolveTerminal(params)
+  if (!terminal.git_repo) {
+    const err = new Error('Not a git repository') as Error & {
+      statusCode: number
+    }
+    err.statusCode = 400
+    throw err
+  }
+  return terminal as typeof terminal & {
+    git_repo: NonNullable<(typeof terminal)['git_repo']>
+  }
+}
+
+async function resolveShell(params: { id: string }) {
+  const id = parseId(params.id, 'shell')
+  const shell = await getShellById(id)
+  if (!shell) {
+    const err = new Error('Shell not found') as Error & { statusCode: number }
+    err.statusCode = 404
+    throw err
+  }
+  return shell
+}
+
 export default async function terminalRoutes(fastify: FastifyInstance) {
   // Cache git fetch calls to avoid redundant network round-trips.
   // Key: "cwd\0" + sorted refspecs, Value: timestamp of last fetch
@@ -923,16 +973,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   // Get single terminal
   fastify.get<{ Params: TerminalParams }>(
     '/api/terminals/:id',
-    async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
+    async (request, _reply) => {
+      const terminal = await resolveTerminal(request.params)
       return terminal
     },
   )
@@ -941,15 +983,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.patch<{ Params: TerminalParams; Body: UpdateTerminalBody }>(
     '/api/terminals/:id',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
+      const terminal = await resolveTerminal(request.params)
+      const id = terminal.id
 
       // Check for duplicate name on rename
       if (
@@ -1004,15 +1039,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     Params: TerminalParams
     Querystring: { deleteDirectory?: string }
   }>('/api/terminals/:id', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
+    const terminal = await resolveTerminal(request.params)
+    const id = terminal.id
 
     const deleteDirectory = !!request.query.deleteDirectory
 
@@ -1064,10 +1092,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams }>(
     '/api/terminals/:id/cancel-workspace',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
+      const id = parseId(request.params.id)
 
       const cancelled = cancelWorkspaceOperation(id)
       if (!cancelled) {
@@ -1094,15 +1119,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams }>(
     '/api/terminals/:id/rerun-setup',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
+      const terminal = await resolveTerminal(request.params)
+      const id = terminal.id
       if (terminal.setup?.status !== 'failed') {
         return reply.status(409).send({ error: 'Setup is not in failed state' })
       }
@@ -1117,15 +1135,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams }>(
     '/api/terminals/:id/clear-setup-error',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
+      const terminal = await resolveTerminal(request.params)
+      const id = terminal.id
       if (terminal.setup?.status !== 'failed') {
         return reply.status(409).send({ error: 'Setup is not in failed state' })
       }
@@ -1145,19 +1156,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: TerminalParams }>(
     '/api/terminals/:id/branches',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
 
       try {
         const result = await gitExec(
@@ -1220,19 +1219,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams }>(
     '/api/terminals/:id/fetch-all',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       try {
         await gitExecLogged(terminal, ['fetch', '--all'], {
@@ -1253,19 +1241,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: CheckoutBranchBody }>(
     '/api/terminals/:id/checkout',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { branch } = request.body
       if (!branch) {
@@ -1305,19 +1282,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: PullBranchBody }>(
     '/api/terminals/:id/pull',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { branch } = request.body
       if (!branch) {
@@ -1373,19 +1339,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: PushBranchBody }>(
     '/api/terminals/:id/push',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { branch, force } = request.body
       if (!branch) {
@@ -1432,19 +1387,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: TerminalParams }>(
     '/api/terminals/:id/head-message',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
 
       try {
         const result = await gitExec(terminal, ['log', '-1', '--format=%B'], {
@@ -1464,19 +1407,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: TerminalParams; Querystring: { base?: string } }>(
     '/api/terminals/:id/changed-files',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
 
       try {
         const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
@@ -1565,19 +1496,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     Params: TerminalParams
     Querystring: { path?: string; context?: string; base?: string }
   }>('/api/terminals/:id/file-diff', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
-
-    if (!terminal.git_repo) {
-      return reply.status(400).send({ error: 'Terminal has no git repo' })
-    }
+    const terminal = await resolveGitTerminal(request.params)
 
     const filePath = request.query.path
     const context = request.query.context || '5'
@@ -1665,19 +1584,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       files?: string[]
     }
   }>('/api/terminals/:id/commit', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
-
-    if (!terminal.git_repo) {
-      return reply.status(400).send({ error: 'Terminal has no git repo' })
-    }
+    const terminal = await resolveGitTerminal(request.params)
+    const id = terminal.id
 
     const { message, amend, noVerify, files } = request.body
 
@@ -1745,19 +1653,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     Params: TerminalParams
     Body: { files: string[] }
   }>('/api/terminals/:id/discard', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
-
-    if (!terminal.git_repo) {
-      return reply.status(400).send({ error: 'Terminal has no git repo' })
-    }
+    const terminal = await resolveGitTerminal(request.params)
+    const id = terminal.id
 
     const { files } = request.body
     if (!files || files.length === 0) {
@@ -1883,19 +1780,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: RebaseBranchBody }>(
     '/api/terminals/:id/rebase',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { branch } = request.body
       if (!branch) {
@@ -1947,19 +1833,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: UndoCommitBody }>(
     '/api/terminals/:id/undo-commit',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { commitHash } = request.body
       if (!commitHash) {
@@ -2007,19 +1882,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: DropCommitBody }>(
     '/api/terminals/:id/drop-commit',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { commitHash } = request.body
       if (!commitHash) {
@@ -2073,19 +1937,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: TerminalParams; Body: DeleteBranchBody }>(
     '/api/terminals/:id/branch',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { branch, deleteRemote } = request.body
       if (!branch) {
@@ -2139,19 +1992,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: RenameBranchBody }>(
     '/api/terminals/:id/rename-branch',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { branch, newName, renameRemote } = request.body
       if (!branch) {
@@ -2229,19 +2071,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: CreateBranchBody }>(
     '/api/terminals/:id/create-branch',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      if (!terminal.git_repo) {
-        return reply.status(400).send({ error: 'Terminal has no git repo' })
-      }
+      const terminal = await resolveGitTerminal(request.params)
+      const id = terminal.id
 
       const { name, from } = request.body
       if (!name) {
@@ -2277,15 +2108,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: TerminalParams; Body: { name?: string } }>(
     '/api/terminals/:id/shells',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid terminal id' })
-      }
-
-      const terminal = await getTerminalById(id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
+      const terminal = await resolveTerminal(request.params)
+      const id = terminal.id
 
       const name = request.body?.name?.trim()
       if (name === 'main') {
@@ -2306,15 +2130,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { id: string } }>(
     '/api/shells/:id',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid shell id' })
-      }
-
-      const shell = await getShellById(id)
-      if (!shell) {
-        return reply.status(404).send({ error: 'Shell not found' })
-      }
+      const shell = await resolveShell(request.params)
+      const id = shell.id
 
       if (shell.name === 'main') {
         return reply.status(400).send({ error: 'Cannot delete the main shell' })
@@ -2332,15 +2149,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.patch<{ Params: { id: string }; Body: { name: string } }>(
     '/api/shells/:id',
     async (request, reply) => {
-      const id = Number(request.params.id)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid shell id' })
-      }
-
-      const shell = await getShellById(id)
-      if (!shell) {
-        return reply.status(404).send({ error: 'Shell not found' })
-      }
+      const shell = await resolveShell(request.params)
+      const id = shell.id
 
       if (shell.name === 'main') {
         return reply.status(400).send({ error: 'Cannot rename the main shell' })
@@ -2390,15 +2200,8 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: { id: string }; Body: { data: string } }>(
     '/api/shells/:id/write',
     async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid shell id' })
-      }
-
-      const shell = await getShellById(id)
-      if (!shell) {
-        return reply.status(404).send({ error: 'Shell not found' })
-      }
+      const shell = await resolveShell(request.params)
+      const id = shell.id
 
       const { data } = request.body
       if (typeof data !== 'string') {
@@ -2423,16 +2226,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   // Send interrupt (Ctrl+C) to a shell's PTY session
   fastify.post<{ Params: { id: string } }>(
     '/api/shells/:id/interrupt',
-    async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid shell id' })
-      }
-
-      const shell = await getShellById(id)
-      if (!shell) {
-        return reply.status(404).send({ error: 'Shell not found' })
-      }
+    async (request, _reply) => {
+      const shell = await resolveShell(request.params)
+      const id = shell.id
 
       // If the shell's session is waiting for permission, mark it done
       const doneSessionId = await setActiveSessionDone(id)
@@ -2455,16 +2251,9 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
   // Kill all child processes in a shell (SIGKILL to direct children)
   fastify.post<{ Params: { id: string } }>(
     '/api/shells/:id/kill',
-    async (request, reply) => {
-      const id = parseInt(request.params.id, 10)
-      if (Number.isNaN(id)) {
-        return reply.status(400).send({ error: 'Invalid shell id' })
-      }
-
-      const shell = await getShellById(id)
-      if (!shell) {
-        return reply.status(404).send({ error: 'Shell not found' })
-      }
+    async (request, _reply) => {
+      const shell = await resolveShell(request.params)
+      const id = shell.id
 
       killShellChildren(id)
       return { success: true }
@@ -2476,15 +2265,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     Params: TerminalParams
     Querystring: { head: string; base: string }
   }>('/api/terminals/:id/branch-conflicts', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
+    const terminal = await resolveTerminal(request.params)
 
     const { head, base } = request.query
     if (!head || !base) {
@@ -2529,15 +2310,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     Params: TerminalParams
     Querystring: { head: string; base: string }
   }>('/api/terminals/:id/commits', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
+    const terminal = await resolveTerminal(request.params)
 
     const { head, base } = request.query
     if (!head || !base) {
@@ -2597,15 +2370,7 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
     Params: TerminalParams
     Querystring: { branch: string; limit?: string; offset?: string }
   }>('/api/terminals/:id/branch-commits', async (request, reply) => {
-    const id = parseInt(request.params.id, 10)
-    if (Number.isNaN(id)) {
-      return reply.status(400).send({ error: 'Invalid terminal id' })
-    }
-
-    const terminal = await getTerminalById(id)
-    if (!terminal) {
-      return reply.status(404).send({ error: 'Terminal not found' })
-    }
+    const terminal = await resolveTerminal(request.params)
 
     const { branch } = request.query
     if (!branch) {
