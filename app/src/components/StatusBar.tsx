@@ -15,8 +15,6 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   Activity,
-  ArrowDown,
-  ArrowUp,
   Check,
   ChevronDown,
   ChevronUp,
@@ -55,12 +53,9 @@ import {
   type StatusBarSection,
   type StatusBarSectionName,
 } from '../types'
+import { GitStatus } from './GitStatus'
 import { ResourceInfo } from './ResourceInfo'
-import {
-  GitDirtyBadge,
-  PortsList,
-  ProcessesList,
-} from './terminal-status-sections'
+import { PortsList, ProcessesList } from './terminal-status-sections'
 
 interface StatusBarProps {
   position: 'top' | 'bottom'
@@ -283,12 +278,6 @@ function GitDirtySection({
   terminalId: number
   remoteSyncStat?: { behind: number; ahead: number; noRemote: boolean }
 }) {
-  const showRemoteSync =
-    !!remoteSyncStat &&
-    (remoteSyncStat.noRemote ||
-      remoteSyncStat.behind > 0 ||
-      remoteSyncStat.ahead > 0)
-
   return (
     <SortableStatusSection
       section={section}
@@ -300,40 +289,12 @@ function GitDirtySection({
         )
       }
     >
-      {diffStat && (
-        <GitDirtyBadge
-          added={diffStat.added}
-          removed={diffStat.removed}
-          untracked={diffStat.untracked}
-          untrackedLines={diffStat.untrackedLines}
-          className="text-[11px]"
-        />
-      )}
-      {showRemoteSync && remoteSyncStat && (
-        <span className="text-[11px] font-mono flex items-center gap-1">
-          {remoteSyncStat.noRemote ? (
-            <span className="flex gap-0">
-              <ArrowDown className="w-3 h-3 text-yellow-500/80" />
-              <ArrowUp className="w-3 h-3 text-yellow-500/80 translate-x-[-3px]" />
-            </span>
-          ) : (
-            <>
-              {remoteSyncStat.behind > 0 && (
-                <span className="flex items-center text-blue-500/80">
-                  {remoteSyncStat.behind}
-                  <ArrowDown className="w-3 h-3" />
-                </span>
-              )}
-              {remoteSyncStat.ahead > 0 && (
-                <span className="flex items-center text-green-500/80">
-                  {remoteSyncStat.ahead}
-                  <ArrowUp className="w-3 h-3" />
-                </span>
-              )}
-            </>
-          )}
-        </span>
-      )}
+      <GitStatus
+        terminalId={terminalId}
+        diffStat={diffStat}
+        remoteSyncStat={remoteSyncStat}
+        badgeClassName="text-[11px]"
+      />
     </SortableStatusSection>
   )
 }

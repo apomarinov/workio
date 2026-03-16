@@ -1,7 +1,5 @@
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
   ChevronRight,
   GitBranch,
@@ -18,11 +16,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
@@ -35,17 +28,14 @@ import { useGitHubContext } from '../context/GitHubContext'
 import { useProcessContext } from '../context/ProcessContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import type { SessionWithProject, Terminal } from '../types'
+import { GitStatus } from './GitStatus'
 import { TerminalIcon2 } from './icons'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'
 import { ResourceInfo } from './ResourceInfo'
 import { SessionItem } from './SessionItem'
 import { ShellTabs } from './ShellTabs'
 import { TruncatedPath } from './TruncatedPath'
-import {
-  GitDirtyBadge,
-  PortsList,
-  ProcessesList,
-} from './terminal-status-sections'
+import { PortsList, ProcessesList } from './terminal-status-sections'
 
 interface TerminalItemProps {
   terminal: Terminal
@@ -509,85 +499,14 @@ export const TerminalItem = memo(function TerminalItem({
                         Ports ({ports.length})
                       </button>
                     )}
-                    {isDirty && diffStat && (
-                      <button
-                        type="button"
-                        className={cn(
-                          'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded cursor-pointer hover:opacity-100 transition-opacity',
-                          isActive && 'opacity-80',
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          window.dispatchEvent(
-                            new CustomEvent('open-commit-dialog', {
-                              detail: { terminalId: terminal.id },
-                            }),
-                          )
-                        }}
-                      >
-                        <GitDirtyBadge
-                          added={diffStat.added}
-                          removed={diffStat.removed}
-                          untracked={diffStat.untracked}
-                          untrackedLines={diffStat.untrackedLines}
-                        />
-                      </button>
-                    )}
-                    {showRemoteSync && remoteSyncStat && (
-                      <span
-                        className={cn(
-                          'text-[10px] opacity-60 tracking-wider px-1.5 py-0.5 rounded flex items-center gap-1 font-mono',
-                          isActive && 'opacity-80',
-                        )}
-                      >
-                        {remoteSyncStat.noRemote ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex gap-0 group/norem">
-                                <ArrowDown className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500" />
-                                <ArrowUp className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500 translate-x-[-3px]" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              No remote configured
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <>
-                            {remoteSyncStat.behind > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center text-blue-500/80 hover:text-blue-500">
-                                    {remoteSyncStat.behind}
-                                    <ArrowDown className="w-3 h-3" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {remoteSyncStat.behind} commit
-                                  {remoteSyncStat.behind > 1 ? 's' : ''} behind
-                                  remote
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                            {remoteSyncStat.ahead > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center text-green-500/80 hover:text-green-500">
-                                    {remoteSyncStat.ahead}
-                                    <ArrowUp className="w-3 h-3" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {remoteSyncStat.ahead} commit
-                                  {remoteSyncStat.ahead > 1 ? 's' : ''} ahead of
-                                  remote
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </>
-                        )}
-                      </span>
-                    )}
+                    <GitStatus
+                      terminalId={terminal.id}
+                      diffStat={diffStat}
+                      remoteSyncStat={remoteSyncStat}
+                      className={cn(
+                        'text-[10px] opacity-80 hover:opacity-100 tracking-wider px-1.5 py-0.5 rounded',
+                      )}
+                    />
                   </div>
                   <div className="ml-1">
                     {activeTab === 'processes' && hasProcesses && (
