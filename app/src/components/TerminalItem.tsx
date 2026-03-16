@@ -150,7 +150,7 @@ export const TerminalItem = memo(function TerminalItem({
     _setActiveTab((o) => (o === v ? null : v))
   }
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
-  const [showAllSessions, setShowAllSessions] = useState(false)
+  const [olderSessionsCount, setOlderSessionsCount] = useState(0)
   const isSettingUp =
     terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'
   const isDeleting = terminal.setup?.status === 'delete'
@@ -552,7 +552,7 @@ export const TerminalItem = memo(function TerminalItem({
                       !sessionsListExpanded && '-rotate-90',
                     )}
                   />
-                  Claude ({sessions.length})
+                  Claude
                 </button>
                 {sessionsListExpanded &&
                   (() => {
@@ -565,9 +565,11 @@ export const TerminalItem = memo(function TerminalItem({
                       activeSessions.length > 1
                         ? activeSessions
                         : sessions.slice(0, 1)
-                    const hiddenSessions = sessions.filter(
+                    const allHidden = sessions.filter(
                       (s) => !visibleSessions.includes(s),
                     )
+                    const shownOlder = allHidden.slice(0, olderSessionsCount)
+                    const remainingCount = allHidden.length - shownOlder.length
                     return (
                       <>
                         {visibleSessions.map((session, idx) => (
@@ -577,34 +579,32 @@ export const TerminalItem = memo(function TerminalItem({
                             session={session}
                           />
                         ))}
-                        {hiddenSessions.length > 0 && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowAllSessions(!showAllSessions)
-                              }
-                              className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2"
-                            >
-                              <ChevronDown
-                                className={cn(
-                                  'size-3 text-zinc-400 transition-transform duration-150',
-                                  !showAllSessions && '-rotate-90',
-                                )}
-                              />
-                              {showAllSessions
-                                ? 'Hide older'
-                                : `Show ${hiddenSessions.length} older`}
-                            </button>
-                            {showAllSessions &&
-                              hiddenSessions.map((session) => (
-                                <SessionItem
-                                  defaultCollapsed
-                                  key={session.session_id}
-                                  session={session}
-                                />
-                              ))}
-                          </>
+                        {olderSessionsCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setOlderSessionsCount(0)}
+                            className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2"
+                          >
+                            <ChevronDown className="size-3 text-zinc-400 transition-transform duration-150" />
+                            Hide older
+                          </button>
+                        )}
+                        {shownOlder.map((session) => (
+                          <SessionItem
+                            defaultCollapsed
+                            key={session.session_id}
+                            session={session}
+                          />
+                        ))}
+                        {remainingCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setOlderSessionsCount((c) => c + 10)}
+                            className="flex cursor-pointer w-full items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2"
+                          >
+                            <ChevronDown className="size-3 text-zinc-400 transition-transform duration-150 -rotate-90" />
+                            Show more
+                          </button>
                         )}
                       </>
                     )

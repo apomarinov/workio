@@ -46,16 +46,9 @@ export const SessionItem = memo(function SessionItem({
     [],
   )
   const isPinned = pinnedSessions.includes(session.session_id)
-  const [collapsedSessions, setCollapsedSessions] = useLocalStorage<string[]>(
-    'sidebar-collapsed-sessions',
-    [],
+  const [isExpanded, setIsExpanded] = useState(
+    popoverContainer ? true : !defaultCollapsed,
   )
-  const inList = collapsedSessions.includes(session.session_id)
-  const isExpanded = popoverContainer
-    ? true
-    : defaultCollapsed
-      ? inList
-      : !inList
   const displayName = terminalName || session.name || 'Untitled'
   const isSelected = activeSessionId === session.session_id
 
@@ -64,18 +57,12 @@ export const SessionItem = memo(function SessionItem({
     if (popoverContainer) {
       return
     }
-    setCollapsedSessions((prev) =>
-      prev.includes(session.session_id)
-        ? prev.filter((id) => id !== session.session_id)
-        : [...prev, session.session_id],
-    )
+    setIsExpanded((prev) => !prev)
   }
 
   const handleClick = () => {
     if (!isExpanded) {
-      setCollapsedSessions((prev) =>
-        prev.filter((id) => id !== session.session_id),
-      )
+      setIsExpanded(true)
       return
     }
     if (onClick) {
@@ -192,7 +179,7 @@ export const SessionItem = memo(function SessionItem({
                     <div className="w-[15px] border-l-[1px] border-b-[1px] h-[1220px] -translate-y-full"></div>
                   </div>
                 )}
-                <div className="max-h-[300px] overflow-y-auto text-xs border-[1px] rounded-md px-2 text-muted-foreground py-0.5 my-1">
+                <div className="max-h-[300px] overflow-y-hidden text-xs border-[1px] rounded-md px-2 text-muted-foreground py-0.5 my-1">
                   <MarkdownContent content={session.latest_agent_message} />
                 </div>
               </div>
