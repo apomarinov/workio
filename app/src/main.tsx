@@ -1,9 +1,13 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { SWRConfig } from 'swr'
 import { NotificationProvider } from './context/NotificationContext'
 import './index.css'
 import App from './App'
+import { trpc, trpcClient } from './lib/trpc'
+
+const queryClient = new QueryClient()
 
 const ONE_HOUR = 60 * 60 * 1000
 
@@ -44,10 +48,16 @@ function swrCacheProvider() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SWRConfig value={{ provider: swrCacheProvider, revalidateOnFocus: false }}>
-      <NotificationProvider>
-        <App />
-      </NotificationProvider>
-    </SWRConfig>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <SWRConfig
+          value={{ provider: swrCacheProvider, revalidateOnFocus: false }}
+        >
+          <NotificationProvider>
+            <App />
+          </NotificationProvider>
+        </SWRConfig>
+      </QueryClientProvider>
+    </trpc.Provider>
   </StrictMode>,
 )

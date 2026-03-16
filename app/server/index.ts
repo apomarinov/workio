@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
+import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
 import { format } from 'date-fns'
 import Fastify from 'fastify'
 import pino from 'pino'
@@ -49,6 +50,8 @@ import terminalRoutes from './routes/terminals'
 import { getServicesStatus, updateNgrokStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
+import { createContext } from './trpc/init'
+import { appRouter } from './trpc/router'
 import { emitAllShellClients, handleUpgrade } from './ws/terminal'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -380,6 +383,12 @@ fastify.addHook('onResponse', (request, reply, done) => {
     }
   }
   done()
+})
+
+// tRPC
+await fastify.register(fastifyTRPCPlugin, {
+  prefix: '/api/trpc',
+  trpcOptions: { router: appRouter, createContext },
 })
 
 // Routes
