@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import {
   createDirectory,
@@ -248,9 +249,7 @@ export function DirectoryBrowser({
       setHiddenVersion((v) => v + 1)
       navigateToPath(result.path)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to create folder',
-      )
+      toastError(err, 'Failed to create folder')
     } finally {
       setCreatingFolder(false)
     }

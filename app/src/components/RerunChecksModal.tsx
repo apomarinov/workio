@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
 import { rerunAllFailedChecks } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import type { PRCheckStatus } from '../../shared/types'
 
 interface RerunChecksModalProps {
@@ -52,9 +53,7 @@ export function RerunChecksModal({
       onClose()
       onSuccess?.()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to re-run checks',
-      )
+      toastError(err, 'Failed to re-run checks')
     } finally {
       setLoading(false)
     }

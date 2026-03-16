@@ -28,6 +28,7 @@ import {
   checkBranchConflicts,
   createPR,
 } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import type { Terminal } from '../../types'
 import { BranchDiffPanel } from '../BranchDiffPanel'
@@ -117,7 +118,7 @@ export function CreatePRDialog({
       toast.success(`Created PR #${result.prNumber}`)
       onClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create PR')
+      toastError(err, 'Failed to create PR')
     } finally {
       setCreating(false)
     }

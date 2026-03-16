@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 
 interface SecondaryAction {
   label: string
@@ -73,7 +73,7 @@ export function ConfirmModal({
       try {
         await result
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Something went wrong')
+        toastError(err)
       } finally {
         setInternalLoading(false)
         confirmedRef.current = false
@@ -92,7 +92,7 @@ export function ConfirmModal({
       try {
         await result
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Something went wrong')
+        toastError(err)
       } finally {
         setSecondaryLoading(null)
         confirmedRef.current = false

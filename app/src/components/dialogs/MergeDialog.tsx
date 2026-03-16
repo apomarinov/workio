@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toast } from '@/components/ui/sonner'
+import { useDialog } from '@/hooks/useDialog'
 
 interface MergeDialogProps {
   prNumber: number
@@ -29,32 +29,11 @@ export function MergeDialog({
   onConfirm,
   onClose,
 }: MergeDialogProps) {
-  const [open, setOpen] = useState(true)
-  const [loading, setLoading] = useState(false)
+  const { open, loading, handleClose, handleOpenChange, submit } =
+    useDialog(onClose)
   const [method, setMethod] = useState<'merge' | 'squash' | 'rebase'>('squash')
 
-  const handleClose = () => {
-    setOpen(false)
-    setTimeout(onClose, 300)
-  }
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value && !loading) {
-      handleClose()
-    }
-  }
-
-  const handleConfirm = async () => {
-    setLoading(true)
-    try {
-      await onConfirm(method)
-      handleClose()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const handleConfirm = () => submit(() => onConfirm(method))
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

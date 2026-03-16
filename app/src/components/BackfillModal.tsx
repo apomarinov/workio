@@ -16,6 +16,7 @@ import {
   backfillCheck,
   backfillSessions,
 } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
@@ -84,9 +85,7 @@ export function BackfillSection() {
       await mutate()
       refetchSessions()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to backfill sessions',
-      )
+      toastError(err, 'Failed to backfill sessions')
     } finally {
       setBackfillingCwd(null)
     }

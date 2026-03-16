@@ -32,6 +32,7 @@ import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
 import * as api from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { WEBHOOK_EVENTS } from '../../shared/types'
 import type { GHQueryLimits } from '../types'
@@ -146,9 +147,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
       toast.success(`Webhook created for ${repo}`)
       refetch()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to create webhook',
-      )
+      toastError(err, 'Failed to create webhook')
     } finally {
       setLoading((prev) => ({ ...prev, [repo]: false }))
     }
@@ -164,9 +163,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
       toast.success(`Webhook deleted for ${repo}`)
       refetch()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete webhook',
-      )
+      toastError(err, 'Failed to delete webhook')
     } finally {
       setLoading((prev) => ({ ...prev, [repo]: false }))
     }
@@ -182,9 +179,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
       toast.success(`Webhook recreated for ${repo}`)
       refetch()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to recreate webhook',
-      )
+      toastError(err, 'Failed to recreate webhook')
     } finally {
       setLoading((prev) => ({ ...prev, [repo]: false }))
     }
@@ -199,7 +194,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
       await api.testWebhook(owner, repoName)
       toast.success(`Ping sent to ${repo}. You should receive a notification.`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to test webhook')
+      toastError(err, 'Failed to test webhook')
     } finally {
       setLoading((prev) => ({ ...prev, [`${repo}-test`]: false }))
     }
@@ -220,7 +215,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
       setLinkWebhookRepo(null)
       refetch()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to link webhook')
+      toastError(err, 'Failed to link webhook')
     } finally {
       setLoading((prev) => ({ ...prev, [repo]: false }))
     }
@@ -254,9 +249,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
       await updateSettings({ gh_query_limits: limits })
       toast.success('Query limits saved')
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to save query limits',
-      )
+      toastError(err, 'Failed to save query limits')
     } finally {
       setSavingLimits(false)
     }

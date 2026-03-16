@@ -16,6 +16,7 @@ import {
   getChangedFiles,
   getHeadMessage,
 } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import type { ChangedFile, PRCheckStatus } from '../../shared/types'
 import { BranchDiffPanel } from './BranchDiffPanel'
@@ -128,9 +129,7 @@ export function CommitDialog({
       })
       .catch((err) => {
         setChangedFiles([])
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to load changed files',
-        )
+        toastError(err, 'Failed to load changed files')
       })
       .finally(() => {
         setLoadingFiles(false)
@@ -169,9 +168,7 @@ export function CommitDialog({
       })
       .catch((err) => {
         if (!cancelled) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to get HEAD message',
-          )
+          toastError(err, 'Failed to get HEAD message')
           setAmend(false)
         }
       })
@@ -241,7 +238,7 @@ export function CommitDialog({
       onClose()
       onSuccess?.()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to commit')
+      toastError(err, 'Failed to commit')
     } finally {
       setLoading(false)
     }
@@ -261,9 +258,7 @@ export function CommitDialog({
       }
       refreshFiles(!clearViewer)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to discard changes',
-      )
+      toastError(err, 'Failed to discard changes')
     } finally {
       setDiscarding(false)
     }

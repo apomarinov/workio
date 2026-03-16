@@ -26,6 +26,35 @@ const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
 })
 
+function buildSetClauses(
+  fields: Record<string, unknown>,
+  opts?: { updatedAt?: boolean },
+): { sql: string; values: unknown[]; nextParam: number } | null {
+  const clauses: string[] = []
+  const values: unknown[] = []
+  let paramIdx = 1
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      clauses.push(`${key} = $${paramIdx++}`)
+      values.push(value)
+    }
+  }
+
+  if (clauses.length === 0) return null
+
+  if (opts?.updatedAt !== false) {
+    clauses.push('updated_at = NOW()')
+  }
+
+  return { sql: clauses.join(', '), values, nextParam: paramIdx }
+}
+
+function jsonOrNull(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined
+  return v ? JSON.stringify(v) : null
+}
+
 // Initialize database from schema.sql
 export async function initDb() {
   if (!fs.existsSync(SCHEMA_PATH)) {
@@ -299,25 +328,13 @@ export async function updateSession(
   sessionId: string,
   updates: { name?: string },
 ): Promise<boolean> {
-  const setClauses: string[] = []
-  const values: (string | null)[] = []
-  let paramIdx = 1
+  const set = buildSetClauses({ name: updates.name })
+  if (!set) return true
 
-  if (updates.name !== undefined) {
-    setClauses.push(`name = $${paramIdx++}`)
-    values.push(updates.name)
-  }
-
-  if (setClauses.length === 0) {
-    return true
-  }
-
-  setClauses.push('updated_at = NOW()')
-  values.push(sessionId)
-
+  set.values.push(sessionId)
   const result = await pool.query(
-    `UPDATE sessions SET ${setClauses.join(', ')} WHERE session_id = $${paramIdx}`,
-    values,
+    `UPDATE sessions SET ${set.sql} WHERE session_id = $${set.nextParam}`,
+    set.values,
   )
   return (result.rowCount ?? 0) > 0
 }
@@ -357,44 +374,10 @@ export async function resumePermissionSession(
   return rows[0]?.session_id ?? null
 }
 
-export async function deleteSession(sessionId: string): Promise<boolean> {
-  // Delete in order: messages (via prompts), prompts, hooks, then session
-  const promptResult = await pool.query(
-    'SELECT id FROM prompts WHERE session_id = $1',
-    [sessionId],
-  )
-
-  if (promptResult.rows.length > 0) {
-    const ids = promptResult.rows.map((p: { id: number }) => p.id)
-    await pool.query('DELETE FROM messages WHERE prompt_id = ANY($1)', [ids])
-  }
-
-  await pool.query('DELETE FROM prompts WHERE session_id = $1', [sessionId])
-  await pool.query('DELETE FROM hooks WHERE session_id = $1', [sessionId])
-  const result = await pool.query(
-    'DELETE FROM sessions WHERE session_id = $1',
-    [sessionId],
-  )
-  return (result.rowCount ?? 0) > 0
-}
-
-export async function getOldSessionIds(
-  weeks: number,
-  excludeIds: string[],
-): Promise<string[]> {
-  const { rows } = await pool.query(
-    `SELECT session_id FROM sessions
-     WHERE updated_at < NOW() - INTERVAL '1 week' * $1
-       AND session_id != ALL($2)`,
-    [weeks, excludeIds],
-  )
-  return rows.map((r: { session_id: string }) => r.session_id)
-}
-
-export async function deleteSessions(sessionIds: string[]): Promise<number> {
+async function deleteSessionCascade(sessionIds: string[]): Promise<number> {
   if (sessionIds.length === 0) return 0
 
-  // Batch-delete all related rows in dependency order
+  // Delete in order: messages (via prompts), prompts, hooks, then sessions
   const promptResult = await pool.query(
     'SELECT id FROM prompts WHERE session_id = ANY($1)',
     [sessionIds],
@@ -412,6 +395,27 @@ export async function deleteSessions(sessionIds: string[]): Promise<number> {
     [sessionIds],
   )
   return result.rowCount ?? 0
+}
+
+export async function deleteSession(sessionId: string): Promise<boolean> {
+  return (await deleteSessionCascade([sessionId])) > 0
+}
+
+export async function getOldSessionIds(
+  weeks: number,
+  excludeIds: string[],
+): Promise<string[]> {
+  const { rows } = await pool.query(
+    `SELECT session_id FROM sessions
+     WHERE updated_at < NOW() - INTERVAL '1 week' * $1
+       AND session_id != ALL($2)`,
+    [weeks, excludeIds],
+  )
+  return rows.map((r: { session_id: string }) => r.session_id)
+}
+
+export async function deleteSessions(sessionIds: string[]): Promise<number> {
+  return deleteSessionCascade(sessionIds)
 }
 
 export async function searchSessionMessages(
@@ -745,53 +749,23 @@ export async function updateTerminal(
     oldName = oldTerminal?.name || null
   }
 
-  const setClauses: string[] = []
-  const values: (string | number | null)[] = []
-  let paramIdx = 1
+  const set = buildSetClauses({
+    name: updates.name,
+    cwd: updates.cwd,
+    pid: updates.pid,
+    status: updates.status,
+    git_branch: updates.git_branch,
+    git_repo: jsonOrNull(updates.git_repo),
+    setup: jsonOrNull(updates.setup),
+    settings: jsonOrNull(updates.settings),
+  })
 
-  if (updates.name !== undefined) {
-    setClauses.push(`name = $${paramIdx++}`)
-    values.push(updates.name)
-  }
-  if (updates.cwd !== undefined) {
-    setClauses.push(`cwd = $${paramIdx++}`)
-    values.push(updates.cwd)
-  }
-  if (updates.pid !== undefined) {
-    setClauses.push(`pid = $${paramIdx++}`)
-    values.push(updates.pid)
-  }
-  if (updates.status !== undefined) {
-    setClauses.push(`status = $${paramIdx++}`)
-    values.push(updates.status)
-  }
-  if (updates.git_branch !== undefined) {
-    setClauses.push(`git_branch = $${paramIdx++}`)
-    values.push(updates.git_branch)
-  }
-  if (updates.git_repo !== undefined) {
-    setClauses.push(`git_repo = $${paramIdx++}`)
-    values.push(updates.git_repo ? JSON.stringify(updates.git_repo) : null)
-  }
-  if (updates.setup !== undefined) {
-    setClauses.push(`setup = $${paramIdx++}`)
-    values.push(updates.setup ? JSON.stringify(updates.setup) : null)
-  }
-  if (updates.settings !== undefined) {
-    setClauses.push(`settings = $${paramIdx++}`)
-    values.push(updates.settings ? JSON.stringify(updates.settings) : null)
-  }
+  if (!set) return getTerminalById(id)
 
-  if (setClauses.length === 0) {
-    return getTerminalById(id)
-  }
-
-  setClauses.push('updated_at = NOW()')
-  values.push(id)
-
+  set.values.push(id)
   await pool.query(
-    `UPDATE terminals SET ${setClauses.join(', ')} WHERE id = $${paramIdx}`,
-    values,
+    `UPDATE terminals SET ${set.sql} WHERE id = $${set.nextParam}`,
+    set.values,
   )
 
   // Handle name change: update file and rename zellij session
@@ -902,21 +876,16 @@ export async function updateShell(
   updates: { active_cmd?: string | null },
 ): Promise<void> {
   try {
-    const setClauses: string[] = []
-    const values: (string | null)[] = []
-    let paramIdx = 1
+    const set = buildSetClauses(
+      { active_cmd: updates.active_cmd },
+      { updatedAt: false },
+    )
+    if (!set) return
 
-    if (updates.active_cmd !== undefined) {
-      setClauses.push(`active_cmd = $${paramIdx++}`)
-      values.push(updates.active_cmd)
-    }
-
-    if (setClauses.length === 0) return
-
-    values.push(String(id))
+    set.values.push(id)
     await pool.query(
-      `UPDATE shells SET ${setClauses.join(', ')} WHERE id = $${paramIdx}`,
-      values,
+      `UPDATE shells SET ${set.sql} WHERE id = $${set.nextParam}`,
+      set.values,
     )
   } catch (err) {
     log.error({ err, shellId: id }, '[db] Failed to update shell')

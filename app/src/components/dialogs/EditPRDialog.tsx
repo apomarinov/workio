@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 
 interface EditPRDialogProps {
   open: boolean
@@ -42,7 +42,7 @@ export function EditPRDialog({
       await onSave(title.trim(), body, draft)
       onCancel()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
+      toastError(err)
     } finally {
       setSaving(false)
     }

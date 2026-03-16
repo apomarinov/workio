@@ -1,7 +1,7 @@
 import { ChevronDown, Folder, Trash2 } from 'lucide-react'
 import { memo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useIsMobile } from '../hooks/useMediaQuery'
@@ -39,9 +39,7 @@ export const SessionGroup = memo(function SessionGroup({
     try {
       await deleteSessions(sessions.map((s) => s.session_id))
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete sessions',
-      )
+      toastError(err, 'Failed to delete sessions')
     }
   }
 

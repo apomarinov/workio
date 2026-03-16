@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
+import { useDialog } from '@/hooks/useDialog'
 
 interface HideAuthorDialogProps {
   author: string
@@ -35,8 +35,8 @@ export function HideAuthorDialog({
   onSave,
   onClose,
 }: HideAuthorDialogProps) {
-  const [open, setOpen] = useState(true)
-  const [loading, setLoading] = useState(false)
+  const { open, loading, handleClose, handleOpenChange, submit } =
+    useDialog(onClose)
   const [hideComments, setHideComments] = useState(isHidden)
   const [silenceNotifications, setSilenceNotifications] = useState(isSilenced)
   const [collapseReplies, setCollapseReplies] = useState(isCollapsed)
@@ -47,28 +47,10 @@ export function HideAuthorDialog({
     setCollapseReplies(isCollapsed)
   }, [isHidden, isSilenced, isCollapsed])
 
-  const handleClose = () => {
-    setOpen(false)
-    setTimeout(onClose, 300)
-  }
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value && !loading) {
-      handleClose()
-    }
-  }
-
-  const handleSave = async () => {
-    setLoading(true)
-    try {
-      await onSave({ hideComments, silenceNotifications, collapseReplies })
-      handleClose()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const handleSave = () =>
+    submit(() =>
+      onSave({ hideComments, silenceNotifications, collapseReplies }),
+    )
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

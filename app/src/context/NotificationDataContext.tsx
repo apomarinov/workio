@@ -7,7 +7,7 @@ import {
   useRef,
 } from 'react'
 import useSWR from 'swr'
-import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import { resolveNotification } from '../../shared/notifications'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
@@ -207,9 +207,7 @@ export function NotificationDataProvider({
         )
         mutateUnreadPRData()
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to mark as read',
-        )
+        toastError(err, 'Failed to mark as read')
       }
     },
     [mutateNotifications, mutateUnreadPRData],
@@ -225,9 +223,7 @@ export function NotificationDataProvider({
         )
         mutateUnreadPRData()
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to mark as unread',
-        )
+        toastError(err, 'Failed to mark as unread')
       }
     },
     [mutateNotifications, mutateUnreadPRData],
@@ -262,9 +258,7 @@ export function NotificationDataProvider({
         )
         mutateUnreadPRData()
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to mark as read',
-        )
+        toastError(err, 'Failed to mark as read')
       }
     },
     [mutateNotifications, mutateUnreadPRData],
@@ -278,11 +272,7 @@ export function NotificationDataProvider({
       })
       mutateUnreadPRData(EMPTY_UNREAD, { revalidate: false })
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : 'Failed to mark notifications as read',
-      )
+      toastError(err, 'Failed to mark notifications as read')
     }
   }, [mutateNotifications, mutateUnreadPRData])
 
@@ -309,9 +299,7 @@ export function NotificationDataProvider({
           { revalidate: false },
         )
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to mark as read',
-        )
+        toastError(err, 'Failed to mark as read')
       }
     },
     [mutateNotifications, mutateUnreadPRData],
@@ -325,9 +313,7 @@ export function NotificationDataProvider({
           revalidate: false,
         })
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to delete notification',
-        )
+        toastError(err, 'Failed to delete notification')
       }
     },
     [mutateNotifications],
@@ -339,9 +325,7 @@ export function NotificationDataProvider({
       mutateNotifications([], { revalidate: false })
       mutateUnreadPRData(EMPTY_UNREAD, { revalidate: false })
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete notifications',
-      )
+      toastError(err, 'Failed to delete notifications')
     }
   }, [mutateNotifications, mutateUnreadPRData])
 

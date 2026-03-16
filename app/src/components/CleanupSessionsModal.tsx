@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { cleanupOldSessions } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 
 interface CleanupSessionsModalProps {
   open: boolean
@@ -56,9 +57,7 @@ export function CleanupSessionsModal({
       onClose()
       onSuccess()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to cleanup sessions',
-      )
+      toastError(err, 'Failed to cleanup sessions')
     } finally {
       setLoading(false)
     }

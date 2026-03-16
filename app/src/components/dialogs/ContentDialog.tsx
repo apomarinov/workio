@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useDialog } from '@/hooks/useDialog'
 import { MarkdownContent } from '../MarkdownContent'
 
 interface ContentDialogProps {
@@ -21,14 +21,7 @@ export function ContentDialog({
   content,
   onClose,
 }: ContentDialogProps) {
-  const [open, setOpen] = useState(true)
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value) {
-      setOpen(false)
-      setTimeout(onClose, 300)
-    }
-  }
+  const { open, handleOpenChange } = useDialog(onClose)
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

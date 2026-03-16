@@ -18,6 +18,7 @@ import {
   undoCommit,
 } from '@/lib/api'
 import { formatDate } from '@/lib/time'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel } from './DiffViewerPanel'
@@ -339,9 +340,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
       setConfirmAction(null)
       refreshBranchCommits()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to modify commit',
-      )
+      toastError(err, 'Failed to modify commit')
     }
   }
 

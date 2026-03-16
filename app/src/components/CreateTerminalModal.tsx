@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useSettings } from '../hooks/useSettings'
@@ -248,9 +249,7 @@ export function CreateTerminalModal({
       handleOpenChange(false)
       onCreated?.(terminal.id)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to create project',
-      )
+      toastError(err, 'Failed to create project')
     } finally {
       setCreating(false)
     }
@@ -403,11 +402,7 @@ export function CreateTerminalModal({
                           }
                         })
                         .catch((err) =>
-                          toast.error(
-                            err instanceof Error
-                              ? err.message
-                              : 'Failed to fix MaxSessions',
-                          ),
+                          toastError(err, 'Failed to fix MaxSessions'),
                         )
                         .finally(() => setFixingSSH(false))
                     }}

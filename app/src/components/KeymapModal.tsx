@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
 import {
@@ -346,9 +347,7 @@ export function KeymapModal({ open, onOpenChange }: KeymapModalProps) {
       toast.success('Keyboard shortcuts saved')
       onOpenChange(false)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to save shortcuts',
-      )
+      toastError(err, 'Failed to save shortcuts')
     } finally {
       setSaving(false)
     }

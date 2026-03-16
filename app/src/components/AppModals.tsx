@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import type { PRCheckStatus } from '../../shared/types'
 import { useSessionContext } from '../context/SessionContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
@@ -174,9 +175,7 @@ export function AppModals() {
               )
               setPortMappingTarget(null)
             } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to map port',
-              )
+              toastError(err, 'Failed to map port')
             }
           }}
           onCancel={() => setPortMappingTarget(null)}

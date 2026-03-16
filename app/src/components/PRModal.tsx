@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -6,6 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useGitHubContext } from '@/context/GitHubContext'
+import { useDialog } from '@/hooks/useDialog'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { PRStatusContent } from './PRStatusContent'
 
@@ -18,20 +18,13 @@ export function PRModal({
   repo: string
   onClose: () => void
 }) {
-  const [open, setOpen] = useState(true)
+  const { open, handleOpenChange } = useDialog(onClose)
   const { githubPRs } = useGitHubContext()
   const pr = githubPRs.find((p) => p.prNumber === prNumber && p.repo === repo)
 
   if (!pr) return null
 
   const prInfo = getPRStatusInfo(pr)
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value) {
-      setOpen(false)
-      setTimeout(onClose, 300)
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

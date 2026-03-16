@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { mergePR } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import type { PRCheckStatus } from '../../shared/types'
 
 interface MergePRModalProps {
@@ -48,7 +49,7 @@ export function MergePRModal({
       onClose()
       onSuccess?.()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to merge PR')
+      toastError(err, 'Failed to merge PR')
     } finally {
       setLoading(false)
     }

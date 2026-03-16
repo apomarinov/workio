@@ -1,5 +1,4 @@
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from '@/components/ui/sonner'
+import { useDialog } from '@/hooks/useDialog'
 
 interface RerunCheckDialogProps {
   checkName: string
@@ -22,31 +21,10 @@ export function RerunCheckDialog({
   onConfirm,
   onClose,
 }: RerunCheckDialogProps) {
-  const [open, setOpen] = useState(true)
-  const [loading, setLoading] = useState(false)
+  const { open, loading, handleClose, handleOpenChange, submit } =
+    useDialog(onClose)
 
-  const handleClose = () => {
-    setOpen(false)
-    setTimeout(onClose, 300)
-  }
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value && !loading) {
-      handleClose()
-    }
-  }
-
-  const handleConfirm = async () => {
-    setLoading(true)
-    try {
-      await onConfirm()
-      handleClose()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const handleConfirm = () => submit(onConfirm)
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from '@/components/ui/sonner'
+import { useDialog } from '@/hooks/useDialog'
 
 interface EditCommentDialogProps {
   body: string
@@ -22,32 +22,13 @@ export function EditCommentDialog({
   onConfirm,
   onClose,
 }: EditCommentDialogProps) {
-  const [open, setOpen] = useState(true)
-  const [loading, setLoading] = useState(false)
+  const { open, loading, handleClose, handleOpenChange, submit } =
+    useDialog(onClose)
   const [body, setBody] = useState(initialBody)
-
-  const handleClose = () => {
-    setOpen(false)
-    setTimeout(onClose, 300)
-  }
-
-  const handleOpenChange = (value: boolean) => {
-    if (!value && !loading) {
-      handleClose()
-    }
-  }
 
   const handleConfirm = async () => {
     if (!body.trim()) return
-    setLoading(true)
-    try {
-      await onConfirm(body)
-      handleClose()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
+    await submit(() => onConfirm(body))
   }
 
   return (

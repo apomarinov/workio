@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import type { Terminal } from '@/types'
 
 interface EditTerminalModalProps {
@@ -51,9 +51,7 @@ export function EditTerminalModal({
         settings: trimmedCmd ? { defaultClaudeCommand: trimmedCmd } : null,
       })
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to update project',
-      )
+      toastError(err, 'Failed to update project')
     } finally {
       setSaving(false)
     }

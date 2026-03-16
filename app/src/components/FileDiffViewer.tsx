@@ -19,8 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from '@/components/ui/sonner'
 import { getFileDiff, openInIDE } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 
 const D2H_CONFIG = {
   outputFormat: 'line-by-line' as const,
@@ -130,10 +130,7 @@ function DiffContent({
         ev.preventDefault()
         ev.stopPropagation()
         openInIDE(`${filePath}:${lineNum}`, preferredIde, terminalId).catch(
-          (err) =>
-            toast.error(
-              err instanceof Error ? err.message : 'Failed to open in IDE',
-            ),
+          (err) => toastError(err, 'Failed to open in IDE'),
         )
       })
       cell.appendChild(btn)
@@ -307,9 +304,7 @@ export function FileDiffViewer({
         className="h-7 w-7"
         onClick={() =>
           openInIDE(filePath, preferredIde, terminalId).catch((err) =>
-            toast.error(
-              err instanceof Error ? err.message : 'Failed to open in IDE',
-            ),
+            toastError(err, 'Failed to open in IDE'),
           )
         }
         title={`Open in ${preferredIde === 'cursor' ? 'Cursor' : 'VS Code'}`}

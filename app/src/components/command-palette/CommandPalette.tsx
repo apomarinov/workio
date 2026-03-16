@@ -37,6 +37,7 @@ import {
   renameBranch,
   toggleFavoriteSession,
 } from '@/lib/api'
+import { toastError } from '@/lib/toastError'
 import { DEFAULT_KEYMAP } from '@/types'
 import type { PRCheckStatus } from '../../../shared/types'
 import type { MoveTarget, SessionWithProject, Terminal } from '../../types'
@@ -391,9 +392,7 @@ export function CommandPalette() {
             })
           })
           .catch((err) => {
-            toast.error(
-              err instanceof Error ? err.message : 'Failed to fetch branches',
-            )
+            toastError(err, 'Failed to fetch branches')
             setStack((prev) => {
               const current = prev[prev.length - 1]
               if (current.mode !== 'branches') return prev
@@ -691,9 +690,7 @@ export function CommandPalette() {
         try {
           await openInExplorer(terminal.cwd)
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to open file explorer',
-          )
+          toastError(err, 'Failed to open file explorer')
         }
         closePalette()
       },
@@ -711,9 +708,7 @@ export function CommandPalette() {
           selectTerminal(newTerminal.id)
           clearSession()
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to add workspace',
-          )
+          toastError(err, 'Failed to add workspace')
         }
       },
       openEditModal: (terminal) => {
@@ -820,9 +815,7 @@ export function CommandPalette() {
           await toggleFavoriteSession(sessionId)
           refetchSessions()
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to toggle favorite',
-          )
+          toastError(err, 'Failed to toggle favorite')
         }
       },
 
@@ -840,9 +833,7 @@ export function CommandPalette() {
           }
           await updateSettings({ starred_branches: starred })
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to toggle star',
-          )
+          toastError(err, 'Failed to toggle star')
         }
       },
 
@@ -883,7 +874,7 @@ export function CommandPalette() {
             })
             .catch(() => toast.error('Failed to load branches'))
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : 'Failed to fetch')
+          toastError(err, 'Failed to fetch')
         } finally {
           api.updateLevel((l) => ({
             ...l,
@@ -916,9 +907,7 @@ export function CommandPalette() {
             })
           })
           .catch((err) => {
-            toast.error(
-              err instanceof Error ? err.message : 'Failed to fetch branches',
-            )
+            toastError(err, 'Failed to fetch branches')
             setStack((prev) => {
               const current = prev[prev.length - 1]
               if (
@@ -948,9 +937,7 @@ export function CommandPalette() {
           toast.success(`Switched to ${name}`)
           closePalette()
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to checkout branch',
-          )
+          toastError(err, 'Failed to checkout branch')
         } finally {
           api.updateLevel((l) => ({
             ...l,
@@ -969,9 +956,7 @@ export function CommandPalette() {
           await pullBranch(terminal.id, name)
           toast.success(`Pulled ${name}`)
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to pull branch',
-          )
+          toastError(err, 'Failed to pull branch')
         } finally {
           api.updateLevel((l) => ({
             ...l,
@@ -993,9 +978,7 @@ export function CommandPalette() {
           await pushBranch(terminal.id, name, force)
           toast.success(force ? `Force pushed ${name}` : `Pushed ${name}`)
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to push branch',
-          )
+          toastError(err, 'Failed to push branch')
         } finally {
           api.updateLevel((l) => ({
             ...l,
@@ -1018,9 +1001,7 @@ export function CommandPalette() {
           toast.success(`Rebased ${name} onto ${result.onto}`)
           closePalette()
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to rebase branch',
-          )
+          toastError(err, 'Failed to rebase branch')
         } finally {
           api.updateLevel((l) => ({
             ...l,
@@ -1064,9 +1045,7 @@ export function CommandPalette() {
           const data = await getBranches(terminal.id)
           setCreatePRTarget({ terminal, branches: data })
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to fetch branches',
-          )
+          toastError(err, 'Failed to fetch branches')
         }
       },
       openDiffViewer: (pr, terminalId) => {
@@ -1116,9 +1095,7 @@ export function CommandPalette() {
             new CustomEvent('reveal-terminal', { detail: { id: terminalId } }),
           )
         } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to checkout branch',
-          )
+          toastError(err, 'Failed to checkout branch')
         } finally {
           api.updateLevel((l) => ({
             ...l,
@@ -1137,7 +1114,7 @@ export function CommandPalette() {
           toast.success(`Hidden PR #${pr.prNumber}`)
           closePalette()
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : 'Failed to hide PR')
+          toastError(err, 'Failed to hide PR')
         }
       },
 
@@ -1697,9 +1674,7 @@ export function CommandPalette() {
               toast.success(`Created and switched to ${name}`)
               setCreateBranchFrom(null)
             } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to create branch',
-              )
+              toastError(err, 'Failed to create branch')
             } finally {
               setCreateBranchLoading(false)
             }

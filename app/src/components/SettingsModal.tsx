@@ -33,6 +33,7 @@ import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { DEFAULT_KEYBOARD_ROWS } from '@/lib/terminalActions'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
@@ -124,9 +125,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       toast.success('Settings saved')
       onOpenChange(false)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to save settings',
-      )
+      toastError(err, 'Failed to save settings')
     } finally {
       setSaving(false)
     }

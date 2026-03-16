@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 
 interface RenameModalProps {
   open: boolean
@@ -39,7 +39,7 @@ export function RenameModal({
     try {
       await onSave(name.trim())
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
+      toastError(err)
     } finally {
       setSaving(false)
     }

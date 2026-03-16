@@ -41,6 +41,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { formatTimeAgo } from '@/lib/time'
+import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import type {
   PRCheckStatus,
@@ -1431,9 +1432,7 @@ export function PRStatusContent({
         !!remove,
       )
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to update reaction',
-      )
+      toastError(err, 'Failed to update reaction')
     }
   }
 

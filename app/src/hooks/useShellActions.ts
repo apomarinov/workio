@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import {
   createShellForTerminal,
@@ -48,7 +49,7 @@ export function useShellActions() {
         }),
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create shell')
+      toastError(err, 'Failed to create shell')
     }
   }
 
@@ -81,7 +82,7 @@ export function useShellActions() {
         )
       }, 50)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete shell')
+      toastError(err, 'Failed to delete shell')
     }
   }
 
@@ -157,7 +158,7 @@ export function useShellActions() {
 
       toast.success(`Template "${template.name}" started`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to run template')
+      toastError(err, 'Failed to run template')
     }
   }
 
