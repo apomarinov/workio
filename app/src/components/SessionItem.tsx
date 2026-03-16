@@ -76,6 +76,7 @@ export const SessionItem = memo(function SessionItem({
       setCollapsedSessions((prev) =>
         prev.filter((id) => id !== session.session_id),
       )
+      return
     }
     if (onClick) {
       onClick()

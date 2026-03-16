@@ -1695,7 +1695,7 @@ export function CommandPalette() {
           title="Select Files"
           onSelectPaths={(paths) => {
             const escaped = paths
-              .map((p) => p.replace(/([ {2}\\'"()&|;$`!#{}[\]*?<>])/g, '\\$1'))
+              .map((p) => p.replace(/([ \\'"()&|;$`!#{}[\]*?<>])/g, '\\$1'))
               .join(' ')
             window.dispatchEvent(
               new CustomEvent('terminal-paste', {
@@ -1706,6 +1706,7 @@ export function CommandPalette() {
               }),
             )
             setFilePickerTerminal(null)
+            window.dispatchEvent(new Event('dialog-closed'))
           }}
           sshHost={filePickerTerminal.ssh_host ?? undefined}
         />
