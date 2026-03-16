@@ -18,26 +18,10 @@ import type {
 } from '../../shared/types'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
+import { EMPTY_UNREAD, fetchUnreadPRData, UNREAD_PR_KEY } from '../lib/unreadPR'
 import { useWorkspaceContext } from './WorkspaceContext'
 
 const RECENT_PR_THRESHOLD_MS = 15 * 60 * 1000
-
-const UNREAD_PR_KEY = '/api/notifications/pr-unread'
-
-async function fetchUnreadPRData() {
-  const data = await api.getUnreadPRNotifications()
-  const map = new Map<string, { count: number; itemIds: Set<string> }>()
-  for (const item of data) {
-    const key = `${item.repo}#${item.prNumber}`
-    const itemIds = new Set<string>()
-    for (const i of item.items) {
-      if (i.commentId) itemIds.add(String(i.commentId))
-      if (i.reviewId) itemIds.add(String(i.reviewId))
-    }
-    map.set(key, { count: item.count, itemIds })
-  }
-  return map
-}
 
 interface GitHubContextValue {
   ghUsername: string | null
@@ -71,7 +55,7 @@ export function GitHubProvider({ children }: { children: React.ReactNode }) {
   const lastDetectEmitRef = useRef(0)
 
   // Unread PR data via SWR (shared cache key with NotificationDataContext)
-  const { data: unreadPRData = new Map() } = useSWR(
+  const { data: unreadPRData = EMPTY_UNREAD } = useSWR(
     UNREAD_PR_KEY,
     fetchUnreadPRData,
   )
@@ -114,16 +98,16 @@ export function GitHubProvider({ children }: { children: React.ReactNode }) {
 
   // Enrich githubPRs with unread notification status
   const enrichedGithubPRs = useMemo(() => {
-    if (unreadPRData.size === 0) return githubPRs
+    if (Object.keys(unreadPRData).length === 0) return githubPRs
     return githubPRs.map((pr) => {
       const key = `${pr.repo}#${pr.prNumber}`
-      const unread = unreadPRData.get(key)
+      const unread = unreadPRData[key]
       if (!unread) return pr
       const ids = unread.itemIds
       const markComment = (c: (typeof pr.comments)[0]) =>
-        c.id && ids.has(String(c.id)) ? { ...c, isUnread: true } : c
+        c.id && ids.includes(String(c.id)) ? { ...c, isUnread: true } : c
       const markReview = (r: (typeof pr.reviews)[0]) =>
-        r.id && ids.has(String(r.id)) ? { ...r, isUnread: true } : r
+        r.id && ids.includes(String(r.id)) ? { ...r, isUnread: true } : r
       return {
         ...pr,
         hasUnreadNotifications: true,
@@ -158,7 +142,7 @@ export function GitHubProvider({ children }: { children: React.ReactNode }) {
     })
   }, [githubPRs, unreadPRData])
 
-  const hasAnyUnseenPRs = unreadPRData.size > 0
+  const hasAnyUnseenPRs = Object.keys(unreadPRData).length > 0
 
   // Fetch merged PRs for all repos
   const [mergedPRs, setMergedPRs] = useState<MergedPRSummary[]>([])

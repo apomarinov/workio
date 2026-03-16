@@ -11,25 +11,9 @@ import { toast } from '@/components/ui/sonner'
 import { resolveNotification } from '../../shared/notifications'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
+import { EMPTY_UNREAD, fetchUnreadPRData, UNREAD_PR_KEY } from '../lib/unreadPR'
 import type { Notification } from '../types'
 import { useNotifications } from './NotificationContext'
-
-const UNREAD_PR_KEY = '/api/notifications/pr-unread'
-
-async function fetchUnreadPRData() {
-  const data = await api.getUnreadPRNotifications()
-  const map = new Map<string, { count: number; itemIds: Set<string> }>()
-  for (const item of data) {
-    const key = `${item.repo}#${item.prNumber}`
-    const itemIds = new Set<string>()
-    for (const i of item.items) {
-      if (i.commentId) itemIds.add(String(i.commentId))
-      if (i.reviewId) itemIds.add(String(i.reviewId))
-    }
-    map.set(key, { count: item.count, itemIds })
-  }
-  return map
-}
 
 interface NotificationDataContextValue {
   notifications: Notification[]
@@ -75,12 +59,10 @@ export function NotificationDataProvider({
   )
 
   // Unread PR data via SWR (shared cache key with GitHubContext)
-  const { data: unreadPRData = new Map(), mutate: mutateUnreadPRData } = useSWR(
-    UNREAD_PR_KEY,
-    fetchUnreadPRData,
-  )
+  const { data: unreadPRData = EMPTY_UNREAD, mutate: mutateUnreadPRData } =
+    useSWR(UNREAD_PR_KEY, fetchUnreadPRData)
 
-  const hasAnyUnseenPRs = unreadPRData.size > 0
+  const hasAnyUnseenPRs = Object.keys(unreadPRData).length > 0
 
   // Subscribe to server-side notifications — OS notification sending
   useEffect(() => {
@@ -241,13 +223,14 @@ export function NotificationDataProvider({
           (prev) => prev?.map((n) => (n.id === id ? { ...n, read: false } : n)),
           { revalidate: false },
         )
+        mutateUnreadPRData()
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : 'Failed to mark as unread',
         )
       }
     },
-    [mutateNotifications],
+    [mutateNotifications, mutateUnreadPRData],
   )
 
   const markNotificationReadByItem = useCallback(
@@ -293,7 +276,7 @@ export function NotificationDataProvider({
       mutateNotifications((prev) => prev?.map((n) => ({ ...n, read: true })), {
         revalidate: false,
       })
-      mutateUnreadPRData(new Map(), { revalidate: false })
+      mutateUnreadPRData(EMPTY_UNREAD, { revalidate: false })
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -318,9 +301,9 @@ export function NotificationDataProvider({
         )
         mutateUnreadPRData(
           (prev) => {
-            if (!prev) return new Map()
-            const next = new Map(prev)
-            next.delete(`${repo}#${prNumber}`)
+            if (!prev) return EMPTY_UNREAD
+            const next = { ...prev }
+            delete next[`${repo}#${prNumber}`]
             return next
           },
           { revalidate: false },
@@ -354,7 +337,7 @@ export function NotificationDataProvider({
     try {
       await api.deleteAllNotifications()
       mutateNotifications([], { revalidate: false })
-      mutateUnreadPRData(new Map(), { revalidate: false })
+      mutateUnreadPRData(EMPTY_UNREAD, { revalidate: false })
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to delete notifications',
