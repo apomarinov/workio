@@ -177,10 +177,10 @@ import {
 } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
+import { emitWorkspace } from '../workspace/emit'
 import {
   cancelWorkspaceOperation,
   deleteTerminalWorkspace,
-  emitWorkspace,
   rerunSetupScript,
   rmrf,
   setupTerminalWorkspace,
