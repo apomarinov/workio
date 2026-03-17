@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 // --- Sub-schemas ---
-
 const shortcutBindingSchema = z
   .object({
     metaKey: z.boolean().optional(),
@@ -150,8 +149,7 @@ const DEFAULT_GH_QUERY_LIMITS: z.input<typeof ghQueryLimitsSchema> = {
 }
 
 // --- Config schema (stored fields with defaults) ---
-
-export const settingsConfigSchema = z.object({
+const settingsBaseSchema = z.object({
   default_shell: z.string().default('/bin/bash'),
   font_size: z.number().min(8).max(32).nullable().default(null),
   mobile_font_size: z.number().min(8).max(32).nullable().default(null),
@@ -186,24 +184,25 @@ export const settingsConfigSchema = z.object({
 })
 
 /** Default config derived from schema defaults */
-export const DEFAULT_CONFIG = settingsConfigSchema.parse({})
+export const DEFAULT_CONFIG = settingsBaseSchema.parse({})
 
-// --- Full settings (config + id + computed fields) ---
-
-export const settingsSchema = settingsConfigSchema.extend({
+// --- Full settings (config + id) ---
+export const settingsSchema = settingsBaseSchema.extend({
   id: z.number(),
-  // Computed (added by query, not stored)
-  missingWebhookCount: z.number().optional(),
-  orphanedWebhookCount: z.number().optional(),
 })
 
 // --- Input schemas ---
-
-export const updateSettingsInput = settingsConfigSchema
+export const updateSettingsInput = settingsBaseSchema
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, {
     message: 'At least one setting must be provided',
   })
+
+export type Settings = z.infer<typeof settingsSchema>
+export type SettingsUpdate = z.infer<typeof updateSettingsInput>
+export type PushSubscriptionRecord = z.infer<
+  typeof pushSubscriptionRecordSchema
+>
 
 export const pushSubscribeInput = z.object({
   endpoint: z.string(),

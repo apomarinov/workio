@@ -1,9 +1,9 @@
-import type { PushSubscriptionRecord } from '../../../src/types'
 import { refreshPRChecks } from '../../github/checks'
 import { execFileAsync } from '../../lib/exec'
 import { sendPushNotification } from '../../push'
 import { publicProcedure } from '../../trpc/init'
 import { getSettings, updateSettings } from './db'
+import type { PushSubscriptionRecord } from './schema'
 import {
   pushSubscribeInput,
   pushUnsubscribeInput,
@@ -58,9 +58,7 @@ export const pushUnsubscribe = publicProcedure
   .mutation(async ({ input }) => {
     const settings = await getSettings()
     const existing = settings.push_subscriptions ?? []
-    const filtered = existing.filter(
-      (s: PushSubscriptionRecord) => s.endpoint !== input.endpoint,
-    )
+    const filtered = existing.filter((s) => s.endpoint !== input.endpoint)
     await updateSettings({ push_subscriptions: filtered })
   })
 
