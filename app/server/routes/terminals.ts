@@ -158,13 +158,8 @@ import {
 } from '../db'
 import { refreshPRChecks, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
-import {
-  expandPath,
-  gitExec,
-  gitExecLogged,
-  sanitizeName,
-  shellEscape,
-} from '../lib/git'
+import { gitExec, gitExecLogged } from '../lib/git'
+import { expandPath, sanitizeName, shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,

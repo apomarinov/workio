@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { Client } from 'ssh2'
-import { shellEscape } from '../lib/git'
+import { shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { type ResolvedSSHConfig, validateSSHHost } from './config'
 

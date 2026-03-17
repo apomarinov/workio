@@ -13,7 +13,7 @@ import type {
 } from '../src/types'
 import { env } from './env'
 import { execFileAsync } from './lib/exec'
-import { sanitizeName, shellEscape } from './lib/git'
+import { sanitizeName, shellEscape } from './lib/strings'
 import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

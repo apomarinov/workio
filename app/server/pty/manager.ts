@@ -23,7 +23,7 @@ import {
   untrackTerminal,
 } from '../github/checks'
 import { getIO } from '../io'
-import { sanitizeName } from '../lib/git'
+import { sanitizeName } from '../lib/strings'
 import { log } from '../logger'
 import { sendPushNotification } from '../push'
 import { execSSHCommand } from '../ssh/exec'

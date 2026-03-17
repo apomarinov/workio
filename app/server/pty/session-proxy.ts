@@ -20,7 +20,7 @@ import {
 } from '../db'
 import { startChecksPolling, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
-import { sanitizeName, shellEscape } from '../lib/git'
+import { sanitizeName, shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { validateSSHHost } from '../ssh/config'
 import type { WorkerInitConfig, WorkerToMasterMessage } from './ipc-types'

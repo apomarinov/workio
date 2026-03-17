@@ -11,7 +11,7 @@ import {
 } from '../db'
 import { getIO } from '../io'
 import { execFileAsync } from '../lib/exec'
-import { shellEscape } from '../lib/git'
+import { shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { emitNotification } from '../notify'
 import {

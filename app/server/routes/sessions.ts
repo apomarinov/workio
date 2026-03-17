@@ -27,7 +27,7 @@ import {
   upsertProject,
   withTransaction,
 } from '../db'
-import { sanitizeName, shellEscape } from '../lib/git'
+import { sanitizeName, shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { execSSHCommand } from '../ssh/exec'
 
