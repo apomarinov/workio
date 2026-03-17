@@ -51,10 +51,20 @@ import type {
   GitLastCommit,
 } from '../../shared/types'
 import type { Terminal } from '../types'
-import { DEFAULT_STATUS_BAR, STATUS_BAR_SECTION_LABELS } from '../types'
 import { GitStatus } from './GitStatus'
 import { ResourceInfo } from './ResourceInfo'
 import { PortsList, ProcessesList } from './terminal-status-sections'
+
+const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
+  pr: 'Pull Request',
+  resources: 'Resources',
+  processes: 'Processes',
+  ports: 'Ports',
+  gitDirty: 'Git Changes',
+  lastCommit: 'Last Commit',
+  branch: 'Branch',
+  spacer: 'Spacer',
+}
 
 interface StatusBarProps {
   position: 'top' | 'bottom'
@@ -466,27 +476,8 @@ export function StatusBar({ position }: StatusBarProps) {
   const { settings, updateSettings } = useSettings()
   const isMobile = useIsMobile()
 
-  const rawStatusBar = settings?.statusBar ?? DEFAULT_STATUS_BAR
-  let sections = rawStatusBar.sections
-  if (!sections.some((s) => s.name === 'spacer')) {
-    sections = [
-      ...sections,
-      { name: 'spacer' as const, visible: true, order: sections.length },
-    ]
-  }
-  if (!sections.some((s) => s.name === 'lastCommit')) {
-    sections = [
-      ...sections,
-      { name: 'lastCommit' as const, visible: true, order: sections.length },
-    ]
-  }
-  if (!sections.some((s) => s.name === 'resources')) {
-    sections = [
-      ...sections,
-      { name: 'resources' as const, visible: true, order: sections.length },
-    ]
-  }
-  const statusBar = { ...rawStatusBar, sections }
+  // statusBar always has a default from the server, with missing sections backfilled
+  const statusBar = settings!.statusBar
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

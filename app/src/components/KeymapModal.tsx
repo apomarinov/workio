@@ -33,8 +33,27 @@ import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
-import { CODE_TO_DISPLAY, mapEventCode } from '../types'
 import { ConfirmModal } from './ConfirmModal'
+
+const CODE_TO_DISPLAY: Record<string, string> = {
+  bracketleft: '[',
+  bracketright: ']',
+  comma: ',',
+  period: '.',
+  slash: '/',
+  backslash: '\\',
+  semicolon: ';',
+  quote: "'",
+  backquote: '`',
+  minus: '-',
+  equal: '=',
+}
+
+function mapEventCode(code: string): string {
+  if (code.startsWith('Key')) return code.slice(3).toLowerCase()
+  if (code.startsWith('Digit')) return code.slice(5)
+  return code.toLowerCase()
+}
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])
 const MOD_MAP: Record<string, 'meta' | 'ctrl' | 'alt' | 'shift'> = {

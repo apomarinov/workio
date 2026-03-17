@@ -8,8 +8,17 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import type { Options } from 'react-hotkeys-hook'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { bindingToHotkeyString } from '../types'
 import { useSettings } from './useSettings'
+
+function bindingToHotkeyString(b: ShortcutBinding): string {
+  const parts: string[] = []
+  if (b.ctrlKey) parts.push('ctrl')
+  if (b.altKey) parts.push('alt')
+  if (b.shiftKey) parts.push('shift')
+  if (b.metaKey) parts.push('meta')
+  if (b.key) parts.push(b.key)
+  return parts.join('+')
+}
 
 // --- Module-level palette state tracking ---
 

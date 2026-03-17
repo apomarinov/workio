@@ -10,7 +10,6 @@ import { useEdgeSwipe } from '../hooks/useEdgeSwipe'
 import { useSettings } from '../hooks/useSettings'
 import { useShellActions } from '../hooks/useShellActions'
 import { cn } from '../lib/utils'
-import { DEFAULT_STATUS_BAR } from '../types'
 import { ShellTabs } from './ShellTabs'
 import { Sidebar } from './Sidebar'
 
@@ -183,12 +182,11 @@ export function MobileLayout({ children }: MobileLayoutProps) {
                   }
                 />
               )}
-              {(settings?.statusBar ?? DEFAULT_STATUS_BAR).enabled &&
-                activeShellId != null && (
-                  <Suspense fallback={<div className="w-full h-[29px]" />}>
-                    <StatusBar position="bottom" />
-                  </Suspense>
-                )}
+              {settings?.statusBar?.enabled && activeShellId != null && (
+                <Suspense fallback={<div className="w-full h-[29px]" />}>
+                  <StatusBar position="bottom" />
+                </Suspense>
+              )}
               <Suspense fallback={null}>
                 <MobileKeyboard
                   terminalId={t.id}

@@ -148,6 +148,21 @@ export const DEFAULT_GH_QUERY_LIMITS: z.input<typeof ghQueryLimitsSchema> = {
   reactors: 3,
 }
 
+export const DEFAULT_STATUS_BAR: z.input<typeof statusBarConfigSchema> = {
+  enabled: true,
+  onTop: false,
+  sections: [
+    { name: 'branch', visible: true, order: 0 },
+    { name: 'lastCommit', visible: true, order: 1 },
+    { name: 'gitDirty', visible: true, order: 2 },
+    { name: 'spacer', visible: true, order: 3 },
+    { name: 'resources', visible: true, order: 4 },
+    { name: 'processes', visible: true, order: 5 },
+    { name: 'ports', visible: true, order: 6 },
+    { name: 'pr', visible: true, order: 7 },
+  ],
+}
+
 // --- Config schema (stored fields with defaults) ---
 const settingsBaseSchema = z.object({
   default_shell: z.string().default('/bin/bash'),
@@ -177,7 +192,7 @@ const settingsBaseSchema = z.object({
   terminal_order: z.array(z.number()).optional(),
   shell_order: z.record(z.string(), z.array(z.number())).optional(),
   starred_branches: z.record(z.string(), z.array(z.string())).optional(),
-  statusBar: statusBarConfigSchema.optional(),
+  statusBar: statusBarConfigSchema.optional().default(DEFAULT_STATUS_BAR),
   vapid_public_key: z.string().optional(),
   vapid_private_key: z.string().optional(),
   push_subscriptions: z.array(pushSubscriptionRecordSchema).optional(),

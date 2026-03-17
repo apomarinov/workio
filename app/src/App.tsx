@@ -35,7 +35,6 @@ import { useSettings } from './hooks/useSettings'
 import { useShellActions } from './hooks/useShellActions'
 import { useSleepWakeRevalidation } from './hooks/useSleepWakeRevalidation'
 import { cn } from './lib/utils'
-import { DEFAULT_STATUS_BAR } from './types'
 
 function AppContent() {
   const {
@@ -119,9 +118,9 @@ function AppContent() {
           t.shells.find((s) => s.name === 'main')?.id ??
           t.shells[0]?.id
         const isTermVisible = !activeSessionId && t.id === activeTerminal?.id
-        const statusBarConfig = settings?.statusBar ?? DEFAULT_STATUS_BAR
-        const showStatusBar = statusBarConfig.enabled && !isMobile
-        const statusBarOnTop = statusBarConfig.onTop
+        const statusBarConfig = settings?.statusBar
+        const showStatusBar = statusBarConfig?.enabled && !isMobile
+        const statusBarOnTop = statusBarConfig?.onTop
 
         return (
           <div

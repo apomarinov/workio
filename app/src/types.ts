@@ -301,49 +301,6 @@ export interface HookEvent {
   last_message?: string
 }
 
-import type {
-  ShortcutBinding,
-  StatusBarConfig,
-  StatusBarSection,
-  StatusBarSectionName,
-} from '@domains/settings/schema'
-
-// Map event.code-based key names to display characters
-export const CODE_TO_DISPLAY: Record<string, string> = {
-  bracketleft: '[',
-  bracketright: ']',
-  comma: ',',
-  period: '.',
-  slash: '/',
-  backslash: '\\',
-  semicolon: ';',
-  quote: "'",
-  backquote: '`',
-  minus: '-',
-  equal: '=',
-}
-
-// Convert event.code to our normalized key name (lowercase, no prefix)
-export function mapEventCode(code: string): string {
-  // KeyA → a, KeyZ → z
-  if (code.startsWith('Key')) return code.slice(3).toLowerCase()
-  // Digit0 → 0
-  if (code.startsWith('Digit')) return code.slice(5)
-  // BracketLeft → bracketleft, ArrowUp → arrowup, Comma → comma
-  return code.toLowerCase()
-}
-
-// Convert a ShortcutBinding to a react-hotkeys-hook hotkey string
-export function bindingToHotkeyString(b: ShortcutBinding): string {
-  const parts: string[] = []
-  if (b.ctrlKey) parts.push('ctrl')
-  if (b.altKey) parts.push('alt')
-  if (b.shiftKey) parts.push('shift')
-  if (b.metaKey) parts.push('meta')
-  if (b.key) parts.push(b.key)
-  return parts.join('+')
-}
-
 export interface NotificationData {
   // Auth fields
   attempts?: number
@@ -399,32 +356,4 @@ export interface LogTerminal {
   id: number
   name: string
   deleted: boolean
-}
-
-export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
-  pr: 'Pull Request',
-  resources: 'Resources',
-  processes: 'Processes',
-  ports: 'Ports',
-  gitDirty: 'Git Changes',
-  lastCommit: 'Last Commit',
-  branch: 'Branch',
-  spacer: 'Spacer',
-}
-
-export const DEFAULT_STATUS_BAR_SECTIONS: StatusBarSection[] = [
-  { name: 'branch', visible: true, order: 0 },
-  { name: 'lastCommit', visible: true, order: 1 },
-  { name: 'gitDirty', visible: true, order: 2 },
-  { name: 'spacer', visible: true, order: 3 },
-  { name: 'resources', visible: true, order: 4 },
-  { name: 'processes', visible: true, order: 5 },
-  { name: 'ports', visible: true, order: 6 },
-  { name: 'pr', visible: true, order: 7 },
-]
-
-export const DEFAULT_STATUS_BAR: StatusBarConfig = {
-  enabled: true,
-  onTop: false,
-  sections: DEFAULT_STATUS_BAR_SECTIONS,
 }
