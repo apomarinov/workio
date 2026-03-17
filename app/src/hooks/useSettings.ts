@@ -1,5 +1,5 @@
+import type { SettingsUpdate } from '@domains/settings/schema'
 import { useEffect } from 'react'
-import type { SettingsUpdate } from 'server/domains/settings/schema'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { useSocket } from './useSocket'

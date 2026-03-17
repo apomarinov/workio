@@ -1,17 +1,15 @@
 import type {
+  CustomTerminalAction,
+  PreferredIDE,
+  ShellTemplate,
+} from '@domains/settings/schema'
+import type {
   ActiveProcess,
   GitDiffStat,
   MergedPRSummary,
   PRCheckStatus,
 } from '../../../shared/types'
-import type {
-  CustomTerminalAction,
-  MoveTarget,
-  PreferredIDE,
-  SessionWithProject,
-  ShellTemplate,
-  Terminal,
-} from '../../types'
+import type { MoveTarget, SessionWithProject, Terminal } from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchClaudeSessionsMode } from './modes/branch-claude-sessions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'

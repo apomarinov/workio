@@ -1,4 +1,8 @@
 import {
+  DEFAULT_GH_QUERY_LIMITS,
+  type GHQueryLimits,
+} from '@domains/settings/schema'
+import {
   AlertTriangle,
   ChevronDown,
   Copy,
@@ -35,8 +39,6 @@ import * as api from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { WEBHOOK_EVENTS } from '../../shared/types'
-import type { GHQueryLimits } from '../types'
-import { DEFAULT_GH_QUERY_LIMITS } from '../types'
 import { RefreshIcon } from './icons'
 
 interface GitHubModalProps {

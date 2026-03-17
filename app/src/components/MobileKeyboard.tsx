@@ -1,3 +1,7 @@
+import type {
+  CustomTerminalAction,
+  MobileKeyboardRow,
+} from '@domains/settings/schema'
 import { ArrowUpFromLine, CornerDownLeft } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
@@ -10,7 +14,6 @@ import {
   type Modifiers,
 } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
-import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 import { ActionButton } from './ActionButton'
 import { MobileKeyboardActions } from './MobileKeyboardActions'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'

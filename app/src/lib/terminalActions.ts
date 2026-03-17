@@ -1,4 +1,7 @@
-import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
+import type {
+  CustomTerminalAction,
+  MobileKeyboardRow,
+} from '@domains/settings/schema'
 
 export interface TerminalAction {
   id: string

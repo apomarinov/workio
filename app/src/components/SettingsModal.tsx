@@ -1,3 +1,7 @@
+import type {
+  CustomTerminalAction,
+  PreferredIDE,
+} from '@domains/settings/schema'
 import {
   AlertTriangle,
   AlignLeft,
@@ -37,7 +41,6 @@ import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useSettings } from '../hooks/useSettings'
-import type { CustomTerminalAction, PreferredIDE } from '../types'
 import { BackfillSection } from './BackfillModal'
 import { GitHubModal, useWebhookWarning } from './GitHubModal'
 import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'

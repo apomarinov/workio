@@ -1,7 +1,7 @@
+import type { CustomTerminalAction } from '@domains/settings/schema'
 import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
-import type { CustomTerminalAction } from '../types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import {
   Select,

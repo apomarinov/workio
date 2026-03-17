@@ -1,3 +1,4 @@
+import { DEFAULT_KEYMAP } from '@domains/settings/schema'
 import {
   ArrowBigUp,
   ChevronUp,
@@ -38,7 +39,6 @@ import {
   toggleFavoriteSession,
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
-import { DEFAULT_KEYMAP } from '@/types'
 import type { PRCheckStatus } from '../../../shared/types'
 import type { MoveTarget, SessionWithProject, Terminal } from '../../types'
 

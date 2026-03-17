@@ -1,14 +1,14 @@
+import {
+  DEFAULT_KEYMAP,
+  type Keymap,
+  type ShortcutBinding,
+} from '@domains/settings/schema'
 import { ArrowBigUp, ChevronUp, Command, Option } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import type { Options } from 'react-hotkeys-hook'
 import { useHotkeys } from 'react-hotkeys-hook'
-import {
-  bindingToHotkeyString,
-  DEFAULT_KEYMAP,
-  type Keymap,
-  type ShortcutBinding,
-} from '../types'
+import { bindingToHotkeyString } from '../types'
 import { useSettings } from './useSettings'
 
 // --- Module-level palette state tracking ---

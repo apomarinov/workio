@@ -1,3 +1,4 @@
+import type { SettingsUpdate } from '@domains/settings/schema'
 import {
   createContext,
   useCallback,
@@ -20,7 +21,7 @@ import { useSettings } from '../hooks/useSettings'
 import { useShellLastActive } from '../hooks/useShellLastActive'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
-import type { Settings, Shell, Terminal } from '../types'
+import type { Shell, Terminal } from '../types'
 
 interface WorkspaceContextValue {
   terminals: Terminal[]
@@ -415,7 +416,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   )
 
   const cleanupTerminalOrder = (id: number) => {
-    const orderUpdates: Partial<Settings> = {}
+    const orderUpdates: SettingsUpdate = {}
     if (terminalOrder.includes(id)) {
       orderUpdates.terminal_order = terminalOrder.filter((tid) => tid !== id)
     }

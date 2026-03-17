@@ -1,3 +1,7 @@
+import type {
+  ShellTemplate,
+  ShellTemplateEntry,
+} from '@domains/settings/schema'
 import { Plus, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -9,7 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import type { ShellTemplate, ShellTemplateEntry } from '../types'
 
 interface ShellTemplateModalProps {
   open: boolean

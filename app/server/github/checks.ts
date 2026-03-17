@@ -1,5 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  DEFAULT_GH_QUERY_LIMITS,
+  type GHQueryLimits,
+  type HiddenGHAuthor,
+  type HiddenPR,
+} from '@domains/settings/schema'
 import type {
   FailedPRCheck,
   InvolvedPRSummary,
@@ -10,8 +16,6 @@ import type {
   PRReview,
   PRReviewThread,
 } from '../../shared/types'
-import type { GHQueryLimits, HiddenGHAuthor, HiddenPR } from '../../src/types'
-import { DEFAULT_GH_QUERY_LIMITS } from '../../src/types'
 import {
   getAllTerminals,
   getSettings,

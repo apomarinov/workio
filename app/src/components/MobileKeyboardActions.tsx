@@ -1,5 +1,5 @@
+import type { MobileKeyboardRow } from '@domains/settings/schema'
 import type { Modifiers, TerminalAction } from '@/lib/terminalActions'
-import type { MobileKeyboardRow } from '../types'
 import { ActionButton } from './ActionButton'
 
 interface MobileKeyboardActionsProps {

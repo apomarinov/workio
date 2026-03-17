@@ -1,8 +1,11 @@
+import type {
+  CustomTerminalAction,
+  MobileKeyboardRow,
+} from '@domains/settings/schema'
 import { ArrowDown, ArrowUp, Minus, Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
-import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 import { ActionButton } from './ActionButton'
 import { MobileKeyboardNewGroup } from './MobileKeyboardNewGroup'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'

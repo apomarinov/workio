@@ -116,7 +116,7 @@ const statusBarConfigSchema = z.object({
 
 // --- Defaults ---
 
-const DEFAULT_KEYMAP: z.input<typeof keymapSchema> = {
+export const DEFAULT_KEYMAP: z.input<typeof keymapSchema> = {
   palette: { metaKey: true, key: 'k' },
   goToTab: { metaKey: true },
   goToShell: { altKey: true },
@@ -138,7 +138,7 @@ const DEFAULT_KEYMAP: z.input<typeof keymapSchema> = {
   commit: { metaKey: true, shiftKey: true, key: 'k' },
 }
 
-const DEFAULT_GH_QUERY_LIMITS: z.input<typeof ghQueryLimitsSchema> = {
+export const DEFAULT_GH_QUERY_LIMITS: z.input<typeof ghQueryLimitsSchema> = {
   checks: 5,
   reviews: 10,
   comments: 10,
@@ -200,10 +200,23 @@ export const updateSettingsInput = settingsBaseSchema
 
 export type Settings = z.infer<typeof settingsSchema>
 export type SettingsUpdate = z.infer<typeof updateSettingsInput>
+export type ShortcutBinding = z.infer<typeof shortcutBindingSchema>
 export type Keymap = z.infer<typeof keymapSchema>
+export type HiddenGHAuthor = z.infer<typeof hiddenGHAuthorSchema>
+export type HiddenPR = z.infer<typeof hiddenPRSchema>
+export type RepoWebhookStatus = z.infer<typeof repoWebhookStatusSchema>
+export type GHQueryLimits = z.infer<typeof ghQueryLimitsSchema>
+export type ShellTemplateEntry = z.infer<typeof shellTemplateEntrySchema>
+export type ShellTemplate = z.infer<typeof shellTemplateSchema>
+export type MobileKeyboardRow = z.infer<typeof mobileKeyboardRowSchema>
+export type CustomTerminalAction = z.infer<typeof customTerminalActionSchema>
 export type PushSubscriptionRecord = z.infer<
   typeof pushSubscriptionRecordSchema
 >
+export type StatusBarSectionName = z.infer<typeof statusBarSectionNameSchema>
+export type StatusBarSection = z.infer<typeof statusBarSectionSchema>
+export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
+export type PreferredIDE = Settings['preferred_ide']
 
 export const pushSubscribeInput = z.object({
   endpoint: z.string(),

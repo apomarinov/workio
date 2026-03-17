@@ -301,57 +301,12 @@ export interface HookEvent {
   last_message?: string
 }
 
-export interface ShortcutBinding {
-  metaKey?: boolean
-  ctrlKey?: boolean
-  altKey?: boolean
-  shiftKey?: boolean
-  key?: string
-}
-
-export interface Keymap {
-  palette: ShortcutBinding | null
-  goToTab: ShortcutBinding | null
-  goToShell: ShortcutBinding | null
-  prevShell: ShortcutBinding | null
-  nextShell: ShortcutBinding | null
-  togglePip: ShortcutBinding | null
-  itemActions: ShortcutBinding | null
-  collapseAll: ShortcutBinding | null
-  settings: ShortcutBinding | null
-  newShell: ShortcutBinding | null
-  closeShell: ShortcutBinding | null
-  commitAmend: ShortcutBinding | null
-  commitNoVerify: ShortcutBinding | null
-  shellTemplates: ShortcutBinding | null
-  customCommands: ShortcutBinding | null
-  branches: ShortcutBinding | null
-  pullBranch: ShortcutBinding | null
-  toggleSidebar: ShortcutBinding | null
-  commit: ShortcutBinding | null
-}
-
-export const DEFAULT_KEYMAP: Keymap = {
-  palette: { metaKey: true, key: 'k' },
-  goToTab: { metaKey: true },
-  goToShell: { altKey: true },
-  prevShell: { altKey: true, key: 'bracketleft' },
-  nextShell: { altKey: true, key: 'bracketright' },
-  togglePip: { metaKey: true, key: 'p' },
-  itemActions: { metaKey: true, key: 'i' },
-  collapseAll: { metaKey: true, key: 'arrowup' },
-  settings: { metaKey: true, key: 'comma' },
-  newShell: { altKey: true, key: 'n' },
-  closeShell: { altKey: true, key: 'w' },
-  commitAmend: { altKey: true, key: 'a' },
-  commitNoVerify: { altKey: true, key: 'n' },
-  shellTemplates: { shiftKey: true, altKey: true, key: 'k' },
-  customCommands: { altKey: true, key: 'a' },
-  branches: { ctrlKey: true, shiftKey: true, key: 'enter' },
-  pullBranch: { metaKey: true, key: 't' },
-  toggleSidebar: { altKey: true, key: 'backquote' },
-  commit: { metaKey: true, shiftKey: true, key: 'k' },
-}
+import type {
+  ShortcutBinding,
+  StatusBarConfig,
+  StatusBarSection,
+  StatusBarSectionName,
+} from '@domains/settings/schema'
 
 // Map event.code-based key names to display characters
 export const CODE_TO_DISPLAY: Record<string, string> = {
@@ -387,42 +342,6 @@ export function bindingToHotkeyString(b: ShortcutBinding): string {
   if (b.metaKey) parts.push('meta')
   if (b.key) parts.push(b.key)
   return parts.join('+')
-}
-
-export interface GHQueryLimits {
-  checks: number // contexts(first: N) — CI check runs
-  reviews: number // reviews(last: N)
-  comments: number // comments(last: N)
-  review_threads: number // reviewThreads(last: N)
-  thread_comments: number // reviewThreads.comments(first: N)
-  review_requests: number // reviewRequests(first: N)
-  reactors: number // reactors(first: N)
-}
-
-export const DEFAULT_GH_QUERY_LIMITS: GHQueryLimits = {
-  checks: 5,
-  reviews: 10,
-  comments: 10,
-  review_threads: 10,
-  thread_comments: 10,
-  review_requests: 10,
-  reactors: 3,
-}
-
-export interface RepoWebhookStatus {
-  id: number
-  missing?: boolean
-}
-
-export interface HiddenGHAuthor {
-  repo: string
-  author: string
-}
-
-export interface HiddenPR {
-  repo: string
-  prNumber: number
-  title: string
 }
 
 export interface NotificationData {
@@ -482,58 +401,6 @@ export interface LogTerminal {
   deleted: boolean
 }
 
-export interface ShellTemplateEntry {
-  name: string
-  command: string
-}
-
-export interface ShellTemplate {
-  id: string
-  name: string
-  entries: ShellTemplateEntry[]
-}
-
-export interface MobileKeyboardRow {
-  id: string
-  actions: string[] // action IDs, max 8 per row
-}
-
-export interface CustomTerminalAction {
-  id: string // e.g. "custom-1708901234-abc123"
-  label: string // user-defined display label
-  command: string // text to send to terminal (+ \r appended on send)
-  repo?: string // optional git repo (e.g. "owner/repo") to target a specific terminal
-}
-
-export interface PushSubscriptionRecord {
-  endpoint: string
-  keys: { p256dh: string; auth: string }
-  userAgent?: string
-  created_at: string
-}
-
-export type StatusBarSectionName =
-  | 'pr'
-  | 'resources'
-  | 'processes'
-  | 'ports'
-  | 'gitDirty'
-  | 'lastCommit'
-  | 'branch'
-  | 'spacer'
-
-export interface StatusBarSection {
-  name: StatusBarSectionName
-  visible: boolean
-  order: number
-}
-
-export interface StatusBarConfig {
-  enabled: boolean
-  onTop: boolean
-  sections: StatusBarSection[]
-}
-
 export const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
   pr: 'Pull Request',
   resources: 'Resources',
@@ -560,40 +427,4 @@ export const DEFAULT_STATUS_BAR: StatusBarConfig = {
   enabled: true,
   onTop: false,
   sections: DEFAULT_STATUS_BAR_SECTIONS,
-}
-
-export type PreferredIDE = 'cursor' | 'vscode'
-
-export interface Settings {
-  id: number
-  default_shell: string
-  font_size: number | null
-  mobile_font_size: number | null
-  show_thinking: boolean
-  show_tools: boolean
-  show_tool_output: boolean
-  message_line_clamp: number
-  preferred_ide: PreferredIDE
-  keymap?: Keymap
-  webhook_secret?: string
-  ngrok_url?: string
-  repo_webhooks?: Record<string, RepoWebhookStatus>
-  hide_gh_authors?: HiddenGHAuthor[]
-  silence_gh_authors?: HiddenGHAuthor[]
-  collapse_gh_authors?: HiddenGHAuthor[]
-  hidden_prs?: HiddenPR[]
-  favorite_sessions?: string[]
-  shell_templates?: ShellTemplate[]
-  mobile_keyboard_rows?: MobileKeyboardRow[]
-  custom_terminal_actions?: CustomTerminalAction[]
-  terminal_order?: number[]
-  shell_order?: Record<number, number[]>
-  starred_branches?: Record<string, string[]>
-  statusBar?: StatusBarConfig
-  ignore_external_sessions?: boolean
-  // Push notification settings
-  vapid_public_key?: string
-  vapid_private_key?: string
-  push_subscriptions?: PushSubscriptionRecord[]
-  gh_query_limits?: GHQueryLimits
 }

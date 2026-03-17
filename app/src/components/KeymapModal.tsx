@@ -1,4 +1,9 @@
 import {
+  DEFAULT_KEYMAP,
+  type Keymap,
+  type ShortcutBinding,
+} from '@domains/settings/schema'
+import {
   ArrowBigUp,
   ArrowDown,
   ArrowLeft,
@@ -28,13 +33,7 @@ import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../hooks/useSettings'
-import {
-  CODE_TO_DISPLAY,
-  DEFAULT_KEYMAP,
-  type Keymap,
-  mapEventCode,
-  type ShortcutBinding,
-} from '../types'
+import { CODE_TO_DISPLAY, mapEventCode } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift'])

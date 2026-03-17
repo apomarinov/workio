@@ -1,5 +1,5 @@
+import type { PushSubscriptionRecord, Settings } from '@domains/settings/schema'
 import type { FastifyInstance } from 'fastify'
-import type { PushSubscriptionRecord, Settings } from '../../src/types'
 import {
   getAllTerminals,
   getOrCreateVapidKeys,

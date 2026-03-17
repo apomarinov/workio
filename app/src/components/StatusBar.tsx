@@ -13,6 +13,11 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type {
+  StatusBarConfig,
+  StatusBarSection,
+  StatusBarSectionName,
+} from '@domains/settings/schema'
 import {
   Activity,
   Check,
@@ -46,13 +51,7 @@ import type {
   GitLastCommit,
 } from '../../shared/types'
 import type { Terminal } from '../types'
-import {
-  DEFAULT_STATUS_BAR,
-  STATUS_BAR_SECTION_LABELS,
-  type StatusBarConfig,
-  type StatusBarSection,
-  type StatusBarSectionName,
-} from '../types'
+import { DEFAULT_STATUS_BAR, STATUS_BAR_SECTION_LABELS } from '../types'
 import { GitStatus } from './GitStatus'
 import { ResourceInfo } from './ResourceInfo'
 import { PortsList, ProcessesList } from './terminal-status-sections'

@@ -891,8 +891,8 @@ export async function updateShell(
 }
 
 // Settings — re-exported from domain
-export { getSettings, updateSettings } from './domains/settings/db'
-export { getOrCreateVapidKeys } from './domains/settings/service'
+export { getSettings, updateSettings } from '@domains/settings/db'
+export { getOrCreateVapidKeys } from '@domains/settings/service'
 
 // Notification queries
 

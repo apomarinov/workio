@@ -13,11 +13,14 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type {
+  CustomTerminalAction,
+  MobileKeyboardRow,
+} from '@domains/settings/schema'
 import { Check, Delete, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ALL_ACTIONS, buildActionsMap } from '@/lib/terminalActions'
 import { cn } from '@/lib/utils'
-import type { CustomTerminalAction, MobileKeyboardRow } from '../types'
 import { ActionButton } from './ActionButton'
 import { ConfirmModal } from './ConfirmModal'
 import { MobileKeyboardCustomAction } from './MobileKeyboardCustomAction'

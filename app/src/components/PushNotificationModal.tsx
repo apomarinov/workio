@@ -1,3 +1,4 @@
+import type { PushSubscriptionRecord } from '@domains/settings/schema'
 import {
   Bell,
   BellOff,
@@ -18,7 +19,6 @@ import {
 import { toast } from '@/components/ui/sonner'
 import { useNotifications } from '../context/NotificationContext'
 import { useSettings } from '../hooks/useSettings'
-import type { PushSubscriptionRecord } from '../types'
 
 interface PushNotificationModalProps {
   open: boolean

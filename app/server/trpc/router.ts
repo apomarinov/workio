@@ -1,4 +1,4 @@
-import { settingsRouter } from '../domains/settings/router'
+import { settingsRouter } from '@domains/settings/router'
 import { router } from './init'
 import { healthRouter } from './routers/health'
 

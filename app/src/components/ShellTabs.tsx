@@ -17,6 +17,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { ShellTemplate } from '@domains/settings/schema'
 import {
   Activity,
   Ban,
@@ -59,7 +60,6 @@ import {
   DEFAULT_STATUS_BAR,
   type SessionWithProject,
   type Shell,
-  type ShellTemplate,
   type Terminal,
 } from '../types'
 import { ConfirmModal } from './ConfirmModal'

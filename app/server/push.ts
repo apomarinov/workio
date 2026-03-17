@@ -1,5 +1,5 @@
+import type { PushSubscriptionRecord } from '@domains/settings/schema'
 import webPush from 'web-push'
-import type { PushSubscriptionRecord } from '../src/types'
 import { getOrCreateVapidKeys, getSettings, updateSettings } from './db'
 import { log } from './logger'
 
