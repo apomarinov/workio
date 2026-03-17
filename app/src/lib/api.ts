@@ -11,7 +11,6 @@ import type {
   SessionMessagesResponse,
   SessionSearchMatch,
   SessionWithProject,
-  Settings,
   Shell,
   Terminal,
 } from '../types'
@@ -308,18 +307,6 @@ export async function createDirectory(
   const body: Record<string, unknown> = { path: parentPath, name }
   if (sshHost) body.ssh_host = sshHost
   return api(`${API_BASE}/create-directory`, { body })
-}
-
-// --- Settings ---
-
-export async function getSettings(): Promise<Settings> {
-  return api(`${API_BASE}/settings`)
-}
-
-export async function updateSettings(
-  updates: Partial<Omit<Settings, 'id'>>,
-): Promise<Settings> {
-  return api(`${API_BASE}/settings`, { method: 'PATCH', body: updates })
 }
 
 // --- Permissions ---

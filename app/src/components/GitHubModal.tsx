@@ -133,9 +133,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
     return infos
   }, [repos, repoWebhooks])
 
-  const missingCount = settings?.missingWebhookCount ?? 0
-  const orphanedCount = settings?.orphanedWebhookCount ?? 0
-  const noNgrok = !ngrokUrl
+  const { missingCount, orphanedCount, noNgrok } = useWebhookWarning()
 
   const handleCreate = async (repo: string) => {
     const [owner, repoName] = repo.split('/')
@@ -208,7 +206,7 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
     setLoading((prev) => ({ ...prev, [repo]: true }))
     try {
       const currentWebhooks = settings?.repo_webhooks || {}
-      await api.updateSettings({
+      await updateSettings({
         repo_webhooks: { ...currentWebhooks, [repo]: { id: webhookId } },
       })
       toast.success(`Webhook ${webhookId} linked for ${repo}`)
@@ -680,9 +678,23 @@ export function useWebhookWarning(): {
   noNgrok: boolean
 } {
   const { settings } = useSettings()
+  const { terminals } = useWorkspaceContext()
 
-  const missingCount = settings?.missingWebhookCount ?? 0
-  const orphanedCount = settings?.orphanedWebhookCount ?? 0
+  const repoWebhooks = settings?.repo_webhooks ?? {}
+  const terminalRepos = new Set(
+    terminals.map((t) => t.git_repo?.repo).filter(Boolean),
+  )
+
+  let missingCount = 0
+  for (const repo of terminalRepos) {
+    if (repoWebhooks[repo as string]?.missing) missingCount++
+  }
+
+  let orphanedCount = 0
+  for (const repo of Object.keys(repoWebhooks)) {
+    if (!terminalRepos.has(repo)) orphanedCount++
+  }
+
   const noNgrok = !settings?.ngrok_url
   const hasWarning = missingCount > 0 || orphanedCount > 0 || noNgrok
 

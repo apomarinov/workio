@@ -368,21 +368,6 @@ export const CODE_TO_DISPLAY: Record<string, string> = {
   equal: '=',
 }
 
-// Map old char-based key values to new code-based names (for migration)
-const CHAR_TO_CODE: Record<string, string> = {
-  '[': 'bracketleft',
-  ']': 'bracketright',
-  ',': 'comma',
-  '.': 'period',
-  '/': 'slash',
-  '\\': 'backslash',
-  ';': 'semicolon',
-  "'": 'quote',
-  '`': 'backquote',
-  '-': 'minus',
-  '=': 'equal',
-}
-
 // Convert event.code to our normalized key name (lowercase, no prefix)
 export function mapEventCode(code: string): string {
   // KeyA → a, KeyZ → z
@@ -402,18 +387,6 @@ export function bindingToHotkeyString(b: ShortcutBinding): string {
   if (b.metaKey) parts.push('meta')
   if (b.key) parts.push(b.key)
   return parts.join('+')
-}
-
-// Migrate old char-based keymap values to code-based names
-export function migrateKeymap(keymap: Keymap): Keymap {
-  const result = { ...keymap }
-  for (const name of Object.keys(result) as (keyof Keymap)[]) {
-    const binding = result[name]
-    if (binding?.key && CHAR_TO_CODE[binding.key]) {
-      result[name] = { ...binding, key: CHAR_TO_CODE[binding.key] }
-    }
-  }
-  return result
 }
 
 export interface GHQueryLimits {
@@ -623,7 +596,4 @@ export interface Settings {
   vapid_private_key?: string
   push_subscriptions?: PushSubscriptionRecord[]
   gh_query_limits?: GHQueryLimits
-  // Computed webhook warning counts
-  missingWebhookCount?: number
-  orphanedWebhookCount?: number
 }

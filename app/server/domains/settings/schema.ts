@@ -200,6 +200,7 @@ export const updateSettingsInput = settingsBaseSchema
 
 export type Settings = z.infer<typeof settingsSchema>
 export type SettingsUpdate = z.infer<typeof updateSettingsInput>
+export type Keymap = z.infer<typeof keymapSchema>
 export type PushSubscriptionRecord = z.infer<
   typeof pushSubscriptionRecordSchema
 >
