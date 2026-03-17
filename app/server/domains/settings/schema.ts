@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 // --- Sub-schemas ---
+
 const shortcutBindingSchema = z
   .object({
     metaKey: z.boolean().optional(),
@@ -164,6 +165,7 @@ export const DEFAULT_STATUS_BAR: z.input<typeof statusBarConfigSchema> = {
 }
 
 // --- Config schema (stored fields with defaults) ---
+
 const settingsBaseSchema = z.object({
   default_shell: z.string().default('/bin/bash'),
   font_size: z.number().min(8).max(32).nullable().default(null),
@@ -178,9 +180,14 @@ const settingsBaseSchema = z.object({
     .optional()
     .default(DEFAULT_GH_QUERY_LIMITS),
   ignore_external_sessions: z.boolean().default(false),
+  // Server-managed fields (not user-editable)
   webhook_secret: z.string().optional(),
   ngrok_url: z.string().optional(),
   repo_webhooks: z.record(z.string(), repoWebhookStatusSchema).optional(),
+  vapid_public_key: z.string().optional(),
+  vapid_private_key: z.string().optional(),
+  push_subscriptions: z.array(pushSubscriptionRecordSchema).optional(),
+  // User-editable collections
   hide_gh_authors: z.array(hiddenGHAuthorSchema).optional(),
   silence_gh_authors: z.array(hiddenGHAuthorSchema).optional(),
   collapse_gh_authors: z.array(hiddenGHAuthorSchema).optional(),
@@ -193,33 +200,53 @@ const settingsBaseSchema = z.object({
   shell_order: z.record(z.string(), z.array(z.number())).optional(),
   starred_branches: z.record(z.string(), z.array(z.string())).optional(),
   statusBar: statusBarConfigSchema.optional().default(DEFAULT_STATUS_BAR),
-  vapid_public_key: z.string().optional(),
-  vapid_private_key: z.string().optional(),
-  push_subscriptions: z.array(pushSubscriptionRecordSchema).optional(),
 })
 
 /** Default config derived from schema defaults */
 export const DEFAULT_CONFIG = settingsBaseSchema.parse({})
 
 // --- Full settings (config + id) ---
+
 export const settingsSchema = settingsBaseSchema.extend({
   id: z.number(),
 })
 
 // --- Input schemas ---
+
+/** Fields the client cannot set directly */
+const SERVER_ONLY_FIELDS = {
+  webhook_secret: true,
+  ngrok_url: true,
+  vapid_public_key: true,
+  vapid_private_key: true,
+} as const
+
 export const updateSettingsInput = settingsBaseSchema
+  .omit(SERVER_ONLY_FIELDS)
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, {
     message: 'At least one setting must be provided',
   })
 
-export type Settings = z.infer<typeof settingsSchema>
+export const pushSubscribeInput = z.object({
+  endpoint: z.string(),
+  keys: z.object({ p256dh: z.string(), auth: z.string() }),
+  userAgent: z.string().optional(),
+})
+
+export const pushUnsubscribeInput = z.object({
+  endpoint: z.string(),
+})
+
+// --- Types ---
+
+type Settings = z.infer<typeof settingsSchema>
 export type SettingsUpdate = z.infer<typeof updateSettingsInput>
+export type SettingsUpdateInternal = Partial<Omit<Settings, 'id'>>
 export type ShortcutBinding = z.infer<typeof shortcutBindingSchema>
 export type Keymap = z.infer<typeof keymapSchema>
 export type HiddenGHAuthor = z.infer<typeof hiddenGHAuthorSchema>
 export type HiddenPR = z.infer<typeof hiddenPRSchema>
-export type RepoWebhookStatus = z.infer<typeof repoWebhookStatusSchema>
 export type GHQueryLimits = z.infer<typeof ghQueryLimitsSchema>
 export type ShellTemplateEntry = z.infer<typeof shellTemplateEntrySchema>
 export type ShellTemplate = z.infer<typeof shellTemplateSchema>
@@ -232,13 +259,3 @@ export type StatusBarSectionName = z.infer<typeof statusBarSectionNameSchema>
 export type StatusBarSection = z.infer<typeof statusBarSectionSchema>
 export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
 export type PreferredIDE = Settings['preferred_ide']
-
-export const pushSubscribeInput = z.object({
-  endpoint: z.string(),
-  keys: z.object({ p256dh: z.string(), auth: z.string() }),
-  userAgent: z.string().optional(),
-})
-
-export const pushUnsubscribeInput = z.object({
-  endpoint: z.string(),
-})

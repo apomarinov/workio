@@ -20,6 +20,6 @@
       "@domains/*": ["server/domains/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "server"],
   "exclude": ["src/sw.ts"]
 }

@@ -1,10 +1,11 @@
 import pool from '../../db'
-import { DEFAULT_CONFIG, type SettingsUpdate } from './schema'
+import { DEFAULT_CONFIG, type SettingsUpdateInternal } from './schema'
 
 export async function getSettings() {
-  const { rows } = await pool.query<{ id: number; config: SettingsUpdate }>(
-    'SELECT * FROM settings WHERE id = 1',
-  )
+  const { rows } = await pool.query<{
+    id: number
+    config: SettingsUpdateInternal
+  }>('SELECT * FROM settings WHERE id = 1')
 
   if (rows.length === 0) {
     await pool.query('INSERT INTO settings (id, config) VALUES (1, $1)', [
@@ -21,7 +22,7 @@ export async function getSettings() {
   }
 }
 
-export async function updateSettings(updates: SettingsUpdate) {
+export async function updateSettings(updates: SettingsUpdateInternal) {
   const current = await getSettings()
   const { id, ...currentConfig } = current
   const newConfig = { ...currentConfig, ...updates }
