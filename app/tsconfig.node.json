@@ -16,7 +16,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@domains/*": ["server/domains/*"]
+      "@domains/*": ["server/domains/*"],
+      "@server/*": ["server/*"]
     }
   },
   "include": ["vite.config.ts", "server/**/*", "src/types.ts"]

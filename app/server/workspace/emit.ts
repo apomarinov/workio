@@ -1,5 +1,5 @@
+import { emitNotification } from '@domains/notifications/service'
 import { getIO } from '../io'
-import { emitNotification } from '../notify'
 
 export async function emitWorkspace(
   terminalId: number,

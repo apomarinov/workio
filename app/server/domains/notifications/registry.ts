@@ -1,4 +1,9 @@
-export type AudioType = 'permission' | 'done' | 'pr-activity' | 'error' | 'bell-notify'
+export type AudioType =
+  | 'permission'
+  | 'done'
+  | 'pr-activity'
+  | 'error'
+  | 'bell-notify'
 
 export interface NotificationDef {
   emoji: string
@@ -130,7 +135,8 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
     icon: 'ShieldAlert',
     iconColor: 'text-red-500',
     titleTemplate: 'Failed Login Detected',
-    bodyTemplate: '{attempts} failed login attempts on ngrok — endpoint locked for 10min',
+    bodyTemplate:
+      '{attempts} failed login attempts on ngrok — endpoint locked for 10min',
     audio: 'error',
   },
   // OS/push-only types (no icon/iconColor)
@@ -167,10 +173,7 @@ export function resolveTemplate(
 }
 
 /** Get emoji for a notification type, handling conditional cases */
-export function getEmoji(
-  type: string,
-  data: Record<string, unknown>,
-): string {
+export function getEmoji(type: string, data: Record<string, unknown>): string {
   if (type === 'new_review') {
     if (data.state === 'APPROVED') return '✅'
     if (data.state === 'CHANGES_REQUESTED') return '🔄'
@@ -186,17 +189,17 @@ export function getEmoji(
 export function resolveNotification(
   type: string,
   data: Record<string, unknown>,
-): {
-  emoji: string
-  title: string
-  body: string
-  audio: AudioType
-  icon?: string
-  iconColor?: string
-} {
+) {
   const def = NOTIFICATION_REGISTRY[type]
   if (!def) {
-    return { emoji: '', title: type, body: '', audio: 'pr-activity' }
+    return {
+      emoji: '',
+      title: type,
+      body: '',
+      audio: 'pr-activity' as AudioType,
+      icon: undefined,
+      iconColor: undefined,
+    }
   }
 
   return {

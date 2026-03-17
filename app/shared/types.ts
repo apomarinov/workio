@@ -206,13 +206,6 @@ export interface WorkspacePayload {
   deleted?: boolean
 }
 
-export interface UnreadPRNotification {
-  repo: string
-  prNumber: number
-  count: number
-  items: { commentId?: number; reviewId?: number }[]
-}
-
 export interface ShellClient {
   device: string
   browser: string

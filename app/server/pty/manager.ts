@@ -3,7 +3,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveNotification } from '../../shared/notifications'
+import { resolveNotification } from '@domains/notifications/registry'
+import { sendPushNotification } from '@domains/notifications/service'
 import type {
   ActiveProcess,
   GitLastCommit,
@@ -25,7 +26,6 @@ import {
 import { getIO } from '../io'
 import { sanitizeName } from '../lib/strings'
 import { log } from '../logger'
-import { sendPushNotification } from '../push'
 import { execSSHCommand } from '../ssh/exec'
 import { closeConnection } from '../ssh/pool'
 import {

@@ -2,12 +2,10 @@ import type {
   ChangedFile,
   InvolvedPRSummary,
   MergedPRSummary,
-  UnreadPRNotification,
 } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
 import type {
   MoveTarget,
-  Notification,
   SessionMessagesResponse,
   SessionSearchMatch,
   SessionWithProject,
@@ -846,67 +844,6 @@ export async function testWebhook(owner: string, repo: string): Promise<void> {
   await api(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
     method: 'POST',
   })
-}
-
-// --- Notifications ---
-
-export async function getNotifications(
-  limit = 50,
-  offset = 0,
-): Promise<{ notifications: Notification[]; total: number }> {
-  return api(`${API_BASE}/notifications?limit=${limit}&offset=${offset}`)
-}
-
-export async function markAllNotificationsRead(): Promise<{ count: number }> {
-  return api(`${API_BASE}/notifications/mark-all-read`, { method: 'POST' })
-}
-
-export async function markNotificationReadByItem(
-  repo: string,
-  prNumber: number,
-  commentId?: number,
-  reviewId?: number,
-): Promise<{ success: boolean }> {
-  return api(`${API_BASE}/notifications/item-read`, {
-    body: { repo, prNumber, commentId, reviewId },
-  })
-}
-
-export async function markPRNotificationsRead(
-  repo: string,
-  prNumber: number,
-): Promise<{ count: number }> {
-  return api(`${API_BASE}/notifications/pr-read`, {
-    body: { repo, prNumber },
-  })
-}
-
-export async function markNotificationRead(
-  id: number,
-): Promise<{ success: boolean }> {
-  return api(`${API_BASE}/notifications/${id}/read`, { method: 'POST' })
-}
-
-export async function markNotificationUnread(
-  id: number,
-): Promise<{ success: boolean }> {
-  return api(`${API_BASE}/notifications/${id}/unread`, { method: 'POST' })
-}
-
-export async function getUnreadPRNotifications(): Promise<
-  UnreadPRNotification[]
-> {
-  return api(`${API_BASE}/notifications/pr-unread`)
-}
-
-export async function deleteNotification(
-  id: number,
-): Promise<{ success: boolean }> {
-  return api(`${API_BASE}/notifications/${id}`, { method: 'DELETE' })
-}
-
-export async function deleteAllNotifications(): Promise<{ count: number }> {
-  return api(`${API_BASE}/notifications`, { method: 'DELETE' })
 }
 
 // --- Shells ---

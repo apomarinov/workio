@@ -1,3 +1,4 @@
+import type { AudioType } from '@domains/notifications/registry'
 import {
   createContext,
   useCallback,
@@ -6,7 +7,6 @@ import {
   useState,
 } from 'react'
 import { toast } from 'sonner'
-import type { AudioType } from '../../shared/notifications'
 import { NotificationPrompt } from '../components/NotificationPrompt'
 import { useSettings } from '../hooks/useSettings'
 

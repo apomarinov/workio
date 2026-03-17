@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { emitNotification } from '@domains/notifications/service'
 import {
   DEFAULT_GH_QUERY_LIMITS,
   type GHQueryLimits,
@@ -26,7 +27,6 @@ import {
 import { getIO } from '../io'
 import { execFileAsync, getExecStderr } from '../lib/exec'
 import { log } from '../logger'
-import { emitNotification } from '../notify'
 import { detectGitBranch } from '../pty/manager'
 import { updateGithubGraphql, updateGithubRest } from '../services/status'
 import { execSSHCommand } from '../ssh/exec'

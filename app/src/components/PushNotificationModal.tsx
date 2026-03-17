@@ -1,3 +1,4 @@
+import { pushSubscribeInput } from '@domains/notifications/schema'
 import type { PushSubscriptionRecord } from '@domains/settings/schema'
 import {
   Bell,
@@ -17,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { trpc } from '@/lib/trpc'
 import { useNotifications } from '../context/NotificationContext'
 import { useSettings } from '../hooks/useSettings'
 
@@ -43,6 +45,12 @@ export function PushNotificationModal({
   const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
 
+  const { data: vapidData } = trpc.notifications.vapidKey.useQuery()
+  const subscribeMutation = trpc.notifications.pushSubscribe.useMutation()
+  const unsubscribeMutation = trpc.notifications.pushUnsubscribe.useMutation()
+  const testMutation = trpc.notifications.pushTest.useMutation()
+  const testDismissMutation = trpc.notifications.pushTestDismiss.useMutation()
+
   const subscriptions = settings?.push_subscriptions ?? []
   const supported = 'serviceWorker' in navigator && 'PushManager' in window
 
@@ -62,37 +70,36 @@ export function PushNotificationModal({
         return
       }
 
-      const res = await fetch('/api/push/vapid-key')
-      const { publicKey } = await res.json()
+      if (!vapidData?.publicKey) {
+        toast.error('VAPID key not available')
+        return
+      }
 
       const reg = await navigator.serviceWorker.ready
 
       // Remove any existing browser subscription from server before creating new one
       const existing = await reg.pushManager.getSubscription()
       if (existing) {
-        await fetch('/api/push/unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: existing.endpoint }),
-        })
+        await unsubscribeMutation.mutateAsync({ endpoint: existing.endpoint })
         await existing.unsubscribe()
       }
 
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey),
       })
 
       const subJson = subscription.toJSON()
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: subJson.endpoint,
-          keys: subJson.keys,
-          userAgent: navigator.userAgent,
-        }),
+      const parsed = pushSubscribeInput.safeParse({
+        endpoint: subJson.endpoint,
+        keys: subJson.keys,
+        userAgent: navigator.userAgent,
       })
+      if (!parsed.success) {
+        toast.error('Invalid push subscription data')
+        return
+      }
+      await subscribeMutation.mutateAsync(parsed.data)
 
       setCurrentEndpoint(subJson.endpoint ?? null)
       refetch()
@@ -113,11 +120,7 @@ export function PushNotificationModal({
     try {
       const sub = await getCurrentSubscription()
       if (sub) {
-        await fetch('/api/push/unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        })
+        await unsubscribeMutation.mutateAsync({ endpoint: sub.endpoint })
         await sub.unsubscribe()
       }
       setCurrentEndpoint(null)
@@ -136,11 +139,7 @@ export function PushNotificationModal({
 
   const handleRemoveDevice = async (endpoint: string) => {
     try {
-      await fetch('/api/push/unsubscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint }),
-      })
+      await unsubscribeMutation.mutateAsync({ endpoint })
       refetch()
       if (endpoint === currentEndpoint) {
         setCurrentEndpoint(null)
@@ -154,7 +153,7 @@ export function PushNotificationModal({
   const handleTest = async () => {
     setTesting(true)
     try {
-      await fetch('/api/push/test', { method: 'POST' })
+      await testMutation.mutateAsync()
       toast.success('Test notification sent')
     } catch {
       toast.error('Failed to send test notification')
@@ -167,7 +166,7 @@ export function PushNotificationModal({
   const handleTestDismiss = async () => {
     setDismissing(true)
     try {
-      await fetch('/api/push/test-dismiss', { method: 'POST' })
+      await testDismissMutation.mutateAsync()
       toast.success('Dismiss sent')
     } catch {
       toast.error('Failed to send dismiss')

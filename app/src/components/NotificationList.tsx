@@ -1,3 +1,8 @@
+import {
+  NOTIFICATION_REGISTRY,
+  resolveTemplate,
+} from '@domains/notifications/registry'
+import type { Notification } from '@domains/notifications/schema'
 import type { LucideIcon } from 'lucide-react'
 import {
   AtSign,
@@ -19,11 +24,6 @@ import { Button } from '@/components/ui/button'
 import { useNotificationDataContext } from '@/context/NotificationDataContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
-import type { Notification } from '@/types'
-import {
-  NOTIFICATION_REGISTRY,
-  resolveTemplate,
-} from '../../shared/notifications'
 import { RefreshIcon } from './icons'
 
 const ICON_MAP: Record<string, LucideIcon | typeof RefreshIcon> = {

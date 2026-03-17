@@ -1,5 +1,5 @@
+import { resolveNotification } from '@domains/notifications/registry'
 import { useEffect } from 'react'
-import { resolveNotification } from '../../shared/notifications'
 import { useNotifications } from '../context/NotificationContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import type { HookEvent } from '../types'

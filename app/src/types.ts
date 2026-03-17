@@ -301,41 +301,6 @@ export interface HookEvent {
   last_message?: string
 }
 
-export interface NotificationData {
-  // Auth fields
-  attempts?: number
-  // PR fields
-  prTitle?: string
-  prUrl?: string
-  prNumber?: number
-  reviewer?: string
-  approver?: string
-  author?: string
-  body?: string
-  commentUrl?: string
-  commentId?: number
-  checkName?: string
-  checkUrl?: string
-  state?: string
-  reviewId?: number
-  // Workspace fields
-  terminalId?: number
-  name?: string // workspace name
-  deleted?: boolean
-  git_repo?: GitRepoStatus
-  setup?: SetupStatus
-}
-
-export interface Notification {
-  id: number
-  dedup_hash: string | null
-  type: string
-  repo: string | null
-  read: boolean
-  created_at: string
-  data: NotificationData
-}
-
 export interface CommandLog {
   id: number
   terminal_id: number | null

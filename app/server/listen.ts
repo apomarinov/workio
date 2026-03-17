@@ -1,6 +1,7 @@
+import { resolveNotification } from '@domains/notifications/registry'
+import { sendPushNotification } from '@domains/notifications/service'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
-import { resolveNotification } from '../shared/notifications'
 import {
   getActivePermissions,
   getMessagesByIds,
@@ -11,7 +12,6 @@ import {
 import { execFileAsync } from './lib/exec'
 import { log } from './logger'
 import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
-import { sendPushNotification } from './push'
 import { execSSHCommand } from './ssh/exec'
 
 async function detectLocalBranch(cwd: string): Promise<string> {

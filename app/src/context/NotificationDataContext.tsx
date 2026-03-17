@@ -1,22 +1,19 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from 'react'
-import useSWR from 'swr'
+import { resolveNotification } from '@domains/notifications/registry'
+import type { Notification } from '@domains/notifications/schema'
+import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { toastError } from '@/lib/toastError'
-import { resolveNotification } from '../../shared/notifications'
+import { trpc } from '@/lib/trpc'
 import { useSocket } from '../hooks/useSocket'
-import * as api from '../lib/api'
-import { EMPTY_UNREAD, fetchUnreadPRData, UNREAD_PR_KEY } from '../lib/unreadPR'
-import type { Notification } from '../types'
 import { useNotifications } from './NotificationContext'
+
+export type UnreadPRData = Record<string, { count: number; itemIds: string[] }>
+const EMPTY_UNREAD: UnreadPRData = {}
+
+const LIST_INPUT = { limit: 50, offset: 0 }
 
 interface NotificationDataContextValue {
   notifications: Notification[]
+  unreadPRData: UnreadPRData
   hasNotifications: boolean
   hasUnreadNotifications: boolean
   hasAnyUnseenPRs: boolean
@@ -51,18 +48,26 @@ export function NotificationDataProvider({
     new Map(),
   )
 
-  // Notifications (SWR-backed for multi-client sync)
-  const { data: notifications = [], mutate: mutateNotifications } = useSWR<
-    Notification[]
-  >('/api/notifications', () =>
-    api.getNotifications().then((r) => r.notifications),
-  )
+  const utils = trpc.useUtils()
 
-  // Unread PR data via SWR (shared cache key with GitHubContext)
-  const { data: unreadPRData = EMPTY_UNREAD, mutate: mutateUnreadPRData } =
-    useSWR(UNREAD_PR_KEY, fetchUnreadPRData)
+  // Notifications via tRPC
+  const { data: listData } = trpc.notifications.list.useQuery(LIST_INPUT)
+  const notifications = listData?.notifications ?? []
+
+  // Unread PR data via tRPC (shared with GitHubContext)
+  const { data: unreadPRData = EMPTY_UNREAD } =
+    trpc.notifications.prUnread.useQuery()
 
   const hasAnyUnseenPRs = Object.keys(unreadPRData).length > 0
+
+  // tRPC mutations
+  const markReadMutation = trpc.notifications.markRead.useMutation()
+  const markUnreadMutation = trpc.notifications.markUnread.useMutation()
+  const markItemReadMutation = trpc.notifications.markItemRead.useMutation()
+  const markAllReadMutation = trpc.notifications.markAllRead.useMutation()
+  const markPRReadMutation = trpc.notifications.markPRRead.useMutation()
+  const removeMutation = trpc.notifications.remove.useMutation()
+  const removeAllMutation = trpc.notifications.removeAll.useMutation()
 
   // Subscribe to server-side notifications — OS notification sending
   useEffect(() => {
@@ -161,29 +166,29 @@ export function NotificationDataProvider({
   // Listen for new notifications from socket — list update
   useEffect(() => {
     return subscribe<Notification>('notifications:new', (notification) => {
-      mutateNotifications(
-        (prev) => {
-          if (!prev) return [notification]
-          const exists = prev.some(
-            (n) =>
-              (n.dedup_hash && n.dedup_hash === notification.dedup_hash) ||
-              n.id === notification.id,
-          )
-          if (exists) return prev
-          return [notification, ...prev]
-        },
-        { revalidate: false },
-      )
-      mutateUnreadPRData()
+      utils.notifications.list.setData(LIST_INPUT, (prev) => {
+        if (!prev) return { notifications: [notification], total: 1 }
+        const exists = prev.notifications.some(
+          (n) =>
+            (n.dedup_hash && n.dedup_hash === notification.dedup_hash) ||
+            n.id === notification.id,
+        )
+        if (exists) return prev
+        return {
+          notifications: [notification, ...prev.notifications],
+          total: prev.total + 1,
+        }
+      })
+      utils.notifications.prUnread.invalidate()
     })
-  }, [subscribe, mutateNotifications, mutateUnreadPRData])
+  }, [subscribe, utils])
 
   // Listen for refetch events from other clients
   useEffect(() => {
     return subscribe<{ group: string }>('refetch', ({ group }) => {
-      if (group === 'notifications') mutateNotifications()
+      if (group === 'notifications') utils.notifications.list.invalidate()
     })
-  }, [subscribe, mutateNotifications])
+  }, [subscribe, utils])
 
   const hasNotifications = notifications.length > 0
 
@@ -197,140 +202,157 @@ export function NotificationDataProvider({
     [notifications],
   )
 
-  const markNotificationRead = useCallback(
-    async (id: number) => {
-      try {
-        await api.markNotificationRead(id)
-        mutateNotifications(
-          (prev) => prev?.map((n) => (n.id === id ? { ...n, read: true } : n)),
-          { revalidate: false },
-        )
-        mutateUnreadPRData()
-      } catch (err) {
-        toastError(err, 'Failed to mark as read')
-      }
-    },
-    [mutateNotifications, mutateUnreadPRData],
-  )
-
-  const markNotificationUnread = useCallback(
-    async (id: number) => {
-      try {
-        await api.markNotificationUnread(id)
-        mutateNotifications(
-          (prev) => prev?.map((n) => (n.id === id ? { ...n, read: false } : n)),
-          { revalidate: false },
-        )
-        mutateUnreadPRData()
-      } catch (err) {
-        toastError(err, 'Failed to mark as unread')
-      }
-    },
-    [mutateNotifications, mutateUnreadPRData],
-  )
-
-  const markNotificationReadByItem = useCallback(
-    async (
-      repo: string,
-      prNumber: number,
-      commentId?: number,
-      reviewId?: number,
-    ) => {
-      try {
-        await api.markNotificationReadByItem(
-          repo,
-          prNumber,
-          commentId,
-          reviewId,
-        )
-        mutateNotifications(
-          (prev) =>
-            prev?.map((n) => {
-              if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
-                return n
-              if (commentId && n.data.commentId === commentId)
-                return { ...n, read: true }
-              if (reviewId && n.data.reviewId === reviewId)
-                return { ...n, read: true }
-              return n
-            }),
-          { revalidate: false },
-        )
-        mutateUnreadPRData()
-      } catch (err) {
-        toastError(err, 'Failed to mark as read')
-      }
-    },
-    [mutateNotifications, mutateUnreadPRData],
-  )
-
-  const markAllNotificationsRead = useCallback(async () => {
+  const markNotificationRead = async (id: number) => {
     try {
-      await api.markAllNotificationsRead()
-      mutateNotifications((prev) => prev?.map((n) => ({ ...n, read: true })), {
-        revalidate: false,
+      await markReadMutation.mutateAsync({ id })
+      utils.notifications.list.setData(LIST_INPUT, (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.map((n) =>
+                n.id === id ? { ...n, read: true } : n,
+              ),
+            }
+          : prev,
+      )
+      utils.notifications.prUnread.invalidate()
+    } catch (err) {
+      toastError(err, 'Failed to mark as read')
+    }
+  }
+
+  const markNotificationUnread = async (id: number) => {
+    try {
+      await markUnreadMutation.mutateAsync({ id })
+      utils.notifications.list.setData(LIST_INPUT, (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.map((n) =>
+                n.id === id ? { ...n, read: false } : n,
+              ),
+            }
+          : prev,
+      )
+      utils.notifications.prUnread.invalidate()
+    } catch (err) {
+      toastError(err, 'Failed to mark as unread')
+    }
+  }
+
+  const markNotificationReadByItem = async (
+    repo: string,
+    prNumber: number,
+    commentId?: number,
+    reviewId?: number,
+  ) => {
+    try {
+      await markItemReadMutation.mutateAsync({
+        repo,
+        prNumber,
+        commentId,
+        reviewId,
       })
-      mutateUnreadPRData(EMPTY_UNREAD, { revalidate: false })
+      utils.notifications.list.setData(LIST_INPUT, (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.map((n) => {
+                if (n.repo !== repo || n.data.prNumber !== prNumber || n.read)
+                  return n
+                if (commentId && n.data.commentId === commentId)
+                  return { ...n, read: true }
+                if (reviewId && n.data.reviewId === reviewId)
+                  return { ...n, read: true }
+                return n
+              }),
+            }
+          : prev,
+      )
+      utils.notifications.prUnread.invalidate()
+    } catch (err) {
+      toastError(err, 'Failed to mark as read')
+    }
+  }
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await markAllReadMutation.mutateAsync()
+      utils.notifications.list.setData(LIST_INPUT, (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.map((n) => ({
+                ...n,
+                read: true,
+              })),
+            }
+          : prev,
+      )
+      utils.notifications.prUnread.setData(undefined, EMPTY_UNREAD)
     } catch (err) {
       toastError(err, 'Failed to mark notifications as read')
     }
-  }, [mutateNotifications, mutateUnreadPRData])
+  }
 
-  const markPRNotificationsRead = useCallback(
-    async (repo: string, prNumber: number) => {
-      try {
-        await api.markPRNotificationsRead(repo, prNumber)
-        mutateNotifications(
-          (prev) =>
-            prev?.map((n) =>
-              n.repo === repo && n.data.prNumber === prNumber
-                ? { ...n, read: true }
-                : n,
-            ),
-          { revalidate: false },
-        )
-        mutateUnreadPRData(
-          (prev) => {
-            if (!prev) return EMPTY_UNREAD
-            const next = { ...prev }
-            delete next[`${repo}#${prNumber}`]
-            return next
-          },
-          { revalidate: false },
-        )
-      } catch (err) {
-        toastError(err, 'Failed to mark as read')
-      }
-    },
-    [mutateNotifications, mutateUnreadPRData],
-  )
-
-  const deleteNotification = useCallback(
-    async (id: number) => {
-      try {
-        await api.deleteNotification(id)
-        mutateNotifications((prev) => prev?.filter((n) => n.id !== id), {
-          revalidate: false,
-        })
-      } catch (err) {
-        toastError(err, 'Failed to delete notification')
-      }
-    },
-    [mutateNotifications],
-  )
-
-  const deleteAllNotifications = useCallback(async () => {
+  const markPRNotificationsRead = async (repo: string, prNumber: number) => {
     try {
-      await api.deleteAllNotifications()
-      mutateNotifications([], { revalidate: false })
-      mutateUnreadPRData(EMPTY_UNREAD, { revalidate: false })
+      await markPRReadMutation.mutateAsync({ repo, prNumber })
+      utils.notifications.list.setData(LIST_INPUT, (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.map((n) =>
+                n.repo === repo && n.data.prNumber === prNumber
+                  ? { ...n, read: true }
+                  : n,
+              ),
+            }
+          : prev,
+      )
+      utils.notifications.prUnread.setData(undefined, (prev) => {
+        if (!prev) return EMPTY_UNREAD
+        const next = { ...prev }
+        delete next[`${repo}#${prNumber}`]
+        return next
+      })
+    } catch (err) {
+      toastError(err, 'Failed to mark as read')
+    }
+  }
+
+  const deleteNotification = async (id: number) => {
+    try {
+      await removeMutation.mutateAsync({ id })
+      utils.notifications.list.setData(LIST_INPUT, (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.filter((n) => n.id !== id),
+              total: prev.total - 1,
+            }
+          : prev,
+      )
+    } catch (err) {
+      toastError(err, 'Failed to delete notification')
+    }
+  }
+
+  const deleteAllNotifications = async () => {
+    try {
+      await removeAllMutation.mutateAsync()
+      utils.notifications.list.setData(LIST_INPUT, {
+        notifications: [],
+        total: 0,
+      })
+      utils.notifications.prUnread.setData(undefined, EMPTY_UNREAD)
     } catch (err) {
       toastError(err, 'Failed to delete notifications')
     }
-  }, [mutateNotifications, mutateUnreadPRData])
+  }
 
   const refetchNotifications = () => {
-    mutateNotifications()
+    utils.notifications.list.invalidate()
   }
 
   // Update app badge based on unread notifications
@@ -347,6 +369,7 @@ export function NotificationDataProvider({
   const value = useMemo(
     () => ({
       notifications,
+      unreadPRData,
       hasNotifications,
       hasUnreadNotifications,
       hasAnyUnseenPRs,
@@ -361,16 +384,10 @@ export function NotificationDataProvider({
     }),
     [
       notifications,
+      unreadPRData,
       hasNotifications,
       hasUnreadNotifications,
       hasAnyUnseenPRs,
-      markNotificationRead,
-      markNotificationUnread,
-      markNotificationReadByItem,
-      markAllNotificationsRead,
-      markPRNotificationsRead,
-      deleteNotification,
-      deleteAllNotifications,
     ],
   )
 

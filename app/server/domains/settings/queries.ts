@@ -1,7 +1,6 @@
 import { publicProcedure } from '../../trpc/init'
 import { getSettings } from './db'
 import { DEFAULT_CONFIG } from './schema'
-import { getOrCreateVapidKeys } from './service'
 
 export const get = publicProcedure.query(async () => {
   const settings = await getSettings()
@@ -40,5 +39,3 @@ export const get = publicProcedure.query(async () => {
     ? { ...settings, ...patches }
     : settings
 })
-
-export const vapidKey = publicProcedure.query(getOrCreateVapidKeys)

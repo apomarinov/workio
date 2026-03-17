@@ -1,14 +1,8 @@
 import { refreshPRChecks } from '../../github/checks'
 import { execFileAsync } from '../../lib/exec'
-import { sendPushNotification } from '../../push'
 import { publicProcedure } from '../../trpc/init'
-import { getSettings, updateSettings } from './db'
-import type { PushSubscriptionRecord } from './schema'
-import {
-  pushSubscribeInput,
-  pushUnsubscribeInput,
-  updateSettingsInput,
-} from './schema'
+import { updateSettings } from './db'
+import { updateSettingsInput } from './schema'
 
 export const update = publicProcedure
   .input(updateSettingsInput)
@@ -36,55 +30,3 @@ export const update = publicProcedure
 
     return settings
   })
-
-export const pushSubscribe = publicProcedure
-  .input(pushSubscribeInput)
-  .mutation(async ({ input }) => {
-    const settings = await getSettings()
-    const existing = settings.push_subscriptions ?? []
-
-    const filtered = existing.filter((s) => s.endpoint !== input.endpoint)
-    const newSub: PushSubscriptionRecord = {
-      endpoint: input.endpoint,
-      keys: input.keys,
-      userAgent: input.userAgent,
-      created_at: new Date().toISOString(),
-    }
-    await updateSettings({ push_subscriptions: [...filtered, newSub] })
-  })
-
-export const pushUnsubscribe = publicProcedure
-  .input(pushUnsubscribeInput)
-  .mutation(async ({ input }) => {
-    const settings = await getSettings()
-    const existing = settings.push_subscriptions ?? []
-    const filtered = existing.filter((s) => s.endpoint !== input.endpoint)
-    await updateSettings({ push_subscriptions: filtered })
-  })
-
-export const pushTest = publicProcedure.mutation(async () => {
-  const result = await sendPushNotification(
-    {
-      title: 'WorkIO Test',
-      body: 'Push notifications are working!',
-      tag: 'test',
-      data: { type: 'test' },
-    },
-    { force: true },
-  )
-  if (!result.success) {
-    throw new Error(result.error || 'Push notification failed')
-  }
-})
-
-export const pushTestDismiss = publicProcedure.mutation(async () => {
-  await sendPushNotification(
-    {
-      title: '',
-      body: '',
-      tag: 'test',
-      action: 'dismiss',
-    },
-    { force: true },
-  )
-})

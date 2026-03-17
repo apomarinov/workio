@@ -7,8 +7,8 @@ import {
   useRef,
   useState,
 } from 'react'
-import useSWR from 'swr'
 import { toast } from '@/components/ui/sonner'
+import { trpc } from '@/lib/trpc'
 import type {
   InvolvedPRSummary,
   MergedPRSummary,
@@ -18,7 +18,6 @@ import type {
 } from '../../shared/types'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
-import { EMPTY_UNREAD, fetchUnreadPRData, UNREAD_PR_KEY } from '../lib/unreadPR'
 import { useWorkspaceContext } from './WorkspaceContext'
 
 const RECENT_PR_THRESHOLD_MS = 15 * 60 * 1000
@@ -54,11 +53,8 @@ export function GitHubProvider({ children }: { children: React.ReactNode }) {
   const [prPoll, setPrPoll] = useState(true)
   const lastDetectEmitRef = useRef(0)
 
-  // Unread PR data via SWR (shared cache key with NotificationDataContext)
-  const { data: unreadPRData = EMPTY_UNREAD } = useSWR(
-    UNREAD_PR_KEY,
-    fetchUnreadPRData,
-  )
+  // Unread PR data via tRPC (shared cache with NotificationDataContext)
+  const { data: unreadPRData = {} } = trpc.notifications.prUnread.useQuery()
 
   useEffect(() => {
     if (!prPoll) {

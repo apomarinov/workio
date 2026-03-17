@@ -228,16 +228,6 @@ export const updateSettingsInput = settingsBaseSchema
     message: 'At least one setting must be provided',
   })
 
-export const pushSubscribeInput = z.object({
-  endpoint: z.string(),
-  keys: z.object({ p256dh: z.string(), auth: z.string() }),
-  userAgent: z.string().optional(),
-})
-
-export const pushUnsubscribeInput = z.object({
-  endpoint: z.string(),
-})
-
 // --- Types ---
 
 type Settings = z.infer<typeof settingsSchema>

@@ -1,5 +1,5 @@
+import { resolveNotification } from '@domains/notifications/registry'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { resolveNotification } from '../../shared/notifications'
 import type {
   ActiveProcess,
   GitDiffStat,

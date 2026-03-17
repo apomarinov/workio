@@ -2,6 +2,11 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  emitNotification,
+  initWebPush,
+  markDesktopActive,
+} from '@domains/notifications/service'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
@@ -25,7 +30,6 @@ import {
 import { broadcastRefetch, type RefetchGroup, setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
-import { emitNotification } from './notify'
 import {
   destroyAllSessions,
   getBellSubscribedShellIds,
@@ -39,13 +43,10 @@ import {
   writeToSession,
 } from './pty/manager'
 import { getActiveZellijSessionNames } from './pty/process-tree'
-import { initWebPush, markDesktopActive } from './push'
 import claudeHookRoute from './routes/claude-hook'
 import githubRoutes from './routes/github'
 import logsRoutes from './routes/logs'
-import notificationRoutes from './routes/notifications'
 import sessionRoutes from './routes/sessions'
-import settingsRoutes from './routes/settings'
 import terminalRoutes from './routes/terminals'
 import { getServicesStatus, updateNgrokStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
@@ -394,10 +395,8 @@ await fastify.register(fastifyTRPCPlugin, {
 // Routes
 await fastify.register(githubRoutes)
 await fastify.register(terminalRoutes)
-await fastify.register(settingsRoutes)
 await fastify.register(sessionRoutes)
 await fastify.register(logsRoutes)
-await fastify.register(notificationRoutes)
 await fastify.register(claudeHookRoute)
 
 // Start monitor daemon (persistent Python process for hook events)
