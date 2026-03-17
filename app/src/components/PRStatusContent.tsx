@@ -1651,7 +1651,7 @@ export function PRStatusContent({
                   onClick={() => setRerunAllOpen(true)}
                   className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer group/check-btn"
                 >
-                  <RefreshIcon className="w-3 h-3 duration-150 transition-all group-hover/check-btn:rotate-180" />
+                  <RefreshIcon className="w-3 h-3 duration-300 transition-all group-hover/check-btn:-rotate-180" />
                   Re-run All ({failedCompletedChecks.length})
                 </button>
               )}

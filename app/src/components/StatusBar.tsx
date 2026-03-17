@@ -308,6 +308,7 @@ function BranchSection({
   branch: string
   terminalId: number
 }) {
+  const overflowRef = useOverflowDetector<HTMLSpanElement>()
   return (
     <SortableStatusSection
       section={section}
@@ -320,7 +321,9 @@ function BranchSection({
       }}
     >
       <GitBranch className="w-3 h-3" />
-      <span className="truncate-fade max-w-[250px]">{branch}</span>
+      <span ref={overflowRef} className="truncate-fade max-w-[220px]">
+        {branch}
+      </span>
     </SortableStatusSection>
   )
 }
