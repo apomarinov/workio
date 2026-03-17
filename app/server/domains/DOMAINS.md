@@ -5,6 +5,7 @@
 | Domain | Imports from | Why |
 |---|---|---|
 | **workspace** | — | Core entity, no domain deps |
+| **pty** | workspace, sessions | Needs terminal/shell info to create sessions; permission scanner writes to sessions DB |
 | **git** | workspace, logs | Needs terminal cwd/ssh_host to run git; logs git commands |
 | **sessions** | workspace, settings | Terminal/project lookups for backfill/move; settings for favorites |
 | **github** | workspace, logs | Terminal tracking for branch detection; logs GitHub API calls |
@@ -13,10 +14,12 @@
 | **notifications** | — | Standalone |
 
 ```
+workspace ← pty
 workspace ← git
 workspace ← sessions
 workspace ← github
 workspace ← logs
+sessions  ← pty
 settings  ← sessions
 logs      ← git
 logs      ← github
@@ -53,10 +56,19 @@ server/domains/
 │   │       ├── deleteShell
 │   │       ├── updateShellName
 │   │       └── updateShell
-│   ├── queries.ts               (3 tRPC queries)
-│   │   ├── list                      GET /api/terminals
-│   │   ├── getById                   GET /api/terminals/:id
-│   │   └── sshHosts                  GET /api/ssh/hosts
+│   ├── queries/
+│   │   ├── terminals.ts         (3 tRPC queries)
+│   │   │   ├── list                      GET /api/terminals
+│   │   │   ├── getById                   GET /api/terminals/:id
+│   │   │   └── sshHosts                  GET /api/ssh/hosts
+│   │   └── system.ts            (7 tRPC queries/mutations)
+│   │       ├── browseFolder              GET /api/browse-folder
+│   │       ├── listDirectories           POST /api/list-directories
+│   │       ├── sshAudit                  GET /api/ssh/audit
+│   │       ├── sshPing                   POST /api/ssh/ping
+│   │       ├── openFullDiskAccess        POST /api/open-full-disk-access
+│   │       ├── openInIde                 POST /api/open-in-ide
+│   │       └── openInExplorer            POST /api/open-in-explorer
 │   ├── mutations.ts             (10 tRPC mutations)
 │   │   ├── create                    POST /api/terminals
 │   │   ├── update                    PATCH /api/terminals/:id
@@ -74,20 +86,64 @@ server/domains/
 │       │   ├── cancelWorkspace
 │       │   ├── rerunSetup
 │       │   └── clearSetupError
-│       ├── shell.ts             (3 functions)
-│       │   ├── writeShell
-│       │   ├── interruptShell
-│       │   └── killShell
-│       └── system.ts            (9 functions)
+│       └── system.ts            (2 functions)
 │           ├── getParentAppName
-│           ├── getParentAppNameCached
-│           ├── isLocalPortAvailable
-│           ├── browseFolder           GET /api/browse-folder
-│           ├── openInIde              POST /api/open-in-ide
-│           ├── openInExplorer         POST /api/open-in-explorer
-│           ├── openFullDiskAccess     POST /api/open-full-disk-access
-│           ├── listDirectories        POST /api/list-directories
-│           └── sshAudit               GET /api/ssh/audit
+│           └── getParentAppNameCached
+│
+├── pty/
+│   ├── ipc-types.ts             (IPC message types between master and workers)
+│   ├── services/
+│   │   ├── session-proxy.ts     (15 functions — master-side worker pool)
+│   │   │   ├── createSession
+│   │   │   ├── attachSession
+│   │   │   ├── destroySession
+│   │   │   ├── getSession
+│   │   │   ├── writeToSession
+│   │   │   ├── resizeSession
+│   │   │   ├── interruptSession
+│   │   │   ├── killShellChildren
+│   │   │   ├── getSessionBuffer
+│   │   │   ├── waitForMarker
+│   │   │   ├── waitForSession
+│   │   │   ├── startSessionTimeout
+│   │   │   ├── clearSessionTimeout
+│   │   │   ├── updateSessionName
+│   │   │   └── getAllWorkers
+│   │   ├── manager.ts          (8 functions — high-level PTY API)
+│   │   │   ├── setPendingCommand
+│   │   │   ├── getBellSubscribedShellIds
+│   │   │   ├── subscribeBell
+│   │   │   ├── unsubscribeBell
+│   │   │   ├── writeShellIntegrationScripts
+│   │   │   ├── detectGitBranch
+│   │   │   ├── startGitDirtyPolling
+│   │   │   └── setCommandEventHandler
+│   │   ├── worker.ts           (PTY child process entry point)
+│   │   ├── osc-parser.ts       (2 functions — OSC 133 shell integration parser)
+│   │   │   ├── createOscParser
+│   │   │   └── type CommandEvent
+│   │   ├── permission-scanner.ts (2 functions — Claude permission prompt scanner)
+│   │   │   ├── scanBufferForPermissionPrompt
+│   │   │   └── scanAndStorePermissionPrompt
+│   │   ├── process-tree.ts      (10 functions — process introspection)
+│   │   │   ├── getChildPids
+│   │   │   ├── getProcessComm
+│   │   │   ├── getZellijSessionProcesses
+│   │   │   ├── getSystemMemoryUsage
+│   │   │   ├── getRemoteHostInfo
+│   │   │   ├── getRemoteZellijSessionProcesses
+│   │   │   ├── getListeningPorts
+│   │   │   ├── getDescendantPids
+│   │   │   ├── getResourceUsage
+│   │   │   └── findPidByPort
+│   │   └── websocket.ts        (3 functions — WebSocket PTY streaming)
+│   │       ├── handleUpgrade
+│   │       ├── emitAllShellClients
+│   │       └── handleConnection
+│   └── shell.ts                 (3 functions — shell write/interrupt/kill)
+│       ├── writeShell
+│       ├── interruptShell
+│       └── killShell
 │
 ├── git/
 │   ├── schema.ts
@@ -248,7 +304,8 @@ server/domains/
 
 | Domain | db | queries | mutations | service fns | total |
 |---|---|---|---|---|---|
-| **workspace** | 19 | 3 | 10 | 15 | 47 |
+| **workspace** | 19 | 10 | 10 | 5 | 44 |
+| **pty** | 0 | 0 | 0 | 43 | 43 |
 | **git** | 0 | 6 | 13 | 3 | 22 |
 | **sessions** | 18 | 5 | 7 | 16 | 46 |
 | **github** | 0 | 4 | 14 | 26 | 44 |

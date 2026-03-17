@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { stripDefaults } from '../../lib/zod'
 
 // --- Sub-schemas ---
 
@@ -221,7 +222,7 @@ const SERVER_ONLY_FIELDS = {
   vapid_private_key: true,
 } as const
 
-export const updateSettingsInput = settingsBaseSchema
+export const updateSettingsInput = stripDefaults(settingsBaseSchema)
   .omit(SERVER_ONLY_FIELDS)
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, {
