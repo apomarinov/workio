@@ -1,7 +1,7 @@
-import { refreshPRChecks } from '../../github/checks'
 import { execFileAsync } from '../../lib/exec'
 import { publicProcedure } from '../../trpc/init'
 import { updateSettings } from './db'
+import settingsEvents from './events'
 import { updateSettingsInput } from './schema'
 
 export const update = publicProcedure
@@ -23,9 +23,9 @@ export const update = publicProcedure
 
     const settings = await updateSettings(input)
 
-    // Refresh PR checks when hidden_prs changes
+    // Notify subscribers when hidden_prs changes
     if (input.hidden_prs !== undefined) {
-      refreshPRChecks(true)
+      settingsEvents.emit('settings:hidden_prs_changed')
     }
 
     return settings

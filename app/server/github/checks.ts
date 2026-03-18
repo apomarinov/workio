@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { emitNotification } from '@domains/notifications/service'
+import settingsEvents from '@domains/settings/events'
 import {
   DEFAULT_GH_QUERY_LIMITS,
   type GHQueryLimits,
@@ -2547,6 +2548,8 @@ export async function initGitHubChecks(): Promise<void> {
     updateGithubGraphql({ status: 'inactive', error: 'gh CLI not available' })
     return
   }
+
+  settingsEvents.on('settings:hidden_prs_changed', () => refreshPRChecks(true))
 
   const terminals = await getAllTerminals()
   for (const terminal of terminals) {
