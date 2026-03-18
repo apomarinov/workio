@@ -45,7 +45,6 @@ import {
 import { getActiveZellijSessionNames } from './pty/process-tree'
 import claudeHookRoute from './routes/claude-hook'
 import githubRoutes from './routes/github'
-import logsRoutes from './routes/logs'
 import sessionRoutes from './routes/sessions'
 import terminalRoutes from './routes/terminals'
 import { getServicesStatus, updateNgrokStatus } from './services/status'
@@ -396,7 +395,6 @@ await fastify.register(fastifyTRPCPlugin, {
 await fastify.register(githubRoutes)
 await fastify.register(terminalRoutes)
 await fastify.register(sessionRoutes)
-await fastify.register(logsRoutes)
 await fastify.register(claudeHookRoute)
 
 // Start monitor daemon (persistent Python process for hook events)

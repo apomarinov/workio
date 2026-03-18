@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
+import { logCommand } from '@domains/logs/db'
 import type { FastifyInstance } from 'fastify'
 import { execFileAsync } from '../lib/exec'
 
@@ -149,7 +150,6 @@ import {
   getAllTerminals,
   getShellById,
   getTerminalById,
-  logCommand,
   setActiveSessionDone,
   terminalCwdExists,
   terminalNameExists,

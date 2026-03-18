@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { logCommand } from '@domains/logs/db'
 import { emitNotification } from '@domains/notifications/service'
 import settingsEvents from '@domains/settings/events'
 import {
@@ -22,7 +23,6 @@ import {
   getAllTerminals,
   getSettings,
   getTerminalById,
-  logCommand,
   updateTerminal,
 } from '../db'
 import { getIO } from '../io'

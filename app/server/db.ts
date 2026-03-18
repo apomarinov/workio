@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cleanupOrphanedCommandLogs } from '@domains/logs/db'
 import pg from 'pg'
 import type {
   Project,
@@ -94,16 +95,7 @@ export async function initDb() {
 
   log.info('[db] Database initialized from schema.sql')
 
-  // Cleanup orphaned command_logs older than 1 week (terminal no longer exists)
-  const orphanedResult = await pool.query(`
-    DELETE FROM command_logs
-    WHERE terminal_id IS NOT NULL
-      AND terminal_id NOT IN (SELECT id FROM terminals)
-      AND created_at < NOW() - INTERVAL '1 week'
-  `)
-  if (orphanedResult.rowCount && orphanedResult.rowCount > 0) {
-    log.info(`[db] Cleaned up ${orphanedResult.rowCount} orphaned command_logs`)
-  }
+  await cleanupOrphanedCommandLogs()
 
   // Cleanup general logs older than 1 week
   const logsResult = await pool.query(`
@@ -930,65 +922,6 @@ export async function insertBackfilledSession(
   if (rowCount && rowCount > 0) {
     await db.query(`INSERT INTO prompts (session_id) VALUES ($1)`, [sessionId])
   }
-}
-
-// Command logging
-
-interface LogCommandOptions {
-  terminalId?: number
-  prId?: string // "owner/repo#123" format
-  category: 'git' | 'workspace' | 'github'
-  command: string
-  stdout?: string
-  stderr?: string
-  failed?: boolean
-}
-
-/** Fire-and-forget command logging - does not await at call sites */
-export function logCommand(opts: LogCommandOptions): void {
-  const exitCode = opts.failed ? 1 : 0
-  ;(async () => {
-    let sshHost: string | undefined
-    let terminalName: string | undefined
-    if (opts.terminalId) {
-      const terminal = await getTerminalById(opts.terminalId)
-      if (terminal) {
-        sshHost = terminal.ssh_host ?? undefined
-        terminalName = terminal.name ?? undefined
-      }
-    }
-    // If not failed, combine stderr into stdout (git often outputs progress to stderr)
-    let stdout = opts.stdout ?? ''
-    let stderr: string | undefined
-    if (opts.failed) {
-      stderr = opts.stderr
-    } else if (opts.stderr) {
-      stdout = stdout ? `${stdout}\n${opts.stderr}` : opts.stderr
-    }
-
-    await pool.query(
-      `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        opts.terminalId ?? null,
-        opts.prId ?? null,
-        exitCode,
-        opts.category,
-        JSON.stringify({
-          command: opts.command,
-          stdout: stdout.substring(0, 10000) || undefined,
-          stderr: stderr?.substring(0, 5000),
-          sshHost,
-          terminalName,
-        }),
-      ],
-    )
-  })().catch((err) => {
-    log.error(
-      { err, terminalId: opts.terminalId, prId: opts.prId },
-      '[command_logs] Failed to log',
-    )
-  })
 }
 
 // Active permissions query

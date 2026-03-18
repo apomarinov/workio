@@ -1,3 +1,4 @@
+import type { CommandLog } from '@server/domains/logs/schema'
 import { format } from 'date-fns'
 import {
   AlertCircle,
@@ -8,7 +9,7 @@ import {
   Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -27,8 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import type { CommandLog, LogTerminal } from '@/types'
 
 interface LogsModalProps {
   open: boolean
@@ -47,9 +48,6 @@ export function LogsModal({
   initialFilter,
 }: LogsModalProps) {
   const [logs, setLogs] = useState<CommandLog[]>([])
-  const [terminals, setTerminals] = useState<LogTerminal[]>([])
-  const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
@@ -64,18 +62,48 @@ export function LogsModal({
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Load terminals for dropdown
-  useEffect(() => {
-    if (!open) return
-
-    fetch('/api/command-logs/terminals')
-      .then((res) => res.json())
-      .then((data) => setTerminals(data.terminals || []))
-      .catch(console.error)
-  }, [open])
-
   // Track when initial filter is being applied to skip stale fetch
   const pendingInitialFilter = useRef(false)
+  const offsetRef = useRef(0)
+
+  // Build tRPC input from filter state
+  const listInput = {
+    terminalId: typeof terminalFilter === 'number' ? terminalFilter : undefined,
+    deleted: terminalFilter === 'deleted' ? true : undefined,
+    prName: prNameFilter,
+    category: categoryFilter !== 'all' ? categoryFilter : undefined,
+    failed: failedOnly || undefined,
+    startDate: dateRange?.from?.toISOString(),
+    endDate: dateRange?.to?.toISOString(),
+    search: searchQuery || undefined,
+    offset: offsetRef.current,
+    limit: 50,
+  }
+
+  const { data: terminalsData } = trpc.logs.terminals.useQuery(undefined, {
+    enabled: open,
+  })
+  const terminals = terminalsData?.terminals ?? []
+
+  const {
+    data: logsData,
+    isLoading: loading,
+    isFetching,
+    refetch,
+  } = trpc.logs.list.useQuery(listInput, {
+    enabled: open && !pendingInitialFilter.current,
+  })
+
+  // When data arrives, update local logs state (handles append for load-more)
+  useEffect(() => {
+    if (!logsData) return
+    if (offsetRef.current > 0) {
+      setLogs((prev) => [...prev, ...logsData.logs])
+    } else {
+      setLogs(logsData.logs)
+    }
+    setHasMore(logsData.hasMore)
+  }, [logsData])
 
   // Apply initial filter when modal opens
   useEffect(() => {
@@ -90,6 +118,24 @@ export function LogsModal({
     }
   }, [open, initialFilter])
 
+  // When filters change, reset offset and clear pending flag
+  useEffect(() => {
+    if (!open) return
+    if (pendingInitialFilter.current) {
+      pendingInitialFilter.current = false
+      return
+    }
+    offsetRef.current = 0
+  }, [
+    open,
+    terminalFilter,
+    prNameFilter,
+    categoryFilter,
+    failedOnly,
+    dateRange,
+    searchQuery,
+  ])
+
   // Reset filters when modal closes
   useEffect(() => {
     if (!open) {
@@ -103,95 +149,17 @@ export function LogsModal({
         setSearchQuery('')
         setExpandedId(null)
         setHasMore(true)
+        offsetRef.current = 0
       }, 200)
     }
   }, [open])
 
-  const fetchLogs = useCallback(
-    async (offset = 0, append = false) => {
-      if (offset === 0) {
-        setLoading(true)
-      } else {
-        setLoadingMore(true)
-      }
-
-      try {
-        const params = new URLSearchParams()
-
-        if (terminalFilter === 'deleted') {
-          params.set('deleted', 'true')
-        } else if (typeof terminalFilter === 'number') {
-          params.set('terminalId', String(terminalFilter))
-        }
-
-        if (prNameFilter) {
-          params.set('prName', prNameFilter)
-        }
-
-        if (categoryFilter !== 'all') {
-          params.set('category', categoryFilter)
-        }
-
-        if (failedOnly) {
-          params.set('failed', 'true')
-        }
-
-        if (dateRange?.from) {
-          params.set('startDate', dateRange.from.toISOString())
-        }
-        if (dateRange?.to) {
-          params.set('endDate', dateRange.to.toISOString())
-        }
-
-        if (searchQuery) {
-          params.set('search', searchQuery)
-        }
-
-        params.set('offset', String(offset))
-        params.set('limit', '50')
-
-        const res = await fetch(`/api/command-logs?${params}`)
-        const data = await res.json()
-
-        if (append) {
-          setLogs((prev) => [...prev, ...data.logs])
-        } else {
-          setLogs(data.logs)
-        }
-        setHasMore(data.hasMore)
-      } catch (err) {
-        console.error('Failed to fetch logs:', err)
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [
-      terminalFilter,
-      prNameFilter,
-      categoryFilter,
-      failedOnly,
-      dateRange,
-      searchQuery,
-    ],
-  )
-
-  // Fetch logs when filters change
-  useEffect(() => {
-    if (!open) return
-
-    // Skip fetch if initial filter was just applied - wait for state to update
-    if (pendingInitialFilter.current) {
-      pendingInitialFilter.current = false
-      return
-    }
-
-    fetchLogs(0, false)
-  }, [open, fetchLogs])
+  const loadingMore = isFetching && offsetRef.current > 0
 
   const loadMore = () => {
-    if (!loadingMore && hasMore) {
-      fetchLogs(logs.length, true)
+    if (!isFetching && hasMore) {
+      offsetRef.current = logs.length
+      refetch()
     }
   }
 

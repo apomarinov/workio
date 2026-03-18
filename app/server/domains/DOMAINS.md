@@ -4,16 +4,18 @@ Target structure for migrating the server codebase into isolated domains with tR
 
 ## Dependencies
 
-| Domain | Imports from | Why |
-|---|---|---|
-| **workspace** | notifications | `emitWorkspace` calls `emitNotification` |
-| **pty** | workspace, sessions, notifications | Terminal/shell info for sessions; permission scanner writes to sessions DB; sends push notifications |
-| **git** | workspace, logs | Needs terminal cwd/ssh_host to run git; logs git commands |
-| **sessions** | workspace, settings | Terminal/project lookups for backfill/move; settings for favorites |
-| **github** | workspace, logs, settings | Terminal tracking for branch detection; logs GitHub API calls; reads `GHQueryLimits` from settings schema |
-| **logs** | workspace | `logCommand` reads terminal name/ssh_host via `getTerminalById` |
-| **settings** | — | Standalone |
-| **notifications** | settings | Reads/updates settings for push subscription management |
+
+| Domain            | Imports from                       | Why                                                                                                       |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **workspace**     | notifications                      | `emitWorkspace` calls `emitNotification`                                                                  |
+| **pty**           | workspace, sessions, notifications | Terminal/shell info for sessions; permission scanner writes to sessions DB; sends push notifications      |
+| **git**           | workspace, logs                    | Needs terminal cwd/ssh_host to run git; logs git commands                                                 |
+| **sessions**      | workspace, settings                | Terminal/project lookups for backfill/move; settings for favorites                                        |
+| **github**        | workspace, logs, settings          | Terminal tracking for branch detection; logs GitHub API calls; reads `GHQueryLimits` from settings schema |
+| **logs**          | workspace                          | `logCommand` reads terminal name/ssh_host via `getTerminalById`                                           |
+| **settings**      | —                                  | Standalone                                                                                                |
+| **notifications** | settings                           | Reads/updates settings for push subscription management                                                   |
+
 
 ```
 workspace     ← pty
@@ -343,25 +345,29 @@ These files stay in place — they're cross-cutting concerns used by all domains
 
 ## Totals
 
-| Domain | db | queries | mutations | service fns | total |
-|---|---|---|---|---|---|
-| **workspace** | 19 | 10 | 13 | 5 | 47 |
-| **pty** | 0 | 0 | 0 | 58 | 58 |
-| **git** | 0 | 6 | 13 | 3 | 22 |
-| **sessions** | 18 | 5 | 7 | 17 | 47 |
-| **github** | 0 | 4 | 14 | 24 | 42 |
-| **logs** | 1 | 2 | 0 | 0 | 3 |
+
+| Domain        | db  | queries | mutations | service fns | total |
+| ------------- | --- | ------- | --------- | ----------- | ----- |
+| **workspace** | 19  | 10      | 13        | 5           | 47    |
+| **pty**       | 0   | 0       | 0         | 58          | 58    |
+| **git**       | 0   | 6       | 13        | 3           | 22    |
+| **sessions**  | 18  | 5       | 7         | 17          | 47    |
+| **github**    | 0   | 4       | 14        | 24          | 42    |
+| **logs**      | 1   | 2       | 0         | 0           | 3     |
+
 
 ## Migration Order
 
-| # | Domain | Status | Notes |
-|---|---|---|---|
-| 1 | **logs** | [ ] | Smallest (3 functions), no deps on other unmigrated domains, good warmup to establish the pattern |
-| 2 | **workspace** | [ ] | Leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it |
-| 3 | **pty** | [ ] | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
-| 4 | **git** | [ ] | Depends on workspace + logs, both done by now |
-| 5 | **sessions** | [ ] | Depends on workspace + settings (already done). Large but self-contained |
-| 6 | **github** | [ ] | Depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers |
+
+| #   | Domain        | Status | Notes                                                                                                                                                           |
+| --- | ------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **logs**      | [x]    | Smallest (3 functions), no deps on other unmigrated domains, good warmup to establish the pattern                                                               |
+| 2   | **workspace** | [ ]    | Leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it                                                 |
+| 3   | **pty**       | [ ]    | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
+| 4   | **git**       | [ ]    | Depends on workspace + logs, both done by now                                                                                                                   |
+| 5   | **sessions**  | [ ]    | Depends on workspace + settings (already done). Large but self-contained                                                                                        |
+| 6   | **github**    | [ ]    | Depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers                          |
+
 
 Steps 4 and 5 can be done in either order or in parallel since they don't depend on each other.
 
@@ -369,56 +375,66 @@ Steps 4 and 5 can be done in either order or in parallel since they don't depend
 
 ### workspace (47 functions → 4 sub-groups)
 
-| Done | Sub-group | Count | What | Client usage |
-|---|---|---|---|---|
-| [ ] | **terminals** | 15 | CRUD, project upsert, name uniqueness | Sidebar list, CreateTerminalModal, EditTerminalModal |
-| [ ] | **shells** | 10 | create, delete, rename, get, write, interrupt, kill | Shell tabs in terminal, context menu |
-| [ ] | **setup** | 5 | cancel, rerun, clear error, setupWorkspace, emitWorkspace | EditTerminalModal lifecycle buttons, CreateTerminalModal |
-| [ ] | **system** | 10+ | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/fix-max-sessions, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
+
+| Done | Sub-group     | Count | What                                                                                                                              | Client usage                                                            |
+| ---- | ------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [ ]  | **terminals** | 15    | CRUD, project upsert, name uniqueness                                                                                             | Sidebar list, CreateTerminalModal, EditTerminalModal                    |
+| [ ]  | **shells**    | 10    | create, delete, rename, get, write, interrupt, kill                                                                               | Shell tabs in terminal, context menu                                    |
+| [ ]  | **setup**     | 5     | cancel, rerun, clear error, setupWorkspace, emitWorkspace                                                                         | EditTerminalModal lifecycle buttons, CreateTerminalModal                |
+| [ ]  | **system**    | 10+   | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/fix-max-sessions, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
+
 
 ### pty (58 functions → 5 sub-groups)
 
-| Done | Sub-group | Count | What | Notes |
-|---|---|---|---|---|
-| [ ] | **manager** | 33 | Public API: session lifecycle, commands, bell, git/process scanning, shell integration, naming | Facade over session-proxy; all external consumers import from here |
-| [ ] | **process-tree** | 16 | child PIDs, process comm, zellij sessions, memory, resource usage, listening ports (local + remote) | Process introspection for terminal status display |
-| [ ] | **shell-integration** | 4 | OSC parser, command events, permission scanner | Parsing terminal output for commands and Claude prompts |
-| [ ] | **websocket** | 2 | handleUpgrade, emitAllShellClients | WebSocket PTY streaming to browser |
-| [ ] | **shell** | 3 | writeShell, interruptShell, killShell | Shell write/interrupt/kill extracted from routes |
+
+| Done | Sub-group             | Count | What                                                                                                | Notes                                                              |
+| ---- | --------------------- | ----- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [ ]  | **manager**           | 33    | Public API: session lifecycle, commands, bell, git/process scanning, shell integration, naming      | Facade over session-proxy; all external consumers import from here |
+| [ ]  | **process-tree**      | 16    | child PIDs, process comm, zellij sessions, memory, resource usage, listening ports (local + remote) | Process introspection for terminal status display                  |
+| [ ]  | **shell-integration** | 4     | OSC parser, command events, permission scanner                                                      | Parsing terminal output for commands and Claude prompts            |
+| [ ]  | **websocket**         | 2     | handleUpgrade, emitAllShellClients                                                                  | WebSocket PTY streaming to browser                                 |
+| [ ]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Shell write/interrupt/kill extracted from routes                   |
+
 
 Plus `session-proxy.ts` (internal worker pool IPC), `worker.ts` (child process entry point), and `ipc-types.ts` (shared types).
 
 ### sessions (46 functions → 7 sub-groups)
 
-| Done | Sub-group | Count | What | Client usage |
-|---|---|---|---|---|
-| [ ] | **crud** | 12 | list, getById, update, delete, bulkDelete, cleanup, favorites | SessionContext sidebar, context menus, CleanupModal |
-| [ ] | **messages** | 4 | getMessages, getByIds, getByUuid | SessionChat, paginated message viewer |
-| [ ] | **search** | 2 | searchSessionMessages, buildResults | SessionSearchPanel — full-text search with repo/branch filters |
-| [ ] | **backfill** | 5 | backfillCheck, backfillRun, isRealSession, readLastTimestamp, readSessionBranches | BackfillModal — import sessions from JSONL files |
-| [ ] | **move** | 9 | moveSession, moveTargets, appendMeta, updateIndex local/remote, snapshots | Command palette "Move To Project" action |
-| [ ] | **permissions** | 4 | getActivePermissions, getLatestPromptId, insertPermissionMessage, resumePermissionSession | useActivePermissions hook — permission indicators on sessions |
-| [ ] | **hook** | 2 | forwardToDaemon, handleClaudeHook | No direct client usage — receives from SSH reverse tunnel |
+
+| Done | Sub-group       | Count | What                                                                                      | Client usage                                                   |
+| ---- | --------------- | ----- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [ ]  | **crud**        | 12    | list, getById, update, delete, bulkDelete, cleanup, favorites                             | SessionContext sidebar, context menus, CleanupModal            |
+| [ ]  | **messages**    | 4     | getMessages, getByIds, getByUuid                                                          | SessionChat, paginated message viewer                          |
+| [ ]  | **search**      | 2     | searchSessionMessages, buildResults                                                       | SessionSearchPanel — full-text search with repo/branch filters |
+| [ ]  | **backfill**    | 5     | backfillCheck, backfillRun, isRealSession, readLastTimestamp, readSessionBranches         | BackfillModal — import sessions from JSONL files               |
+| [ ]  | **move**        | 9     | moveSession, moveTargets, appendMeta, updateIndex local/remote, snapshots                 | Command palette "Move To Project" action                       |
+| [ ]  | **permissions** | 4     | getActivePermissions, getLatestPromptId, insertPermissionMessage, resumePermissionSession | useActivePermissions hook — permission indicators on sessions  |
+| [ ]  | **hook**        | 2     | forwardToDaemon, handleClaudeHook                                                         | No direct client usage — receives from SSH reverse tunnel      |
+
 
 ### github (42 functions → 5 sub-groups)
 
-| Done | Sub-group | Count | What | Client usage |
-|---|---|---|---|---|
-| [ ] | **pr-data** | 8 | fetchClosedPRs, fetchInvolvedPRs, refreshPRChecks, polling, branch detection, caching | GitHubContext — sidebar PR list, socket `github:pr-checks` |
-| [ ] | **pr-ops** | 8 | merge, close, create, edit, rename, requestReview | MergeDialog, EditPRDialog, ReReviewDialog, command palette |
-| [ ] | **comments** | 6 | addComment, replyToReview, editIssueComment, editReviewComment, editReview | PRStatusContent — discussion timeline, ReplyDialog, EditCommentDialog |
-| [ ] | **reactions** | 2 | addReaction, removeReaction | PRStatusContent — emoji reaction badges |
-| [ ] | **webhooks** | 10 | ngrok init/stop, webhook CRUD, signature verify, validation polling, secret management | CreateTerminalModal (webhook setup), no direct UI for most |
+
+| Done | Sub-group     | Count | What                                                                                   | Client usage                                                          |
+| ---- | ------------- | ----- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [ ]  | **pr-data**   | 8     | fetchClosedPRs, fetchInvolvedPRs, refreshPRChecks, polling, branch detection, caching  | GitHubContext — sidebar PR list, socket `github:pr-checks`            |
+| [ ]  | **pr-ops**    | 8     | merge, close, create, edit, rename, requestReview                                      | MergeDialog, EditPRDialog, ReReviewDialog, command palette            |
+| [ ]  | **comments**  | 6     | addComment, replyToReview, editIssueComment, editReviewComment, editReview             | PRStatusContent — discussion timeline, ReplyDialog, EditCommentDialog |
+| [ ]  | **reactions** | 2     | addReaction, removeReaction                                                            | PRStatusContent — emoji reaction badges                               |
+| [ ]  | **webhooks**  | 10    | ngrok init/stop, webhook CRUD, signature verify, validation polling, secret management | CreateTerminalModal (webhook setup), no direct UI for most            |
+
 
 Plus `repos` and `conductor` queries used only by CreateTerminalModal for repo selection.
 
 ### git (22 functions → 3 sub-groups)
 
-| Done | Sub-group | Count | What | Client usage |
-|---|---|---|---|---|
-| [ ] | **branches** | 10 | list, checkout, create, delete, rename, fetch-all, pull, push, rebase | Branch palette, command palette actions |
-| [ ] | **diff** | 6 | changedFiles, fileDiff, headMessage, commits, branchCommits, branchConflicts | CommitDialog, FileDiffViewer, BranchDiffPanel |
-| [ ] | **commit** | 6 | commit, discard, undoCommit, dropCommit, fetchOriginIfNeeded, parseChangedFiles/parseUntrackedWc | CommitDialog stage/commit/discard |
+
+| Done | Sub-group    | Count | What                                                                                             | Client usage                                  |
+| ---- | ------------ | ----- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| [ ]  | **branches** | 10    | list, checkout, create, delete, rename, fetch-all, pull, push, rebase                            | Branch palette, command palette actions       |
+| [ ]  | **diff**     | 6     | changedFiles, fileDiff, headMessage, commits, branchCommits, branchConflicts                     | CommitDialog, FileDiffViewer, BranchDiffPanel |
+| [ ]  | **commit**   | 6     | commit, discard, undoCommit, dropCommit, fetchOriginIfNeeded, parseChangedFiles/parseUntrackedWc | CommitDialog stage/commit/discard             |
+
 
 ### logs (3 functions)
 

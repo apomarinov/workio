@@ -300,25 +300,3 @@ export interface HookEvent {
   shell_id: number | null
   last_message?: string
 }
-
-export interface CommandLog {
-  id: number
-  terminal_id: number | null
-  pr_id: string | null // "owner/repo#123" format
-  exit_code: number
-  category: string
-  data: {
-    command: string
-    stdout?: string
-    stderr?: string
-    sshHost?: string
-    terminalName?: string
-  }
-  created_at: string
-}
-
-export interface LogTerminal {
-  id: number
-  name: string
-  deleted: boolean
-}

@@ -110,7 +110,7 @@ export function BackfillSection() {
           size="sm"
           onClick={() => setOpen(true)}
         >
-          Import
+          Review
         </Button>
       </div>
 

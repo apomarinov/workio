@@ -1,4 +1,4 @@
-import { logCommand } from '../db'
+import { logCommand } from '@domains/logs/db'
 import { execSSHCommand } from '../ssh/exec'
 import { execFileAsync } from './exec'
 import { expandPath, shellEscape } from './strings'
