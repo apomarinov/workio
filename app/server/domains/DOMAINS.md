@@ -310,3 +310,65 @@ server/domains/
 | **sessions** | 18 | 5 | 7 | 16 | 46 |
 | **github** | 0 | 4 | 14 | 26 | 44 |
 | **logs** | 1 | 2 | 0 | 0 | 3 |
+
+## Migration Order
+
+1. **logs** — smallest (3 functions), no deps on other unmigrated domains, good warmup to establish the pattern
+2. **workspace** — leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it
+3. **pty** — depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations
+4. **git** — depends on workspace + logs, both done by now
+5. **sessions** — depends on workspace + settings (already done). Large but self-contained
+6. **github** — depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers
+
+Steps 4 and 5 can be done in either order or in parallel since they don't depend on each other.
+
+## Sub-groups
+
+### workspace (44 functions → 4 sub-groups)
+
+| Sub-group | Count | What | Client usage |
+|---|---|---|---|
+| **terminals** | 15 | CRUD, project upsert, name uniqueness | Sidebar list, CreateTerminalModal, EditTerminalModal |
+| **shells** | 7 | create, delete, rename, get | Shell tabs in terminal, context menu |
+| **setup** | 5 | cancel, rerun, clear error, setupWorkspace, emitWorkspace | EditTerminalModal lifecycle buttons, CreateTerminalModal |
+| **system** | 10+ | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/ping, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
+
+### pty (43 functions → 5 sub-groups)
+
+| Sub-group | Count | What | Notes |
+|---|---|---|---|
+| **session-proxy** | 15 | create, attach, destroy, write, resize, buffer, timeout | Worker pool — master-side lifecycle of PTY processes |
+| **manager** | 8 | pending command, bell subscriptions, shell integration scripts, git branch/dirty polling | High-level API that other domains call |
+| **process-tree** | 10 | child PIDs, process comm, zellij sessions, memory, remote host info, ports, resource usage | Process introspection for terminal status display |
+| **shell-integration** | 4 | OSC parser, command events, permission scanner | Parsing terminal output for commands and Claude prompts |
+| **websocket** | 3 | handleUpgrade, handleConnection, emitAllShellClients | WebSocket PTY streaming to browser |
+
+Plus `worker.ts` (standalone child process) and `ipc-types.ts` (shared types).
+
+### sessions (46 functions → 7 sub-groups)
+
+| Sub-group | Count | What | Client usage |
+|---|---|---|---|
+| **crud** | 12 | list, getById, update, delete, bulkDelete, cleanup, favorites | SessionContext sidebar, context menus, CleanupModal |
+| **messages** | 4 | getMessages, getByIds, getByUuid | SessionChat, paginated message viewer |
+| **search** | 2 | searchSessionMessages, buildResults | SessionSearchPanel — full-text search with repo/branch filters |
+| **backfill** | 5 | backfillCheck, backfillRun, isRealSession, readLastTimestamp, readSessionBranches | BackfillModal — import sessions from JSONL files |
+| **move** | 9 | moveSession, moveTargets, appendMeta, updateIndex local/remote, snapshots | Command palette "Move To Project" action |
+| **permissions** | 4 | getActivePermissions, getLatestPromptId, insertPermissionMessage, resumePermissionSession | useActivePermissions hook — permission indicators on sessions |
+| **hook** | 2 | forwardToDaemon, handleClaudeHook | No direct client usage — receives from SSH reverse tunnel |
+
+### github (44 functions → 5 sub-groups)
+
+| Sub-group | Count | What | Client usage |
+|---|---|---|---|
+| **pr-data** | 10 | fetchClosedPRs, fetchInvolvedPRs, refreshPRChecks, polling, branch detection, caching | GitHubContext — sidebar PR list, socket `github:pr-checks` |
+| **pr-ops** | 8 | merge, close, create, edit, rename, requestReview | MergeDialog, EditPRDialog, ReReviewDialog, command palette |
+| **comments** | 6 | addComment, replyToReview, editIssueComment, editReviewComment, editReview | PRStatusContent — discussion timeline, ReplyDialog, EditCommentDialog |
+| **reactions** | 2 | addReaction, removeReaction | PRStatusContent — emoji reaction badges |
+| **webhooks** | 10 | ngrok init/stop, webhook CRUD, signature verify, validation polling, secret management | CreateTerminalModal (webhook setup), no direct UI for most |
+
+Plus `repos` and `conductor` queries used only by CreateTerminalModal for repo selection.
+
+### git (22 functions) and logs (3 functions)
+
+Small enough to not need sub-groups.
