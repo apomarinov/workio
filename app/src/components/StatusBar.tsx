@@ -21,12 +21,11 @@ import type {
 import {
   Activity,
   Check,
-  ChevronDown,
-  ChevronUp,
   GitBranch,
   GitCommitHorizontal,
   Globe,
   MoreVertical,
+  Settings2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -402,10 +401,9 @@ function StatusBarMenu({
         <Button
           variant="ghost"
           size="icon"
-          className="h-5 w-5 flex-shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
+          className="mt-0.5 h-5 w-5 flex-shrink-0 text-muted-foreground/60 hover:text-foreground"
         >
-          {!statusBar.onTop && <ChevronUp className="w-3 h-3" />}
-          {statusBar.onTop && <ChevronDown className="w-3 h-3" />}
+          <Settings2 className="w-3 h-3" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-0" align="end" side="bottom">

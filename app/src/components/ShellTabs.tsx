@@ -24,7 +24,6 @@ import {
   Bell,
   BellRing,
   ChevronDown,
-  ChevronUp,
   FolderOpen,
   Globe,
   Laptop,
@@ -32,6 +31,7 @@ import {
   PencilIcon,
   Play,
   Plus,
+  Settings2,
   Smartphone,
   Tablet,
   TrashIcon,
@@ -94,7 +94,7 @@ function ShellPopover({
   isMain,
   terminal,
   isPill,
-  isActive,
+  isActive: _isActive,
   onRename,
   onDelete,
 }: {
@@ -149,8 +149,7 @@ function ShellPopover({
         >
           <div
             className={cn(
-              'p-0.5',
-              isActive && 'bg-accent',
+              'p-0.5 bg-accent',
               isPill ? 'rounded-full' : 'rounded-sm',
             )}
           >
@@ -854,8 +853,6 @@ export function ShellTabs({
     }
   }
 
-  const ChevronElement = position === 'top' ? ChevronDown : ChevronUp
-
   const menuButton = (
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
       <PopoverTrigger asChild>
@@ -864,7 +861,7 @@ export function ShellTabs({
           size="icon"
           className="h-5 w-5 flex-shrink-0 text-muted-foreground/60 group-hover/tabs:text-muted-foreground"
         >
-          <ChevronElement className="w-3 h-3" />
+          <Settings2 className="w-3 h-3" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-0" align="start" side="bottom">
@@ -1020,10 +1017,15 @@ export function ShellTabs({
         )}
       >
         {isMobile && (
-          <div className="absolute top-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
+          <div className="absolute top-0 left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
         )}
         {tabBar && (
-          <div className="absolute bottom-[0.02rem] left-0 w-full h-[0.02rem] bg-zinc-400/30"></div>
+          <div
+            className={cn(
+              'absolute left-0 w-full h-[0.02rem] bg-zinc-400/30',
+              position === 'top' || isMobile ? 'bottom-0' : 'top-0',
+            )}
+          ></div>
         )}
         {children && <div className="flex-shrink-0">{children}</div>}
         {/* Shell items — responsive */}

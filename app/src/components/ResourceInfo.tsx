@@ -71,7 +71,7 @@ export function ResourceInfo({
 
   // No data available (e.g. process tree command errored out)
   if (totalRam === 0 || totalCpu === 0 || Object.keys(usage).length === 0) {
-    return <div></div>
+    return null
   }
 
   // System-wide metrics

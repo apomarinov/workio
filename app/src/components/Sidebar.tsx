@@ -999,7 +999,7 @@ export function Sidebar({ width }: SidebarProps) {
         )}
       </div>
 
-      <div className="border-t border-sidebar-border pl-4 pr-2 flex items-center w-full justify-between min-h-[28px]">
+      <div className="border-t border-sidebar-border pl-4 pr-2 flex items-center w-full justify-end gap-2 min-h-[28px]">
         <ResourceInfo className="hover:opacity-80 py-[0.35rem]" />
         <ServiceStatusIndicator className="hover:opacity-100 py-[0.35rem] px-1" />
       </div>
