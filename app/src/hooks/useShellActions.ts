@@ -3,14 +3,8 @@ import type { Shell, Terminal } from '@domains/workspace/schema'
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
-import {
-  createShellForTerminal,
-  deleteShell,
-  interruptShell,
-  renameShell,
-  writeToShell,
-} from '../lib/api'
 import { useSettings } from './useSettings'
 
 /** Return shells in DnD-reordered display order for a terminal */
@@ -39,9 +33,16 @@ export function useShellActions() {
   const shellOrderRef = useRef<Record<number, number[]>>({})
   shellOrderRef.current = settings?.shell_order ?? {}
 
+  const createShellMutation = trpc.workspace.shells.createShell.useMutation()
+  const deleteShellMutation = trpc.workspace.shells.deleteShell.useMutation()
+  const renameShellMutation = trpc.workspace.shells.renameShell.useMutation()
+  const writeShellMutation = trpc.workspace.shells.writeShell.useMutation()
+  const interruptShellMutation =
+    trpc.workspace.shells.interruptShell.useMutation()
+
   const handleCreateShell = async (terminalId: number) => {
     try {
-      const shell = await createShellForTerminal(terminalId)
+      const shell = await createShellMutation.mutateAsync({ terminalId })
       await refetch()
       setShell(terminalId, shell.id)
       window.dispatchEvent(
@@ -62,7 +63,7 @@ export function useShellActions() {
       const shellsBefore = terminalBefore?.shells ?? []
       const deletedIndex = shellsBefore.findIndex((s) => s.id === shellId)
 
-      await deleteShell(shellId)
+      await deleteShellMutation.mutateAsync({ id: shellId })
       cleanupShellOrder(terminalId, shellId)
       setTimeout(async () => {
         await refetch()
@@ -88,7 +89,7 @@ export function useShellActions() {
   }
 
   const handleRenameShell = async (shellId: number, name: string) => {
-    await renameShell(shellId, name)
+    await renameShellMutation.mutateAsync({ id: shellId, name })
     await refetch()
   }
 
@@ -112,15 +113,15 @@ export function useShellActions() {
       // 1. Delete all non-main shells
       const nonMainShells = terminal.shells.filter((s) => s.name !== 'main')
       for (const shell of nonMainShells) {
-        await deleteShell(shell.id)
+        await deleteShellMutation.mutateAsync({ id: shell.id })
       }
 
       // 2. Interrupt main shell
       const mainShell = terminal.shells.find((s) => s.name === 'main')
       if (mainShell) {
-        await interruptShell(mainShell.id).catch(() =>
-          toast.error('Failed to interrupt shell'),
-        )
+        await interruptShellMutation
+          .mutateAsync({ id: mainShell.id })
+          .catch(() => toast.error('Failed to interrupt shell'))
       }
 
       // 3. Wait for things to settle
@@ -130,7 +131,10 @@ export function useShellActions() {
       const customEntries = template.entries.slice(1)
       const createdShellIds: number[] = []
       for (const entry of customEntries) {
-        const shell = await createShellForTerminal(terminalId, entry.name)
+        const shell = await createShellMutation.mutateAsync({
+          terminalId,
+          name: entry.name,
+        })
         createdShellIds.push(shell.id)
       }
 
@@ -139,16 +143,19 @@ export function useShellActions() {
 
       // 6. Send commands to main shell
       if (mainShell && template.entries[0]?.command) {
-        await writeToShell(mainShell.id, `${template.entries[0].command}\n`)
+        await writeShellMutation.mutateAsync({
+          id: mainShell.id,
+          data: `${template.entries[0].command}\n`,
+        })
       }
 
       // 7. Send commands to custom shells
       for (let i = 0; i < customEntries.length; i++) {
         if (customEntries[i].command) {
-          await writeToShell(
-            createdShellIds[i],
-            `${customEntries[i].command}\n`,
-          )
+          await writeShellMutation.mutateAsync({
+            id: createdShellIds[i],
+            data: `${customEntries[i].command}\n`,
+          })
         }
       }
 

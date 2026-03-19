@@ -1,8 +1,14 @@
 import { router } from '@server/trpc/init'
-import * as mutations from './mutations'
-import * as queries from './queries/terminals'
+import * as shellMutations from './mutations/shells'
+import * as terminalMutations from './mutations/terminals'
+import * as terminalQueries from './queries/terminals'
 
 export const workspaceRouter = router({
-  ...queries,
-  ...mutations,
+  terminals: router({
+    ...terminalQueries,
+    ...terminalMutations,
+  }),
+  shells: router({
+    ...shellMutations,
+  }),
 })

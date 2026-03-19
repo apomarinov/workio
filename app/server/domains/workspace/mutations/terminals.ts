@@ -23,12 +23,12 @@ import {
   getTerminalById,
   terminalCwdExists,
   terminalNameExists,
-} from './db/terminals'
+} from '../db/terminals'
 import {
   createTerminalInput,
   deleteTerminalInput,
   updateTerminalInput,
-} from './schema'
+} from '../schema'
 
 function isLocalPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {

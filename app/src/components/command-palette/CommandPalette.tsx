@@ -23,13 +23,11 @@ import {
   checkoutBranch,
   closePR,
   createBranch,
-  createShellForTerminal,
   deleteBranch,
   editPR,
   fetchAll,
   getBranches,
   getMoveTargets,
-  killShell,
   moveSession,
   openInExplorer,
   openInIDE,
@@ -40,6 +38,7 @@ import {
   toggleFavoriteSession,
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import type { PRCheckStatus } from '../../../shared/types'
 import type { MoveTarget, SessionWithProject } from '../../types'
 
@@ -152,6 +151,9 @@ export function CommandPalette() {
   } | null>(null)
 
   const [, setSearchText] = useState('')
+
+  const killShellMutation = trpc.workspace.shells.killShell.useMutation()
+  const createShellMutation = trpc.workspace.shells.createShell.useMutation()
 
   // Context data
   const {
@@ -1381,7 +1383,7 @@ export function CommandPalette() {
           variant="danger"
           onConfirm={async () => {
             const { terminalId, shellId, command } = runConfirm
-            await killShell(shellId)
+            await killShellMutation.mutateAsync({ id: shellId })
             setRunConfirm(null)
             doRunInShell(terminalId, shellId, command)
           }}
@@ -1398,7 +1400,9 @@ export function CommandPalette() {
               label: 'Run in New Shell',
               onAction: async () => {
                 const { terminalId, command } = runConfirm
-                const shell = await createShellForTerminal(terminalId)
+                const shell = await createShellMutation.mutateAsync({
+                  terminalId,
+                })
                 await refetch()
                 setRunConfirm(null)
                 doRunInShell(terminalId, shell.id, command)

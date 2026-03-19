@@ -128,32 +128,13 @@ function parseChangedFiles(
 }
 
 import {
-  createShell,
-  deleteShell,
-  getShellById,
-  updateShellName,
-} from '@domains/workspace/db/shells'
-import {
   getTerminalById,
   updateTerminal,
 } from '@domains/workspace/db/terminals'
-import { setActiveSessionDone } from '../db'
-import { getIO } from '../io'
 import { gitExec, gitExecLogged } from '../lib/git'
-import { expandPath, sanitizeName, shellEscape } from '../lib/strings'
+import { expandPath, shellEscape } from '../lib/strings'
 import { log } from '../logger'
-import {
-  checkAndEmitSingleGitDirty,
-  destroySession,
-  detectGitBranch,
-  interruptSession,
-  killShellChildren,
-  renameZellijSession,
-  updateSessionName,
-  waitForSession,
-  writeShellNameFile,
-  writeToSession,
-} from '../pty/manager'
+import { checkAndEmitSingleGitDirty, detectGitBranch } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import { emitWorkspace } from '../workspace/emit'
@@ -262,17 +243,6 @@ async function resolveGitTerminal(params: TerminalParams) {
   return terminal as typeof terminal & {
     git_repo: NonNullable<(typeof terminal)['git_repo']>
   }
-}
-
-async function resolveShell(params: { id: string }) {
-  const id = parseId(params.id, 'shell')
-  const shell = await getShellById(id)
-  if (!shell) {
-    const err = new Error('Shell not found') as Error & { statusCode: number }
-    err.statusCode = 404
-    throw err
-  }
-  return shell
 }
 
 export default async function terminalRoutes(fastify: FastifyInstance) {
@@ -1708,166 +1678,6 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
           error: errorMessage,
         })
       }
-    },
-  )
-
-  // Create a new shell for a terminal
-  fastify.post<{ Params: TerminalParams; Body: { name?: string } }>(
-    '/api/terminals/:id/shells',
-    async (request, reply) => {
-      const terminal = await resolveTerminal(request.params)
-      const id = terminal.id
-
-      const name = request.body?.name?.trim()
-      if (name === 'main') {
-        return reply
-          .status(400)
-          .send({ error: '"main" is a reserved shell name' })
-      }
-
-      // Auto-generate name if not provided
-      const shellName = name || `shell-${terminal.shells.length + 1}`
-
-      const shell = await createShell(id, shellName)
-      return reply.status(201).send(shell)
-    },
-  )
-
-  // Delete a shell
-  fastify.delete<{ Params: { id: string } }>(
-    '/api/shells/:id',
-    async (request, reply) => {
-      const shell = await resolveShell(request.params)
-      const id = shell.id
-
-      if (shell.name === 'main') {
-        return reply.status(400).send({ error: 'Cannot delete the main shell' })
-      }
-
-      // Destroy PTY session for this shell
-      destroySession(id)
-
-      await deleteShell(id)
-      return reply.status(204).send()
-    },
-  )
-
-  // Rename a shell
-  fastify.patch<{ Params: { id: string }; Body: { name: string } }>(
-    '/api/shells/:id',
-    async (request, reply) => {
-      const shell = await resolveShell(request.params)
-      const id = shell.id
-
-      if (shell.name === 'main') {
-        return reply.status(400).send({ error: 'Cannot rename the main shell' })
-      }
-
-      const { name } = request.body
-      if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        return reply.status(400).send({ error: 'Name is required' })
-      }
-
-      const trimmedName = name.trim()
-      if (trimmedName === 'main') {
-        return reply
-          .status(400)
-          .send({ error: 'Cannot use reserved name "main"' })
-      }
-
-      const terminal = await getTerminalById(shell.terminal_id)
-      if (!terminal) {
-        return reply.status(404).send({ error: 'Terminal not found' })
-      }
-
-      const terminalName = terminal.name || `terminal-${terminal.id}`
-      const oldSessionName = `${terminalName}-${shell.name}`
-      const newSessionName = `${terminalName}-${trimmedName}`
-
-      const updated = await updateShellName(id, trimmedName)
-      const sanitizedName = sanitizeName(newSessionName)
-      renameZellijSession(
-        sanitizeName(oldSessionName),
-        sanitizedName,
-        terminal.ssh_host,
-      )
-      updateSessionName(id, newSessionName)
-      writeShellNameFile(id, newSessionName)
-
-      // Also write on remote host for SSH terminals (fire-and-forget)
-      if (terminal.ssh_host) {
-        execSSHCommand(
-          terminal.ssh_host,
-          `mkdir -p ~/.workio/shells && printf '%s' ${shellEscape(sanitizedName)} > ~/.workio/shells/${id}`,
-          { timeout: 5000 },
-        ).catch(() => {})
-      }
-
-      return reply.send(updated)
-    },
-  )
-
-  // Write data to a shell's PTY session
-  fastify.post<{ Params: { id: string }; Body: { data: string } }>(
-    '/api/shells/:id/write',
-    async (request, reply) => {
-      const shell = await resolveShell(request.params)
-      const id = shell.id
-
-      const { data } = request.body
-      if (typeof data !== 'string') {
-        return reply.status(400).send({ error: 'data is required' })
-      }
-
-      // Wait for PTY session to be ready (up to 10s)
-      const ready = await waitForSession(id, 10000)
-      if (!ready) {
-        return reply.status(503).send({ error: 'Shell session not ready' })
-      }
-
-      const written = writeToSession(id, data)
-      if (!written) {
-        return reply.status(500).send({ error: 'Failed to write to shell' })
-      }
-
-      return { success: true }
-    },
-  )
-
-  // Send interrupt (Ctrl+C) to a shell's PTY session
-  fastify.post<{ Params: { id: string } }>(
-    '/api/shells/:id/interrupt',
-    async (request, _reply) => {
-      const shell = await resolveShell(request.params)
-      const id = shell.id
-
-      // If the shell's session is waiting for permission, mark it done
-      const doneSessionId = await setActiveSessionDone(id)
-      if (doneSessionId) {
-        log.info(
-          `[interrupt] Set permission_needed session=${doneSessionId} to done (shell=${id})`,
-        )
-        const io = getIO()
-        io?.emit('session:updated', {
-          sessionId: doneSessionId,
-          data: { status: 'done' },
-        })
-      }
-
-      interruptSession(id)
-      return { success: true }
-    },
-  )
-
-  // Kill all child processes in a shell (SIGKILL to direct children)
-  fastify.post<{ Params: { id: string } }>(
-    '/api/shells/:id/kill',
-    async (request, _reply) => {
-      const shell = await resolveShell(request.params)
-      const id = shell.id
-
-      killShellChildren(id)
-      return { success: true }
     },
   )
 

@@ -1,4 +1,3 @@
-import type { Shell } from '@domains/workspace/schema'
 import type {
   ChangedFile,
   InvolvedPRSummary,
@@ -797,46 +796,6 @@ export async function recreateWebhook(
 export async function testWebhook(owner: string, repo: string): Promise<void> {
   await api(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
     method: 'POST',
-  })
-}
-
-// --- Shells ---
-
-export async function createShellForTerminal(
-  terminalId: number,
-  name?: string,
-): Promise<Shell> {
-  return api(`${API_BASE}/terminals/${terminalId}/shells`, {
-    body: { name },
-  })
-}
-
-export async function deleteShell(shellId: number): Promise<void> {
-  await api(`${API_BASE}/shells/${shellId}`, { method: 'DELETE' })
-}
-
-export async function writeToShell(
-  shellId: number,
-  data: string,
-): Promise<void> {
-  await api(`${API_BASE}/shells/${shellId}/write`, { body: { data } })
-}
-
-export async function interruptShell(shellId: number): Promise<void> {
-  await api(`${API_BASE}/shells/${shellId}/interrupt`, { method: 'POST' })
-}
-
-export async function killShell(shellId: number): Promise<void> {
-  await api(`${API_BASE}/shells/${shellId}/kill`, { method: 'POST' })
-}
-
-export async function renameShell(
-  shellId: number,
-  name: string,
-): Promise<Shell> {
-  return api(`${API_BASE}/shells/${shellId}`, {
-    method: 'PATCH',
-    body: { name },
   })
 }
 

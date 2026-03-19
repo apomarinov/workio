@@ -86,14 +86,14 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { subscribe } = useSocket()
   const utils = trpc.useUtils()
-  const { data, isLoading } = trpc.workspace.listTerminals.useQuery()
+  const { data, isLoading } = trpc.workspace.terminals.listTerminals.useQuery()
   const hasEverLoaded = useRef(false)
   if (data) hasEverLoaded.current = true
 
   const setData = (
     updater: (prev: Terminal[] | undefined) => Terminal[] | undefined,
   ) => {
-    utils.workspace.listTerminals.setData(undefined, updater)
+    utils.workspace.terminals.listTerminals.setData(undefined, updater)
   }
 
   const { settings, updateSettings } = useSettings()
@@ -341,9 +341,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return ordered
   }, [terminals, collapsedProjectRepos])
 
-  const createMutation = trpc.workspace.createTerminal.useMutation()
-  const updateMutation = trpc.workspace.updateTerminal.useMutation()
-  const deleteMutation = trpc.workspace.deleteTerminal.useMutation()
+  const createMutation = trpc.workspace.terminals.createTerminal.useMutation()
+  const updateMutation = trpc.workspace.terminals.updateTerminal.useMutation()
+  const deleteMutation = trpc.workspace.terminals.deleteTerminal.useMutation()
 
   const createTerminal = useCallback(
     async (opts: {
@@ -463,14 +463,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refetch = useCallback(
-    () => utils.workspace.listTerminals.invalidate(),
+    () => utils.workspace.terminals.listTerminals.invalidate(),
     [utils],
   )
 
   // Listen for refetch events from other clients
   useEffect(() => {
     return subscribe<{ group: string }>('refetch', ({ group }) => {
-      if (group === 'terminals') utils.workspace.listTerminals.invalidate()
+      if (group === 'terminals')
+        utils.workspace.terminals.listTerminals.invalidate()
     })
   }, [subscribe, utils])
 

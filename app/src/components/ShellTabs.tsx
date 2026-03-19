@@ -55,7 +55,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
-import { interruptShell, killShell } from '@/lib/api'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
@@ -678,6 +678,9 @@ export function ShellTabs({
   children,
   rightExtra,
 }: ShellTabsProps) {
+  const interruptShellMutation =
+    trpc.workspace.shells.interruptShell.useMutation()
+  const killShellMutation = trpc.workspace.shells.killShell.useMutation()
   const { isBellSubscribed, processes } = useProcessContext()
   const { sessions } = useSessionContext()
 
@@ -1179,15 +1182,15 @@ export function ShellTabs({
         variant="danger"
         onConfirm={() => {
           for (const shell of terminal.shells) {
-            interruptShell(shell.id).catch(() =>
-              toast.error('Failed to interrupt shell'),
-            )
+            interruptShellMutation
+              .mutateAsync({ id: shell.id })
+              .catch(() => toast.error('Failed to interrupt shell'))
           }
           setTimeout(() => {
             for (const shell of terminal.shells) {
-              killShell(shell.id).catch(() =>
-                toast.error('Failed to kill shell'),
-              )
+              killShellMutation
+                .mutateAsync({ id: shell.id })
+                .catch(() => toast.error('Failed to kill shell'))
             }
           }, 1000)
           toast.success(

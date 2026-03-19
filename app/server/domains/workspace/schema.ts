@@ -85,6 +85,27 @@ export const deleteTerminalInput = terminalSchema
   .pick({ id: true })
   .extend({ deleteDirectory: z.boolean().optional() })
 
+// --- Shell input schemas ---
+
+export const createShellInput = z.object({
+  terminalId: z.number(),
+  name: z.string().optional(),
+})
+
+export const shellIdInput = z.object({
+  id: z.number(),
+})
+
+export const renameShellInput = z.object({
+  id: z.number(),
+  name: z.string(),
+})
+
+export const writeShellInput = z.object({
+  id: z.number(),
+  data: z.string(),
+})
+
 // --- Types ---
 
 export type GitRepoStatus = z.infer<typeof gitRepoStatusSchema>
