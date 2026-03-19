@@ -1,15 +1,9 @@
 import crypto from 'node:crypto'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import pool from '@server/db'
 import { buildSetClauses, jsonOrNull } from '@server/lib/db'
-import { execFileAsync } from '@server/lib/exec'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
-import { log } from '@server/logger'
+import { renameZellijSession, writeTerminalNameFile } from '@server/pty/manager'
 import type { Project, Shell, Terminal } from '../schema'
-
-const WORKIO_TERMINALS_DIR = path.join(os.homedir(), '.workio', 'terminals')
 
 async function attachShellsToTerminals(terminals: Terminal[]) {
   if (terminals.length === 0) return terminals
@@ -165,40 +159,28 @@ export async function updateTerminal(
   // Handle name change: update file and rename zellij session
   if (updates.name !== undefined) {
     const newName = updates.name
-    // Write new name to file (fire-and-forget async)
-    ;(async () => {
-      try {
-        await fs.promises.mkdir(WORKIO_TERMINALS_DIR, { recursive: true })
-        await fs.promises.writeFile(
-          path.join(WORKIO_TERMINALS_DIR, String(id)),
-          sanitizeName(newName),
-        )
-      } catch (err) {
-        log.error({ err }, `[db] Failed to write terminal name file for ${id}`)
-      }
-    })()
-    // Rename zellij session if it exists
-    if (oldName && oldName !== newName) {
-      execFileAsync(
-        'zellij',
-        ['--session', oldName, 'action', 'rename-session', newName],
-        { timeout: 5000 },
-      ).then(
-        () => log.info(`[db] Renamed zellij session ${oldName} to ${newName}`),
-        () => {}, // Session might not exist or not be running, that's ok
-      )
-    }
-    // Also write name file on remote host for SSH terminals (fire-and-forget)
+    const sanitizedName = sanitizeName(newName)
     const terminal = await getTerminalById(id)
+
+    writeTerminalNameFile(id, newName)
+    // Also write name file on remote host for SSH terminals (fire-and-forget)
     if (terminal?.ssh_host) {
       import('@server/ssh/pool').then(({ poolExecSSHCommand }) => {
-        const escaped = sanitizeName(newName)
         poolExecSSHCommand(
           terminal.ssh_host!,
-          `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(escaped)} > ~/.workio/terminals/${id}`,
+          `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(sanitizedName)} > ~/.workio/terminals/${id}`,
           { timeout: 5000 },
         ).catch(() => {})
       })
+    }
+
+    // Rename zellij session if it exists (local or SSH)
+    if (oldName && oldName !== newName) {
+      renameZellijSession(
+        sanitizeName(oldName),
+        sanitizedName,
+        terminal?.ssh_host,
+      )
     }
   }
 

@@ -8,7 +8,7 @@ export function shellEscape(s: string): string {
 
 /** Sanitize a name for use as a zellij session name or file-safe identifier. */
 export function sanitizeName(s: string): string {
-  return s.replace(/\//g, '-')
+  return s.replace(/[/ ]/g, '-')
 }
 
 /** Expand ~ to home directory. */

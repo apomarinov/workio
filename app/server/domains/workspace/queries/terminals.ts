@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import { publicProcedure } from '@server/trpc/init'
-import { z } from 'zod'
-import { getAllTerminals, getTerminalById } from '../db/terminals'
+import { getAllTerminals } from '../db/terminals'
 
 export const listTerminals = publicProcedure.query(async () => {
   const terminals = await getAllTerminals()
@@ -17,11 +16,3 @@ export const listTerminals = publicProcedure.query(async () => {
     }
   })
 })
-
-export const getTerminalByIdQuery = publicProcedure
-  .input(z.object({ id: z.number() }))
-  .query(async ({ input }) => {
-    const terminal = await getTerminalById(input.id)
-    if (!terminal) throw new Error('Terminal not found')
-    return terminal
-  })

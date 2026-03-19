@@ -1785,16 +1785,20 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       const newSessionName = `${terminalName}-${trimmedName}`
 
       const updated = await updateShellName(id, trimmedName)
-      renameZellijSession(oldSessionName, newSessionName)
+      const sanitizedName = sanitizeName(newSessionName)
+      renameZellijSession(
+        sanitizeName(oldSessionName),
+        sanitizedName,
+        terminal.ssh_host,
+      )
       updateSessionName(id, newSessionName)
-      writeShellNameFile(id, trimmedName)
+      writeShellNameFile(id, newSessionName)
 
       // Also write on remote host for SSH terminals (fire-and-forget)
       if (terminal.ssh_host) {
-        const sn = sanitizeName(trimmedName)
         execSSHCommand(
           terminal.ssh_host,
-          `mkdir -p ~/.workio/shells && printf '%s' ${shellEscape(sn)} > ~/.workio/shells/${id}`,
+          `mkdir -p ~/.workio/shells && printf '%s' ${shellEscape(sanitizedName)} > ~/.workio/shells/${id}`,
           { timeout: 5000 },
         ).catch(() => {})
       }

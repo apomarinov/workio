@@ -24,7 +24,7 @@ import {
   untrackTerminal,
 } from '../github/checks'
 import { getIO } from '../io'
-import { sanitizeName } from '../lib/strings'
+import { sanitizeName, shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { execSSHCommand } from '../ssh/exec'
 import { closeConnection } from '../ssh/pool'
@@ -1393,17 +1393,37 @@ export async function writeShellNameFile(
   }
 }
 
-export function renameZellijSession(oldName: string, newName: string): void {
-  execFile(
-    'zellij',
-    ['--session', oldName, 'action', 'rename-session', newName],
-    { timeout: 5000 },
-    (err) => {
-      if (!err) {
-        log.info(`[pty] Renamed zellij session ${oldName} to ${newName}`)
-      }
-    },
-  )
+export function renameZellijSession(
+  oldName: string,
+  newName: string,
+  sshHost?: string | null,
+) {
+  if (sshHost) {
+    return execSSHCommand(
+      sshHost,
+      `zellij --session ${shellEscape(oldName)} action rename-session ${shellEscape(newName)}`,
+      { timeout: 5000 },
+    ).then(
+      () =>
+        log.info(
+          `[pty] Renamed zellij session ${oldName} to ${newName} on ${sshHost}`,
+        ),
+      () => {},
+    )
+  }
+  return new Promise<void>((resolve) => {
+    execFile(
+      'zellij',
+      ['--session', oldName, 'action', 'rename-session', newName],
+      { timeout: 5000 },
+      (err) => {
+        if (!err) {
+          log.info(`[pty] Renamed zellij session ${oldName} to ${newName}`)
+        }
+        resolve()
+      },
+    )
+  })
 }
 
 // ── Wrapped destroy with cleanup ────────────────────────────────────
