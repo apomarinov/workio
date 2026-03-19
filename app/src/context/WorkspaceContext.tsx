@@ -66,13 +66,15 @@ interface WorkspaceContextValue {
     opts?: { deleteDirectory?: boolean },
   ) => Promise<void>
   setTerminalOrder: (value: number[]) => void
-  refetch: () => void
+  refetch: () => Promise<void>
   cleanupShellOrder: (terminalId: number, shellId: number) => void
   shellClients: Map<number, ShellClient[]>
   allClients: ShellClient[]
   activeShells: Record<number, number>
   activeShellsRef: React.RefObject<Record<number, number>>
   setShell: (terminalId: number, shellId: number) => void
+  mountAllShellsTerminalId: number | null
+  setMountAllShellsTerminalId: (id: number | null) => void
   collapsedProjectRepos: string[]
   setCollapsedProjectRepos: (
     value: string[] | ((prev: string[]) => string[]),
@@ -126,6 +128,26 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // Shell mount tracking: only mount recently-active shells
   const { markInactive, shouldMount: shouldMountShell } =
     useShellLastActive(terminals)
+
+  // Force-mount all shells for a terminal (used during template application)
+  const [mountAllShellsTerminalId, _setMountAllShellsTerminalId] = useState<
+    number | null
+  >(null)
+  const mountAllTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const setMountAllShellsTerminalId = (id: number | null) => {
+    if (mountAllTimerRef.current) {
+      clearTimeout(mountAllTimerRef.current)
+      mountAllTimerRef.current = null
+    }
+    if (id !== null) {
+      // Auto-clear after 10s — by then shells have connected and have active_cmd
+      mountAllTimerRef.current = setTimeout(() => {
+        _setMountAllShellsTerminalId(null)
+        mountAllTimerRef.current = null
+      }, 10_000)
+    }
+    _setMountAllShellsTerminalId(id)
+  }
 
   const storedTerminalId = useRef<number | null>(
     (() => {
@@ -462,10 +484,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const refetch = useCallback(
-    () => utils.workspace.terminals.listTerminals.invalidate(),
-    [utils],
-  )
+  const refetch = useCallback(async () => {
+    await utils.workspace.terminals.listTerminals.invalidate()
+  }, [utils])
 
   // Listen for refetch events from other clients
   useEffect(() => {
@@ -497,6 +518,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       activeShells,
       activeShellsRef,
       setShell,
+      mountAllShellsTerminalId,
+      setMountAllShellsTerminalId,
       collapsedProjectRepos,
       setCollapsedProjectRepos,
       orderedTerminals,
@@ -523,6 +546,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       activeShells,
       activeShellsRef,
       setShell,
+      mountAllShellsTerminalId,
+      setMountAllShellsTerminalId,
       collapsedProjectRepos,
       setCollapsedProjectRepos,
       orderedTerminals,

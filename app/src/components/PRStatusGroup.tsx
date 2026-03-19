@@ -58,7 +58,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.isApproved ||
           prInfo.hasConflicts ||
           prInfo.hasPendingReviews ? (
-          prInfo.icon({ cls: 'w-4 h-4' })
+          prInfo.icon({ cls: 'w-4 h-4', group: 'group/pr' })
         ) : (
           <ChevronRight className="w-4 h-4 flex-shrink-0" />
         )}
@@ -76,7 +76,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           </span>
           <div className="flex gap-1 items-center justify-between min-w-0">
             <div className="flex gap-1 items-center min-w-0">
-              <GitBranch className="min-w-2.5 min-h-2.5 max-w-2.5 max-h-2.5" />
+              <GitBranch className="min-w-2.5 min-h-2.5 max-w-2.5 max-h-2.5 text-sidebar-foreground/70" />
               <span className="text-[11px] text-muted-foreground/70 truncate">
                 {pr.branch}
               </span>

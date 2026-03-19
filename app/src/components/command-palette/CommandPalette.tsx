@@ -742,7 +742,7 @@ export function CommandPalette() {
         // Resolve target shell: prefer session's shell_id if it still exists
         const explicitShellId =
           session.shell_id &&
-            terminal.shells.find((s) => s.id === session.shell_id)
+          terminal.shells.find((s) => s.id === session.shell_id)
             ? session.shell_id
             : undefined
 
@@ -1704,7 +1704,7 @@ export function CommandPalette() {
             if (!open) setFilePickerTerminal(null)
           }}
           value={filePickerTerminal.cwd}
-          onSelect={() => { }}
+          onSelect={() => {}}
           mode="file"
           title="Select Files"
           onSelectPaths={(paths) => {

@@ -104,6 +104,7 @@ export const renameShellInput = z.object({
 export const writeShellInput = z.object({
   id: z.number(),
   data: z.string(),
+  pending: z.boolean().optional(),
 })
 
 // --- Types ---

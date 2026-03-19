@@ -7,6 +7,7 @@ import {
   interruptSession,
   killShellChildren,
   renameZellijSession,
+  setPendingCommand,
   updateSessionName,
   waitForSession,
   writeShellNameFile,
@@ -112,6 +113,12 @@ export const writeShell = publicProcedure
   .input(writeShellInput)
   .mutation(async ({ input }) => {
     await resolveShell(input.id)
+
+    if (input.pending) {
+      // Queue command to run after shell integration is ready (first prompt)
+      setPendingCommand(input.id, input.data.replace(/\n$/, ''))
+      return
+    }
 
     // Wait for PTY session to be ready (up to 10s)
     const ready = await waitForSession(input.id, 10000)

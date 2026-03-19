@@ -25,8 +25,13 @@ export function getSortedShellsFromOrder(
 }
 
 export function useShellActions() {
-  const { terminals, refetch, cleanupShellOrder, setShell } =
-    useWorkspaceContext()
+  const {
+    terminals,
+    refetch,
+    cleanupShellOrder,
+    setShell,
+    setMountAllShellsTerminalId,
+  } = useWorkspaceContext()
   const { settings } = useSettings()
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
@@ -112,58 +117,74 @@ export function useShellActions() {
 
       // 1. Delete all non-main shells
       const nonMainShells = terminal.shells.filter((s) => s.name !== 'main')
-      for (const shell of nonMainShells) {
-        await deleteShellMutation.mutateAsync({ id: shell.id })
-      }
+      await Promise.all(
+        nonMainShells.map((shell) =>
+          deleteShellMutation.mutateAsync({ id: shell.id }),
+        ),
+      )
 
-      // 2. Interrupt main shell
+      // 2. Interrupt main shell and wait for it to be idle
       const mainShell = terminal.shells.find((s) => s.name === 'main')
       if (mainShell) {
         await interruptShellMutation.mutateAsync({ id: mainShell.id })
+        const deadline = Date.now() + 5000
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 100))
+          await refetch()
+          const current = terminalsRef.current.find((t) => t.id === terminalId)
+          const shell = current?.shells.find((s) => s.id === mainShell.id)
+          if (!shell?.active_cmd) break
+        }
       }
 
-      // 3. Wait for things to settle
-      await new Promise((r) => setTimeout(r, 300))
+      // 3. Mount all shells for this terminal so new ones get PTY connections
+      setMountAllShellsTerminalId(terminalId)
 
       // 4. Create custom shells from template entries (skip first, that's main)
       const customEntries = template.entries.slice(1)
       const createdShellIds: number[] = []
       for (const entry of customEntries) {
-        const shell = await createShellMutation.mutateAsync({
+        const newShell = await createShellMutation.mutateAsync({
           terminalId,
           name: entry.name,
         })
-        createdShellIds.push(shell.id)
+        createdShellIds.push(newShell.id)
       }
 
-      // 5. Refetch to get updated terminal state
-      await refetch()
-
-      // 6. Send commands to main shell
+      // 5. Queue commands via pending (runs after shell integration is ready)
+      const writes: Promise<void>[] = []
       if (mainShell && template.entries[0]?.command) {
-        await writeShellMutation.mutateAsync({
-          id: mainShell.id,
-          data: `${template.entries[0].command}\n`,
-        })
+        writes.push(
+          writeShellMutation.mutateAsync({
+            id: mainShell.id,
+            data: `${template.entries[0].command}\n`,
+          }),
+        )
       }
-
-      // 7. Send commands to custom shells
       for (let i = 0; i < customEntries.length; i++) {
         if (customEntries[i].command) {
-          await writeShellMutation.mutateAsync({
-            id: createdShellIds[i],
-            data: `${customEntries[i].command}\n`,
-          })
+          writes.push(
+            writeShellMutation.mutateAsync({
+              id: createdShellIds[i],
+              data: `${customEntries[i].command}\n`,
+              pending: true,
+            }),
+          )
         }
       }
+      await Promise.all(writes)
 
-      // 8. Set active shell to main
+      // 6. Refetch so React renders the new shells (mount-all flag ensures they mount)
+      await refetch()
+
+      // 7. Set active shell to main
       if (mainShell) {
         setShell(terminalId, mainShell.id)
       }
 
       toast.success(`Template "${template.name}" started`)
     } catch (err) {
+      setMountAllShellsTerminalId(null)
       toastError(err, 'Failed to run template')
     }
   }

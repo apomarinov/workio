@@ -2,14 +2,24 @@ import { useProcessContext } from '../context/ProcessContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 
 export function useMountedShells(): Set<number> {
-  const { terminals, activeTerminal, activeShells, shouldMountShell } =
-    useWorkspaceContext()
+  const {
+    terminals,
+    activeTerminal,
+    activeShells,
+    shouldMountShell,
+    mountAllShellsTerminalId,
+  } = useWorkspaceContext()
   const { processes } = useProcessContext()
 
   const set = new Set<number>()
   for (const terminal of terminals) {
+    const mountAll = terminal.id === mountAllShellsTerminalId
     const activeShellId = activeShells[terminal.id]
     for (const shell of terminal.shells) {
+      if (mountAll) {
+        set.add(shell.id)
+        continue
+      }
       const isActive =
         terminal.id === activeTerminal?.id && shell.id === activeShellId
       const hasActivity =
