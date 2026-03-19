@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { ShellTemplate } from '@domains/settings/schema'
+import type { Shell, Terminal } from '@domains/workspace/schema'
 import {
   Activity,
   Ban,
@@ -56,7 +57,7 @@ import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
 import { interruptShell, killShell } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { SessionWithProject, Shell, Terminal } from '../types'
+import type { SessionWithProject } from '../types'
 import { ConfirmModal } from './ConfirmModal'
 import { RenameModal } from './EditSessionModal'
 import { ShellTemplateModal } from './ShellTemplateModal'

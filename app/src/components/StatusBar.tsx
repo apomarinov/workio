@@ -18,6 +18,7 @@ import type {
   StatusBarSection,
   StatusBarSectionName,
 } from '@domains/settings/schema'
+import type { Terminal } from '@domains/workspace/schema'
 import {
   Activity,
   Check,
@@ -49,7 +50,6 @@ import type {
   GitDiffStat,
   GitLastCommit,
 } from '../../shared/types'
-import type { Terminal } from '../types'
 import { GitStatus } from './GitStatus'
 import { ResourceInfo } from './ResourceInfo'
 import { PortsList, ProcessesList } from './terminal-status-sections'

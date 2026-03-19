@@ -1,5 +1,5 @@
+import type { Terminal } from '@domains/workspace/schema'
 import { useEffect, useRef, useState } from 'react'
-import type { Terminal } from '@/types'
 
 const STORAGE_KEY = 'shell-last-active'
 const MOUNT_WINDOW = 15 * 60 * 1000 // 15 minutes

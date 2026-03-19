@@ -4,27 +4,29 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  getAllTerminals,
+  getProjectByPath,
+  getTerminalById,
+  upsertProject,
+} from '@domains/workspace/db/terminals'
 import type { FastifyInstance } from 'fastify'
 import {
   deleteSession,
   deleteSessions,
   getActivePermissions,
   getAllSessions,
-  getAllTerminals,
   getOldSessionIds,
-  getProjectByPath,
   getSessionById,
   getSessionMessages,
   getSessionTranscriptPaths,
   getSettings,
-  getTerminalById,
   insertBackfilledSession,
   searchSessionMessages,
   updateSession,
   updateSessionData,
   updateSessionMove,
   updateSettings,
-  upsertProject,
   withTransaction,
 } from '../db'
 import { sanitizeName, shellEscape } from '../lib/strings'

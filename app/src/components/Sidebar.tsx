@@ -11,6 +11,7 @@ import {
   restrictToVerticalAxis,
 } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import type { Terminal } from '@domains/workspace/schema'
 import {
   Bell,
   BellOff,
@@ -56,7 +57,7 @@ import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
-import type { SessionWithProject, Terminal } from '../types'
+import type { SessionWithProject } from '../types'
 import { useBackfillCheck } from './BackfillModal'
 import { useWebhookWarning } from './GitHubModal'
 import { LogsModal } from './LogsModal'

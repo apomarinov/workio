@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { Terminal } from '@domains/workspace/schema'
 import { memo } from 'react'
-import type { SessionWithProject, Terminal } from '../types'
+import type { SessionWithProject } from '../types'
 import { TerminalItem } from './TerminalItem'
 
 interface SortableTerminalItemProps {

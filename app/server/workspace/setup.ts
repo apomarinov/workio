@@ -3,12 +3,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { logCommand } from '@domains/logs/db'
+import { getMainShellForTerminal } from '@domains/workspace/db/shells'
 import {
   deleteTerminal,
-  getMainShellForTerminal,
   getTerminalById,
   updateTerminal,
-} from '../db'
+} from '@domains/workspace/db/terminals'
 import { execFileAsync } from '../lib/exec'
 import { shellEscape } from '../lib/strings'
 import { log } from '../logger'

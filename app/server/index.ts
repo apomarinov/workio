@@ -7,6 +7,7 @@ import {
   initWebPush,
   markDesktopActive,
 } from '@domains/notifications/service'
+import { getTerminalById } from '@domains/workspace/db/terminals'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
@@ -14,7 +15,7 @@ import { format } from 'date-fns'
 import Fastify from 'fastify'
 import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
-import { getTerminalById, initDb } from './db'
+import { initDb } from './db'
 import { env } from './env'
 import {
   detectAllTerminalBranches,

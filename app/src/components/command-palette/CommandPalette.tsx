@@ -1,4 +1,5 @@
 import { DEFAULT_KEYMAP } from '@domains/settings/schema'
+import type { Terminal } from '@domains/workspace/schema'
 import {
   ArrowBigUp,
   ChevronUp,
@@ -40,7 +41,7 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import type { PRCheckStatus } from '../../../shared/types'
-import type { MoveTarget, SessionWithProject, Terminal } from '../../types'
+import type { MoveTarget, SessionWithProject } from '../../types'
 
 const CreatePRDialog = lazy(() =>
   import('../dialogs/CreatePRDialog').then((m) => ({

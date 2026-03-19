@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
-import net from 'node:net'
 import path from 'node:path'
 import { logCommand } from '@domains/logs/db'
 import type { FastifyInstance } from 'fastify'
@@ -38,20 +37,6 @@ function getParentAppNameCached(): Promise<string | null> {
     parentAppNamePromise = getParentAppName()
   }
   return parentAppNamePromise
-}
-
-function isLocalPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const sock = net.connect({ port, host: '127.0.0.1' })
-    sock.once('connect', () => {
-      sock.destroy()
-      resolve(false) // something is listening — taken
-    })
-    sock.once('error', () => {
-      sock.destroy()
-      resolve(true) // connection refused — free
-    })
-  })
 }
 
 function parseUntrackedWc(wcOut: string): Map<string, number> {
@@ -144,19 +129,15 @@ function parseChangedFiles(
 
 import {
   createShell,
-  createTerminal,
   deleteShell,
-  deleteTerminal,
-  getAllTerminals,
   getShellById,
-  getTerminalById,
-  setActiveSessionDone,
-  terminalCwdExists,
-  terminalNameExists,
   updateShellName,
+} from '@domains/workspace/db/shells'
+import {
+  getTerminalById,
   updateTerminal,
-} from '../db'
-import { refreshPRChecks, trackTerminal } from '../github/checks'
+} from '@domains/workspace/db/terminals'
+import { setActiveSessionDone } from '../db'
 import { getIO } from '../io'
 import { gitExec, gitExecLogged } from '../lib/git'
 import { expandPath, sanitizeName, shellEscape } from '../lib/strings'
@@ -164,12 +145,10 @@ import { log } from '../logger'
 import {
   checkAndEmitSingleGitDirty,
   destroySession,
-  destroySessionsForTerminal,
   detectGitBranch,
   interruptSession,
   killShellChildren,
   renameZellijSession,
-  scanAndEmitProcessesForTerminal,
   updateSessionName,
   waitForSession,
   writeShellNameFile,
@@ -178,33 +157,7 @@ import {
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
 import { emitWorkspace } from '../workspace/emit'
-import {
-  cancelWorkspaceOperation,
-  deleteTerminalWorkspace,
-  rerunSetupScript,
-  rmrf,
-  setupTerminalWorkspace,
-} from '../workspace/setup'
-
-interface CreateTerminalBody {
-  cwd?: string
-  name?: string
-  shell?: string
-  ssh_host?: string
-  git_repo?: string
-  workspaces_root?: string
-  setup_script?: string
-  delete_script?: string
-  source_terminal_id?: number
-}
-
-interface UpdateTerminalBody {
-  name?: string
-  settings?: {
-    defaultClaudeCommand?: string
-    portMappings?: { port: number; localPort: number }[]
-  } | null
-}
+import { cancelWorkspaceOperation, rerunSetupScript } from '../workspace/setup'
 
 interface CheckoutBranchBody {
   branch: string
@@ -741,347 +694,6 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
       }
     },
   )
-
-  // List all terminals
-  fastify.get('/api/terminals', async () => {
-    const terminals = await getAllTerminals()
-    return terminals.map((terminal) => {
-      // Don't mark as orphaned if it's being set up (directory doesn't exist yet)
-      const isSettingUp =
-        terminal.git_repo?.status === 'setup' ||
-        terminal.setup?.status === 'setup'
-      return {
-        ...terminal,
-        orphaned:
-          terminal.ssh_host || isSettingUp
-            ? false
-            : !fs.existsSync(terminal.cwd),
-      }
-    })
-  })
-
-  // Create terminal
-  fastify.post<{ Body: CreateTerminalBody }>(
-    '/api/terminals',
-    async (request, reply) => {
-      const {
-        cwd: rawCwd,
-        name,
-        shell,
-        ssh_host,
-        git_repo,
-        workspaces_root,
-        setup_script,
-        delete_script,
-        source_terminal_id,
-      } = request.body
-
-      // --- Worktree mode (Add Workspace from existing terminal) ---
-      if (source_terminal_id) {
-        const sourceTerminal = await getTerminalById(source_terminal_id)
-        if (!sourceTerminal?.git_repo) {
-          return reply
-            .status(400)
-            .send({ error: 'Source terminal has no git repo' })
-        }
-
-        const repo = sourceTerminal.git_repo.repo
-        // Build setup object from source terminal's setup (with status reset)
-        let setupObj: Record<string, unknown> | null = null
-        if (sourceTerminal.setup) {
-          const { status: _, error: _e, ...rest } = sourceTerminal.setup
-          setupObj = { ...rest, status: 'setup' as const }
-        }
-
-        const gitRepoData: Record<string, unknown> = {
-          repo,
-          status: 'setup' as const,
-        }
-        if (sourceTerminal.git_repo.workspaces_root) {
-          gitRepoData.workspaces_root = sourceTerminal.git_repo.workspaces_root
-        }
-
-        const terminal = await createTerminal(
-          '~',
-          name?.trim() || repo.split('/').pop()!,
-          sourceTerminal.shell,
-          sourceTerminal.ssh_host,
-          gitRepoData,
-          setupObj,
-          sourceTerminal.settings,
-        )
-
-        setupTerminalWorkspace({
-          terminalId: terminal.id,
-          repo,
-          setupObj: setupObj as {
-            conductor?: boolean
-            setup?: string
-            delete?: string
-          } | null,
-          workspacesRoot: sourceTerminal.git_repo.workspaces_root || undefined,
-          worktreeSource: sourceTerminal.cwd,
-          customName: !!name?.trim(),
-          sshHost: sourceTerminal.ssh_host,
-        }).catch((err) =>
-          log.error(
-            `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
-          ),
-        )
-
-        trackTerminal(terminal.id).then(() => refreshPRChecks(true))
-        return reply.status(201).send(terminal)
-      }
-
-      if (git_repo) {
-        // --- Git repo workspace creation (local or SSH) ---
-        const repo = git_repo.trim()
-        if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
-          return reply
-            .status(400)
-            .send({ error: 'git_repo must be in owner/repo format' })
-        }
-
-        // Validate SSH host if provided alongside git repo
-        let trimmedHost: string | null = null
-        if (ssh_host) {
-          trimmedHost = ssh_host.trim()
-          if (trimmedHost) {
-            const result = validateSSHHost(trimmedHost)
-            if (!result.valid) {
-              return reply.status(400).send({ error: result.error })
-            }
-          }
-        }
-
-        // Build setup object
-        const hasSetup = setup_script || delete_script
-        const setupObj = hasSetup
-          ? {
-              ...(setup_script?.trim() ? { setup: setup_script.trim() } : {}),
-              ...(delete_script?.trim()
-                ? { delete: delete_script.trim() }
-                : {}),
-              status: 'setup' as const,
-            }
-          : null
-
-        const gitRepoData: Record<string, unknown> = {
-          repo,
-          status: 'setup' as const,
-        }
-        if (workspaces_root?.trim()) {
-          gitRepoData.workspaces_root = workspaces_root.trim()
-        }
-
-        // cwd is a placeholder — setupTerminalWorkspace will update it to the clone target
-        const terminal = await createTerminal(
-          '~',
-          name?.trim() || repo.split('/').pop()!,
-          shell?.trim() || null,
-          trimmedHost,
-          gitRepoData,
-          setupObj,
-        )
-
-        // Fire-and-forget: setup workspace async
-        setupTerminalWorkspace({
-          terminalId: terminal.id,
-          repo,
-          setupObj: setupObj as {
-            conductor?: boolean
-            setup?: string
-            delete?: string
-          } | null,
-          workspacesRoot: workspaces_root?.trim() || undefined,
-          customName: !!name?.trim(),
-          sshHost: trimmedHost,
-        }).catch((err) =>
-          log.error(
-            `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
-          ),
-        )
-        trackTerminal(terminal.id).then(() => refreshPRChecks(true))
-        return reply.status(201).send(terminal)
-      }
-
-      if (ssh_host) {
-        // --- SSH terminal creation (without git repo) ---
-        const trimmedHost = ssh_host.trim()
-        if (!trimmedHost) {
-          return reply.status(400).send({ error: 'ssh_host cannot be empty' })
-        }
-
-        const result = validateSSHHost(trimmedHost)
-        if (!result.valid) {
-          return reply.status(400).send({ error: result.error })
-        }
-
-        const terminal = await createTerminal(
-          rawCwd?.trim() || '~',
-          name?.trim() || trimmedHost,
-          null,
-          trimmedHost,
-        )
-        trackTerminal(terminal.id).then(() => refreshPRChecks(true))
-        return reply.status(201).send(terminal)
-      }
-
-      // --- Local terminal creation ---
-      if (!rawCwd) {
-        return reply.status(400).send({ error: 'cwd is required' })
-      }
-
-      // Expand ~ to home directory
-      const cwd = expandPath(rawCwd.trim())
-
-      try {
-        const stat = await fs.promises.stat(cwd)
-        if (!stat.isDirectory()) {
-          return reply.status(400).send({ error: 'Path is not a directory' })
-        }
-      } catch {
-        return reply.status(400).send({ error: 'Directory does not exist' })
-      }
-
-      // Check read and execute permissions (needed to cd into and list directory)
-      try {
-        await fs.promises.access(cwd, fs.constants.R_OK | fs.constants.X_OK)
-      } catch {
-        return reply
-          .status(403)
-          .send({ error: 'Permission denied: cannot access directory' })
-      }
-
-      if (await terminalCwdExists(cwd)) {
-        return reply
-          .status(409)
-          .send({ error: 'A project with this directory already exists' })
-      }
-
-      const terminal = await createTerminal(cwd, name || null, shell || null)
-      trackTerminal(terminal.id).then(() => refreshPRChecks(true))
-      return reply.status(201).send(terminal)
-    },
-  )
-
-  // Get single terminal
-  fastify.get<{ Params: TerminalParams }>(
-    '/api/terminals/:id',
-    async (request, _reply) => {
-      const terminal = await resolveTerminal(request.params)
-      return terminal
-    },
-  )
-
-  // Update terminal
-  fastify.patch<{ Params: TerminalParams; Body: UpdateTerminalBody }>(
-    '/api/terminals/:id',
-    async (request, reply) => {
-      const terminal = await resolveTerminal(request.params)
-      const id = terminal.id
-
-      // Check for duplicate name on rename
-      if (
-        request.body.name !== undefined &&
-        (await terminalNameExists(request.body.name, id))
-      ) {
-        return reply
-          .status(409)
-          .send({ error: 'A terminal with this name already exists' })
-      }
-
-      // Validate new port mappings — check local ports are available
-      const newMappings = request.body.settings?.portMappings
-      const oldMappings = terminal.settings?.portMappings ?? []
-      if (newMappings) {
-        for (const mapping of newMappings) {
-          // Skip ports that are already mapped (no change)
-          if (
-            oldMappings.some(
-              (m) =>
-                m.port === mapping.port && m.localPort === mapping.localPort,
-            )
-          )
-            continue
-          const available = await isLocalPortAvailable(mapping.localPort)
-          if (!available) {
-            return reply.status(409).send({
-              error: `Local port ${mapping.localPort} is already in use`,
-            })
-          }
-        }
-      }
-
-      const updated = await updateTerminal(id, request.body)
-
-      // Trigger immediate process scan when port mappings change
-      if (request.body.settings !== undefined) {
-        scanAndEmitProcessesForTerminal(id).catch((err) =>
-          log.error(
-            { err },
-            `[terminals] Failed to scan after settings update for terminal ${id}`,
-          ),
-        )
-      }
-
-      return updated
-    },
-  )
-
-  // Delete terminal
-  fastify.delete<{
-    Params: TerminalParams
-    Querystring: { deleteDirectory?: string }
-  }>('/api/terminals/:id', async (request, reply) => {
-    const terminal = await resolveTerminal(request.params)
-    const id = terminal.id
-
-    const deleteDirectory = !!request.query.deleteDirectory
-
-    // Setup with delete script or conductor: run delete script async, then delete
-    // Don't destroy session — teardown script will run in it
-    const hasDeleteFlow =
-      deleteDirectory &&
-      terminal.setup &&
-      terminal.setup.status !== 'failed' &&
-      (terminal.setup.conductor || terminal.setup.delete) &&
-      terminal.git_repo?.status === 'done'
-    if (hasDeleteFlow) {
-      const deleteSetup = { ...terminal.setup, status: 'delete' as const }
-      await updateTerminal(id, { setup: deleteSetup })
-      emitWorkspace(id, { setup: deleteSetup })
-      deleteTerminalWorkspace(id).catch((err) =>
-        log.error(
-          `[terminals] Delete workspace error: ${err instanceof Error ? err.message : err}`,
-        ),
-      )
-      refreshPRChecks(true)
-      return reply.status(202).send()
-    }
-
-    // Kill all PTY sessions for non-delete-flow paths
-    const killed = destroySessionsForTerminal(id)
-    if (killed) {
-      log.info(`[terminals] Killed PTY sessions for terminal ${id}`)
-    }
-
-    // Delete workspace directory if requested
-    if (deleteDirectory) {
-      try {
-        await rmrf(
-          terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd),
-          terminal.ssh_host ?? null,
-        )
-      } catch {
-        // Directory may not exist if clone failed
-      }
-    }
-
-    await deleteTerminal(id)
-    refreshPRChecks(true)
-    return reply.status(204).send()
-  })
 
   // Cancel a running workspace operation (clone, setup, or teardown)
   fastify.post<{ Params: TerminalParams }>(

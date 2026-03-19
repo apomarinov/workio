@@ -1,4 +1,5 @@
 import type { SettingsUpdate } from '@domains/settings/schema'
+import type { Shell, Terminal } from '@domains/workspace/schema'
 import {
   createContext,
   useCallback,
@@ -8,7 +9,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import useSWR from 'swr'
 import type {
   ServicesStatus,
   ShellClient,
@@ -20,8 +20,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
 import { useShellLastActive } from '../hooks/useShellLastActive'
 import { useSocket } from '../hooks/useSocket'
-import * as api from '../lib/api'
-import type { Shell, Terminal } from '../types'
+import { trpc } from '../lib/trpc'
 
 interface WorkspaceContextValue {
   terminals: Terminal[]
@@ -86,12 +85,16 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { subscribe } = useSocket()
-  const { data, isLoading, mutate } = useSWR<Terminal[]>(
-    '/api/terminals',
-    api.getTerminals,
-  )
+  const utils = trpc.useUtils()
+  const { data, isLoading } = trpc.workspace.listTerminals.useQuery()
   const hasEverLoaded = useRef(false)
   if (data) hasEverLoaded.current = true
+
+  const setData = (
+    updater: (prev: Terminal[] | undefined) => Terminal[] | undefined,
+  ) => {
+    utils.workspace.listTerminals.setData(undefined, updater)
+  }
 
   const { settings, updateSettings } = useSettings()
   const terminalOrder = settings?.terminal_order ?? []
@@ -173,14 +176,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         terminalId: number
         data: Partial<Terminal>
       }) => {
-        mutate(
-          (prev) =>
-            prev?.map((t) => (t.id === terminalId ? { ...t, ...data } : t)),
-          false,
+        setData((prev) =>
+          prev?.map((t) => (t.id === terminalId ? { ...t, ...data } : t)),
         )
       },
     )
-  }, [subscribe, mutate])
+  }, [subscribe, setData])
 
   // Update shell state in-place when server emits changes
   useEffect(() => {
@@ -195,47 +196,43 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         shellId: number
         data: Partial<Shell>
       }) => {
-        mutate(
-          (prev) =>
-            prev?.map((t) =>
-              t.id === terminalId
-                ? {
-                    ...t,
-                    shells: t.shells.map((s) =>
-                      s.id === shellId ? { ...s, ...data } : s,
-                    ),
-                  }
-                : t,
-            ),
-          false,
+        setData((prev) =>
+          prev?.map((t) =>
+            t.id === terminalId
+              ? {
+                  ...t,
+                  shells: t.shells.map((s) =>
+                    s.id === shellId ? { ...s, ...data } : s,
+                  ),
+                }
+              : t,
+          ),
         )
       },
     )
-  }, [subscribe, mutate])
+  }, [subscribe, setData])
 
   // Handle terminal:workspace events for state updates
   useEffect(() => {
     return subscribe<WorkspacePayload>('terminal:workspace', (data) => {
       if (data.deleted) {
-        mutate((prev) => prev?.filter((t) => t.id !== data.terminalId), false)
+        setData((prev) => prev?.filter((t) => t.id !== data.terminalId))
         cleanupTerminalOrder(data.terminalId)
         return
       }
-      mutate(
-        (prev) =>
-          prev?.map((t) => {
-            if (t.id !== data.terminalId) return t
-            return {
-              ...t,
-              ...(data.name && { name: data.name }),
-              ...(data.git_repo && { git_repo: data.git_repo }),
-              ...(data.setup && { setup: data.setup }),
-            }
-          }),
-        false,
+      setData((prev) =>
+        prev?.map((t) => {
+          if (t.id !== data.terminalId) return t
+          return {
+            ...t,
+            ...(data.name && { name: data.name }),
+            ...(data.git_repo && { git_repo: data.git_repo }),
+            ...(data.setup && { setup: data.setup }),
+          }
+        }),
       )
     })
-  }, [subscribe, mutate])
+  }, [subscribe, setData])
 
   // Service status tracking
   const [servicesStatus, setServicesStatus] = useState<ServicesStatus | null>(
@@ -344,6 +341,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return ordered
   }, [terminals, collapsedProjectRepos])
 
+  const createMutation = trpc.workspace.createTerminal.useMutation()
+  const updateMutation = trpc.workspace.updateTerminal.useMutation()
+  const deleteMutation = trpc.workspace.deleteTerminal.useMutation()
+
   const createTerminal = useCallback(
     async (opts: {
       cwd: string
@@ -356,12 +357,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       delete_script?: string
       source_terminal_id?: number
     }) => {
-      const terminal = await api.createTerminal(opts)
-      mutate((prev) => (prev ? [terminal, ...prev] : [terminal]), false)
+      const terminal = await createMutation.mutateAsync(opts)
+      setData((prev) => (prev ? [terminal, ...prev] : [terminal]))
       setTerminalOrder([terminal.id, ...terminalOrder])
       return terminal
     },
-    [mutate, terminalOrder, setTerminalOrder],
+    [createMutation, terminalOrder, setTerminalOrder, setData],
   )
 
   const updateTerminal = useCallback(
@@ -375,11 +376,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         } | null
       },
     ) => {
-      const updated = await api.updateTerminal(id, updates)
-      mutate((prev) => prev?.map((t) => (t.id === id ? updated : t)), false)
+      const updated = await updateMutation.mutateAsync({
+        id,
+        ...updates,
+      })
+      if (!updated) throw new Error('Terminal not found')
+      setData((prev) => prev?.map((t) => (t.id === id ? updated : t)))
       return updated
     },
-    [mutate],
+    [updateMutation, setData],
   )
 
   const mapPort = useCallback(
@@ -432,13 +437,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTerminal = useCallback(
     async (id: number, opts?: { deleteDirectory?: boolean }) => {
-      const isAsync = await api.deleteTerminal(id, opts)
-      if (!isAsync) {
-        mutate((prev) => prev?.filter((t) => t.id !== id), false)
+      const result = await deleteMutation.mutateAsync({
+        id,
+        deleteDirectory: opts?.deleteDirectory,
+      })
+      if (!result.async) {
+        setData((prev) => prev?.filter((t) => t.id !== id))
         cleanupTerminalOrder(id)
       }
     },
-    [mutate, cleanupTerminalOrder],
+    [deleteMutation, setData, cleanupTerminalOrder],
   )
 
   const cleanupShellOrder = (terminalId: number, shellId: number) => {
@@ -454,14 +462,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const refetch = useCallback(() => mutate(), [mutate])
+  const refetch = useCallback(
+    () => utils.workspace.listTerminals.invalidate(),
+    [utils],
+  )
 
   // Listen for refetch events from other clients
   useEffect(() => {
     return subscribe<{ group: string }>('refetch', ({ group }) => {
-      if (group === 'terminals') mutate()
+      if (group === 'terminals') utils.workspace.listTerminals.invalidate()
     })
-  }, [subscribe, mutate])
+  }, [subscribe, utils])
 
   const value = useMemo(
     () => ({

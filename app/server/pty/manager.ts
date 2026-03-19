@@ -5,6 +5,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
+import { updateShell } from '@domains/workspace/db/shells'
+import {
+  getAllTerminals,
+  getTerminalById,
+  updateTerminal,
+} from '@domains/workspace/db/terminals'
 import type {
   ActiveProcess,
   GitLastCommit,
@@ -12,12 +18,6 @@ import type {
   PortForwardStatus,
   ResourceUsage,
 } from '../../shared/types'
-import {
-  getAllTerminals,
-  getTerminalById,
-  updateShell,
-  updateTerminal,
-} from '../db'
 import {
   getGhUsername,
   refreshPRChecks,

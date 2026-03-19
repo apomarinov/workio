@@ -1,3 +1,4 @@
+import type { Terminal } from '@domains/workspace/schema'
 import {
   AlertTriangle,
   ChevronDown,
@@ -27,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { useGitHubContext } from '../context/GitHubContext'
 import { useProcessContext } from '../context/ProcessContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
-import type { SessionWithProject, Terminal } from '../types'
+import type { SessionWithProject } from '../types'
 import { GitStatus } from './GitStatus'
 import { TerminalIcon2 } from './icons'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'

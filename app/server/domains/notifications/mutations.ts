@@ -1,6 +1,7 @@
 import { getSettings, updateSettings } from '@domains/settings/db'
 import type { PushSubscriptionRecord } from '@domains/settings/schema'
-import { getShellById, getTerminalById } from '@server/db'
+import { getShellById } from '@domains/workspace/db/shells'
+import { getTerminalById } from '@domains/workspace/db/terminals'
 import { getIO } from '@server/io'
 import { log } from '@server/logger'
 import { publicProcedure } from '@server/trpc/init'

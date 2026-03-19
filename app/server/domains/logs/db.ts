@@ -1,4 +1,5 @@
-import pool, { getTerminalById } from '@server/db'
+import { getTerminalById } from '@domains/workspace/db/terminals'
+import pool from '@server/db'
 import { log } from '@server/logger'
 import type { CommandLog, ListInput, LogTerminal } from './schema'
 

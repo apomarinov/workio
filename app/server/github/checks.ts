@@ -2,13 +2,18 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { logCommand } from '@domains/logs/db'
 import { emitNotification } from '@domains/notifications/service'
-import settingsEvents from '@domains/settings/events'
 import {
   DEFAULT_GH_QUERY_LIMITS,
   type GHQueryLimits,
   type HiddenGHAuthor,
   type HiddenPR,
 } from '@domains/settings/schema'
+import {
+  getAllTerminals,
+  getTerminalById,
+  updateTerminal,
+} from '@domains/workspace/db/terminals'
+import serverEvents from '@server/lib/events'
 import type {
   FailedPRCheck,
   InvolvedPRSummary,
@@ -19,12 +24,7 @@ import type {
   PRReview,
   PRReviewThread,
 } from '../../shared/types'
-import {
-  getAllTerminals,
-  getSettings,
-  getTerminalById,
-  updateTerminal,
-} from '../db'
+import { getSettings } from '../db'
 import { getIO } from '../io'
 import { execFileAsync, getExecStderr } from '../lib/exec'
 import { log } from '../logger'
@@ -2549,7 +2549,7 @@ export async function initGitHubChecks(): Promise<void> {
     return
   }
 
-  settingsEvents.on('settings:hidden_prs_changed', () => refreshPRChecks(true))
+  serverEvents.on('github:refresh-pr-checks', () => refreshPRChecks(true))
 
   const terminals = await getAllTerminals()
   for (const terminal of terminals) {

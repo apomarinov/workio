@@ -1,3 +1,4 @@
+import type { Shell } from '@domains/workspace/schema'
 import {
   Activity,
   ChevronDown,
@@ -17,7 +18,6 @@ import { useSocket } from '@/hooks/useSocket'
 import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import type { ActiveProcess, PortForwardStatus } from '../../shared/types'
-import type { Shell } from '../types'
 
 interface GitDirtyBadgeProps {
   added: number

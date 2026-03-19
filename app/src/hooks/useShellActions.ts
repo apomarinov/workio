@@ -1,4 +1,5 @@
 import type { ShellTemplate } from '@domains/settings/schema'
+import type { Shell, Terminal } from '@domains/workspace/schema'
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
@@ -10,7 +11,6 @@ import {
   renameShell,
   writeToShell,
 } from '../lib/api'
-import type { Shell, Terminal } from '../types'
 import { useSettings } from './useSettings'
 
 /** Return shells in DnD-reordered display order for a terminal */

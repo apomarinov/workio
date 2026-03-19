@@ -1,12 +1,12 @@
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
+import { getTerminalById } from '@domains/workspace/db/terminals'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
 import {
   getActivePermissions,
   getMessagesByIds,
   getSessionById,
-  getTerminalById,
   updateSessionData,
 } from './db'
 import { execFileAsync } from './lib/exec'

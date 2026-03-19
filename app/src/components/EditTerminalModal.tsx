@@ -1,3 +1,4 @@
+import type { Terminal } from '@domains/workspace/schema'
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toastError } from '@/lib/toastError'
-import type { Terminal } from '@/types'
 
 interface EditTerminalModalProps {
   open: boolean

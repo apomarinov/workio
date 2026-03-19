@@ -11,13 +11,13 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Shell } from '../../src/types'
+import { getShellById } from '@domains/workspace/db/shells'
 import {
-  getSettings,
-  getShellById,
   getTerminalById,
   updateTerminal,
-} from '../db'
+} from '@domains/workspace/db/terminals'
+import type { Shell } from '@domains/workspace/schema'
+import { getSettings } from '../db'
 import { startChecksPolling, trackTerminal } from '../github/checks'
 import { getIO } from '../io'
 import { sanitizeName, shellEscape } from '../lib/strings'

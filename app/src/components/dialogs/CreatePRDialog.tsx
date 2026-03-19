@@ -1,3 +1,4 @@
+import type { Terminal } from '@domains/workspace/schema'
 import { Check, ChevronDown, Loader2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,6 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import type { Terminal } from '../../types'
 import { BranchDiffPanel } from '../BranchDiffPanel'
 
 interface CreatePRDialogProps {

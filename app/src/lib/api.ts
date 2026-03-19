@@ -1,3 +1,4 @@
+import type { Shell } from '@domains/workspace/schema'
 import type {
   ChangedFile,
   InvolvedPRSummary,
@@ -9,8 +10,6 @@ import type {
   SessionMessagesResponse,
   SessionSearchMatch,
   SessionWithProject,
-  Shell,
-  Terminal,
 } from '../types'
 
 const API_BASE = '/api'
@@ -116,10 +115,6 @@ async function api<T = void>(
 
 // --- Terminals ---
 
-export async function getTerminals(): Promise<Terminal[]> {
-  return api(`${API_BASE}/terminals`)
-}
-
 export interface SSHHostEntry {
   alias: string
   hostname: string
@@ -167,47 +162,6 @@ export async function checkConductor(repo: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-export async function createTerminal(opts: {
-  cwd: string
-  name?: string
-  shell?: string
-  ssh_host?: string
-  git_repo?: string
-  workspaces_root?: string
-  setup_script?: string
-  delete_script?: string
-  source_terminal_id?: number
-}): Promise<Terminal> {
-  return api(`${API_BASE}/terminals`, { body: opts })
-}
-
-export async function updateTerminal(
-  id: number,
-  updates: {
-    name?: string
-    settings?: {
-      defaultClaudeCommand?: string
-      portMappings?: { port: number; localPort: number }[]
-    } | null
-  },
-): Promise<Terminal> {
-  return api(`${API_BASE}/terminals/${id}`, {
-    method: 'PATCH',
-    body: updates,
-  })
-}
-
-export async function deleteTerminal(
-  id: number,
-  opts?: { deleteDirectory?: boolean },
-): Promise<boolean> {
-  const url = opts?.deleteDirectory
-    ? `${API_BASE}/terminals/${id}?deleteDirectory=1`
-    : `${API_BASE}/terminals/${id}`
-  const res = await apiFetch(url, { method: 'DELETE' })
-  return res.status === 202
 }
 
 export async function cancelWorkspace(terminalId: number): Promise<void> {

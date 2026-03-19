@@ -1,3 +1,4 @@
+import type { Shell, Terminal } from '@domains/workspace/schema'
 import { useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useProcessContext } from '../context/ProcessContext'
@@ -6,7 +7,6 @@ import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useSettings } from '../hooks/useSettings'
 import { pullBranch } from '../lib/api'
-import type { Shell, Terminal } from '../types'
 
 /** Return shells in DnD-reordered display order for a terminal */
 function getSortedShells(

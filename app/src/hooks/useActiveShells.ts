@@ -1,5 +1,5 @@
+import type { Terminal } from '@domains/workspace/schema'
 import { useEffect, useRef, useState } from 'react'
-import type { Terminal } from '@/types'
 
 const STORAGE_KEY = 'active-shells'
 
