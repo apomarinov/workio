@@ -1,10 +1,10 @@
 import { emitNotification } from '@domains/notifications/service'
-import { getIO } from '../io'
+import { getIO } from '@server/io'
 
 export async function emitWorkspace(
   terminalId: number,
   payload: Record<string, unknown>,
-): Promise<void> {
+) {
   const io = getIO()
 
   // Always emit terminal:workspace for client state updates

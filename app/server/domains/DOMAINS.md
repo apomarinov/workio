@@ -380,7 +380,7 @@ Steps 4 and 5 can be done in either order or in parallel since they don't depend
 | ---- | ------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | [x]  | **terminals** | 15    | CRUD, project upsert, name uniqueness                                                                                             | Sidebar list, CreateTerminalModal, EditTerminalModal                    |
 | [x]  | **shells**    | 10    | create, delete, rename, get, write, interrupt, kill                                                                               | Shell tabs in terminal, context menu                                    |
-| [ ]  | **setup**     | 5     | cancel, rerun, clear error, setupWorkspace, emitWorkspace                                                                         | EditTerminalModal lifecycle buttons, CreateTerminalModal                |
+| [x]  | **setup**     | 5     | cancel, rerun, clear error, setupWorkspace, emitWorkspace                                                                         | EditTerminalModal lifecycle buttons, CreateTerminalModal                |
 | [ ]  | **system**    | 10+   | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/fix-max-sessions, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
 
 

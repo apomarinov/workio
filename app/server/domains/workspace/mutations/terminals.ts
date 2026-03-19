@@ -10,12 +10,6 @@ import {
 } from '@server/pty/manager'
 import { validateSSHHost } from '@server/ssh/config'
 import { publicProcedure } from '@server/trpc/init'
-import { emitWorkspace } from '@server/workspace/emit'
-import {
-  deleteTerminalWorkspace,
-  rmrf,
-  setupTerminalWorkspace,
-} from '@server/workspace/setup'
 import {
   createTerminal as dbCreateTerminal,
   deleteTerminal as dbDeleteTerminal,
@@ -29,6 +23,12 @@ import {
   deleteTerminalInput,
   updateTerminalInput,
 } from '../schema'
+import { emitWorkspace } from '../services/emit'
+import {
+  deleteTerminalWorkspace,
+  rmrf,
+  setupTerminalWorkspace,
+} from '../services/setup'
 
 function isLocalPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {

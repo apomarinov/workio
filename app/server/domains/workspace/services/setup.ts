@@ -9,9 +9,9 @@ import {
   getTerminalById,
   updateTerminal,
 } from '@domains/workspace/db/terminals'
-import { execFileAsync } from '../lib/exec'
-import { shellEscape } from '../lib/strings'
-import { log } from '../logger'
+import { execFileAsync } from '@server/lib/exec'
+import { shellEscape } from '@server/lib/strings'
+import { log } from '@server/logger'
 import {
   cancelWaitForMarker,
   destroySessionsForTerminal,
@@ -20,8 +20,8 @@ import {
   waitForMarker,
   waitForSession,
   writeToSession,
-} from '../pty/manager'
-import { execSSHCommand } from '../ssh/exec'
+} from '@server/pty/manager'
+import { execSSHCommand } from '@server/ssh/exec'
 import { emitWorkspace } from './emit'
 
 const LONG_TIMEOUT = 300_000 // 5 min for clone/setup operations
@@ -218,17 +218,17 @@ const NOUNS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-export function generateSlug(): string {
+export function generateSlug() {
   const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)]
   return `${adj}-${noun}`
 }
 
-function repoSlug(repo: string): string {
+function repoSlug(repo: string) {
   return repo.split('/').pop()!
 }
 
-function cloneUrl(repo: string): string {
+function cloneUrl(repo: string) {
   return `git@github.com:${repo}.git`
 }
 
@@ -236,7 +236,7 @@ function cloneUrl(repo: string): string {
 // SSH-aware filesystem helpers
 // ---------------------------------------------------------------------------
 
-function joinPath(sshHost: string | null, ...segments: string[]): string {
+function joinPath(sshHost: string | null, ...segments: string[]) {
   if (!sshHost) return path.join(...segments)
   // POSIX join: filter empty, join with /
   return segments
@@ -246,33 +246,26 @@ function joinPath(sshHost: string | null, ...segments: string[]): string {
     .replace(/^(?!\/)/, () => (segments[0]?.startsWith('/') ? '/' : ''))
 }
 
-function dirnamePath(sshHost: string | null, p: string): string {
+function dirnamePath(sshHost: string | null, p: string) {
   if (!sshHost) return path.dirname(p)
   const idx = p.lastIndexOf('/')
   if (idx <= 0) return '/'
   return p.slice(0, idx)
 }
 
-function resolvePath(
-  sshHost: string | null,
-  base: string,
-  rel: string,
-): string {
+function resolvePath(sshHost: string | null, base: string, rel: string) {
   if (!sshHost) return path.resolve(base, rel)
   if (rel.startsWith('/')) return rel
   return `${base.replace(/\/+$/, '')}/${rel}`
 }
 
-async function getHomeDir(sshHost: string | null): Promise<string> {
+async function getHomeDir(sshHost: string | null) {
   if (!sshHost) return os.homedir()
   const { stdout } = await execSSHCommand(sshHost, 'echo $HOME')
   return stdout.trim()
 }
 
-async function dirExists(
-  dirPath: string,
-  sshHost: string | null,
-): Promise<boolean> {
+async function dirExists(dirPath: string, sshHost: string | null) {
   if (!sshHost) return fs.existsSync(dirPath)
   try {
     await execSSHCommand(sshHost, `test -d ${shellEscape(dirPath)}`)
@@ -283,7 +276,7 @@ async function dirExists(
   }
 }
 
-async function mkdirp(dirPath: string, sshHost: string | null): Promise<void> {
+async function mkdirp(dirPath: string, sshHost: string | null) {
   if (!sshHost) {
     fs.mkdirSync(dirPath, { recursive: true })
     return
@@ -291,10 +284,7 @@ async function mkdirp(dirPath: string, sshHost: string | null): Promise<void> {
   await execSSHCommand(sshHost, `mkdir -p ${shellEscape(dirPath)}`)
 }
 
-export async function rmrf(
-  dirPath: string,
-  sshHost: string | null,
-): Promise<void> {
+export async function rmrf(dirPath: string, sshHost: string | null) {
   if (!sshHost) {
     fs.rmSync(dirPath, { recursive: true, force: true })
     return
@@ -302,10 +292,7 @@ export async function rmrf(
   await execSSHCommand(sshHost, `rm -rf ${shellEscape(dirPath)}`)
 }
 
-async function readFileContent(
-  filePath: string,
-  sshHost: string | null,
-): Promise<string | null> {
+async function readFileContent(filePath: string, sshHost: string | null) {
   if (!sshHost) {
     if (!fs.existsSync(filePath)) return null
     return fs.readFileSync(filePath, 'utf-8')
@@ -329,7 +316,7 @@ async function runCmd(
   sshHost: string | null,
   timeout?: number,
   signal?: AbortSignal,
-): Promise<{ stdout: string; stderr: string }> {
+) {
   if (!sshHost) {
     return execFileAsync(cmd, args, { cwd, timeout, signal })
   }
@@ -354,16 +341,13 @@ interface ConductorJson {
   }
 }
 
-async function readConductorJson(
-  cwd: string,
-  sshHost: string | null,
-): Promise<ConductorJson | null> {
+async function readConductorJson(cwd: string, sshHost: string | null) {
   const filePath = sshHost
     ? `${cwd.replace(/\/+$/, '')}/conductor.json`
     : path.join(cwd, 'conductor.json')
   const content = await readFileContent(filePath, sshHost)
   if (content == null) return null
-  return JSON.parse(content)
+  return JSON.parse(content) as ConductorJson
 }
 
 // ---------------------------------------------------------------------------
@@ -421,9 +405,7 @@ export interface SetupOptions {
   sshHost?: string | null
 }
 
-export async function setupTerminalWorkspace(
-  options: SetupOptions,
-): Promise<void> {
+export async function setupTerminalWorkspace(options: SetupOptions) {
   const {
     terminalId,
     repo,
@@ -706,7 +688,7 @@ async function executeSetupScript(
   cwd: string,
   sshHost: string | null,
   signal: AbortSignal,
-): Promise<void> {
+) {
   log.info(`[workspace] t=${terminalId} executeSetupScript: resolving scripts`)
   const { setupScript } = await resolveScripts(setupObj, cwd, sshHost)
   log.info(
@@ -755,7 +737,7 @@ async function executeSetupScript(
 // Rerun setup script (fire-and-forget from route handler)
 // ---------------------------------------------------------------------------
 
-export async function rerunSetupScript(terminalId: number): Promise<void> {
+export async function rerunSetupScript(terminalId: number) {
   const terminal = await getTerminalById(terminalId)
   if (!terminal) return
 
@@ -818,9 +800,7 @@ export async function rerunSetupScript(terminalId: number): Promise<void> {
 // Delete workspace (fire-and-forget from delete route handler)
 // ---------------------------------------------------------------------------
 
-export async function deleteTerminalWorkspace(
-  terminalId: number,
-): Promise<void> {
+export async function deleteTerminalWorkspace(terminalId: number) {
   const terminal = await getTerminalById(terminalId)
   if (!terminal) return
 
@@ -910,7 +890,7 @@ export async function deleteTerminalWorkspace(
   }
 }
 
-export function cancelWorkspaceOperation(terminalId: number): boolean {
+export function cancelWorkspaceOperation(terminalId: number) {
   const controller = activeOperations.get(terminalId)
   if (!controller) return false
 

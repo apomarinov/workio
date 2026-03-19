@@ -11,6 +11,7 @@ import {
   getTerminalById,
   updateTerminal,
 } from '@domains/workspace/db/terminals'
+import { emitWorkspace } from '@domains/workspace/services/emit'
 import type {
   ActiveProcess,
   GitLastCommit,
@@ -33,7 +34,6 @@ import {
   reconcileTunnels,
   stopAllTunnelsForTerminal,
 } from '../ssh/tunnel'
-import { emitWorkspace } from '../workspace/emit'
 import type { CommandEvent } from './osc-parser'
 import {
   findRemoteZellijServerPid,

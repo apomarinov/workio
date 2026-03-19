@@ -127,18 +127,13 @@ function parseChangedFiles(
   return files
 }
 
-import {
-  getTerminalById,
-  updateTerminal,
-} from '@domains/workspace/db/terminals'
+import { getTerminalById } from '@domains/workspace/db/terminals'
 import { gitExec, gitExecLogged } from '../lib/git'
 import { expandPath, shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { checkAndEmitSingleGitDirty, detectGitBranch } from '../pty/manager'
 import { listSSHHosts, validateSSHHost } from '../ssh/config'
 import { execSSHCommand } from '../ssh/exec'
-import { emitWorkspace } from '../workspace/emit'
-import { cancelWorkspaceOperation, rerunSetupScript } from '../workspace/setup'
 
 interface CheckoutBranchBody {
   branch: string
@@ -662,70 +657,6 @@ export default async function terminalRoutes(fastify: FastifyInstance) {
         log.error(`Failed to fix MaxSessions for ${host}: ${message}`)
         return reply.status(500).send({ success: false, error: message })
       }
-    },
-  )
-
-  // Cancel a running workspace operation (clone, setup, or teardown)
-  fastify.post<{ Params: TerminalParams }>(
-    '/api/terminals/:id/cancel-workspace',
-    async (request, reply) => {
-      const id = parseId(request.params.id)
-
-      const cancelled = cancelWorkspaceOperation(id)
-      if (!cancelled) {
-        // No in-memory operation — check if DB is stuck in setup state (e.g. server killed mid-setup)
-        const terminal = await getTerminalById(id)
-        if (terminal?.setup?.status === 'setup') {
-          const failedSetup = {
-            ...terminal.setup,
-            status: 'failed' as const,
-            error: 'Setup interrupted',
-          }
-          await updateTerminal(id, { setup: failedSetup })
-          await emitWorkspace(id, { name: terminal.name, setup: failedSetup })
-          return { cancelled: true }
-        }
-        return reply.status(409).send({ error: 'No cancellable operation' })
-      }
-
-      return { cancelled: true }
-    },
-  )
-
-  // Rerun a failed setup script
-  fastify.post<{ Params: TerminalParams }>(
-    '/api/terminals/:id/rerun-setup',
-    async (request, reply) => {
-      const terminal = await resolveTerminal(request.params)
-      const id = terminal.id
-      if (terminal.setup?.status !== 'failed') {
-        return reply.status(409).send({ error: 'Setup is not in failed state' })
-      }
-
-      // Fire-and-forget
-      rerunSetupScript(id)
-      return { ok: true }
-    },
-  )
-
-  // Clear a failed setup error (mark as done)
-  fastify.post<{ Params: TerminalParams }>(
-    '/api/terminals/:id/clear-setup-error',
-    async (request, reply) => {
-      const terminal = await resolveTerminal(request.params)
-      const id = terminal.id
-      if (terminal.setup?.status !== 'failed') {
-        return reply.status(409).send({ error: 'Setup is not in failed state' })
-      }
-
-      const doneSetup = {
-        ...terminal.setup,
-        status: 'done' as const,
-        error: undefined,
-      }
-      await updateTerminal(id, { setup: doneSetup })
-      await emitWorkspace(id, { name: terminal.name, setup: doneSetup })
-      return { ok: true }
     },
   )
 

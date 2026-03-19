@@ -163,24 +163,6 @@ export async function checkConductor(repo: string): Promise<boolean> {
   }
 }
 
-export async function cancelWorkspace(terminalId: number): Promise<void> {
-  await api(`${API_BASE}/terminals/${terminalId}/cancel-workspace`, {
-    method: 'POST',
-  })
-}
-
-export async function rerunSetup(terminalId: number): Promise<void> {
-  await api(`${API_BASE}/terminals/${terminalId}/rerun-setup`, {
-    method: 'POST',
-  })
-}
-
-export async function clearSetupError(terminalId: number): Promise<void> {
-  await api(`${API_BASE}/terminals/${terminalId}/clear-setup-error`, {
-    method: 'POST',
-  })
-}
-
 export async function browseFolder(): Promise<string | null> {
   const res = await apiFetch(`${API_BASE}/browse-folder`)
   if (res.status === 204) return null

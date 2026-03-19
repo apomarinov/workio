@@ -16,14 +16,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
-import { cancelWorkspace, clearSetupError, rerunSetup } from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
+import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { useGitHubContext } from '../context/GitHubContext'
 import { useProcessContext } from '../context/ProcessContext'
@@ -55,6 +55,17 @@ export const TerminalItem = memo(function TerminalItem({
   onToggleTerminalSessions,
   shortcutIndex: shortcutIndexProp,
 }: TerminalItemProps) {
+  const cancelWorkspaceMutation =
+    trpc.workspace.setup.cancelWorkspace.useMutation({
+      onError: (err) => toastError(err, 'Failed to cancel'),
+    })
+  const rerunSetupMutation = trpc.workspace.setup.rerunSetup.useMutation({
+    onError: (err) => toastError(err, 'Failed to rerun setup'),
+  })
+  const clearSetupErrorMutation =
+    trpc.workspace.setup.clearSetupError.useMutation({
+      onError: (err) => toastError(err, 'Failed to clear error'),
+    })
   const { terminals, activeTerminal, selectTerminal } = useWorkspaceContext()
   const { clearSession } = useSessionContext()
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
@@ -273,9 +284,7 @@ export const TerminalItem = memo(function TerminalItem({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  cancelWorkspace(terminal.id).catch(() =>
-                    toast.error('Failed to cancel'),
-                  )
+                  cancelWorkspaceMutation.mutate({ id: terminal.id })
                 }}
                 className="flex items-center gap-1 text-red-400/60 hover:text-red-400 hover:bg-zinc-400/30 rounded-sm px-1 py-0.5 transition-colors cursor-pointer"
               >
@@ -292,9 +301,7 @@ export const TerminalItem = memo(function TerminalItem({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      cancelWorkspace(terminal.id).catch(() =>
-                        toast.error('Failed to cancel'),
-                      )
+                      cancelWorkspaceMutation.mutate({ id: terminal.id })
                     }}
                     className="flex items-center gap-1 text-red-400/60 hover:text-red-400 hover:bg-zinc-400/30 rounded-sm px-1 py-0.5 transition-colors cursor-pointer"
                   >
@@ -309,9 +316,7 @@ export const TerminalItem = memo(function TerminalItem({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      cancelWorkspace(terminal.id).catch(() =>
-                        toast.error('Failed to cancel'),
-                      )
+                      cancelWorkspaceMutation.mutate({ id: terminal.id })
                     }}
                     className="flex items-center gap-1 text-red-400/60 hover:text-red-400 hover:bg-zinc-400/30 rounded-sm px-1 py-0.5 transition-colors cursor-pointer"
                   >
@@ -374,9 +379,7 @@ export const TerminalItem = memo(function TerminalItem({
               type="button"
               className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer"
               onClick={() => {
-                rerunSetup(terminal.id).catch(() =>
-                  toast.error('Failed to rerun setup'),
-                )
+                rerunSetupMutation.mutate({ id: terminal.id })
               }}
             >
               <RotateCw className="w-3.5 h-3.5" />
@@ -386,9 +389,7 @@ export const TerminalItem = memo(function TerminalItem({
               type="button"
               className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors cursor-pointer"
               onClick={() => {
-                clearSetupError(terminal.id).catch(() =>
-                  toast.error('Failed to clear error'),
-                )
+                clearSetupErrorMutation.mutate({ id: terminal.id })
               }}
             >
               <X className="w-3.5 h-3.5" />
