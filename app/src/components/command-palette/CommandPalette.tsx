@@ -742,7 +742,7 @@ export function CommandPalette() {
         // Resolve target shell: prefer session's shell_id if it still exists
         const explicitShellId =
           session.shell_id &&
-          terminal.shells.find((s) => s.id === session.shell_id)
+            terminal.shells.find((s) => s.id === session.shell_id)
             ? session.shell_id
             : undefined
 
@@ -1383,7 +1383,12 @@ export function CommandPalette() {
           variant="danger"
           onConfirm={async () => {
             const { terminalId, shellId, command } = runConfirm
-            await killShellMutation.mutateAsync({ id: shellId })
+            try {
+              await killShellMutation.mutateAsync({ id: shellId })
+            } catch (err) {
+              toastError(err, 'Failed to kill process')
+              return
+            }
             setRunConfirm(null)
             doRunInShell(terminalId, shellId, command)
           }}
@@ -1400,12 +1405,16 @@ export function CommandPalette() {
               label: 'Run in New Shell',
               onAction: async () => {
                 const { terminalId, command } = runConfirm
-                const shell = await createShellMutation.mutateAsync({
-                  terminalId,
-                })
-                await refetch()
-                setRunConfirm(null)
-                doRunInShell(terminalId, shell.id, command)
+                try {
+                  const shell = await createShellMutation.mutateAsync({
+                    terminalId,
+                  })
+                  await refetch()
+                  setRunConfirm(null)
+                  doRunInShell(terminalId, shell.id, command)
+                } catch (err) {
+                  toastError(err, 'Failed to create shell')
+                }
               },
             },
           ]}
@@ -1695,7 +1704,7 @@ export function CommandPalette() {
             if (!open) setFilePickerTerminal(null)
           }}
           value={filePickerTerminal.cwd}
-          onSelect={() => {}}
+          onSelect={() => { }}
           mode="file"
           title="Select Files"
           onSelectPaths={(paths) => {

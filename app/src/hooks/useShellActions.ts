@@ -119,9 +119,7 @@ export function useShellActions() {
       // 2. Interrupt main shell
       const mainShell = terminal.shells.find((s) => s.name === 'main')
       if (mainShell) {
-        await interruptShellMutation
-          .mutateAsync({ id: mainShell.id })
-          .catch(() => toast.error('Failed to interrupt shell'))
+        await interruptShellMutation.mutateAsync({ id: mainShell.id })
       }
 
       // 3. Wait for things to settle

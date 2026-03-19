@@ -55,6 +55,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useOverflowDetector } from '@/hooks/useOverflowDetector'
 import { useSettings } from '@/hooks/useSettings'
+import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import type { SessionWithProject } from '../types'
@@ -727,6 +728,40 @@ export function ShellTabs({
   const { settings, updateSettings } = useSettings()
   const shellOrder = settings?.shell_order ?? {}
 
+  const handleKillAll = async () => {
+    setKillAllConfirm(false)
+    const interruptResults = await Promise.all(
+      terminal.shells.map(async (shell) => {
+        try {
+          await interruptShellMutation.mutateAsync({ id: shell.id })
+          return true
+        } catch (err) {
+          toastError(err, 'Failed to interrupt shell')
+          return false
+        }
+      }),
+    )
+    const interruptedCount = interruptResults.filter(Boolean).length
+    if (interruptedCount === 0) return
+    setTimeout(async () => {
+      const killResults = await Promise.all(
+        terminal.shells.map(async (shell) => {
+          try {
+            await killShellMutation.mutateAsync({ id: shell.id })
+            return true
+          } catch (err) {
+            toastError(err, 'Failed to kill process')
+            return false
+          }
+        }),
+      )
+      const killedCount = killResults.filter(Boolean).length
+      if (killedCount > 0) {
+        toast.success(`Killed processes in ${killedCount} shell(s)`)
+      }
+    }, 1000)
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -1180,24 +1215,7 @@ export function ShellTabs({
         message={`This will send Ctrl+C to all ${terminal.shells.length} shell(s) in this terminal.`}
         confirmLabel="Kill All"
         variant="danger"
-        onConfirm={() => {
-          for (const shell of terminal.shells) {
-            interruptShellMutation
-              .mutateAsync({ id: shell.id })
-              .catch(() => toast.error('Failed to interrupt shell'))
-          }
-          setTimeout(() => {
-            for (const shell of terminal.shells) {
-              killShellMutation
-                .mutateAsync({ id: shell.id })
-                .catch(() => toast.error('Failed to kill shell'))
-            }
-          }, 1000)
-          toast.success(
-            `Killed processes in ${terminal.shells.length} shell(s)`,
-          )
-          setKillAllConfirm(false)
-        }}
+        onConfirm={handleKillAll}
         onCancel={() => setKillAllConfirm(false)}
       />
       <ConfirmModal
