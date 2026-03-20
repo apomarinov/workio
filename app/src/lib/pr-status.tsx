@@ -96,7 +96,7 @@ export function getPRStatusInfo(pr?: PRCheckStatus) {
         <Loader2
           className={cn(
             iconClass,
-            `text-yellow-400 animate-spin ${props?.group ? `${props.group}:text-yellow-400` : ''}`,
+            `text-yellow-400/80 animate-spin ${props?.group ? `${props.group}:text-yellow-400` : ''}`,
             props?.cls,
           )}
         />

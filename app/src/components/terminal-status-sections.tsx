@@ -240,7 +240,7 @@ export function PortItem({
         <span
           className={cn(
             isMobile ? 'flex' : 'hidden group-hover/port:flex',
-            'items-center gap-0.5 ml-auto text-[10px] text-muted-foreground/60',
+            'items-center gap-0.5 ml-auto text-[10px] text-muted-foreground/60 hover:text-muted-foreground',
           )}
         >
           <Link2 className="w-3 h-3" />

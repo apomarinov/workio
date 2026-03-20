@@ -58,7 +58,7 @@ export const PRStatusGroup = memo(function PRStatusGroup({
           prInfo.isApproved ||
           prInfo.hasConflicts ||
           prInfo.hasPendingReviews ? (
-          prInfo.icon({ cls: 'w-4 h-4', group: 'group/pr' })
+          prInfo.icon({ cls: 'w-4 h-4', group: 'group-hover/pr' })
         ) : (
           <ChevronRight className="w-4 h-4 flex-shrink-0" />
         )}

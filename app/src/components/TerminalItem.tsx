@@ -243,7 +243,7 @@ export const TerminalItem = memo(function TerminalItem({
             {sessionsExpanded ? (
               <ChevronDown className="w-4 h-4" />
             ) : prForBranch ? (
-              prInfo.icon()
+              prInfo.icon({ group: 'group-hover' })
             ) : (
               <ChevronRight className="w-4 h-4" />
             )}
