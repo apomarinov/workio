@@ -362,7 +362,7 @@ These files stay in place — they're cross-cutting concerns used by all domains
 | #   | Domain        | Status | Notes                                                                                                                                                           |
 | --- | ------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **logs**      | [x]    | Smallest (3 functions), no deps on other unmigrated domains, good warmup to establish the pattern                                                               |
-| 2   | **workspace** | [ ]    | Leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it                                                 |
+| 2   | **workspace** | [x]    | Leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it                                                 |
 | 3   | **pty**       | [ ]    | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
 | 4   | **git**       | [ ]    | Depends on workspace + logs, both done by now                                                                                                                   |
 | 5   | **sessions**  | [ ]    | Depends on workspace + settings (already done). Large but self-contained                                                                                        |
@@ -381,7 +381,7 @@ Steps 4 and 5 can be done in either order or in parallel since they don't depend
 | [x]  | **terminals** | 15    | CRUD, project upsert, name uniqueness                                                                                             | Sidebar list, CreateTerminalModal, EditTerminalModal                    |
 | [x]  | **shells**    | 10    | create, delete, rename, get, write, interrupt, kill                                                                               | Shell tabs in terminal, context menu                                    |
 | [x]  | **setup**     | 5     | cancel, rerun, clear error, setupWorkspace, emitWorkspace                                                                         | EditTerminalModal lifecycle buttons, CreateTerminalModal                |
-| [ ]  | **system**    | 10+   | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/fix-max-sessions, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
+| [x]  | **system**    | 10+   | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/fix-max-sessions, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
 
 
 ### pty (58 functions → 5 sub-groups)

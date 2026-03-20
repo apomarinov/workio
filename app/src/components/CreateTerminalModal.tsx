@@ -1,3 +1,4 @@
+import type { SSHHost } from '@domains/workspace/schema/system'
 import {
   AlertTriangle,
   Check,
@@ -39,17 +40,11 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useSettings } from '../hooks/useSettings'
-import {
-  auditSSHHost,
-  checkConductor,
-  fixSSHMaxSessions,
-  getGitHubRepos,
-  getSSHHosts,
-  type SSHHostEntry,
-} from '../lib/api'
+import { checkConductor, getGitHubRepos } from '../lib/api'
 import { DirectoryBrowser } from './DirectoryBrowser'
 import { TerminalIcon2 } from './icons'
 
@@ -117,6 +112,10 @@ export function CreateTerminalModal({
 }: CreateTerminalModalProps) {
   const { createTerminal } = useWorkspaceContext()
   const { settings } = useSettings()
+  const utils = trpc.useUtils()
+  const fixMaxSessionsMutation =
+    trpc.workspace.system.sshFixMaxSessions.useMutation()
+
   const [cwd, setCwd] = useState('')
   const [name, setName] = useState('')
   const [shell, setShell] = useState('')
@@ -128,7 +127,7 @@ export function CreateTerminalModal({
   const [setupScript, setSetupScript] = useState('')
   const [deleteScript, setDeleteScript] = useState('')
   const [creating, setCreating] = useState(false)
-  const [hosts, setHosts] = useState<SSHHostEntry[]>([])
+  const [hosts, setHosts] = useState<SSHHost[]>([])
   const [loadingHosts, setLoadingHosts] = useState(false)
   const [sshMaxSessions, setSSHMaxSessions] = useState<number | null>(null)
   const [auditingSSH, setAuditingSSH] = useState(false)
@@ -150,7 +149,8 @@ export function CreateTerminalModal({
   useEffect(() => {
     if (open) {
       setLoadingHosts(true)
-      getSSHHosts()
+      utils.workspace.system.sshHosts
+        .fetch()
         .then(setHosts)
         .catch(() => toast.error('Failed to load SSH hosts'))
         .finally(() => setLoadingHosts(false))
@@ -329,7 +329,8 @@ export function CreateTerminalModal({
                 setSSHHost(v)
                 setSSHMaxSessions(null)
                 setAuditingSSH(true)
-                auditSSHHost(v)
+                utils.workspace.system.sshAudit
+                  .fetch({ host: v })
                   .then((r) => setSSHMaxSessions(r.maxSessions))
                   .catch(() => setSSHMaxSessions(null))
                   .finally(() => setAuditingSSH(false))
@@ -388,18 +389,16 @@ export function CreateTerminalModal({
                     className="h-6 px-2 text-xs shrink-0"
                     onClick={() => {
                       setFixingSSH(true)
-                      fixSSHMaxSessions(sshHost)
-                        .then((r) => {
-                          if (r.success) {
-                            toast.success('MaxSessions updated to 64')
-                            setAuditingSSH(true)
-                            auditSSHHost(sshHost)
-                              .then((a) => setSSHMaxSessions(a.maxSessions))
-                              .catch(() => setSSHMaxSessions(null))
-                              .finally(() => setAuditingSSH(false))
-                          } else {
-                            toast.error(r.error || 'Failed to fix MaxSessions')
-                          }
+                      fixMaxSessionsMutation
+                        .mutateAsync({ host: sshHost })
+                        .then(() => {
+                          toast.success('MaxSessions updated to 64')
+                          setAuditingSSH(true)
+                          utils.workspace.system.sshAudit
+                            .fetch({ host: sshHost })
+                            .then((a) => setSSHMaxSessions(a.maxSessions))
+                            .catch(() => setSSHMaxSessions(null))
+                            .finally(() => setAuditingSSH(false))
                         })
                         .catch((err) =>
                           toastError(err, 'Failed to fix MaxSessions'),

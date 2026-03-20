@@ -13,13 +13,14 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { DEFAULT_FONT_SIZE } from '../constants'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { useSettings } from '../hooks/useSettings'
 import { useTerminalSocket } from '../hooks/useTerminalSocket'
-import { openInExplorer, openInIDE } from '../lib/api'
 
 interface TerminalProps {
   terminalId: number
@@ -30,6 +31,9 @@ interface TerminalProps {
 export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const { terminals } = useWorkspaceContext()
   const isMobile = useIsMobile()
+  const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
+  const openInExplorerMutation =
+    trpc.workspace.system.openInExplorer.useMutation()
   const terminal = terminals.find((t) => t.id === terminalId)
   const isCloning = terminal?.git_repo?.status === 'setup'
   const isBusy = isCloning
@@ -918,22 +922,21 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
                 navigator.clipboard.writeText(linkText)
                 toast.success('Copied path to clipboard')
               } else if (event instanceof MouseEvent && event.metaKey) {
-                openInExplorer(linkText, terminalIdRef.current).catch((err) => {
-                  toast.error(
-                    err instanceof Error
-                      ? err.message
-                      : 'Failed to open in Finder',
-                  )
-                })
+                openInExplorerMutation
+                  .mutateAsync({
+                    path: linkText,
+                    terminal_id: terminalIdRef.current,
+                  })
+                  .catch((err) => toastError(err, 'Failed to open in Finder'))
               } else {
                 const ide = settingsRef.current?.preferred_ide ?? 'cursor'
-                openInIDE(linkText, ide, terminalIdRef.current).catch((err) => {
-                  toast.error(
-                    err instanceof Error
-                      ? err.message
-                      : 'Failed to open in IDE',
-                  )
-                })
+                openInIdeMutation
+                  .mutateAsync({
+                    path: linkText,
+                    ide,
+                    terminal_id: terminalIdRef.current,
+                  })
+                  .catch((err) => toastError(err, 'Failed to open in IDE'))
               }
             },
             hover: (event) => {

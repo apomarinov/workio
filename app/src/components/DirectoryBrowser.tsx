@@ -1,3 +1,4 @@
+import type { DirEntry } from '@domains/workspace/schema/system'
 import {
   ChevronRight,
   File,
@@ -19,13 +20,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import {
-  createDirectory,
-  type DirEntry,
-  listDirectories,
-  openFullDiskAccess,
-} from '../lib/api'
 
 interface Column {
   path: string
@@ -55,6 +51,9 @@ export function DirectoryBrowser({
   onSelectPaths,
   title,
 }: DirectoryBrowserProps) {
+  const listDirsMutation = trpc.workspace.system.listDirectories.useMutation()
+  const createDirMutation = trpc.workspace.system.createDirectory.useMutation()
+
   const [columns, setColumns] = useState<Column[]>([])
   const [inputPath, setInputPath] = useState('')
   const [showHidden, setShowHidden] = useState(false)
@@ -92,7 +91,12 @@ export function DirectoryBrowser({
       }
 
       try {
-        const res = await listDirectories(segments, 0, showHidden, sshHost)
+        const res = await listDirsMutation.mutateAsync({
+          paths: segments,
+          page: 0,
+          hidden: showHidden,
+          ssh_host: sshHost,
+        })
 
         const newColumns: Column[] = []
         for (let i = 0; i < segments.length; i++) {
@@ -240,11 +244,11 @@ export function DirectoryBrowser({
     const name = newFolderName.trim()
     setCreatingFolder(true)
     try {
-      const result = await createDirectory(
-        inputPath || defaultRoot,
+      const result = await createDirMutation.mutateAsync({
+        path: inputPath || defaultRoot,
         name,
-        sshHost,
-      )
+        ssh_host: sshHost,
+      })
       setNewFolderName(null)
       setHiddenVersion((v) => v + 1)
       navigateToPath(result.path)
@@ -524,6 +528,9 @@ function BrowserColumn({
     columnPath: string,
   ) => void
 }) {
+  const listDirsMutation = trpc.workspace.system.listDirectories.useMutation()
+  const openFdaMutation = trpc.workspace.system.openFullDiskAccess.useMutation()
+
   const [entries, setEntries] = useState<DirEntry[]>(initialEntries ?? [])
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(initialHasMore ?? false)
@@ -545,7 +552,13 @@ function BrowserColumn({
     setHasMore(false)
     setError(null)
 
-    listDirectories([path], 0, showHidden, sshHost)
+    listDirsMutation
+      .mutateAsync({
+        paths: [path],
+        page: 0,
+        hidden: showHidden,
+        ssh_host: sshHost,
+      })
       .then((res) => {
         if (cancelled) return
         const result = res.results[path]
@@ -577,7 +590,13 @@ function BrowserColumn({
         if (observerEntries[0]?.isIntersecting && hasMore && !loadingMore) {
           const nextPage = page + 1
           setLoadingMore(true)
-          listDirectories([path], nextPage, showHidden, sshHost)
+          listDirsMutation
+            .mutateAsync({
+              paths: [path],
+              page: nextPage,
+              hidden: showHidden,
+              ssh_host: sshHost,
+            })
             .then((res) => {
               const result = res.results[path]
               if (result?.entries) {
@@ -626,7 +645,7 @@ function BrowserColumn({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => openFullDiskAccess()}
+              onClick={() => openFdaMutation.mutate()}
             >
               Open System Settings
             </Button>

@@ -29,8 +29,6 @@ import {
   getBranches,
   getMoveTargets,
   moveSession,
-  openInExplorer,
-  openInIDE,
   pullBranch,
   pushBranch,
   rebaseBranch,
@@ -154,6 +152,9 @@ export function CommandPalette() {
 
   const killShellMutation = trpc.workspace.shells.killShell.useMutation()
   const createShellMutation = trpc.workspace.shells.createShell.useMutation()
+  const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
+  const openInExplorerMutation =
+    trpc.workspace.system.openInExplorer.useMutation()
 
   // Context data
   const {
@@ -674,12 +675,11 @@ export function CommandPalette() {
       openInIDE: async (terminal) => {
         closePalette()
         try {
-          await openInIDE(
-            terminal.cwd,
-            preferredIDE,
-            undefined,
-            terminal.ssh_host ?? undefined,
-          )
+          await openInIdeMutation.mutateAsync({
+            path: terminal.cwd,
+            ide: preferredIDE,
+            ssh_host: terminal.ssh_host ?? undefined,
+          })
         } catch {
           // CLI not available — fall back to URL scheme
           const scheme = preferredIDE === 'vscode' ? 'vscode' : 'cursor'
@@ -691,7 +691,7 @@ export function CommandPalette() {
       },
       openInExplorer: async (terminal) => {
         try {
-          await openInExplorer(terminal.cwd)
+          await openInExplorerMutation.mutateAsync({ path: terminal.cwd })
         } catch (err) {
           toastError(err, 'Failed to open file explorer')
         }

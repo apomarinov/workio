@@ -19,8 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { getFileDiff, openInIDE } from '@/lib/api'
+import { getFileDiff } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 
 const D2H_CONFIG = {
   outputFormat: 'line-by-line' as const,
@@ -49,6 +50,7 @@ function DiffContent({
   preferredIde: 'cursor' | 'vscode'
   terminalId: number
 }) {
+  const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
   const containerRef = useRef<HTMLDivElement>(null)
   const prevDiffRef = useRef<string>('')
 
@@ -129,9 +131,13 @@ function DiffContent({
       btn.addEventListener('click', (ev) => {
         ev.preventDefault()
         ev.stopPropagation()
-        openInIDE(`${filePath}:${lineNum}`, preferredIde, terminalId).catch(
-          (err) => toastError(err, 'Failed to open in IDE'),
-        )
+        openInIdeMutation
+          .mutateAsync({
+            path: `${filePath}:${lineNum}`,
+            ide: preferredIde,
+            terminal_id: terminalId,
+          })
+          .catch((err: unknown) => toastError(err, 'Failed to open in IDE'))
       })
       cell.appendChild(btn)
       activeBtn = btn
@@ -164,6 +170,7 @@ export function FileDiffViewer({
   preferredIde,
   base,
 }: FileDiffViewerProps) {
+  const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
   const [showFullFile, setShowFullFile] = useState(false)
   const [maximized, setMaximized] = useState(false)
   const [currentHunkIndex, setCurrentHunkIndex] = useState(0)
@@ -303,9 +310,13 @@ export function FileDiffViewer({
         size="icon"
         className="h-7 w-7"
         onClick={() =>
-          openInIDE(filePath, preferredIde, terminalId).catch((err) =>
-            toastError(err, 'Failed to open in IDE'),
-          )
+          openInIdeMutation
+            .mutateAsync({
+              path: filePath,
+              ide: preferredIde,
+              terminal_id: terminalId,
+            })
+            .catch((err: unknown) => toastError(err, 'Failed to open in IDE'))
         }
         title={`Open in ${preferredIde === 'cursor' ? 'Cursor' : 'VS Code'}`}
       >

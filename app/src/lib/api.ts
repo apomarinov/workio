@@ -112,33 +112,7 @@ async function api<T = void>(
   return res.json()
 }
 
-// --- Terminals ---
-
-export interface SSHHostEntry {
-  alias: string
-  hostname: string
-  user: string | null
-}
-
-export async function getSSHHosts(): Promise<SSHHostEntry[]> {
-  return api(`${API_BASE}/ssh/hosts`)
-}
-
-export async function auditSSHHost(
-  host: string,
-): Promise<{ maxSessions: number | null }> {
-  try {
-    return await api(`${API_BASE}/ssh/audit?host=${encodeURIComponent(host)}`)
-  } catch {
-    return { maxSessions: null }
-  }
-}
-
-export async function fixSSHMaxSessions(
-  host: string,
-): Promise<{ success: boolean; error?: string }> {
-  return api(`${API_BASE}/ssh/fix-max-sessions`, { body: { host } })
-}
+// --- GitHub ---
 
 export async function getGitHubRepos(query?: string): Promise<string[]> {
   try {
@@ -161,85 +135,6 @@ export async function checkConductor(repo: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-export async function browseFolder(): Promise<string | null> {
-  const res = await apiFetch(`${API_BASE}/browse-folder`)
-  if (res.status === 204) return null
-  const data: { path: string } = await res.json()
-  return data.path
-}
-
-export async function openFullDiskAccess(): Promise<void> {
-  await api(`${API_BASE}/open-full-disk-access`, { method: 'POST' })
-}
-
-export async function openInIDE(
-  path: string,
-  ide: 'cursor' | 'vscode',
-  terminalId?: number,
-  sshHost?: string,
-): Promise<void> {
-  await api(`${API_BASE}/open-in-ide`, {
-    body: {
-      path,
-      ide,
-      ...(terminalId != null && { terminal_id: terminalId }),
-      ...(sshHost && { ssh_host: sshHost }),
-    },
-  })
-}
-
-export async function openInExplorer(
-  path: string,
-  terminalId?: number,
-): Promise<void> {
-  await api(`${API_BASE}/open-in-explorer`, {
-    body: {
-      path,
-      ...(terminalId != null && { terminal_id: terminalId }),
-    },
-  })
-}
-
-export interface DirEntry {
-  name: string
-  isDir: boolean
-}
-
-export interface DirResult {
-  entries?: DirEntry[]
-  hasMore?: boolean
-  error?: string | null
-}
-
-export interface ListDirectoriesResponse {
-  results: Record<string, DirResult>
-}
-
-export async function listDirectories(
-  paths: string[],
-  page?: number,
-  hidden?: boolean,
-  sshHost?: string,
-): Promise<ListDirectoriesResponse> {
-  const body: Record<string, unknown> = {
-    paths,
-    page: page ?? 0,
-    hidden: hidden ?? false,
-  }
-  if (sshHost) body.ssh_host = sshHost
-  return api(`${API_BASE}/list-directories`, { body })
-}
-
-export async function createDirectory(
-  parentPath: string,
-  name: string,
-  sshHost?: string,
-): Promise<{ path: string }> {
-  const body: Record<string, unknown> = { path: parentPath, name }
-  if (sshHost) body.ssh_host = sshHost
-  return api(`${API_BASE}/create-directory`, { body })
 }
 
 // --- Permissions ---
