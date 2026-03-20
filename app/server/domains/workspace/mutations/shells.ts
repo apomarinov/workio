@@ -27,7 +27,7 @@ import {
   renameShellInput,
   shellIdInput,
   writeShellInput,
-} from '../schema'
+} from '../schema/shells'
 
 async function resolveShell(id: number) {
   const shell = await getShellById(id)

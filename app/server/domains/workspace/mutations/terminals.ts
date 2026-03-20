@@ -22,7 +22,7 @@ import {
   createTerminalInput,
   deleteTerminalInput,
   updateTerminalInput,
-} from '../schema'
+} from '../schema/terminals'
 import { emitWorkspace } from '../services/emit'
 import {
   deleteTerminalWorkspace,

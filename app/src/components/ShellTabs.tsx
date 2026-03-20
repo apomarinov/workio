@@ -18,7 +18,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { ShellTemplate } from '@domains/settings/schema'
-import type { Shell, Terminal } from '@domains/workspace/schema'
+import type { Shell } from '@domains/workspace/schema/shells'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   Activity,
   Ban,

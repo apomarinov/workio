@@ -1,4 +1,4 @@
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import { Check, ChevronDown, Loader2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'

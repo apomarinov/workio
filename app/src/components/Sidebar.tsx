@@ -11,7 +11,7 @@ import {
   restrictToVerticalAxis,
 } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   Bell,
   BellOff,

@@ -1,5 +1,6 @@
 import type { SettingsUpdate } from '@domains/settings/schema'
-import type { Shell, Terminal } from '@domains/workspace/schema'
+import type { Shell } from '@domains/workspace/schema/shells'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   createContext,
   useCallback,

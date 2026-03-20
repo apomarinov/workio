@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import { memo } from 'react'
 import type { SessionWithProject } from '../types'
 import { TerminalItem } from './TerminalItem'

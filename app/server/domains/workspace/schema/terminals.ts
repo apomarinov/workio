@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { shellSchema } from './shells'
 
 // --- Sub-schemas (JSONB columns) ---
 
@@ -28,14 +29,6 @@ export const terminalSettingsSchema = z.object({
 })
 
 // --- Row schemas ---
-
-export const shellSchema = z.object({
-  id: z.number(),
-  terminal_id: z.number(),
-  name: z.string(),
-  active_cmd: z.string().nullable(),
-  created_at: z.string(),
-})
 
 export const terminalSchema = z.object({
   id: z.number(),
@@ -85,35 +78,12 @@ export const deleteTerminalInput = terminalSchema
   .pick({ id: true })
   .extend({ deleteDirectory: z.boolean().optional() })
 
-// --- Shell input schemas ---
-
-export const createShellInput = z.object({
-  terminalId: z.number(),
-  name: z.string().optional(),
-})
-
-export const shellIdInput = z.object({
-  id: z.number(),
-})
-
-export const renameShellInput = z.object({
-  id: z.number(),
-  name: z.string(),
-})
-
-export const writeShellInput = z.object({
-  id: z.number(),
-  data: z.string(),
-  pending: z.boolean().optional(),
-})
-
 // --- Types ---
 
 export type GitRepoStatus = z.infer<typeof gitRepoStatusSchema>
 export type SetupStatus = z.infer<typeof setupStatusSchema>
 export type PortMapping = z.infer<typeof portMappingSchema>
 export type TerminalSettings = z.infer<typeof terminalSettingsSchema>
-export type Shell = z.infer<typeof shellSchema>
 export type Terminal = z.infer<typeof terminalSchema>
 export type Project = z.infer<typeof projectSchema>
 export type CreateTerminalInput = z.infer<typeof createTerminalInput>

@@ -3,7 +3,8 @@ import pool from '@server/db'
 import { buildSetClauses, jsonOrNull } from '@server/lib/db'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
 import { renameZellijSession, writeTerminalNameFile } from '@server/pty/manager'
-import type { Project, Shell, Terminal } from '../schema'
+import type { Shell } from '../schema/shells'
+import type { Project, Terminal } from '../schema/terminals'
 
 async function attachShellsToTerminals(terminals: Terminal[]) {
   if (terminals.length === 0) return terminals

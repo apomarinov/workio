@@ -1,4 +1,4 @@
-import type { Shell } from '@domains/workspace/schema'
+import type { Shell } from '@domains/workspace/schema/shells'
 import {
   Activity,
   ChevronDown,

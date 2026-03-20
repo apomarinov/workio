@@ -16,7 +16,7 @@ import {
   getTerminalById,
   updateTerminal,
 } from '@domains/workspace/db/terminals'
-import type { Shell } from '@domains/workspace/schema'
+import type { Shell } from '@domains/workspace/schema/shells'
 import { getSettings } from '../db'
 import { startChecksPolling, trackTerminal } from '../github/checks'
 import { getIO } from '../io'

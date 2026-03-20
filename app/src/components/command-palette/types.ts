@@ -1,4 +1,4 @@
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import type { ReactNode } from 'react'
 import type { BranchInfo } from '@/lib/api'
 import type { PRCheckStatus } from '../../../shared/types'

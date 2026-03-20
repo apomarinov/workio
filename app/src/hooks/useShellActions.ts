@@ -1,5 +1,6 @@
 import type { ShellTemplate } from '@domains/settings/schema'
-import type { Shell, Terminal } from '@domains/workspace/schema'
+import type { Shell } from '@domains/workspace/schema/shells'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'

@@ -1,4 +1,4 @@
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   AlertTriangle,
   ChevronDown,

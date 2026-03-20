@@ -3,7 +3,7 @@ import type {
   PreferredIDE,
   ShellTemplate,
 } from '@domains/settings/schema'
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import type {
   ActiveProcess,
   GitDiffStat,

@@ -1,5 +1,5 @@
 import { DEFAULT_KEYMAP } from '@domains/settings/schema'
-import type { Terminal } from '@domains/workspace/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   ArrowBigUp,
   ChevronUp,
