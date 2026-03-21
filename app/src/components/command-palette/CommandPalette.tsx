@@ -1336,14 +1336,16 @@ export function CommandPalette() {
             setDeleteTerminalTarget(null)
           }}
         >
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={deleteDirectory}
-              onCheckedChange={(v) => setDeleteDirectory(v === true)}
-              className="w-5 h-5"
-            />
-            Also delete directory
-          </label>
+          {deleteTerminalTarget.git_repo && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={deleteDirectory}
+                onCheckedChange={(v) => setDeleteDirectory(v === true)}
+                className="w-5 h-5"
+              />
+              Also delete directory
+            </label>
+          )}
         </ConfirmModal>
       )}
 

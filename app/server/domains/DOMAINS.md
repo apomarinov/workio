@@ -412,15 +412,17 @@ Refactored state: 3 Maps (`sessions`, `monitors`, `shellClients`), each holding 
 
 Migration order within pty (each step is independently shippable):
 
-| #   | Done | Sub-group             | Count | What                                                                                                | Notes                                                                                          |
-| --- | ---- | --------------------- | ----- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| 1   | [x]  | **shell-integration** | 4     | `osc-parser.ts` (factory + CommandEvent type), `ipc-types.ts`, `permission-scanner.ts`              | Leaf deps — `osc-parser` has zero imports, `ipc-types` only imports CommandEvent type from it   |
-| 2   | [x]  | **process-tree**      | 16    | child PIDs, process comm, zellij sessions, memory, resource usage, listening ports (local + remote) | Pure/IO-only functions, external deps only (exec, ssh/pool, logger) — move as-is               |
-| 3   | [x]  | **worker**            | 1     | PTY child process entry point (isolated process, no classes)                                        | Imports osc-parser + ipc-types + process-tree (steps 1-2) + ssh-pty-adapter — move as-is       |
-| 4   | [x]  | **session**           | ~26   | `PtySession` class: worker IPC, write/resize/interrupt, timeout, pending commands, bell, naming     | Big refactor — merges `session-proxy.ts` + per-shell Maps from `manager.ts` into class          |
-| 5   | [ ]  | **monitor**           | ~17   | `TerminalMonitor` class: git dirty/commit/remote-sync caching, process/port scanning, polling       | Extracts per-terminal Maps from `manager.ts`; depends on session (step 4) + process-tree        |
-| 6   | [ ]  | **websocket**         | ~14   | `ShellClients` class: per-shell client tracking, primary/secondary, resize debounce, broadcasting   | Refactors `ws/terminal.ts`; depends on session (step 4)                                         |
-| 7   | [ ]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Thin wrappers over session — move last since they depend on session (step 4)                    |
+
+| #   | Done | Sub-group             | Count | What                                                                                                | Notes                                                                                         |
+| --- | ---- | --------------------- | ----- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1   | [x]  | **shell-integration** | 4     | `osc-parser.ts` (factory + CommandEvent type), `ipc-types.ts`, `permission-scanner.ts`              | Leaf deps — `osc-parser` has zero imports, `ipc-types` only imports CommandEvent type from it |
+| 2   | [x]  | **process-tree**      | 16    | child PIDs, process comm, zellij sessions, memory, resource usage, listening ports (local + remote) | Pure/IO-only functions, external deps only (exec, ssh/pool, logger) — move as-is              |
+| 3   | [x]  | **worker**            | 1     | PTY child process entry point (isolated process, no classes)                                        | Imports osc-parser + ipc-types + process-tree (steps 1-2) + ssh-pty-adapter — move as-is      |
+| 4   | [x]  | **session**           | ~26   | `PtySession` class: worker IPC, write/resize/interrupt, timeout, pending commands, bell, naming     | Big refactor — merges `session-proxy.ts` + per-shell Maps from `manager.ts` into class        |
+| 5   | [ ]  | **monitor**           | ~17   | `TerminalMonitor` class: git dirty/commit/remote-sync caching, process/port scanning, polling       | Extracts per-terminal Maps from `manager.ts`; depends on session (step 4) + process-tree      |
+| 6   | [ ]  | **websocket**         | ~14   | `ShellClients` class: per-shell client tracking, primary/secondary, resize debounce, broadcasting   | Refactors `ws/terminal.ts`; depends on session (step 4)                                       |
+| 7   | [ ]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Thin wrappers over session — move last since they depend on session (step 4)                  |
+
 
 Steps 1-3 are pure moves (no refactoring, no classes). Step 4 is the core refactor. Steps 5-7 depend on step 4 but are independent of each other.
 
