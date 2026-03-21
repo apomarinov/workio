@@ -4,6 +4,7 @@ import {
   ChevronDown,
   CircleX,
   GitBranch,
+  Github,
   Loader2,
   MoreVertical,
   Search,
@@ -11,10 +12,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
-import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useSessionContext } from '@/context/SessionContext'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import { getBranches, searchSessionMessages } from '@/lib/api'
+import { searchSessionMessages } from '@/lib/api'
 import { contextExcerpt, highlightMatch } from '@/lib/search-utils'
 import { formatDate } from '@/lib/time'
 import { cn } from '@/lib/utils'
@@ -68,49 +69,46 @@ export function SessionSearchPanel({
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null)
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
-  const [branches, setBranches] = useState<string[]>([])
-  const [branchesLoading, setBranchesLoading] = useState(false)
   const [branchPickerOpen, setBranchPickerOpen] = useState(false)
+  const [expandedBranches, setExpandedBranches] = useState<Set<string>>(
+    new Set(),
+  )
   const [recentOnly, setRecentOnly] = useState(true)
 
-  const { terminals } = useWorkspaceContext()
+  const { sessions } = useSessionContext()
 
-  // Extract distinct repos from terminals
+  // Extract distinct repos and branches from session data
   const repos = [
     ...new Set(
-      terminals
-        .map((t) => (t.git_repo as { repo?: string } | null)?.repo)
-        .filter((r): r is string => r != null),
+      sessions
+        .flatMap((s) => {
+          const entries = s.data?.branches ?? []
+          const mainRepo = s.data?.repo
+          const repoSet = new Set(entries.map((e) => e.repo))
+          if (mainRepo) repoSet.add(mainRepo)
+          return [...repoSet]
+        })
+        .filter(Boolean),
     ),
   ].sort()
 
-  // Fetch branches when repo changes
-  useEffect(() => {
-    if (!selectedRepo) {
-      setBranches([])
-      return
-    }
-    const terminal = terminals.find(
-      (t) => (t.git_repo as { repo?: string } | null)?.repo === selectedRepo,
-    )
-    if (!terminal) {
-      setBranches([])
-      return
-    }
-    setBranchesLoading(true)
-    getBranches(terminal.id)
-      .then((data) => {
-        const allBranches = [
-          ...data.local.map((b) => b.name),
-          ...data.remote.map((b) => b.name),
-        ]
-        setBranches([...new Set(allBranches)].sort())
-      })
-      .catch(() => {
-        setBranches([])
-      })
-      .finally(() => setBranchesLoading(false))
-  }, [selectedRepo, terminals])
+  const branches = selectedRepo
+    ? [
+      ...new Set(
+        sessions.flatMap((s) => {
+          const entries = s.data?.branches ?? []
+          const matching = entries
+            .filter((e) => e.repo === selectedRepo)
+            .map((e) => e.branch)
+          // Also include main branch if repo matches
+          if (s.data?.repo === selectedRepo && s.data?.branch) {
+            matching.push(s.data.branch)
+          }
+          return matching
+        }),
+      ),
+    ].sort()
+    : []
 
   const isMobile = useIsMobile()
   const showingChat = isMobile && selectedSessionId != null
@@ -335,9 +333,53 @@ export function SessionSearchPanel({
                     </div>
                   )}
                   {match.data?.branch && (
-                    <div className="flex items-center gap-0.5 mt-0.5 ml-5.5 text-[11px] text-zinc-500 break-all">
-                      <GitBranch className="w-2.5 h-2.5 shrink-0" />
-                      {match.data.branch}
+                    <div className="mt-0.5 ml-5.5 text-[11px] text-zinc-500">
+                      <div className="flex items-center gap-0.5 break-all">
+                        <GitBranch className="w-2.5 h-2.5 shrink-0" />
+                        {match.data.branch}
+                      </div>
+                      {match.data.branches &&
+                        match.data.branches.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setExpandedBranches((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(match.session_id)) {
+                                    next.delete(match.session_id)
+                                  } else {
+                                    next.add(match.session_id)
+                                  }
+                                  return next
+                                })
+                              }}
+                              className="flex items-center gap-0.5 mt-0.5 text-zinc-600 hover:text-zinc-400 cursor-pointer"
+                            >
+                              <ChevronDown
+                                className={cn(
+                                  'w-2.5 h-2.5 transition-transform',
+                                  !expandedBranches.has(match.session_id) &&
+                                  '-rotate-90',
+                                )}
+                              />
+                              More Branches
+                            </button>
+                            {expandedBranches.has(match.session_id) &&
+                              match.data.branches
+                                .filter((e) => e.branch !== match.data?.branch)
+                                .map((e) => (
+                                  <div
+                                    key={`${e.repo}/${e.branch}`}
+                                    className="flex items-center gap-0.5 mt-0.5 ml-3 break-all"
+                                  >
+                                    <GitBranch className="w-2.5 h-2.5 shrink-0" />
+                                    {e.branch}
+                                  </div>
+                                ))}
+                          </>
+                        )}
                     </div>
                   )}
                 </button>
@@ -514,7 +556,10 @@ export function SessionSearchPanel({
                 size="sm"
                 className="!h-7 text-xs min-w-0 max-w-48"
               >
-                <SelectValue placeholder="All repos" />
+                <div className="flex items-center gap-2">
+                  <Github className="w-3 h-3 max-w-3" />
+                  <SelectValue placeholder="All repos" />
+                </div>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All repos</SelectItem>
@@ -531,18 +576,16 @@ export function SessionSearchPanel({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs font-normal min-w-0 max-w-[90vw] w-fit"
-                  disabled={!selectedRepo || branchesLoading}
+                  className="h-7 group text-xs font-normal min-w-[150px] max-w-[90vw] w-fit flex justify-between"
+                  disabled={!selectedRepo}
                 >
-                  {branchesLoading ? (
-                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                  ) : (
-                    <GitBranch className="w-3 h-3 mr-1" />
-                  )}
-                  <span className="truncate">
-                    {selectedBranch ?? 'All branches'}
-                  </span>
-                  <ChevronDown className="w-3 h-3 ml-1 shrink-0" />
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="w-3 h-3 max-w-3" />
+                    <span className="truncate">
+                      {selectedBranch ?? 'All branches'}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3 h-3 ml-1 shrink-0 opacity-50 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-0" align="start">
