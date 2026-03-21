@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
+import { getSettings, updateSettings } from '@domains/settings/db'
 import { WEBHOOK_EVENTS } from '../../shared/types'
-import { getSettings, updateSettings } from '../db'
 import { env } from '../env'
 import { execFileAsync } from '../lib/exec'
 import { log } from '../logger'

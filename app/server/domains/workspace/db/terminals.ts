@@ -1,8 +1,6 @@
 import crypto from 'node:crypto'
 import pool from '@server/db'
 import { buildSetClauses, jsonOrNull } from '@server/lib/db'
-import { sanitizeName, shellEscape } from '@server/lib/strings'
-import { renameZellijSession, writeTerminalNameFile } from '@server/pty/manager'
 import type { Shell } from '../schema/shells'
 import type { Project, Terminal } from '../schema/terminals'
 
@@ -131,13 +129,6 @@ export async function updateTerminal(
     settings?: object | null
   },
 ) {
-  // Get old terminal if name is changing (for zellij session rename)
-  let oldName: string | null = null
-  if (updates.name !== undefined) {
-    const oldTerminal = await getTerminalById(id)
-    oldName = oldTerminal?.name || null
-  }
-
   const set = buildSetClauses({
     name: updates.name,
     cwd: updates.cwd,
@@ -149,43 +140,13 @@ export async function updateTerminal(
     settings: jsonOrNull(updates.settings),
   })
 
-  if (!set) return getTerminalById(id)
+  if (!set) return
 
   set.values.push(id)
   await pool.query(
     `UPDATE terminals SET ${set.sql} WHERE id = $${set.nextParam}`,
     set.values,
   )
-
-  // Handle name change: update file and rename zellij session
-  if (updates.name !== undefined) {
-    const newName = updates.name
-    const sanitizedName = sanitizeName(newName)
-    const terminal = await getTerminalById(id)
-
-    writeTerminalNameFile(id, newName)
-    // Also write name file on remote host for SSH terminals (fire-and-forget)
-    if (terminal?.ssh_host) {
-      import('@server/ssh/pool').then(({ poolExecSSHCommand }) => {
-        poolExecSSHCommand(
-          terminal.ssh_host!,
-          `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(sanitizedName)} > ~/.workio/terminals/${id}`,
-          { timeout: 5000 },
-        ).catch(() => {})
-      })
-    }
-
-    // Rename zellij session if it exists (local or SSH)
-    if (oldName && oldName !== newName) {
-      renameZellijSession(
-        sanitizeName(oldName),
-        sanitizedName,
-        terminal?.ssh_host,
-      )
-    }
-  }
-
-  return getTerminalById(id)
 }
 
 export async function deleteTerminal(id: number) {

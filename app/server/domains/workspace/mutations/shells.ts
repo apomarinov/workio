@@ -1,7 +1,3 @@
-import { setActiveSessionDone } from '@server/db'
-import { getIO } from '@server/io'
-import { sanitizeName, shellEscape } from '@server/lib/strings'
-import { log } from '@server/logger'
 import {
   destroySession,
   interruptSession,
@@ -12,7 +8,11 @@ import {
   waitForSession,
   writeShellNameFile,
   writeToSession,
-} from '@server/pty/manager'
+} from '@domains/pty/session'
+import { setActiveSessionDone } from '@server/db'
+import { getIO } from '@server/io'
+import { sanitizeName, shellEscape } from '@server/lib/strings'
+import { log } from '@server/logger'
 import { execSSHCommand } from '@server/ssh/exec'
 import { publicProcedure } from '@server/trpc/init'
 import {

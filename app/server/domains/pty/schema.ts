@@ -102,6 +102,17 @@ export const workerToMasterMessageSchema = z.discriminatedUnion('type', [
 
 export type WorkerToMasterMessage = z.infer<typeof workerToMasterMessageSchema>
 
+// ── Session schemas ─────────────────────────────────────────────────
+
+export const bellSubscriptionSchema = z.object({
+  shellId: z.number(),
+  terminalId: z.number(),
+  command: z.string(),
+  terminalName: z.string(),
+})
+
+export type BellSubscription = z.infer<typeof bellSubscriptionSchema>
+
 // ── Permission scanner schemas ──────────────────────────────────────
 
 export const parsedPermissionPromptSchema = z.object({

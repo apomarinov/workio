@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cleanupOrphanedCommandLogs } from '@domains/logs/db'
 import pg from 'pg'
 import type { SessionSearchMatch, SessionWithProject } from '../src/types'
 import { env } from './env'
 import { buildSetClauses } from './lib/db'
+import serverEvents from './lib/events'
 import { log } from './logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -57,7 +57,7 @@ export async function initDb() {
 
   log.info('[db] Database initialized from schema.sql')
 
-  await cleanupOrphanedCommandLogs()
+  serverEvents.emit('db:initialized')
 
   // Cleanup general logs older than 1 week
   const logsResult = await pool.query(`
@@ -516,9 +516,6 @@ function buildResults(
 
   return results
 }
-
-// Settings — re-exported from domain
-export { getSettings, updateSettings } from '@domains/settings/db'
 
 // Session backfill queries
 

@@ -8,6 +8,17 @@ import {
   markDesktopActive,
 } from '@domains/notifications/service'
 import { getActiveZellijSessionNames } from '@domains/pty/services/process-tree'
+import {
+  destroyAllSessions,
+  getBellSubscribedShellIds,
+  getSession,
+  getSessionByTerminalId,
+  setPendingCommand,
+  subscribeBell,
+  unsubscribeBell,
+  writeShellIntegrationScripts,
+  writeToSession,
+} from '@domains/pty/session'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
@@ -32,18 +43,7 @@ import {
 import { broadcastRefetch, type RefetchGroup, setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
-import {
-  destroyAllSessions,
-  getBellSubscribedShellIds,
-  getSession,
-  getSessionByTerminalId,
-  setPendingCommand,
-  startGitDirtyPolling,
-  subscribeBell,
-  unsubscribeBell,
-  writeShellIntegrationScripts,
-  writeToSession,
-} from './pty/manager'
+import { startGitDirtyPolling } from './pty/manager'
 import claudeHookRoute from './routes/claude-hook'
 import githubRoutes from './routes/github'
 import sessionRoutes from './routes/sessions'

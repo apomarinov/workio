@@ -3,6 +3,15 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { logCommand } from '@domains/logs/db'
+import {
+  cancelWaitForMarker,
+  destroySessionsForTerminal,
+  getSessionByTerminalId,
+  interruptSession,
+  waitForMarker,
+  waitForSession,
+  writeToSession,
+} from '@domains/pty/session'
 import { getMainShellForTerminal } from '@domains/workspace/db/shells'
 import {
   deleteTerminal,
@@ -12,15 +21,6 @@ import {
 import { execFileAsync } from '@server/lib/exec'
 import { shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
-import {
-  cancelWaitForMarker,
-  destroySessionsForTerminal,
-  getSessionByTerminalId,
-  interruptSession,
-  waitForMarker,
-  waitForSession,
-  writeToSession,
-} from '@server/pty/manager'
 import { execSSHCommand } from '@server/ssh/exec'
 import { emitWorkspace } from './emit'
 

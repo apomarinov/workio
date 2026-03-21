@@ -1,5 +1,6 @@
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import pool from '@server/db'
+import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
 import type { CommandLog, ListInput, LogTerminal } from './schema'
 
@@ -144,7 +145,7 @@ export async function getLogTerminals() {
   return { terminals: rows }
 }
 
-export async function cleanupOrphanedCommandLogs() {
+async function cleanupOrphanedCommandLogs() {
   const result = await pool.query(`
     DELETE FROM command_logs
     WHERE terminal_id IS NOT NULL
@@ -155,3 +156,7 @@ export async function cleanupOrphanedCommandLogs() {
     log.info(`[db] Cleaned up ${result.rowCount} orphaned command_logs`)
   }
 }
+
+serverEvents.on('db:initialized', () => {
+  cleanupOrphanedCommandLogs()
+})

@@ -1,11 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { sendPushNotification } from '@domains/notifications/service'
-import { WebSocket, WebSocketServer } from 'ws'
-import type { ShellClient } from '../../shared/types'
-import { resumePermissionSession, setActiveSessionDone } from '../db'
-import { getIO, parseUserAgent } from '../io'
-import { log } from '../logger'
 import {
   attachSession,
   clearSessionTimeout,
@@ -15,7 +10,12 @@ import {
   resizeSession,
   startSessionTimeout,
   writeToSession,
-} from '../pty/manager'
+} from '@domains/pty/session'
+import { WebSocket, WebSocketServer } from 'ws'
+import type { ShellClient } from '../../shared/types'
+import { resumePermissionSession, setActiveSessionDone } from '../db'
+import { getIO, parseUserAgent } from '../io'
+import { log } from '../logger'
 
 // Message types
 interface InitMessage {

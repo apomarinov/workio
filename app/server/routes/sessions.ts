@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSettings, updateSettings } from '@domains/settings/db'
 import {
   getAllTerminals,
   getProjectByPath,
@@ -20,13 +21,11 @@ import {
   getSessionById,
   getSessionMessages,
   getSessionTranscriptPaths,
-  getSettings,
   insertBackfilledSession,
   searchSessionMessages,
   updateSession,
   updateSessionData,
   updateSessionMove,
-  updateSettings,
   withTransaction,
 } from '../db'
 import { sanitizeName, shellEscape } from '../lib/strings'

@@ -1,13 +1,14 @@
 import fs from 'node:fs'
 import net from 'node:net'
-import { trackTerminal } from '@server/github/checks'
-import serverEvents from '@server/lib/events'
-import { expandPath } from '@server/lib/strings'
-import { log } from '@server/logger'
 import {
   destroySessionsForTerminal,
-  scanAndEmitProcessesForTerminal,
-} from '@server/pty/manager'
+  renameZellijSession,
+  writeTerminalNameFile,
+} from '@domains/pty/session'
+import serverEvents from '@server/lib/events'
+import { expandPath, sanitizeName, shellEscape } from '@server/lib/strings'
+import { log } from '@server/logger'
+import { scanAndEmitProcessesForTerminal } from '@server/pty/manager'
 import { validateSSHHost } from '@server/ssh/config'
 import { publicProcedure } from '@server/trpc/init'
 import {
@@ -110,9 +111,10 @@ export const createTerminal = publicProcedure
         ),
       )
 
-      trackTerminal(terminal.id).then(() =>
-        serverEvents.emit('github:refresh-pr-checks'),
-      )
+      serverEvents.emit('github:track-terminal', {
+        terminalId: terminal.id,
+        forceRefreshPrs: true,
+      })
       return terminal
     }
 
@@ -180,9 +182,10 @@ export const createTerminal = publicProcedure
           `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
         ),
       )
-      trackTerminal(terminal.id).then(() =>
-        serverEvents.emit('github:refresh-pr-checks'),
-      )
+      serverEvents.emit('github:track-terminal', {
+        terminalId: terminal.id,
+        forceRefreshPrs: true,
+      })
       return terminal
     }
 
@@ -204,9 +207,10 @@ export const createTerminal = publicProcedure
         null,
         trimmedHost,
       )
-      trackTerminal(terminal.id).then(() =>
-        serverEvents.emit('github:refresh-pr-checks'),
-      )
+      serverEvents.emit('github:track-terminal', {
+        terminalId: terminal.id,
+        forceRefreshPrs: true,
+      })
       return terminal
     }
 
@@ -242,9 +246,10 @@ export const createTerminal = publicProcedure
     }
 
     const terminal = await dbCreateTerminal(cwd, name || null, shell || null)
-    trackTerminal(terminal.id).then(() =>
-      serverEvents.emit('github:refresh-pr-checks'),
-    )
+    serverEvents.emit('github:track-terminal', {
+      terminalId: terminal.id,
+      forceRefreshPrs: true,
+    })
     return terminal
   })
 
@@ -282,7 +287,35 @@ export const updateTerminal = publicProcedure
       }
     }
 
-    const updated = await dbUpdateTerminal(id, updates)
+    await dbUpdateTerminal(id, updates)
+
+    // Handle name change: update name files and rename zellij session
+    if (updates.name !== undefined) {
+      const oldName = terminal.name
+      const newName = updates.name
+      writeTerminalNameFile(id, newName)
+
+      // Also write name file on remote host for SSH terminals (fire-and-forget)
+      if (terminal.ssh_host) {
+        const sanitized = sanitizeName(newName)
+        import('@server/ssh/pool').then(({ poolExecSSHCommand }) => {
+          poolExecSSHCommand(
+            terminal.ssh_host!,
+            `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(sanitized)} > ~/.workio/terminals/${id}`,
+            { timeout: 5000 },
+          ).catch(() => {})
+        })
+      }
+
+      // Rename zellij session if it exists
+      if (oldName && oldName !== newName) {
+        renameZellijSession(
+          sanitizeName(oldName),
+          sanitizeName(newName),
+          terminal.ssh_host,
+        )
+      }
+    }
 
     // Trigger immediate process scan when port mappings change
     if (updates.settings !== undefined) {
@@ -294,7 +327,7 @@ export const updateTerminal = publicProcedure
       )
     }
 
-    return updated
+    return getTerminalById(id)
   })
 
 export const deleteTerminal = publicProcedure

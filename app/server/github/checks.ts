@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { logCommand } from '@domains/logs/db'
 import { emitNotification } from '@domains/notifications/service'
+import { getSettings } from '@domains/settings/db'
 import {
   DEFAULT_GH_QUERY_LIMITS,
   type GHQueryLimits,
@@ -24,7 +25,6 @@ import type {
   PRReview,
   PRReviewThread,
 } from '../../shared/types'
-import { getSettings } from '../db'
 import { getIO } from '../io'
 import { execFileAsync, getExecStderr } from '../lib/exec'
 import { log } from '../logger'
@@ -2550,6 +2550,21 @@ export async function initGitHubChecks(): Promise<void> {
   }
 
   serverEvents.on('github:refresh-pr-checks', () => refreshPRChecks(true))
+  serverEvents.on(
+    'github:track-terminal',
+    ({
+      terminalId,
+      forceRefreshPrs,
+    }: {
+      terminalId: number
+      forceRefreshPrs?: boolean
+    }) => {
+      trackTerminal(terminalId).then(() => {
+        startChecksPolling()
+        if (forceRefreshPrs) refreshPRChecks(true)
+      })
+    },
+  )
 
   const terminals = await getAllTerminals()
   for (const terminal of terminals) {
