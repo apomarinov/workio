@@ -12,7 +12,6 @@ import type {
 } from '../../../shared/types'
 import type { MoveTarget, SessionWithProject } from '../../types'
 import { createActionsMode } from './modes/actions'
-import { createBranchClaudeSessionsMode } from './modes/branch-claude-sessions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createCustomCommandsMode } from './modes/custom-commands'
 import { createFavoriteSessionsMode } from './modes/favorite-sessions'
@@ -137,12 +136,6 @@ export function createPaletteModes(
     actions: createActionsMode(data, level, actions, api),
     branches: createBranchesMode(data, level, actions, api),
     'branch-actions': createBranchActionsMode(data, level, actions, api),
-    'branch-claude-sessions': createBranchClaudeSessionsMode(
-      data,
-      level,
-      actions,
-      api,
-    ),
     'pr-actions': createPRActionsMode(data, level, actions, api),
     'pr-checkout': createPRCheckoutMode(data, level, actions, api),
     'move-to-project': createMoveToProjectMode(data, level, actions, api),

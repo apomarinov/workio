@@ -426,10 +426,13 @@ export function createBranchActionsMode(
 
   // Claude Sessions for this branch
   {
+    const terminalRepo = terminal.git_repo?.repo ?? ''
     const count = sessions.filter(
       (s) =>
-        s.data?.branch === branch.name ||
-        s.data?.branches?.some((e) => e.branch === branch.name),
+        (s.data?.branch === branch.name && s.data?.repo === terminalRepo) ||
+        s.data?.branches?.some(
+          (e) => e.branch === branch.name && e.repo === terminalRepo,
+        ),
     ).length
     if (count > 0) {
       items.push({
@@ -437,12 +440,15 @@ export function createBranchActionsMode(
         label: `Claude Sessions (${count})`,
         icon: <ClaudeIcon className="h-4 w-4 shrink-0 text-zinc-400" />,
         onSelect: () => {
-          api.push({
-            mode: 'branch-claude-sessions',
-            title: 'Claude Sessions',
-            terminal,
-            branch,
-          })
+          api.close()
+          window.dispatchEvent(
+            new CustomEvent('open-session-search', {
+              detail: {
+                repo: terminal.git_repo?.repo ?? '',
+                branch: branch.name,
+              },
+            }),
+          )
         },
       })
     }

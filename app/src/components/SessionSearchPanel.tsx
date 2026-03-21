@@ -46,10 +46,12 @@ type NavItem =
 export function SessionSearchPanel({
   open,
   onOpenChange,
+  initialFilter,
   onDismiss,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialFilter?: { repo?: string; branch?: string } | null
   onDismiss: () => void
 }) {
   const [dismissing, setDismissing] = useState(false)
@@ -77,6 +79,14 @@ export function SessionSearchPanel({
 
   const { sessions } = useSessionContext()
 
+  // Apply initial filter from event
+  useEffect(() => {
+    if (initialFilter) {
+      setSelectedRepo(initialFilter.repo ?? null)
+      setSelectedBranch(initialFilter.branch ?? null)
+    }
+  }, [initialFilter])
+
   // Extract distinct repos and branches from session data
   const repos = [
     ...new Set(
@@ -94,20 +104,20 @@ export function SessionSearchPanel({
 
   const branches = selectedRepo
     ? [
-      ...new Set(
-        sessions.flatMap((s) => {
-          const entries = s.data?.branches ?? []
-          const matching = entries
-            .filter((e) => e.repo === selectedRepo)
-            .map((e) => e.branch)
-          // Also include main branch if repo matches
-          if (s.data?.repo === selectedRepo && s.data?.branch) {
-            matching.push(s.data.branch)
-          }
-          return matching
-        }),
-      ),
-    ].sort()
+        ...new Set(
+          sessions.flatMap((s) => {
+            const entries = s.data?.branches ?? []
+            const matching = entries
+              .filter((e) => e.repo === selectedRepo)
+              .map((e) => e.branch)
+            // Also include main branch if repo matches
+            if (s.data?.repo === selectedRepo && s.data?.branch) {
+              matching.push(s.data.branch)
+            }
+            return matching
+          }),
+        ),
+      ].sort()
     : []
 
   const isMobile = useIsMobile()
@@ -361,7 +371,7 @@ export function SessionSearchPanel({
                                 className={cn(
                                   'w-2.5 h-2.5 transition-transform',
                                   !expandedBranches.has(match.session_id) &&
-                                  '-rotate-90',
+                                    '-rotate-90',
                                 )}
                               />
                               More Branches

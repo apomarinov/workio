@@ -109,8 +109,16 @@ export function AppModals() {
   // Session search
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false)
   const [sessionSearchMounted, setSessionSearchMounted] = useState(false)
+  const [sessionSearchFilter, setSessionSearchFilter] = useState<{
+    repo?: string
+    branch?: string
+  } | null>(null)
   useEffect(() => {
-    const handler = () => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { repo?: string; branch?: string }
+        | undefined
+      setSessionSearchFilter(detail ?? null)
       setSessionSearchMounted(true)
       setSessionSearchOpen(true)
     }
@@ -202,8 +210,10 @@ export function AppModals() {
           <SessionSearchPanel
             open={sessionSearchOpen}
             onOpenChange={setSessionSearchOpen}
+            initialFilter={sessionSearchFilter}
             onDismiss={() => {
               setSessionSearchOpen(false)
+              setSessionSearchFilter(null)
               window.dispatchEvent(new Event('dialog-closed'))
               setTimeout(() => setSessionSearchMounted(false), 300)
             }}
