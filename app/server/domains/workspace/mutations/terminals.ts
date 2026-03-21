@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import net from 'node:net'
+import { scanAndEmitProcessesForTerminal } from '@domains/pty/monitor'
 import {
   destroySessionsForTerminal,
   renameZellijSession,
@@ -8,7 +9,6 @@ import {
 import serverEvents from '@server/lib/events'
 import { expandPath, sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
-import { scanAndEmitProcessesForTerminal } from '@server/pty/manager'
 import { validateSSHHost } from '@server/ssh/config'
 import { publicProcedure } from '@server/trpc/init'
 import {

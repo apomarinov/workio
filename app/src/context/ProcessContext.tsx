@@ -1,5 +1,4 @@
 import { resolveNotification } from '@domains/notifications/registry'
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type {
   ActiveProcess,
   GitDiffStat,
@@ -10,7 +9,8 @@ import type {
   PortForwardStatus,
   ProcessesPayload,
   ResourceUsage,
-} from '../../shared/types'
+} from '@domains/pty/schema'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useSocket } from '../hooks/useSocket'
 import { useNotifications } from './NotificationContext'
 

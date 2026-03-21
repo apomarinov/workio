@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { logCommand } from '@domains/logs/db'
 import { emitNotification } from '@domains/notifications/service'
+import { detectGitBranch } from '@domains/pty/monitor'
 import { getSettings } from '@domains/settings/db'
 import {
   DEFAULT_GH_QUERY_LIMITS,
@@ -28,7 +29,6 @@ import type {
 import { getIO } from '../io'
 import { execFileAsync, getExecStderr } from '../lib/exec'
 import { log } from '../logger'
-import { detectGitBranch } from '../pty/manager'
 import { updateGithubGraphql, updateGithubRest } from '../services/status'
 import { execSSHCommand } from '../ssh/exec'
 

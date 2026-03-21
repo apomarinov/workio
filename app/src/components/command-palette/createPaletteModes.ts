@@ -1,15 +1,11 @@
+import type { ActiveProcess, GitDiffStat } from '@domains/pty/schema'
 import type {
   CustomTerminalAction,
   PreferredIDE,
   ShellTemplate,
 } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
-import type {
-  ActiveProcess,
-  GitDiffStat,
-  MergedPRSummary,
-  PRCheckStatus,
-} from '../../../shared/types'
+import type { MergedPRSummary, PRCheckStatus } from '../../../shared/types'
 import type { MoveTarget, SessionWithProject } from '../../types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'

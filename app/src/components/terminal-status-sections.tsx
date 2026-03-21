@@ -1,3 +1,4 @@
+import type { ActiveProcess, PortForwardStatus } from '@domains/pty/schema'
 import type { Shell } from '@domains/workspace/schema/shells'
 import {
   Activity,
@@ -17,7 +18,6 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSocket } from '@/hooks/useSocket'
 import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import type { ActiveProcess, PortForwardStatus } from '../../shared/types'
 
 interface GitDirtyBadgeProps {
   added: number

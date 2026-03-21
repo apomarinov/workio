@@ -92,11 +92,14 @@ function parseChangedFiles(
   return files
 }
 
+import {
+  checkAndEmitSingleGitDirty,
+  detectGitBranch,
+} from '@domains/pty/monitor'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import { gitExec, gitExecLogged } from '../lib/git'
 import { expandPath, shellEscape } from '../lib/strings'
 import { log } from '../logger'
-import { checkAndEmitSingleGitDirty, detectGitBranch } from '../pty/manager'
 import { execSSHCommand } from '../ssh/exec'
 
 interface CheckoutBranchBody {

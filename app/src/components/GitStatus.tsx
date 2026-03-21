@@ -1,3 +1,4 @@
+import type { GitDiffStat, GitRemoteSyncStat } from '@domains/pty/schema'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import {
   Tooltip,
@@ -5,7 +6,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { GitDiffStat, GitRemoteSyncStat } from '../../shared/types'
 import { GitDirtyBadge } from './terminal-status-sections'
 
 interface GitStatusProps {

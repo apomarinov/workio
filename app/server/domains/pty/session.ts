@@ -48,19 +48,6 @@ const WORKIO_SHELLS_DIR = path.join(WORKIO_DIR, 'shells')
 
 // ── PtySession class ────────────────────────────────────────────────
 
-export type CommandEventHandler = (
-  terminalId: number,
-  shellId: number,
-  event: CommandEvent,
-  session: PtySession,
-) => void
-
-let commandEventHandler: CommandEventHandler | null = null
-
-export function setCommandEventHandler(handler: CommandEventHandler) {
-  commandEventHandler = handler
-}
-
 export class PtySession {
   readonly shellId: number
   readonly terminalId: number
@@ -333,13 +320,13 @@ function handleWorkerMessage(session: PtySession, msg: WorkerToMasterMessage) {
         cb(msg.event.exitCode ?? 0)
       }
       session.onCommandEvent?.(msg.event)
-      // Forward to the registered handler for git polling, bell notifications, etc.
-      commandEventHandler?.(
-        session.terminalId,
-        session.shellId,
-        msg.event,
+      // Forward to monitor for git polling, bell notifications, etc.
+      serverEvents.emit('pty:command-event', {
+        terminalId: session.terminalId,
+        shellId: session.shellId,
+        event: msg.event,
         session,
-      )
+      })
       break
 
     case 'bell':

@@ -1,48 +1,3 @@
-export interface ActiveProcess {
-  pid: number
-  name: string
-  command: string
-  terminalId?: number
-  shellId?: number
-  source?: 'direct' | 'zellij'
-  isZellij?: boolean
-  startedAt?: number
-}
-
-export interface ResourceUsage {
-  rss: number
-  cpu: number
-  pidCount: number
-}
-
-export interface HostResourceInfo {
-  systemMemory: number // total RAM in bytes
-  cpuCount: number // logical CPU cores
-  systemCpu: number // total CPU usage (sum of all %cpu)
-  systemRss: number // total RSS in KB
-}
-
-export interface PortForwardStatus {
-  remotePort: number
-  localPort: number
-  connected: boolean
-  error?: string
-}
-
-export interface ProcessesPayload {
-  terminalId?: number
-  processes: ActiveProcess[]
-  ports?: Record<number, number[]>
-  shellPorts?: Record<number, number[]>
-  resourceUsage?: Record<number, ResourceUsage>
-  systemMemory?: number // total system RAM in bytes (os.totalmem)
-  cpuCount?: number // number of logical CPU cores (os.cpus().length)
-  systemCpu?: number // total system CPU usage (sum of all %cpu)
-  systemRss?: number // total system RSS in KB
-  hostResources?: Record<string, HostResourceInfo> // sshHost -> system totals
-  portForwardStatus?: Record<number, PortForwardStatus[]> // terminalId -> statuses
-}
-
 export interface FailedPRCheck {
   name: string
   status: string
@@ -147,13 +102,6 @@ export interface InvolvedPRSummary {
   involvement: 'review-requested' | 'mentioned'
 }
 
-export interface GitDiffStat {
-  added: number
-  removed: number
-  untracked: number
-  untrackedLines: number
-}
-
 export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
 
 export interface ChangedFile {
@@ -162,29 +110,6 @@ export interface ChangedFile {
   added: number
   removed: number
   oldPath?: string
-}
-
-export interface GitLastCommit {
-  hash: string
-  author: string
-  date: string // ISO 8601
-  subject: string
-  isLocal: boolean // true if author matches local git user.name
-}
-
-export interface GitDirtyPayload {
-  dirtyStatus: Record<number, GitDiffStat> // terminalId -> line diff stats
-  lastCommit?: Record<number, GitLastCommit> // terminalId -> last commit info
-}
-
-export interface GitRemoteSyncStat {
-  behind: number
-  ahead: number
-  noRemote: boolean
-}
-
-export interface GitRemoteSyncPayload {
-  syncStatus: Record<number, GitRemoteSyncStat> // terminalId -> remote sync stats
 }
 
 export interface WorkspacePayload {

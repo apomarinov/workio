@@ -1,5 +1,5 @@
 import net from 'node:net'
-import type { PortForwardStatus } from '../../shared/types'
+import type { PortForwardStatus } from '@domains/pty/schema'
 import { log } from '../logger'
 import { getConnection } from './pool'
 

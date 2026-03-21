@@ -1,6 +1,16 @@
 import { execFile } from 'node:child_process'
 import os from 'node:os'
-import type { CommandEvent, RemoteProcessInfo } from '@domains/pty/schema'
+import type {
+  ActiveProcess,
+  CommandEvent,
+  GitDiffStat,
+  GitLastCommit,
+  GitRemoteSyncStat,
+  HostResourceInfo,
+  PortForwardStatus,
+  RemoteProcessInfo,
+  ResourceUsage,
+} from '@domains/pty/schema'
 import {
   findRemoteZellijServerPid,
   getActiveZellijSessionNames,
@@ -24,7 +34,6 @@ import {
   getSessionsForTerminal,
   handleBellNotification,
   type PtySession,
-  setCommandEventHandler,
 } from '@domains/pty/session'
 import { updateShell } from '@domains/workspace/db/shells'
 import {
@@ -33,68 +42,220 @@ import {
   updateTerminal,
 } from '@domains/workspace/db/terminals'
 import { emitWorkspace } from '@domains/workspace/services/emit'
-import type {
-  ActiveProcess,
-  GitLastCommit,
-  HostResourceInfo,
-  PortForwardStatus,
-  ResourceUsage,
-} from '../../shared/types'
 import {
   getGhUsername,
   refreshPRChecks,
   untrackTerminal,
-} from '../github/checks'
-import { getIO } from '../io'
-import serverEvents from '../lib/events'
-import { sanitizeName } from '../lib/strings'
-import { log } from '../logger'
-import { execSSHCommand } from '../ssh/exec'
-import { closeConnection } from '../ssh/pool'
+} from '@server/github/checks'
+import { getIO } from '@server/io'
+import serverEvents from '@server/lib/events'
+import { sanitizeName } from '@server/lib/strings'
+import { log } from '@server/logger'
+import { execSSHCommand } from '@server/ssh/exec'
+import { closeConnection } from '@server/ssh/pool'
 import {
   getTunnelStatuses,
   reconcileTunnels,
   stopAllTunnelsForTerminal,
-} from '../ssh/tunnel'
+} from '@server/ssh/tunnel'
+
+// ── Constants ────────────────────────────────────────────────────────
 
 const SYSTEM_MEMORY = os.totalmem()
 const CPU_COUNT = os.cpus().length
-
 const COMMAND_IGNORE_LIST: string[] = []
+const IGNORE_SHELL_COMMANDS = ['clear']
 
-// Cache static SSH host info (RAM/CPU count) — fetched once per host
+// ── Global shared state ──────────────────────────────────────────────
+
 const sshHostInfoCache = new Map<
   string,
   { cpuCount: number; systemMemory: number }
 >()
 
-// ── Process start time tracking ─────────────────────────────────────
-
 const processFirstSeen = new Map<string, number>()
 
-function stampProcessStartTimes(processes: ActiveProcess[]) {
-  const currentKeys = new Set<string>()
-  const now = Date.now()
-  for (const proc of processes) {
-    const key = `${proc.terminalId}:${proc.shellId}:${proc.command}`
-    currentKeys.add(key)
-    if (!processFirstSeen.has(key)) {
-      processFirstSeen.set(key, now)
-    }
-    proc.startedAt = processFirstSeen.get(key)
+let globalProcessPollingId: NodeJS.Timeout | null = null
+let gitDirtyPollingId: NodeJS.Timeout | null = null
+
+// ── TerminalMonitor class ────────────────────────────────────────────
+
+const monitors = new Map<number, TerminalMonitor>()
+
+export class TerminalMonitor {
+  readonly terminalId: number
+  lastDirty: GitDiffStat | null = null
+  lastRemoteSync: GitRemoteSyncStat | null = null
+  lastCommit: GitLastCommit | null = null
+  processPollTimeout: NodeJS.Timeout | null = null
+
+  constructor(terminalId: number) {
+    this.terminalId = terminalId
   }
-  for (const key of processFirstSeen.keys()) {
-    if (!currentKeys.has(key)) {
-      processFirstSeen.delete(key)
+
+  async checkAndEmitGitDirty(force?: boolean) {
+    try {
+      const terminal = await getTerminalById(this.terminalId)
+      if (!terminal || !terminal.git_branch) return
+
+      const [stat, syncStat, commit] = await Promise.all([
+        checkGitDirty(terminal.cwd, terminal.ssh_host),
+        checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
+        checkLastCommit(terminal.cwd, terminal.ssh_host),
+      ])
+
+      const dirtyChanged =
+        !this.lastDirty ||
+        this.lastDirty.added !== stat.added ||
+        this.lastDirty.removed !== stat.removed ||
+        this.lastDirty.untracked !== stat.untracked ||
+        this.lastDirty.untrackedLines !== stat.untrackedLines
+      const commitChanged = commit
+        ? !this.lastCommit || this.lastCommit.hash !== commit.hash
+        : false
+
+      if (force || dirtyChanged || commitChanged) {
+        this.lastDirty = stat
+        if (commit) this.lastCommit = commit
+        const dirtyStatus: Record<number, GitDiffStat> = {}
+        const lastCommit: Record<number, GitLastCommit> = {}
+        for (const [id, m] of monitors) {
+          if (m.lastDirty) dirtyStatus[id] = m.lastDirty
+          if (m.lastCommit) lastCommit[id] = m.lastCommit
+        }
+        getIO()?.emit('git:dirty-status', { dirtyStatus, lastCommit })
+      }
+
+      const syncChanged =
+        !this.lastRemoteSync ||
+        this.lastRemoteSync.behind !== syncStat.behind ||
+        this.lastRemoteSync.ahead !== syncStat.ahead ||
+        this.lastRemoteSync.noRemote !== syncStat.noRemote
+
+      if (force || syncChanged) {
+        this.lastRemoteSync = syncStat
+        const syncStatus: Record<number, GitRemoteSyncStat> = {}
+        for (const [id, m] of monitors) {
+          if (m.lastRemoteSync) syncStatus[id] = m.lastRemoteSync
+        }
+        getIO()?.emit('git:remote-sync', { syncStatus })
+      }
+    } catch (err) {
+      log.error({ err }, '[pty] Failed to scan and emit git dirty status')
     }
+  }
+
+  async detectGitBranch(options?: { skipPRRefresh?: boolean }) {
+    try {
+      const terminal = await getTerminalById(this.terminalId)
+      if (!terminal) return
+
+      let branch: string | null = null
+
+      if (terminal.ssh_host) {
+        const result = await execSSHCommand(
+          terminal.ssh_host,
+          'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null',
+          terminal.cwd,
+        )
+        branch = result.stdout.trim() || null
+      } else {
+        branch = await new Promise<string | null>((resolve) => {
+          execFile(
+            'git',
+            ['rev-parse', '--abbrev-ref', 'HEAD'],
+            { cwd: terminal.cwd },
+            (err, stdout) => {
+              if (!err && stdout?.trim()) return resolve(stdout.trim())
+              execFile(
+                'git',
+                ['symbolic-ref', '--short', 'HEAD'],
+                { cwd: terminal.cwd },
+                (err2, stdout2) => {
+                  if (err2 || !stdout2) return resolve(null)
+                  resolve(stdout2.trim() || null)
+                },
+              )
+            },
+          )
+        })
+      }
+
+      if (branch) {
+        await updateTerminal(this.terminalId, { git_branch: branch })
+        getIO()?.emit('terminal:updated', {
+          terminalId: this.terminalId,
+          data: { git_branch: branch },
+        })
+        if (!options?.skipPRRefresh) {
+          refreshPRChecks()
+        }
+
+        if (!terminal.git_repo) {
+          try {
+            const repo = await detectRepoSlug(terminal.cwd, terminal.ssh_host)
+            if (repo) {
+              const gitRepo = { repo, status: 'done' as const }
+              await updateTerminal(this.terminalId, { git_repo: gitRepo })
+              await emitWorkspace(this.terminalId, { git_repo: gitRepo })
+            }
+          } catch (err) {
+            log.error(
+              { err, terminalId: this.terminalId },
+              '[pty] Failed to detect repo slug',
+            )
+          }
+        }
+      }
+    } catch (err) {
+      log.error(
+        { err },
+        `[pty] Failed to detect git branch for terminal ${this.terminalId}`,
+      )
+    }
+  }
+
+  clearProcessPollTimeout() {
+    if (this.processPollTimeout) {
+      clearTimeout(this.processPollTimeout)
+      this.processPollTimeout = null
+    }
+  }
+
+  dispose() {
+    this.clearProcessPollTimeout()
+    this.lastDirty = null
+    this.lastRemoteSync = null
+    this.lastCommit = null
   }
 }
 
-// ── Shell update helper ─────────────────────────────────────────────
+// ── Monitor lookup helpers ───────────────────────────────────────────
+
+export function getMonitor(terminalId: number) {
+  return monitors.get(terminalId)
+}
+
+export function getOrCreateMonitor(terminalId: number) {
+  let monitor = monitors.get(terminalId)
+  if (!monitor) {
+    monitor = new TerminalMonitor(terminalId)
+    monitors.set(terminalId, monitor)
+  }
+  return monitor
+}
+
+function disposeMonitor(terminalId: number) {
+  const monitor = monitors.get(terminalId)
+  if (monitor) {
+    monitor.dispose()
+    monitors.delete(terminalId)
+  }
+}
+
+// ── Shell update helper ──────────────────────────────────────────────
 
 type ShellUpdates = { active_cmd?: string | null }
-
-const IGNORE_SHELL_COMMANDS = ['clear']
 
 function emitShellUpdate(
   terminalId: number,
@@ -114,12 +275,27 @@ function emitShellUpdate(
   getIO()?.emit('shell:updated', { terminalId, shellId, data: updates })
 }
 
-// ── Global process polling ──────────────────────────────────────────
+// ── Process start time tracking ──────────────────────────────────────
 
-let globalProcessPollingId: NodeJS.Timeout | null = null
+function stampProcessStartTimes(processes: ActiveProcess[]) {
+  const currentKeys = new Set<string>()
+  const now = Date.now()
+  for (const proc of processes) {
+    const key = `${proc.terminalId}:${proc.shellId}:${proc.command}`
+    currentKeys.add(key)
+    if (!processFirstSeen.has(key)) {
+      processFirstSeen.set(key, now)
+    }
+    proc.startedAt = processFirstSeen.get(key)
+  }
+  for (const key of processFirstSeen.keys()) {
+    if (!currentKeys.has(key)) {
+      processFirstSeen.delete(key)
+    }
+  }
+}
 
-// Process polling timer per-terminal (debounced after command events)
-const processPollTimeoutIds = new Map<number, NodeJS.Timeout>()
+// ── Process scanning ─────────────────────────────────────────────────
 
 interface ProcessScanSession {
   currentCommand: string | null
@@ -166,7 +342,6 @@ async function getProcessesForTerminal(
           // Fall back to pid 0
         }
       } else if (session.remotePid > 0 && remoteProcs) {
-        // SSH terminal: find direct process via remote process tree
         const descendants = getRemoteDescendantPids(
           remoteProcs,
           session.remotePid,
@@ -194,7 +369,6 @@ async function getProcessesForTerminal(
     }
 
     if (session.pty.pid > 0) {
-      // Local zellij scanning
       let zellijProcs = await getZellijSessionProcesses(
         session.sessionName,
         terminalId,
@@ -224,7 +398,6 @@ async function getProcessesForTerminal(
         })
       }
     } else if (session.remotePid > 0 && remoteProcs) {
-      // Remote zellij scanning via already-fetched process data
       const zellijProcs = getRemoteZellijSessionProcesses(
         remoteProcs,
         session.remotePid,
@@ -366,7 +539,6 @@ async function scanSessions(sessionList: PtySession[]) {
           pidCount,
         }
       } else if (s.sshHost && s.remotePid > 0 && hostProcs) {
-        // Remote resource usage from already-fetched process data
         const descendants = getRemoteDescendantPids(hostProcs, s.remotePid)
         descendants.add(s.remotePid)
         let rss = 0
@@ -401,7 +573,6 @@ async function scanSessions(sessionList: PtySession[]) {
             if (s.ptyPid > 0) {
               shellAlive = (await getProcessComm(s.ptyPid)) !== null
             } else if (s.sshHost && s.remotePid > 0) {
-              // Check if remote shell PID exists in already-fetched data
               shellAlive =
                 hostProcs?.some((p) => p.pid === s.remotePid) ?? false
             }
@@ -429,8 +600,6 @@ async function scanSessions(sessionList: PtySession[]) {
     systemCpu += cpu
   }
   systemCpu = Math.round(systemCpu * 10) / 10
-  // Use OS-level memory stats (memory pressure on macOS, MemAvailable on Linux)
-  // instead of summing per-process RSS which double-counts shared memory
   const systemRss = systemMemory?.usedKb ?? 0
 
   // Compute per-SSH-host system totals
@@ -466,7 +635,8 @@ async function scanSessions(sessionList: PtySession[]) {
   }
 }
 
-/** Reconcile SSH tunnels for the given terminal IDs and return portForwardStatus */
+// ── Tunnel reconciliation ────────────────────────────────────────────
+
 async function reconcileTunnelsForTerminals(
   terminalIds: number[],
   ports: Record<number, number[]>,
@@ -504,6 +674,8 @@ async function reconcileTunnelsForTerminals(
   return portForwardStatus
 }
 
+// ── Process scanning (exported) ──────────────────────────────────────
+
 export async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const sessionList = getSessionsForTerminal(terminalId)
   if (sessionList.length === 0) return
@@ -511,7 +683,6 @@ export async function scanAndEmitProcessesForTerminal(terminalId: number) {
   const result = await scanSessions(sessionList)
   const { remoteProcesses: _, ...payload } = result
 
-  // Reconcile SSH tunnels for this terminal
   const portForwardStatus = await reconcileTunnelsForTerminals(
     [terminalId],
     result.ports,
@@ -615,6 +786,8 @@ async function scanAndEmitAllProcesses() {
   })
 }
 
+// ── Global polling ───────────────────────────────────────────────────
+
 function startGlobalProcessPolling() {
   if (globalProcessPollingId) return
   globalProcessPollingId = setInterval(scanAndEmitAllProcesses, 3000)
@@ -627,18 +800,7 @@ function stopGlobalProcessPolling() {
   }
 }
 
-// ── Git dirty status polling ────────────────────────────────────────
-
-let gitDirtyPollingId: NodeJS.Timeout | null = null
-const lastDirtyStatus = new Map<
-  number,
-  { added: number; removed: number; untracked: number; untrackedLines: number }
->()
-const lastRemoteSyncStatus = new Map<
-  number,
-  { behind: number; ahead: number; noRemote: boolean }
->()
-const lastCommitStatus = new Map<number, GitLastCommit>()
+// ── Git helpers (stateless I/O) ──────────────────────────────────────
 
 function parseDiffNumstat(stdout: string) {
   let added = 0
@@ -928,21 +1090,46 @@ function countRemoteSync(
   )
 }
 
+async function detectRepoSlug(cwd: string, sshHost: string | null) {
+  let remoteUrl: string | null = null
+  if (sshHost) {
+    const result = await execSSHCommand(
+      sshHost,
+      'git remote get-url origin',
+      cwd,
+    )
+    remoteUrl = result.stdout.trim() || null
+  } else {
+    remoteUrl = await new Promise<string | null>((resolve) => {
+      execFile(
+        'git',
+        ['remote', 'get-url', 'origin'],
+        { cwd },
+        (err, stdout) => {
+          if (err || !stdout) return resolve(null)
+          resolve(stdout.trim() || null)
+        },
+      )
+    })
+  }
+
+  if (remoteUrl) {
+    const match = remoteUrl.match(
+      /(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/,
+    )
+    if (match) return match[1]
+  }
+
+  const ghUser = getGhUsername()
+  const folderName = cwd.split('/').filter(Boolean).pop()
+  if (ghUser && folderName) return `${ghUser}/${folderName}`
+
+  return null
+}
+
+// ── Git dirty polling ────────────────────────────────────────────────
+
 async function scanAndEmitGitDirty() {
-  const currentStatus: Record<
-    number,
-    {
-      added: number
-      removed: number
-      untracked: number
-      untrackedLines: number
-    }
-  > = {}
-  const currentSyncStatus: Record<
-    number,
-    { behind: number; ahead: number; noRemote: boolean }
-  > = {}
-  const currentLastCommit: Record<number, GitLastCommit> = {}
   const checks: Promise<void>[] = []
 
   try {
@@ -951,6 +1138,7 @@ async function scanAndEmitGitDirty() {
       if (!terminal.git_branch) continue
       if (terminal.ssh_host && getSessionsForTerminal(terminal.id).length === 0)
         continue
+      const monitor = getOrCreateMonitor(terminal.id)
       checks.push(
         (async () => {
           try {
@@ -959,9 +1147,9 @@ async function scanAndEmitGitDirty() {
               checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
               checkLastCommit(terminal.cwd, terminal.ssh_host),
             ])
-            currentStatus[terminal.id] = stat
-            currentSyncStatus[terminal.id] = syncStat
-            if (commit) currentLastCommit[terminal.id] = commit
+            monitor.lastDirty = stat
+            monitor.lastRemoteSync = syncStat
+            if (commit) monitor.lastCommit = commit
 
             let branch: string | null = null
             if (terminal.ssh_host) {
@@ -1016,97 +1204,17 @@ async function scanAndEmitGitDirty() {
 
   await Promise.all(checks)
 
-  lastDirtyStatus.clear()
-  for (const [id, stat] of Object.entries(currentStatus)) {
-    lastDirtyStatus.set(Number(id), stat)
+  const dirtyStatus: Record<number, GitDiffStat> = {}
+  const lastCommit: Record<number, GitLastCommit> = {}
+  const syncStatus: Record<number, GitRemoteSyncStat> = {}
+  for (const [id, m] of monitors) {
+    if (m.lastDirty) dirtyStatus[id] = m.lastDirty
+    if (m.lastCommit) lastCommit[id] = m.lastCommit
+    if (m.lastRemoteSync) syncStatus[id] = m.lastRemoteSync
   }
 
-  lastRemoteSyncStatus.clear()
-  for (const [id, stat] of Object.entries(currentSyncStatus)) {
-    lastRemoteSyncStatus.set(Number(id), stat)
-  }
-
-  lastCommitStatus.clear()
-  for (const [id, stat] of Object.entries(currentLastCommit)) {
-    lastCommitStatus.set(Number(id), stat)
-  }
-
-  getIO()?.emit('git:dirty-status', {
-    dirtyStatus: currentStatus,
-    lastCommit: currentLastCommit,
-  })
-  getIO()?.emit('git:remote-sync', { syncStatus: currentSyncStatus })
-}
-
-export async function checkAndEmitSingleGitDirty(
-  terminalId: number,
-  force?: boolean,
-) {
-  try {
-    const terminal = await getTerminalById(terminalId)
-    if (!terminal || !terminal.git_branch) return
-
-    const [stat, syncStat, commit] = await Promise.all([
-      checkGitDirty(terminal.cwd, terminal.ssh_host),
-      checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
-      checkLastCommit(terminal.cwd, terminal.ssh_host),
-    ])
-
-    const prevDirty = lastDirtyStatus.get(terminalId)
-    const prevCommit = lastCommitStatus.get(terminalId)
-    const dirtyChanged =
-      !prevDirty ||
-      prevDirty.added !== stat.added ||
-      prevDirty.removed !== stat.removed ||
-      prevDirty.untracked !== stat.untracked ||
-      prevDirty.untrackedLines !== stat.untrackedLines
-    const commitChanged = commit
-      ? !prevCommit || prevCommit.hash !== commit.hash
-      : false
-
-    if (force || dirtyChanged || commitChanged) {
-      lastDirtyStatus.set(terminalId, stat)
-      if (commit) lastCommitStatus.set(terminalId, commit)
-      const dirtyStatus: Record<
-        number,
-        {
-          added: number
-          removed: number
-          untracked: number
-          untrackedLines: number
-        }
-      > = {}
-      for (const [id, s] of lastDirtyStatus) {
-        dirtyStatus[id] = s
-      }
-      const lastCommit: Record<number, GitLastCommit> = {}
-      for (const [id, s] of lastCommitStatus) {
-        lastCommit[id] = s
-      }
-      getIO()?.emit('git:dirty-status', { dirtyStatus, lastCommit })
-    }
-
-    const prevSync = lastRemoteSyncStatus.get(terminalId)
-    const syncChanged =
-      !prevSync ||
-      prevSync.behind !== syncStat.behind ||
-      prevSync.ahead !== syncStat.ahead ||
-      prevSync.noRemote !== syncStat.noRemote
-
-    if (force || syncChanged) {
-      lastRemoteSyncStatus.set(terminalId, syncStat)
-      const syncStatus: Record<
-        number,
-        { behind: number; ahead: number; noRemote: boolean }
-      > = {}
-      for (const [id, s] of lastRemoteSyncStatus) {
-        syncStatus[id] = s
-      }
-      getIO()?.emit('git:remote-sync', { syncStatus })
-    }
-  } catch (err) {
-    log.error({ err }, '[pty] Failed to scan and emit git dirty status')
-  }
+  getIO()?.emit('git:dirty-status', { dirtyStatus, lastCommit })
+  getIO()?.emit('git:remote-sync', { syncStatus })
 }
 
 export function startGitDirtyPolling() {
@@ -1115,117 +1223,27 @@ export function startGitDirtyPolling() {
   gitDirtyPollingId = setInterval(scanAndEmitGitDirty, 10000)
 }
 
-// ── Git branch detection ────────────────────────────────────────────
+// ── Exported wrappers for backward compat ────────────────────────────
+// These are used by routes/terminals.ts and github/checks.ts which call
+// by terminalId. They delegate to the monitor instance.
 
-async function detectRepoSlug(cwd: string, sshHost: string | null) {
-  let remoteUrl: string | null = null
-  if (sshHost) {
-    const result = await execSSHCommand(
-      sshHost,
-      'git remote get-url origin',
-      cwd,
-    )
-    remoteUrl = result.stdout.trim() || null
-  } else {
-    remoteUrl = await new Promise<string | null>((resolve) => {
-      execFile(
-        'git',
-        ['remote', 'get-url', 'origin'],
-        { cwd },
-        (err, stdout) => {
-          if (err || !stdout) return resolve(null)
-          resolve(stdout.trim() || null)
-        },
-      )
-    })
-  }
-
-  if (remoteUrl) {
-    const match = remoteUrl.match(
-      /(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/,
-    )
-    if (match) return match[1]
-  }
-
-  const ghUser = getGhUsername()
-  const folderName = cwd.split('/').filter(Boolean).pop()
-  if (ghUser && folderName) return `${ghUser}/${folderName}`
-
-  return null
+export async function checkAndEmitSingleGitDirty(
+  terminalId: number,
+  force?: boolean,
+) {
+  const monitor = getOrCreateMonitor(terminalId)
+  return monitor.checkAndEmitGitDirty(force)
 }
 
 export async function detectGitBranch(
   terminalId: number,
   options?: { skipPRRefresh?: boolean },
 ) {
-  try {
-    const terminal = await getTerminalById(terminalId)
-    if (!terminal) return
-
-    let branch: string | null = null
-
-    if (terminal.ssh_host) {
-      const result = await execSSHCommand(
-        terminal.ssh_host,
-        'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null',
-        terminal.cwd,
-      )
-      branch = result.stdout.trim() || null
-    } else {
-      branch = await new Promise<string | null>((resolve) => {
-        execFile(
-          'git',
-          ['rev-parse', '--abbrev-ref', 'HEAD'],
-          { cwd: terminal.cwd },
-          (err, stdout) => {
-            if (!err && stdout?.trim()) return resolve(stdout.trim())
-            execFile(
-              'git',
-              ['symbolic-ref', '--short', 'HEAD'],
-              { cwd: terminal.cwd },
-              (err2, stdout2) => {
-                if (err2 || !stdout2) return resolve(null)
-                resolve(stdout2.trim() || null)
-              },
-            )
-          },
-        )
-      })
-    }
-
-    if (branch) {
-      await updateTerminal(terminalId, { git_branch: branch })
-      getIO()?.emit('terminal:updated', {
-        terminalId,
-        data: { git_branch: branch },
-      })
-      if (!options?.skipPRRefresh) {
-        refreshPRChecks()
-      }
-
-      if (!terminal.git_repo) {
-        try {
-          const repo = await detectRepoSlug(terminal.cwd, terminal.ssh_host)
-          if (repo) {
-            const gitRepo = { repo, status: 'done' as const }
-            await updateTerminal(terminalId, { git_repo: gitRepo })
-            await emitWorkspace(terminalId, { git_repo: gitRepo })
-          }
-        } catch (err) {
-          log.error({ err, terminalId }, '[pty] Failed to detect repo slug')
-        }
-      }
-    }
-  } catch (err) {
-    log.error(
-      { err },
-      `[pty] Failed to detect git branch for terminal ${terminalId}`,
-    )
-  }
+  const monitor = getOrCreateMonitor(terminalId)
+  return monitor.detectGitBranch(options)
 }
 
-// ── Worker command event handler ────────────────────────────────────
-// Called by session domain when a worker sends a command-event IPC message.
+// ── Worker command event handler ─────────────────────────────────────
 
 function handleWorkerCommandEvent(
   terminalId: number,
@@ -1233,6 +1251,8 @@ function handleWorkerCommandEvent(
   event: CommandEvent,
   session: PtySession,
 ) {
+  const monitor = getOrCreateMonitor(terminalId)
+
   switch (event.type) {
     case 'command_start':
       log.info(
@@ -1244,15 +1264,11 @@ function handleWorkerCommandEvent(
       })
       // Debounced process poll
       {
-        const existing = processPollTimeoutIds.get(terminalId)
-        if (existing) clearTimeout(existing)
-        processPollTimeoutIds.set(
-          terminalId,
-          setTimeout(() => {
-            processPollTimeoutIds.delete(terminalId)
-            scanAndEmitProcessesForTerminal(terminalId)
-          }, 1000),
-        )
+        monitor.clearProcessPollTimeout()
+        monitor.processPollTimeout = setTimeout(() => {
+          monitor.processPollTimeout = null
+          scanAndEmitProcessesForTerminal(terminalId)
+        }, 1000)
       }
       break
 
@@ -1261,14 +1277,10 @@ function handleWorkerCommandEvent(
         `[pty] t=${terminalId} s=${shellId} Command end: "${session.currentCommand}"`,
       )
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
-      const existing = processPollTimeoutIds.get(terminalId)
-      if (existing) {
-        clearTimeout(existing)
-        processPollTimeoutIds.delete(terminalId)
-      }
+      monitor.clearProcessPollTimeout()
 
-      detectGitBranch(terminalId)
-      checkAndEmitSingleGitDirty(terminalId)
+      monitor.detectGitBranch()
+      monitor.checkAndEmitGitDirty()
       setTimeout(() => {
         scanAndEmitProcessesForTerminal(terminalId)
       }, 1000)
@@ -1293,15 +1305,30 @@ function handleWorkerCommandEvent(
   }
 }
 
-// Register the command event handler with the session domain
-setCommandEventHandler(handleWorkerCommandEvent)
+// ── Server event listeners ────────────────────────────────────────────
 
-// ── Server event listeners for session cleanup ──────────────────────
+serverEvents.on(
+  'pty:command-event',
+  ({
+    terminalId,
+    shellId,
+    event,
+    session,
+  }: {
+    terminalId: number
+    shellId: number
+    event: CommandEvent
+    session: PtySession
+  }) => {
+    handleWorkerCommandEvent(terminalId, shellId, event, session)
+  },
+)
 
 serverEvents.on(
   'pty:session-created',
   ({ terminalId }: { terminalId: number }) => {
-    detectGitBranch(terminalId)
+    const monitor = getOrCreateMonitor(terminalId)
+    monitor.detectGitBranch()
   },
 )
 
@@ -1312,8 +1339,7 @@ serverEvents.on('pty:session-destroyed', () => {
 serverEvents.on(
   'pty:terminal-sessions-destroyed',
   ({ terminalId, sshHost }: { terminalId: number; sshHost: string | null }) => {
-    lastDirtyStatus.delete(terminalId)
-    lastRemoteSyncStatus.delete(terminalId)
+    disposeMonitor(terminalId)
     stopGlobalProcessPolling()
     untrackTerminal(terminalId)
     stopAllTunnelsForTerminal(terminalId)

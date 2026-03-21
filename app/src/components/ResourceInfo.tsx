@@ -1,3 +1,4 @@
+import type { ActiveProcess, HostResourceInfo } from '@domains/pty/schema'
 import {
   BarChart3,
   ChevronDown,
@@ -20,7 +21,6 @@ import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useMountedShells } from '@/hooks/useMountedShells'
 import { cn } from '@/lib/utils'
-import type { ActiveProcess, HostResourceInfo } from '../../shared/types'
 import { ResourceView, type ResourceViewMode } from './ResourceView'
 import { ProcessItem } from './terminal-status-sections'
 

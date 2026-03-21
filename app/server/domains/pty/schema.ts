@@ -147,3 +147,102 @@ export const remoteProcessInfoSchema = z.object({
 })
 
 export type RemoteProcessInfo = z.infer<typeof remoteProcessInfoSchema>
+
+// ── Monitor schemas ────────────────────────────────────────────────
+
+export const activeProcessSchema = z.object({
+  pid: z.number(),
+  name: z.string(),
+  command: z.string(),
+  terminalId: z.number().optional(),
+  shellId: z.number().optional(),
+  source: z.enum(['direct', 'zellij']).optional(),
+  isZellij: z.boolean().optional(),
+  startedAt: z.number().optional(),
+})
+
+export type ActiveProcess = z.infer<typeof activeProcessSchema>
+
+export const resourceUsageSchema = z.object({
+  rss: z.number(),
+  cpu: z.number(),
+  pidCount: z.number(),
+})
+
+export type ResourceUsage = z.infer<typeof resourceUsageSchema>
+
+export const hostResourceInfoSchema = z.object({
+  systemMemory: z.number(),
+  cpuCount: z.number(),
+  systemCpu: z.number(),
+  systemRss: z.number(),
+})
+
+export type HostResourceInfo = z.infer<typeof hostResourceInfoSchema>
+
+export const portForwardStatusSchema = z.object({
+  remotePort: z.number(),
+  localPort: z.number(),
+  connected: z.boolean(),
+  error: z.string().optional(),
+})
+
+export type PortForwardStatus = z.infer<typeof portForwardStatusSchema>
+
+export const processesPayloadSchema = z.object({
+  terminalId: z.number().optional(),
+  processes: z.array(activeProcessSchema),
+  ports: z.record(z.string(), z.array(z.number())).optional(),
+  shellPorts: z.record(z.string(), z.array(z.number())).optional(),
+  resourceUsage: z.record(z.string(), resourceUsageSchema).optional(),
+  systemMemory: z.number().optional(),
+  cpuCount: z.number().optional(),
+  systemCpu: z.number().optional(),
+  systemRss: z.number().optional(),
+  hostResources: z.record(z.string(), hostResourceInfoSchema).optional(),
+  portForwardStatus: z
+    .record(z.string(), z.array(portForwardStatusSchema))
+    .optional(),
+})
+
+export type ProcessesPayload = z.infer<typeof processesPayloadSchema>
+
+export const gitDiffStatSchema = z.object({
+  added: z.number(),
+  removed: z.number(),
+  untracked: z.number(),
+  untrackedLines: z.number(),
+})
+
+export type GitDiffStat = z.infer<typeof gitDiffStatSchema>
+
+export const gitLastCommitSchema = z.object({
+  hash: z.string(),
+  author: z.string(),
+  date: z.string(),
+  subject: z.string(),
+  isLocal: z.boolean(),
+})
+
+export type GitLastCommit = z.infer<typeof gitLastCommitSchema>
+
+export const gitDirtyPayloadSchema = z.object({
+  dirtyStatus: z.record(z.string(), gitDiffStatSchema),
+  lastCommit: z.record(z.string(), gitLastCommitSchema).optional(),
+})
+
+export type GitDirtyPayload = z.infer<typeof gitDirtyPayloadSchema>
+
+export const gitRemoteSyncStatSchema = z.object({
+  behind: z.number(),
+  ahead: z.number(),
+  noRemote: z.boolean(),
+})
+
+export type GitRemoteSyncStat = z.infer<typeof gitRemoteSyncStatSchema>
+
+export const gitRemoteSyncPayloadSchema = z.object({
+  syncStatus: z.record(z.string(), gitRemoteSyncStatSchema),
+})
+
+export type GitRemoteSyncPayload = z.infer<typeof gitRemoteSyncPayloadSchema>

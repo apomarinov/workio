@@ -14,6 +14,11 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type {
+  ActiveProcess,
+  GitDiffStat,
+  GitLastCommit,
+} from '@domains/pty/schema'
+import type {
   StatusBarConfig,
   StatusBarSection,
   StatusBarSectionName,
@@ -45,11 +50,6 @@ import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { formatTimeAgo } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import type {
-  ActiveProcess,
-  GitDiffStat,
-  GitLastCommit,
-} from '../../shared/types'
 import { GitStatus } from './GitStatus'
 import { ResourceInfo } from './ResourceInfo'
 import { PortsList, ProcessesList } from './terminal-status-sections'
