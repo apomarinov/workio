@@ -1,17 +1,18 @@
 import crypto from 'node:crypto'
-import type {
-  PermissionOption,
-  PermissionPromptInput,
-  PermissionPromptType,
-} from '../../src/types'
 import {
   getLatestPromptId,
   getMessageByUuid,
   insertPermissionMessage,
-} from '../db'
-import { getIO } from '../io'
-import { log } from '../logger'
-import { getSessionBuffer } from './manager'
+} from '@server/db'
+import { getIO } from '@server/io'
+import { log } from '@server/logger'
+import { getSessionBuffer } from '@server/pty/manager'
+import type {
+  PermissionOption,
+  PermissionPromptInput,
+  PermissionPromptType,
+} from '@/types'
+import type { ParsedPermissionPrompt } from '../schema'
 
 /**
  * Render raw PTY buffer through a minimal virtual terminal emulator.
@@ -22,7 +23,7 @@ import { getSessionBuffer } from './manager'
  * This function simulates a character grid so cursor movements translate
  * into proper whitespace, producing human-readable lines.
  */
-function renderBufferLines(buffer: string[]): string[] {
+function renderBufferLines(buffer: string[]) {
   const raw = buffer.slice(-200).join('')
   const screen: string[][] = [[]]
   let row = 0
@@ -229,21 +230,11 @@ function parseOptions(lines: string[]): PermissionOption[] {
   return options
 }
 
-export interface ParsedPermissionPrompt {
-  type: PermissionPromptType
-  title: string
-  question: string
-  context: string
-  options: PermissionOption[]
-}
-
 /**
  * Scan the PTY buffer for a permission prompt.
  * Returns parsed prompt data or null if no recognized pattern found.
  */
-export function scanBufferForPermissionPrompt(
-  buffer: string[],
-): ParsedPermissionPrompt | null {
+export function scanBufferForPermissionPrompt(buffer: string[]) {
   const lines = renderBufferLines(buffer)
 
   // Try plan mode first
@@ -396,7 +387,7 @@ function computePermissionUuid(
 export async function scanAndStorePermissionPrompt(
   sessionId: string,
   shellId: number,
-): Promise<ParsedPermissionPrompt | null> {
+) {
   try {
     const buffer = await getSessionBuffer(shellId)
     if (buffer.length === 0) return null

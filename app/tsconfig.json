@@ -18,7 +18,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@domains/*": ["server/domains/*"],
-      "@server/*": ["server/*"]
+      "@server/*": ["server/*"],
+      "@shared/*": ["shared/*"]
     }
   },
   "include": ["src", "server"],

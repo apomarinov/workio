@@ -4,14 +4,15 @@
  * Child process entry point that owns a single PTY session.
  * Communicates with the master process via Node.js IPC (fork channel).
  */
+
+import type { TerminalBackend } from '@server/ssh/ssh-pty-adapter'
+import { createSSHSession } from '@server/ssh/ssh-pty-adapter'
 import * as pty from 'node-pty'
-import type { TerminalBackend } from '../ssh/ssh-pty-adapter'
-import { createSSHSession } from '../ssh/ssh-pty-adapter'
 import type {
   MasterToWorkerMessage,
   WorkerInitConfig,
   WorkerToMasterMessage,
-} from './ipc-types'
+} from '../schema'
 import { createOscParser } from './osc-parser'
 import { getChildPids } from './process-tree'
 
@@ -37,7 +38,11 @@ function send(msg: WorkerToMasterMessage) {
   }
 }
 
-function workerLog(level: string, message: string, data?: object) {
+function workerLog(
+  level: string,
+  message: string,
+  data?: Record<string, unknown>,
+) {
   send({ type: 'log', level, message, data })
 }
 

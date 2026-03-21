@@ -5,6 +5,25 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
+import type { CommandEvent, RemoteProcessInfo } from '@domains/pty/schema'
+import {
+  findRemoteZellijServerPid,
+  getActiveZellijSessionNames,
+  getChildPids,
+  getDescendantPids,
+  getListeningPortsForTerminal,
+  getProcessComm,
+  getRemoteDescendantPids,
+  getRemoteHostInfo,
+  getRemoteListeningPorts,
+  getRemoteListeningPortsForTerminal,
+  getRemoteProcessList,
+  getRemoteZellijSessionProcesses,
+  getSystemListeningPorts,
+  getSystemMemoryUsage,
+  getSystemResourceUsage,
+  getZellijSessionProcesses,
+} from '@domains/pty/services/process-tree'
 import { updateShell } from '@domains/workspace/db/shells'
 import {
   getAllTerminals,
@@ -34,26 +53,6 @@ import {
   reconcileTunnels,
   stopAllTunnelsForTerminal,
 } from '../ssh/tunnel'
-import type { CommandEvent } from './osc-parser'
-import {
-  findRemoteZellijServerPid,
-  getActiveZellijSessionNames,
-  getChildPids,
-  getDescendantPids,
-  getListeningPortsForTerminal,
-  getProcessComm,
-  getRemoteDescendantPids,
-  getRemoteHostInfo,
-  getRemoteListeningPorts,
-  getRemoteListeningPortsForTerminal,
-  getRemoteProcessList,
-  getRemoteZellijSessionProcesses,
-  getSystemListeningPorts,
-  getSystemMemoryUsage,
-  getSystemResourceUsage,
-  getZellijSessionProcesses,
-  type RemoteProcessInfo,
-} from './process-tree'
 import {
   getAllWorkers,
   getWorkersForTerminal,

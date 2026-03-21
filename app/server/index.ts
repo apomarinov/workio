@@ -7,6 +7,7 @@ import {
   initWebPush,
   markDesktopActive,
 } from '@domains/notifications/service'
+import { getActiveZellijSessionNames } from '@domains/pty/services/process-tree'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
@@ -43,7 +44,6 @@ import {
   writeShellIntegrationScripts,
   writeToSession,
 } from './pty/manager'
-import { getActiveZellijSessionNames } from './pty/process-tree'
 import claudeHookRoute from './routes/claude-hook'
 import githubRoutes from './routes/github'
 import sessionRoutes from './routes/sessions'

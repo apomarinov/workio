@@ -1,11 +1,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
-import type { ActiveProcess } from '../../shared/types'
-import { execFileAsync } from '../lib/exec'
-import { log } from '../logger'
-import { poolExecSSHCommand } from '../ssh/pool'
+import { execFileAsync } from '@server/lib/exec'
+import { log } from '@server/logger'
+import { poolExecSSHCommand } from '@server/ssh/pool'
+import type { ActiveProcess } from '@shared/types'
+import type { RemoteProcessInfo, ZellijPaneProcess } from '../schema'
 
-export async function getChildPids(pid: number): Promise<number[]> {
+export async function getChildPids(pid: number) {
   try {
     // Try Linux /proc first (faster, no process spawn)
     const childrenPath = `/proc/${pid}/task/${pid}/children`
@@ -30,7 +31,7 @@ export async function getChildPids(pid: number): Promise<number[]> {
   }
 }
 
-export async function getProcessComm(pid: number): Promise<string | null> {
+export async function getProcessComm(pid: number) {
   try {
     // Try Linux /proc first
     const commPath = `/proc/${pid}/comm`
@@ -58,7 +59,7 @@ export async function getProcessComm(pid: number): Promise<string | null> {
 }
 
 // Get full command line with arguments
-async function getProcessArgs(pid: number): Promise<string | null> {
+async function getProcessArgs(pid: number) {
   try {
     const { stdout } = await execFileAsync(
       'ps',
@@ -118,7 +119,7 @@ function shouldIgnoreProcess(name: string): boolean {
 }
 
 // Get the TTY of a process
-async function getProcessTty(pid: number): Promise<string | null> {
+async function getProcessTty(pid: number) {
   try {
     const { stdout } = await execFileAsync(
       'ps',
@@ -136,7 +137,7 @@ async function getProcessTty(pid: number): Promise<string | null> {
 }
 
 // Get all processes on a specific TTY
-async function getProcessesOnTty(tty: string): Promise<Map<number, string>> {
+async function getProcessesOnTty(tty: string) {
   const pidToName = new Map<number, string>()
   try {
     // ps -t <tty> -o pid=,comm= gives all processes on that TTY
@@ -169,18 +170,8 @@ async function getProcessesOnTty(tty: string): Promise<Map<number, string>> {
   return pidToName
 }
 
-// Zellij session detection
-export interface ZellijPaneProcess {
-  pid: number
-  command: string
-  isIdle: boolean
-  terminalId?: number
-}
-
 // Find Zellij server PID for a given session name
-async function findZellijServerForSession(
-  sessionName: string,
-): Promise<number | null> {
+async function findZellijServerForSession(sessionName: string) {
   try {
     // Get all Zellij server PIDs (PPID=1)
     const { stdout } = await execFileAsync(
@@ -227,7 +218,7 @@ async function findZellijServerForSession(
 export async function getZellijSessionProcesses(
   sessionName: string,
   terminalId?: number,
-): Promise<ZellijPaneProcess[]> {
+) {
   try {
     const serverPid = await findZellijServerForSession(sessionName)
     if (!serverPid) return []
@@ -295,7 +286,7 @@ export async function getZellijSessionProcesses(
 }
 
 // Get all descendant PIDs of a process (recursive)
-export async function getDescendantPids(pid: number): Promise<Set<number>> {
+export async function getDescendantPids(pid: number) {
   const descendants = new Set<number>()
   const visit = async (p: number) => {
     if (descendants.has(p)) return
@@ -310,9 +301,7 @@ export async function getDescendantPids(pid: number): Promise<Set<number>> {
 
 // Get system-wide RSS (KB) and CPU% for every process in a single ps call
 // Returns Map<pid, { rss, cpu }>
-export async function getSystemResourceUsage(): Promise<
-  Map<number, { rss: number; cpu: number }>
-> {
+export async function getSystemResourceUsage() {
   const result = new Map<number, { rss: number; cpu: number }>()
   try {
     const { stdout } = await execFileAsync(
@@ -347,10 +336,7 @@ export async function getSystemResourceUsage(): Promise<
  *
  * Returns { usedKb, usedPercent } or null on failure.
  */
-export async function getSystemMemoryUsage(): Promise<{
-  usedKb: number
-  usedPercent: number
-} | null> {
+export async function getSystemMemoryUsage() {
   try {
     if (process.platform === 'darwin') {
       const { stdout } = await execFileAsync('memory_pressure', [], {
@@ -391,9 +377,7 @@ export async function getSystemMemoryUsage(): Promise<{
 
 // Get all TCP listening ports on the system, grouped by PID
 // Returns Map<pid, port[]>
-export async function getSystemListeningPorts(): Promise<
-  Map<number, number[]>
-> {
+export async function getSystemListeningPorts() {
   const pidPorts = new Map<number, number[]>()
   try {
     const { stdout } = await execFileAsync(
@@ -434,7 +418,7 @@ export async function getListeningPortsForTerminal(
   shellPid: number,
   zellijSessionName: string | null,
   systemPorts: Map<number, number[]>,
-): Promise<number[]> {
+) {
   if (systemPorts.size === 0) return []
 
   const allPids = new Set<number>()
@@ -473,7 +457,7 @@ export async function getListeningPortsForTerminal(
 }
 
 // Get all active zellij session names via `zellij list-sessions`
-export async function getActiveZellijSessionNames(): Promise<Set<string>> {
+export async function getActiveZellijSessionNames() {
   try {
     const { stdout } = await execFileAsync('zellij', ['list-sessions', '-ns'], {
       encoding: 'utf8',
@@ -486,7 +470,7 @@ export async function getActiveZellijSessionNames(): Promise<Set<string>> {
     }
     return names
   } catch {
-    return new Set()
+    return new Set<string>()
   }
 }
 
@@ -496,9 +480,7 @@ export async function getActiveZellijSessionNames(): Promise<Set<string>> {
  * Get static host info (CPU count + total RAM) from a remote SSH host.
  * Runs `nproc` and reads `/proc/meminfo` in a single command.
  */
-export async function getRemoteHostInfo(
-  sshHost: string,
-): Promise<{ cpuCount: number; systemMemory: number } | null> {
+export async function getRemoteHostInfo(sshHost: string) {
   try {
     const { stdout } = await poolExecSSHCommand(
       sshHost,
@@ -521,21 +503,11 @@ export async function getRemoteHostInfo(
 
 // ── Remote process scanning (SSH) ──────────────────────────────────
 
-export interface RemoteProcessInfo {
-  pid: number
-  ppid: number
-  rss: number
-  cpu: number
-  comm: string
-}
-
 /**
  * Run a single `ps` on a remote host via pooled SSH connection.
  * Returns all processes with pid, ppid, rss, cpu%, and command name.
  */
-export async function getRemoteProcessList(
-  sshHost: string,
-): Promise<RemoteProcessInfo[]> {
+export async function getRemoteProcessList(sshHost: string) {
   const processes: RemoteProcessInfo[] = []
   try {
     const { stdout } = await poolExecSSHCommand(
@@ -573,7 +545,7 @@ export async function getRemoteProcessList(
 export function getRemoteDescendantPids(
   processes: RemoteProcessInfo[],
   rootPid: number,
-): Set<number> {
+) {
   // Build ppid → children lookup
   const childrenMap = new Map<number, number[]>()
   for (const p of processes) {
@@ -611,7 +583,7 @@ export function getRemoteDescendantPids(
 export function findRemoteZellijServerPid(
   processes: RemoteProcessInfo[],
   remotePid: number,
-): number | null {
+) {
   // Check descendants of remotePid for a zellij client
   const descendants = getRemoteDescendantPids(processes, remotePid)
   let foundClient = false
@@ -647,7 +619,7 @@ export function getRemoteZellijSessionProcesses(
   processes: RemoteProcessInfo[],
   remotePid: number,
   terminalId?: number,
-): ZellijPaneProcess[] {
+) {
   const serverPid = findRemoteZellijServerPid(processes, remotePid)
   if (!serverPid) return []
 
@@ -693,9 +665,7 @@ export function getRemoteZellijSessionProcesses(
  * Run `ss -tlnpH` on a remote host via pooled SSH connection.
  * Returns Map<pid, port[]> — same shape as getSystemListeningPorts().
  */
-export async function getRemoteListeningPorts(
-  sshHost: string,
-): Promise<Map<number, number[]>> {
+export async function getRemoteListeningPorts(sshHost: string) {
   const pidPorts = new Map<number, number[]>()
   try {
     const { stdout } = await poolExecSSHCommand(
@@ -749,7 +719,7 @@ export function getRemoteListeningPortsForTerminal(
   remotePid: number,
   remotePorts: Map<number, number[]>,
   zellijServerPid?: number | null,
-): number[] {
+) {
   if (remotePorts.size === 0) return []
 
   const allPids = getRemoteDescendantPids(processes, remotePid)
@@ -775,10 +745,7 @@ export function getRemoteListeningPortsForTerminal(
   return [...ports].sort((a, b) => a - b)
 }
 
-export async function getChildProcesses(
-  shellPid: number,
-  terminalId?: number,
-): Promise<ActiveProcess[]> {
+export async function getChildProcesses(shellPid: number, terminalId?: number) {
   try {
     const pidToName = new Map<number, string>()
 

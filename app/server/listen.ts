@@ -1,5 +1,6 @@
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
+import { scanAndStorePermissionPrompt } from '@domains/pty/services/permission-scanner'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
@@ -11,7 +12,6 @@ import {
 } from './db'
 import { execFileAsync } from './lib/exec'
 import { log } from './logger'
-import { scanAndStorePermissionPrompt } from './pty/permission-scanner'
 import { execSSHCommand } from './ssh/exec'
 
 async function detectLocalBranch(cwd: string): Promise<string> {

@@ -1,19 +1,7 @@
 // OSC 133 Shell Integration Parser
 // Parses OSC escape sequences from terminal output to extract command events
 
-export interface CommandEvent {
-  type:
-    | 'prompt'
-    | 'command_start'
-    | 'command_end'
-    | 'done_marker'
-    | 'remote_pid'
-  command?: string // For command_start
-  exitCode?: number // For command_end
-  remotePid?: number // For remote_pid
-}
-
-export type CommandEventCallback = (event: CommandEvent) => void
+import type { CommandEventCallback } from '../schema'
 
 // Character codes
 const ESC = '\x1b'
@@ -31,7 +19,7 @@ export function createOscParser(
   onData: (data: string) => void,
   onCommandEvent: CommandEventCallback,
   onBell?: () => void,
-): (data: string) => void {
+) {
   // Buffer for incomplete escape sequences
   let buffer = ''
 

@@ -11,6 +11,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type {
+  CommandEvent,
+  WorkerInitConfig,
+  WorkerToMasterMessage,
+} from '@domains/pty/schema'
 import { getShellById } from '@domains/workspace/db/shells'
 import {
   getTerminalById,
@@ -23,11 +28,16 @@ import { getIO } from '../io'
 import { sanitizeName, shellEscape } from '../lib/strings'
 import { log } from '../logger'
 import { validateSSHHost } from '../ssh/config'
-import type { WorkerInitConfig, WorkerToMasterMessage } from './ipc-types'
-import type { CommandEvent } from './osc-parser'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const WORKER_PATH = path.join(__dirname, 'worker.ts')
+const WORKER_PATH = path.join(
+  __dirname,
+  '..',
+  'domains',
+  'pty',
+  'services',
+  'worker.ts',
+)
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 const LONG_TIMEOUT = 900_000 // 15 min for setup/teardown operations

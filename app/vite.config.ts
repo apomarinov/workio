@@ -69,6 +69,7 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
         '@domains': path.resolve(__dirname, './server/domains'),
         '@server': path.resolve(__dirname, './server'),
+        '@shared': path.resolve(__dirname, './shared'),
       },
     },
     build: {
