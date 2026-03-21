@@ -103,74 +103,94 @@ server/domains/
 │
 ├── pty/
 │   ├── ipc-types.ts             (IPC message types between master and workers)
+│   ├── session.ts               (PtySession class — per-shell worker lifecycle + state)
+│   │   │                        Replaces session-proxy.ts + per-shell Maps from manager.ts.
+│   │   │                        Each instance owns: worker process, callbacks, timeout,
+│   │   │                        pending command, bell subscription — no more scattered Maps.
+│   │   │                        Module-level sessions Map<shellId, PtySession> + lookup helpers.
+│   │   ├── class PtySession
+│   │   │   ├── write(data)
+│   │   │   ├── resize(cols, rows)
+│   │   │   ├── interrupt()
+│   │   │   ├── killChildren()
+│   │   │   ├── getBuffer()
+│   │   │   ├── destroy()
+│   │   │   ├── attach(onData, onExit, onCommandEvent)
+│   │   │   ├── startTimeout() / clearTimeout()
+│   │   │   ├── setPendingCommand(cmd) / flushPendingCommand()
+│   │   │   ├── subscribeBell(sub) / unsubscribeBell()
+│   │   │   ├── waitForMarker() / cancelWaitForMarker()
+│   │   │   ├── waitForReady(timeoutMs)
+│   │   │   └── updateName(name)
+│   │   ├── createSession(shellId, cols, rows, onData, onExit, onCommandEvent)
+│   │   ├── getSession(shellId)
+│   │   ├── getSessionByTerminalId(terminalId)
+│   │   ├── hasActiveSession(shellId)
+│   │   ├── hasActiveSessionForTerminal(terminalId)
+│   │   ├── destroyAllSessions()
+│   │   ├── getBellSubscribedShellIds()
+│   │   ├── writeShellIntegrationScripts()
+│   │   ├── writeTerminalNameFile(terminalId, name)
+│   │   ├── writeShellNameFile(shellId, name)
+│   │   └── renameZellijSession(oldName, newName, sshHost?)
+│   ├── monitor.ts               (TerminalMonitor class — per-terminal polling + caching)
+│   │   │                        Replaces per-terminal Maps from manager.ts (lastDirtyStatus,
+│   │   │                        lastCommitStatus, lastRemoteSyncStatus, processFirstSeen,
+│   │   │                        processPollTimeoutIds, sshHostInfoCache). Each instance owns
+│   │   │                        its cached state; dispose() clears everything.
+│   │   │                        Module-level monitors Map<terminalId, TerminalMonitor> +
+│   │   │                        global polling intervals.
+│   │   ├── class TerminalMonitor
+│   │   │   ├── scanProcesses()
+│   │   │   ├── checkGitDirty()
+│   │   │   ├── checkGitRemoteSync()
+│   │   │   ├── checkLastCommit()
+│   │   │   ├── detectGitBranch()
+│   │   │   ├── detectRepoSlug()
+│   │   │   └── dispose()
+│   │   ├── scanAndEmitProcessesForTerminal(terminalId)
+│   │   ├── checkAndEmitSingleGitDirty(terminalId)
+│   │   ├── startGitDirtyPolling()
+│   │   ├── startGlobalProcessPolling() / stopGlobalProcessPolling()
+│   │   ├── scanAndEmitAllProcesses()
+│   │   └── handleWorkerCommandEvent(terminalId, shellId, event, handle)
+│   ├── websocket.ts             (ShellClients class + WebSocket server)
+│   │   │                        Replaces shells/wsInfo/resizeTimers Maps from ws/terminal.ts.
+│   │   │                        Each ShellClients instance owns its connected clients,
+│   │   │                        primary/secondary promotion, and resize debouncing.
+│   │   ├── class ShellClients
+│   │   │   ├── addClient(ws, info) / removeClient(ws)
+│   │   │   ├── claimPrimary(ws) / releasePrimary()
+│   │   │   ├── broadcast(data) / broadcastExit(code)
+│   │   │   └── get isEmpty
+│   │   ├── handleUpgrade(request, socket, head)
+│   │   └── emitAllShellClients(socket)
 │   ├── services/
-│   │   ├── session-proxy.ts     (internal — master-side IPC with PTY worker processes)
-│   │   ├── manager.ts          (33 functions — public API for PTY domain)
-│   │   │   ├── — session lifecycle (re-exported from session-proxy) —
-│   │   │   ├── createSession
-│   │   │   ├── attachSession
-│   │   │   ├── destroySession          (wrapper: adds cleanup)
-│   │   │   ├── destroySessionsForTerminal (wrapper: adds cleanup)
-│   │   │   ├── destroyAllSessions
-│   │   │   ├── getSession
-│   │   │   ├── getSessionByTerminalId
-│   │   │   ├── getSessionBuffer
-│   │   │   ├── hasActiveSession
-│   │   │   ├── hasActiveSessionForTerminal
-│   │   │   ├── writeToSession
-│   │   │   ├── resizeSession
-│   │   │   ├── interruptSession
-│   │   │   ├── killShellChildren
-│   │   │   ├── waitForMarker
-│   │   │   ├── cancelWaitForMarker
-│   │   │   ├── waitForSession
-│   │   │   ├── startSessionTimeout
-│   │   │   ├── clearSessionTimeout
-│   │   │   ├── updateSessionName
-│   │   │   ├── — commands & bell —
-│   │   │   ├── setPendingCommand
-│   │   │   ├── flushPendingCommand
-│   │   │   ├── subscribeBell
-│   │   │   ├── unsubscribeBell
-│   │   │   ├── getBellSubscribedShellIds
-│   │   │   ├── — git & process scanning —
-│   │   │   ├── detectGitBranch
-│   │   │   ├── startGitDirtyPolling
-│   │   │   ├── checkAndEmitSingleGitDirty
-│   │   │   ├── scanAndEmitProcessesForTerminal
-│   │   │   ├── — shell integration & naming —
-│   │   │   ├── writeShellIntegrationScripts
-│   │   │   ├── writeTerminalNameFile
-│   │   │   ├── writeShellNameFile
-│   │   │   └── renameZellijSession
-│   │   ├── worker.ts           (PTY child process entry point)
-│   │   ├── osc-parser.ts       (2 functions — OSC 133 shell integration parser)
+│   │   ├── worker.ts            (PTY child process entry point — isolated process, no classes)
+│   │   ├── osc-parser.ts        (2 functions — OSC 133 shell integration parser)
 │   │   │   ├── createOscParser
 │   │   │   └── type CommandEvent
 │   │   ├── permission-scanner.ts (2 functions — Claude permission prompt scanner)
 │   │   │   ├── scanBufferForPermissionPrompt
 │   │   │   └── scanAndStorePermissionPrompt
-│   │   ├── process-tree.ts      (16 functions — process introspection)
-│   │   │   ├── getChildPids
-│   │   │   ├── getChildProcesses
-│   │   │   ├── getProcessComm
-│   │   │   ├── getZellijSessionProcesses
-│   │   │   ├── getDescendantPids
-│   │   │   ├── getSystemResourceUsage
-│   │   │   ├── getSystemMemoryUsage
-│   │   │   ├── getSystemListeningPorts
-│   │   │   ├── getListeningPortsForTerminal
-│   │   │   ├── getActiveZellijSessionNames
-│   │   │   ├── getRemoteHostInfo
-│   │   │   ├── getRemoteProcessList
-│   │   │   ├── getRemoteDescendantPids
-│   │   │   ├── findRemoteZellijServerPid
-│   │   │   ├── getRemoteZellijSessionProcesses
-│   │   │   ├── getRemoteListeningPorts
-│   │   │   └── getRemoteListeningPortsForTerminal
-│   │   └── websocket.ts        (2 functions — WebSocket PTY streaming)
-│   │       ├── handleUpgrade
-│   │       └── emitAllShellClients
+│   │   └── process-tree.ts      (16 pure/IO-only functions — process introspection)
+│   │       ├── getChildPids
+│   │       ├── getChildProcesses
+│   │       ├── getProcessComm
+│   │       ├── getZellijSessionProcesses
+│   │       ├── getDescendantPids
+│   │       ├── getSystemResourceUsage
+│   │       ├── getSystemMemoryUsage
+│   │       ├── getSystemListeningPorts
+│   │       ├── getListeningPortsForTerminal
+│   │       ├── getActiveZellijSessionNames
+│   │       ├── getRemoteHostInfo
+│   │       ├── getRemoteProcessList
+│   │       ├── getRemoteDescendantPids
+│   │       ├── findRemoteZellijServerPid
+│   │       ├── getRemoteZellijSessionProcesses
+│   │       ├── getRemoteListeningPorts
+│   │       └── getRemoteListeningPortsForTerminal
 │   └── shell.ts                 (3 functions — shell write/interrupt/kill)
 │       ├── writeShell
 │       ├── interruptShell
@@ -384,19 +404,27 @@ Steps 4 and 5 can be done in either order or in parallel since they don't depend
 | [x]  | **system**    | 10+   | browse folder, list dirs, create dir, open IDE/explorer, SSH hosts/audit/fix-max-sessions, full disk access, parent app detection | DirectoryBrowser, Terminal context menu, CreateTerminalModal SSH picker |
 
 
-### pty (58 functions → 5 sub-groups)
+### pty (58 functions → 6 sub-groups)
 
+Current state: ~15 module-level Maps spread across `manager.ts`, `session-proxy.ts`, and `ws/terminal.ts`, all keyed by `shellId` or `terminalId`. Functions take an ID, do `map.get(id)`, and mutate scattered state. Cleanup (e.g. `destroySession`) must remember to touch every Map — easy to leave orphaned entries.
 
-| Done | Sub-group             | Count | What                                                                                                | Notes                                                              |
-| ---- | --------------------- | ----- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| [ ]  | **manager**           | 33    | Public API: session lifecycle, commands, bell, git/process scanning, shell integration, naming      | Facade over session-proxy; all external consumers import from here |
-| [ ]  | **process-tree**      | 16    | child PIDs, process comm, zellij sessions, memory, resource usage, listening ports (local + remote) | Process introspection for terminal status display                  |
-| [ ]  | **shell-integration** | 4     | OSC parser, command events, permission scanner                                                      | Parsing terminal output for commands and Claude prompts            |
-| [ ]  | **websocket**         | 2     | handleUpgrade, emitAllShellClients                                                                  | WebSocket PTY streaming to browser                                 |
-| [ ]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Shell write/interrupt/kill extracted from routes                   |
+Refactored state: 3 Maps (`sessions`, `monitors`, `shellClients`), each holding a class instance that owns all its related state. `destroy()`/`dispose()` cleans up in one place.
 
+Migration order within pty (each step is independently shippable):
 
-Plus `session-proxy.ts` (internal worker pool IPC), `worker.ts` (child process entry point), and `ipc-types.ts` (shared types).
+| #   | Done | Sub-group             | Count | What                                                                                                | Notes                                                                                          |
+| --- | ---- | --------------------- | ----- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1   | [ ]  | **shell-integration** | 4     | `osc-parser.ts` (factory + CommandEvent type), `ipc-types.ts`, `permission-scanner.ts`              | Leaf deps — `osc-parser` has zero imports, `ipc-types` only imports CommandEvent type from it   |
+| 2   | [ ]  | **process-tree**      | 16    | child PIDs, process comm, zellij sessions, memory, resource usage, listening ports (local + remote) | Pure/IO-only functions, external deps only (exec, ssh/pool, logger) — move as-is               |
+| 3   | [ ]  | **worker**            | 1     | PTY child process entry point (isolated process, no classes)                                        | Imports osc-parser + ipc-types + process-tree (steps 1-2) + ssh-pty-adapter — move as-is       |
+| 4   | [ ]  | **session**           | ~26   | `PtySession` class: worker IPC, write/resize/interrupt, timeout, pending commands, bell, naming     | Big refactor — merges `session-proxy.ts` + per-shell Maps from `manager.ts` into class          |
+| 5   | [ ]  | **monitor**           | ~17   | `TerminalMonitor` class: git dirty/commit/remote-sync caching, process/port scanning, polling       | Extracts per-terminal Maps from `manager.ts`; depends on session (step 4) + process-tree        |
+| 6   | [ ]  | **websocket**         | ~14   | `ShellClients` class: per-shell client tracking, primary/secondary, resize debounce, broadcasting   | Refactors `ws/terminal.ts`; depends on session (step 4)                                         |
+| 7   | [ ]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Thin wrappers over session — move last since they depend on session (step 4)                    |
+
+Steps 1-3 are pure moves (no refactoring, no classes). Step 4 is the core refactor. Steps 5-7 depend on step 4 but are independent of each other.
+
+Note: `permission-scanner.ts` currently has a circular import on `manager.getSessionBuffer` — this breaks naturally when step 4 replaces manager with `PtySession.getBuffer()`.
 
 ### sessions (46 functions → 7 sub-groups)
 
