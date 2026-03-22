@@ -17,8 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
-import { cleanupOldSessions } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 
 interface CleanupSessionsModalProps {
   open: boolean
@@ -40,13 +40,14 @@ export function CleanupSessionsModal({
   onSuccess,
 }: CleanupSessionsModalProps) {
   const [weeks, setWeeks] = useState('4')
-  const [loading, setLoading] = useState(false)
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
+  const cleanupMutation = trpc.sessions.cleanup.useMutation()
 
   const handleCleanup = async () => {
-    setLoading(true)
     try {
-      const result = await cleanupOldSessions(Number(weeks))
+      const result = await cleanupMutation.mutateAsync({
+        weeks: Number(weeks),
+      })
       if (result.deleted > 0) {
         toast.success(
           `Deleted ${result.deleted} old session${result.deleted === 1 ? '' : 's'}`,
@@ -58,8 +59,6 @@ export function CleanupSessionsModal({
       onSuccess()
     } catch (err) {
       toastError(err, 'Failed to cleanup sessions')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -91,16 +90,22 @@ export function CleanupSessionsModal({
           </SelectContent>
         </Select>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={cleanupMutation.isPending}
+          >
             Cancel
           </Button>
           <Button
             ref={deleteButtonRef}
             variant="destructive"
             onClick={handleCleanup}
-            disabled={loading}
+            disabled={cleanupMutation.isPending}
           >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {cleanupMutation.isPending && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Delete
           </Button>
         </DialogFooter>

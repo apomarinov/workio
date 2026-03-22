@@ -33,7 +33,6 @@ import {
   pushBranch,
   rebaseBranch,
   renameBranch,
-  toggleFavoriteSession,
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
@@ -177,6 +176,8 @@ export function CommandPalette() {
   const { gitDirtyStatus, processes, shellPorts } = useProcessContext()
   const { settings, updateSettings } = useSettings()
   const { emit } = useSocket()
+  const toggleFavoriteMutation =
+    trpc.sessions.sessionToggleFavorite.useMutation()
 
   // Pin state (shared localStorage keys with sidebar)
   const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
@@ -815,7 +816,7 @@ export function CommandPalette() {
       },
       toggleFavoriteSession: async (sessionId) => {
         try {
-          await toggleFavoriteSession(sessionId)
+          await toggleFavoriteMutation.mutateAsync({ id: sessionId })
           refetchSessions()
         } catch (err) {
           toastError(err, 'Failed to toggle favorite')

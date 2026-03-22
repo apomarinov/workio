@@ -9,7 +9,7 @@ import {
   writeShellNameFile,
   writeToSession,
 } from '@domains/pty/session'
-import { setActiveSessionDone } from '@server/db'
+import { setActiveSessionDone } from '@domains/sessions/db'
 import { getIO } from '@server/io'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'

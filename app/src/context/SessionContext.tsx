@@ -1,15 +1,6 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import useSWR from 'swr'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useSocket } from '../hooks/useSocket'
-import * as api from '../lib/api'
+import { trpc } from '../lib/trpc'
 import type { HookEvent, SessionWithProject } from '../types'
 
 interface SessionUpdateEvent {
@@ -47,61 +38,62 @@ const SessionContext = createContext<SessionContextValue | null>(null)
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const { subscribe } = useSocket()
-  const { data, error, isLoading, mutate } = useSWR<SessionWithProject[]>(
-    '/api/sessions',
-    api.getClaudeSessions,
-  )
+  const utils = trpc.useUtils()
+  const { data, error, isLoading } = trpc.sessions.list.useQuery()
+
+  const updateMutation = trpc.sessions.update.useMutation()
+  const removeMutation = trpc.sessions.remove.useMutation()
+  const bulkDeleteMutation = trpc.sessions.bulkDelete.useMutation()
+
+  const setData = (
+    updater: (
+      prev: SessionWithProject[] | undefined,
+    ) => SessionWithProject[] | undefined,
+  ) => {
+    utils.sessions.list.setData(undefined, updater)
+  }
 
   const debounceMap = useRef(new Map<string, NodeJS.Timeout>())
 
-  const selectSession = useCallback((id: string) => {
+  const selectSession = (id: string) => {
     setActiveSessionId(id)
-  }, [])
+  }
 
-  const clearSession = useCallback(() => {
+  const clearSession = () => {
     setActiveSessionId(null)
-  }, [])
+  }
 
-  const mergeSession = useCallback(
-    async (sessionId: string) => {
-      try {
-        const updated = await api.getClaudeSession(sessionId)
-        mutate(
-          (prev) => {
-            if (!prev) return [updated]
-            const idx = prev.findIndex((s) => s.session_id === sessionId)
-            if (idx >= 0) {
-              const next = [...prev]
-              next[idx] = updated
-              return next
-            }
-            return [updated, ...prev]
-          },
-          { revalidate: false },
-        )
-      } catch {
-        // Session may not exist yet (e.g. SessionStart before DB commit),
-        // fall back to full refetch
-        mutate()
-      }
-    },
-    [mutate],
-  )
+  const mergeSession = async (sessionId: string) => {
+    try {
+      const updated = await utils.sessions.getById.fetch({ id: sessionId })
+      setData((prev) => {
+        if (!prev) return [updated]
+        const idx = prev.findIndex((s) => s.session_id === sessionId)
+        if (idx >= 0) {
+          const next = [...prev]
+          next[idx] = updated
+          return next
+        }
+        return [updated, ...prev]
+      })
+    } catch {
+      // Session may not exist yet (e.g. SessionStart before DB commit),
+      // fall back to full refetch
+      utils.sessions.list.invalidate()
+    }
+  }
 
-  const debouncedMerge = useCallback(
-    (sessionId: string) => {
-      const existing = debounceMap.current.get(sessionId)
-      if (existing) clearTimeout(existing)
-      debounceMap.current.set(
-        sessionId,
-        setTimeout(() => {
-          debounceMap.current.delete(sessionId)
-          mergeSession(sessionId)
-        }, 1000),
-      )
-    },
-    [mergeSession],
-  )
+  const debouncedMerge = (sessionId: string) => {
+    const existing = debounceMap.current.get(sessionId)
+    if (existing) clearTimeout(existing)
+    debounceMap.current.set(
+      sessionId,
+      setTimeout(() => {
+        debounceMap.current.delete(sessionId)
+        mergeSession(sessionId)
+      }, 1000),
+    )
+  }
 
   useEffect(() => {
     return subscribe<HookEvent>('hook', (data) => {
@@ -121,43 +113,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return subscribe<SessionUpdatedEvent>('session:updated', (event) => {
-      mutate(
-        (prev) => {
-          if (!prev) return prev
-          const idx = prev.findIndex((s) => s.session_id === event.sessionId)
-          if (idx < 0) return prev
-          const next = [...prev]
-          const { status, ...rest } = event.data
-          next[idx] = {
-            ...next[idx],
-            ...(status !== undefined
-              ? { status: status as SessionWithProject['status'] }
-              : {}),
-            data: { ...next[idx].data, ...rest },
-          }
-          return next
-        },
-        { revalidate: false },
-      )
+      setData((prev) => {
+        if (!prev) return prev
+        const idx = prev.findIndex((s) => s.session_id === event.sessionId)
+        if (idx < 0) return prev
+        const next = [...prev]
+        const { status, ...rest } = event.data
+        next[idx] = {
+          ...next[idx],
+          ...(status !== undefined
+            ? { status: status as SessionWithProject['status'] }
+            : {}),
+          data: { ...next[idx].data, ...rest },
+        }
+        return next
+      })
     })
-  }, [subscribe, mutate])
+  }, [subscribe])
 
   // Listen for refetch events from other clients
   useEffect(() => {
     return subscribe<{ group: string }>('refetch', ({ group }) => {
-      if (group === 'sessions') mutate()
+      if (group === 'sessions') utils.sessions.list.invalidate()
     })
-  }, [subscribe, mutate])
+  }, [subscribe])
 
   useEffect(() => {
     return subscribe<SessionsDeletedEvent>('sessions_deleted', (data) => {
       const deletedSet = new Set(data.session_ids)
-      mutate((prev) => prev?.filter((s) => !deletedSet.has(s.session_id)), {
-        revalidate: false,
-      })
+      setData((prev) => prev?.filter((s) => !deletedSet.has(s.session_id)))
       setActiveSessionId((prev) => (prev && deletedSet.has(prev) ? null : prev))
     })
-  }, [subscribe, mutate])
+  }, [subscribe])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -168,76 +155,52 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const updateSession = useCallback(
-    async (sessionId: string, updates: { name?: string }) => {
-      await api.updateSession(sessionId, updates)
-      mutate(
-        (prev) =>
-          prev?.map((s) =>
-            s.session_id === sessionId ? { ...s, ...updates } : s,
-          ),
-        { revalidate: false },
-      )
-    },
-    [mutate],
-  )
+  const updateSession = async (
+    sessionId: string,
+    updates: { name?: string },
+  ) => {
+    await updateMutation.mutateAsync({ id: sessionId, name: updates.name })
+    setData((prev) =>
+      prev?.map((s) => (s.session_id === sessionId ? { ...s, ...updates } : s)),
+    )
+  }
 
-  const deleteSession = useCallback(
-    async (sessionId: string) => {
-      await api.deleteSession(sessionId)
-      if (sessionId === activeSessionId) {
-        clearSession()
-      }
-      mutate((prev) => prev?.filter((s) => s.session_id !== sessionId), {
-        revalidate: false,
-      })
-    },
-    [mutate, activeSessionId, clearSession],
-  )
+  const deleteSession = async (sessionId: string) => {
+    await removeMutation.mutateAsync({ id: sessionId })
+    if (sessionId === activeSessionId) {
+      clearSession()
+    }
+    setData((prev) => prev?.filter((s) => s.session_id !== sessionId))
+  }
 
-  const deleteSessions = useCallback(
-    async (ids: string[]) => {
-      await api.deleteSessions(ids)
-      if (activeSessionId && ids.includes(activeSessionId)) {
-        clearSession()
-      }
-      const deletedSet = new Set(ids)
-      mutate((prev) => prev?.filter((s) => !deletedSet.has(s.session_id)), {
-        revalidate: false,
-      })
-    },
-    [mutate, activeSessionId, clearSession],
-  )
+  const deleteSessions = async (ids: string[]) => {
+    await bulkDeleteMutation.mutateAsync({ ids })
+    if (activeSessionId && ids.includes(activeSessionId)) {
+      clearSession()
+    }
+    const deletedSet = new Set(ids)
+    setData((prev) => prev?.filter((s) => !deletedSet.has(s.session_id)))
+  }
 
-  const sessions = useMemo(() => data ?? [], [data])
-  const errorMessage = useMemo(() => error?.message ?? null, [error])
+  const sessions = data ?? []
+  const errorMessage = error?.message ?? null
 
-  const value = useMemo(
-    () => ({
-      activeSessionId,
-      selectSession,
-      clearSession,
-      sessions,
-      loading: isLoading,
-      error: errorMessage,
-      refetch: mutate,
-      updateSession,
-      deleteSession,
-      deleteSessions,
-    }),
-    [
-      activeSessionId,
-      selectSession,
-      clearSession,
-      sessions,
-      isLoading,
-      errorMessage,
-      mutate,
-      updateSession,
-      deleteSession,
-      deleteSessions,
-    ],
-  )
+  const refetch = () => {
+    utils.sessions.list.invalidate()
+  }
+
+  const value: SessionContextValue = {
+    activeSessionId,
+    selectSession,
+    clearSession,
+    sessions,
+    loading: isLoading,
+    error: errorMessage,
+    refetch,
+    updateSession,
+    deleteSession,
+    deleteSessions,
+  }
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

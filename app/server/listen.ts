@@ -1,15 +1,11 @@
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
 import { scanAndStorePermissionPrompt } from '@domains/pty/services/permission-scanner'
+import { getSessionById, updateSessionData } from '@domains/sessions/db'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
-import {
-  getActivePermissions,
-  getMessagesByIds,
-  getSessionById,
-  updateSessionData,
-} from './db'
+import { getActivePermissions, getMessagesByIds } from './db'
 import { execFileAsync } from './lib/exec'
 import { log } from './logger'
 import { execSSHCommand } from './ssh/exec'

@@ -151,46 +151,6 @@ export async function getActivePermissions(): Promise<ActivePermission[]> {
 
 // --- Sessions ---
 
-export async function getClaudeSessions(): Promise<SessionWithProject[]> {
-  return api(`${API_BASE}/sessions`)
-}
-
-export async function getClaudeSession(
-  sessionId: string,
-): Promise<SessionWithProject> {
-  return api(`${API_BASE}/sessions/${sessionId}`)
-}
-
-export async function updateSession(
-  sessionId: string,
-  updates: { name?: string },
-): Promise<void> {
-  await api(`${API_BASE}/sessions/${sessionId}`, {
-    method: 'PATCH',
-    body: updates,
-  })
-}
-
-export async function deleteSession(sessionId: string): Promise<void> {
-  await api(`${API_BASE}/sessions/${sessionId}`, { method: 'DELETE' })
-}
-
-export async function deleteSessions(ids: string[]): Promise<void> {
-  await api(`${API_BASE}/sessions`, { method: 'DELETE', body: { ids } })
-}
-
-export async function cleanupOldSessions(
-  weeks: number,
-): Promise<{ deleted: number }> {
-  return api(`${API_BASE}/sessions/cleanup`, { body: { weeks } })
-}
-
-export async function toggleFavoriteSession(
-  sessionId: string,
-): Promise<{ is_favorite: boolean }> {
-  return api(`${API_BASE}/sessions/${sessionId}/favorite`, { method: 'POST' })
-}
-
 export async function searchSessionMessages(
   query: string | null,
   opts?: {

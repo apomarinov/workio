@@ -16,7 +16,10 @@ import {
   startSessionTimeout,
   writeToSession,
 } from '@domains/pty/session'
-import { resumePermissionSession, setActiveSessionDone } from '@server/db'
+import {
+  resumePermissionSession,
+  setActiveSessionDone,
+} from '@domains/sessions/db'
 import { getIO, parseUserAgent } from '@server/io'
 import { log } from '@server/logger'
 import type { ShellClient } from '@shared/types'

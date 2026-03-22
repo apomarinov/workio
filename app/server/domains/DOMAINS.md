@@ -383,7 +383,7 @@ These files stay in place — they're cross-cutting concerns used by all domains
 | --- | ------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **logs**      | [x]    | Smallest (3 functions), no deps on other unmigrated domains, good warmup to establish the pattern                                                               |
 | 2   | **workspace** | [x]    | Leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it                                                 |
-| 3   | **pty**       | [ ]    | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
+| 3   | **pty**       | [x]    | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
 | 4   | **git**       | [ ]    | Depends on workspace + logs, both done by now                                                                                                                   |
 | 5   | **sessions**  | [ ]    | Depends on workspace + settings (already done). Large but self-contained                                                                                        |
 | 6   | **github**    | [ ]    | Depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers                          |
@@ -433,7 +433,7 @@ Note: `permission-scanner.ts` currently has a circular import on `manager.getSes
 
 | Done | Sub-group       | Count | What                                                                                      | Client usage                                                   |
 | ---- | --------------- | ----- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [ ]  | **crud**        | 12    | list, getById, update, delete, bulkDelete, cleanup, favorites                             | SessionContext sidebar, context menus, CleanupModal            |
+| [x]  | **crud**        | 12    | list, getById, update, delete, bulkDelete, cleanup, favorites                             | SessionContext sidebar, context menus, CleanupModal            |
 | [ ]  | **messages**    | 4     | getMessages, getByIds, getByUuid                                                          | SessionChat, paginated message viewer                          |
 | [ ]  | **search**      | 2     | searchSessionMessages, buildResults                                                       | SessionSearchPanel — full-text search with repo/branch filters |
 | [ ]  | **backfill**    | 5     | backfillCheck, backfillRun, isRealSession, readLastTimestamp, readSessionBranches         | BackfillModal — import sessions from JSONL files               |
