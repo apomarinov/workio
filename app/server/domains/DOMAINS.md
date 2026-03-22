@@ -420,8 +420,8 @@ Migration order within pty (each step is independently shippable):
 | 3   | [x]  | **worker**            | 1     | PTY child process entry point (isolated process, no classes)                                        | Imports osc-parser + ipc-types + process-tree (steps 1-2) + ssh-pty-adapter — move as-is      |
 | 4   | [x]  | **session**           | ~26   | `PtySession` class: worker IPC, write/resize/interrupt, timeout, pending commands, bell, naming     | Big refactor — merges `session-proxy.ts` + per-shell Maps from `manager.ts` into class        |
 | 5   | [x]  | **monitor**           | ~17   | `TerminalMonitor` class: git dirty/commit/remote-sync caching, process/port scanning, polling       | Extracts per-terminal Maps from `manager.ts`; depends on session (step 4) + process-tree      |
-| 6   | [ ]  | **websocket**         | ~14   | `ShellClients` class: per-shell client tracking, primary/secondary, resize debounce, broadcasting   | Refactors `ws/terminal.ts`; depends on session (step 4)                                       |
-| 7   | [ ]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Thin wrappers over session — move last since they depend on session (step 4)                  |
+| 6   | [x]  | **websocket**         | ~14   | `ShellClients` class: per-shell client tracking, primary/secondary, resize debounce, broadcasting   | Refactors `ws/terminal.ts`; depends on session (step 4)                                       |
+| 7   | [x]  | **shell**             | 3     | writeShell, interruptShell, killShell                                                               | Already in workspace/mutations/shells.ts — correct placement (tRPC layer delegates to pty)    |
 
 
 Steps 1-3 are pure moves (no refactoring, no classes). Step 4 is the core refactor. Steps 5-7 depend on step 4 but are independent of each other.

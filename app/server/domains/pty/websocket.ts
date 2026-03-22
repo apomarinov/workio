@@ -1,6 +1,11 @@
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { sendPushNotification } from '@domains/notifications/service'
+import type {
+  WsClientInfo,
+  WsClientMessage,
+  WsServerMessage,
+} from '@domains/pty/schema'
 import {
   attachSession,
   clearSessionTimeout,
@@ -11,212 +16,141 @@ import {
   startSessionTimeout,
   writeToSession,
 } from '@domains/pty/session'
+import { resumePermissionSession, setActiveSessionDone } from '@server/db'
+import { getIO, parseUserAgent } from '@server/io'
+import { log } from '@server/logger'
+import type { ShellClient } from '@shared/types'
 import { WebSocket, WebSocketServer } from 'ws'
-import type { ShellClient } from '../../shared/types'
-import { resumePermissionSession, setActiveSessionDone } from '../db'
-import { getIO, parseUserAgent } from '../io'
-import { log } from '../logger'
 
-// Message types
-interface InitMessage {
-  type: 'init'
-  shellId: number
-  cols: number
-  rows: number
-  fontSize?: number
-  requestPrimary?: boolean
-}
+// ── ShellClients class ─────────────────────────────────────────────
 
-interface InputMessage {
-  type: 'input'
-  data: string
-}
-
-interface ResizeMessage {
-  type: 'resize'
-  cols: number
-  rows: number
-}
-
-interface ClaimPrimaryMessage {
-  type: 'claim-primary'
-}
-
-interface ReleasePrimaryMessage {
-  type: 'release-primary'
-}
-
-type ClientMessage =
-  | InitMessage
-  | InputMessage
-  | ResizeMessage
-  | ClaimPrimaryMessage
-  | ReleasePrimaryMessage
-
-interface OutputMessage {
-  type: 'output'
-  data: string
-}
-
-interface ExitMessage {
-  type: 'exit'
-  code: number
-}
-
-interface ErrorMessage {
-  type: 'error'
-  message: string
-  code?: string
-}
-
-interface ReadyMessage {
-  type: 'ready'
-  isPrimary: boolean
-  ptyCols: number
-  ptyRows: number
-  ptyFontSize?: number
-}
-
-interface PrimaryChangedMessage {
-  type: 'primary-changed'
-  isPrimary: boolean
-  ptyCols: number
-  ptyRows: number
-  ptyFontSize?: number
-}
-
-type ServerMessage =
-  | OutputMessage
-  | ExitMessage
-  | ErrorMessage
-  | ReadyMessage
-  | PrimaryChangedMessage
-
-// Per-WebSocket metadata (set once at connection time)
-interface WsClientInfo {
-  ip: string
-  device: string
-  browser: string
-  cols: number
-  rows: number
-  fontSize: number
-  activeShellId: number | null
-}
-
-const wsInfo = new WeakMap<WebSocket, WsClientInfo>()
-
-// Per-shell state: all connected clients, keyed by IP for dedup
-interface ShellState {
-  // IP → WebSocket (one connection per device per shell)
-  devices: Map<string, WebSocket>
-  // All connected clients (same WebSocket refs as in devices.values())
-  clients: Set<WebSocket>
-  // The primary client controls PTY dimensions
-  primary: WebSocket | null
-}
-
-const shells = new Map<number, ShellState>()
-
-function getOrCreateShell(shellId: number): ShellState {
-  let state = shells.get(shellId)
-  if (!state) {
-    state = { devices: new Map(), clients: new Set(), primary: null }
-    shells.set(shellId, state)
-  }
-  return state
-}
-
-// Debounce resize events to prevent shell redraw spam during drag
-const resizeTimers = new Map<number, ReturnType<typeof setTimeout>>()
 const RESIZE_DEBOUNCE_MS = 500
+const BATCH_INTERVAL_MS = 4
 
-// Create WebSocket server (noServer mode - we handle upgrades manually)
-const wss = new WebSocketServer({ noServer: true })
+export class ShellClients {
+  readonly shellId: number
+  devices = new Map<string, WebSocket>()
+  clients = new Set<WebSocket>()
+  primary: WebSocket | null = null
+  private resizeTimer: ReturnType<typeof setTimeout> | null = null
+  private batchTimer: ReturnType<typeof setTimeout> | null = null
+  private batchPending = ''
 
-function sendMessage(ws: WebSocket, message: ServerMessage): void {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(message))
+  constructor(shellId: number) {
+    this.shellId = shellId
   }
-}
 
-// Batch rapid output chunks into a single broadcast to all connected clients
-// (helps with TUI apps that emit many small writes)
-function createBroadcastBatcher(shellId: number): (data: string) => void {
-  let pending = ''
-  let timer: ReturnType<typeof setTimeout> | null = null
-
-  const flush = () => {
-    timer = null
-    if (pending) {
-      const msg: ServerMessage = { type: 'output', data: pending }
-      const state = shells.get(shellId)
-      if (state) {
-        for (const client of state.clients) {
-          sendMessage(client, msg)
+  // Batched output broadcast
+  broadcast(data: string) {
+    this.batchPending += data
+    if (!this.batchTimer) {
+      this.batchTimer = setTimeout(() => {
+        this.batchTimer = null
+        if (this.batchPending) {
+          const msg: WsServerMessage = {
+            type: 'output',
+            data: this.batchPending,
+          }
+          for (const client of this.clients) {
+            sendMessage(client, msg)
+          }
+          this.batchPending = ''
         }
-      }
-      pending = ''
+      }, BATCH_INTERVAL_MS)
     }
   }
 
-  return (data: string) => {
-    pending += data
-    if (!timer) {
-      timer = setTimeout(flush, 4)
-    }
-  }
-}
-
-// Broadcast exit to all connected clients for a shell
-function broadcastExit(shellId: number, code: number): void {
-  const state = shells.get(shellId)
-  if (state) {
-    for (const client of state.clients) {
+  broadcastExit(code: number) {
+    for (const client of this.clients) {
       sendMessage(client, { type: 'exit', code })
     }
   }
-}
 
-function getShellClientsList(shellId: number): ShellClient[] {
-  const state = shells.get(shellId)
-  const clients: ShellClient[] = []
-  if (state) {
+  getClientsList(): ShellClient[] {
+    const clients: ShellClient[] = []
     const seen = new Set<string>()
-    for (const ws of state.clients) {
+    for (const ws of this.clients) {
       if (ws.readyState !== WebSocket.OPEN) continue
       const info = wsInfo.get(ws)
       if (!info) continue
-      // Only include clients that have this shell as their active shell
-      if (info.activeShellId !== shellId) continue
-      // Deduplicate by IP — a reconnecting device can briefly have two WS
+      if (info.activeShellId !== this.shellId) continue
       if (seen.has(info.ip)) continue
       seen.add(info.ip)
       clients.push({
         device: info.device,
         browser: info.browser,
         ip: info.ip,
-        isPrimary: ws === state.primary,
+        isPrimary: ws === this.primary,
       })
     }
+    return clients
   }
-  return clients
+
+  queueResize(cols: number, rows: number) {
+    if (this.resizeTimer) {
+      clearTimeout(this.resizeTimer)
+    }
+    const sid = this.shellId
+    this.resizeTimer = setTimeout(() => {
+      this.resizeTimer = null
+      resizeSession(sid, cols, rows)
+    }, RESIZE_DEBOUNCE_MS)
+  }
+
+  dispose() {
+    if (this.resizeTimer) {
+      clearTimeout(this.resizeTimer)
+      this.resizeTimer = null
+    }
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer)
+      this.batchTimer = null
+    }
+  }
 }
 
-function broadcastShellClients(shellId: number): void {
-  const io = getIO()
-  io?.emit('shell:clients', { shellId, clients: getShellClientsList(shellId) })
+// ── Module-level state ─────────────────────────────────────────────
+
+const shellClients = new Map<number, ShellClients>()
+const wsInfo = new WeakMap<WebSocket, WsClientInfo>()
+const wss = new WebSocketServer({ noServer: true })
+
+// ── Module-level helpers (exported) ────────────────────────────────
+
+export function getOrCreateShellClients(shellId: number): ShellClients {
+  let sc = shellClients.get(shellId)
+  if (!sc) {
+    sc = new ShellClients(shellId)
+    shellClients.set(shellId, sc)
+  }
+  return sc
 }
 
 /** Emit current shell:clients state for all active shells to a specific socket. */
 export function emitAllShellClients(socket: {
   emit: (ev: string, data: unknown) => void
 }): void {
-  for (const shellId of shells.keys()) {
-    const clients = getShellClientsList(shellId)
+  for (const [shellId, sc] of shellClients) {
+    const clients = sc.getClientsList()
     if (clients.length > 0) {
       socket.emit('shell:clients', { shellId, clients })
     }
   }
+}
+
+// ── Internal helpers ───────────────────────────────────────────────
+
+function sendMessage(ws: WebSocket, message: WsServerMessage) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(message))
+  }
+}
+
+function broadcastShellClients(shellId: number) {
+  const sc = shellClients.get(shellId)
+  if (!sc) return
+  const io = getIO()
+  io?.emit('shell:clients', { shellId, clients: sc.getClientsList() })
 }
 
 /**
@@ -225,12 +159,12 @@ export function emitAllShellClients(socket: {
  * activeShellId on that IP's WS for each other shell so the client count
  * only reflects clients actively viewing each shell.
  */
-function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
-  for (const [shellId, state] of shells) {
+function autoReleaseOtherShells(clientIP: string, newShellId: number) {
+  for (const [shellId, sc] of shellClients) {
     if (shellId === newShellId) continue
 
     // Clear activeShellId for this IP's WS on this shell regardless of primary
-    const ipWs = state.devices.get(clientIP)
+    const ipWs = sc.devices.get(clientIP)
     if (ipWs) {
       const info = wsInfo.get(ipWs)
       if (info && info.activeShellId === shellId) {
@@ -239,14 +173,14 @@ function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
       }
     }
 
-    if (!state.primary) continue
-    const primaryInfo = wsInfo.get(state.primary)
+    if (!sc.primary) continue
+    const primaryInfo = wsInfo.get(sc.primary)
     if (!primaryInfo || primaryInfo.ip !== clientIP) continue
 
     // This shell has the same IP as primary — release it
-    const releasedWs = state.primary
+    const releasedWs = sc.primary
     let next: WebSocket | null = null
-    for (const client of state.clients) {
+    for (const client of sc.clients) {
       if (client !== releasedWs) {
         next = client
         break
@@ -254,7 +188,7 @@ function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
     }
 
     if (next) {
-      state.primary = next
+      sc.primary = next
       const nextInfo = wsInfo.get(next)
       if (nextInfo && nextInfo.cols > 0 && nextInfo.rows > 0) {
         resizeSession(shellId, nextInfo.cols, nextInfo.rows)
@@ -263,7 +197,7 @@ function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
       const ptyCols = session?.cols ?? nextInfo?.cols ?? 80
       const ptyRows = session?.rows ?? nextInfo?.rows ?? 24
       const ptyFontSize = nextInfo?.fontSize || undefined
-      for (const client of state.clients) {
+      for (const client of sc.clients) {
         sendMessage(client, {
           type: 'primary-changed',
           isPrimary: client === next,
@@ -278,6 +212,8 @@ function autoReleaseOtherShells(clientIP: string, newShellId: number): void {
     broadcastShellClients(shellId)
   }
 }
+
+// ── WebSocket connection handler ───────────────────────────────────
 
 wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
   // Extract client IP from the upgrade request
@@ -306,9 +242,9 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
   let shellId: number | null = null
 
   ws.on('message', async (rawData) => {
-    let message: ClientMessage
+    let message: WsClientMessage
     try {
-      message = JSON.parse(rawData.toString()) as ClientMessage
+      message = JSON.parse(rawData.toString()) as WsClientMessage
     } catch {
       sendMessage(ws, { type: 'error', message: 'Invalid JSON' })
       return
@@ -317,10 +253,10 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     switch (message.type) {
       case 'init': {
         shellId = message.shellId
-        const state = getOrCreateShell(shellId)
+        const sc = getOrCreateShellClients(shellId)
 
         // Handle duplicate connection from the same device (IP) for the same shell
-        const existingDeviceWs = state.devices.get(clientIP)
+        const existingDeviceWs = sc.devices.get(clientIP)
         if (existingDeviceWs) {
           if (existingDeviceWs.readyState === WebSocket.OPEN) {
             log.info(
@@ -335,12 +271,12 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
             return
           }
           // Stale WS (CLOSING/CLOSED) — clean it up so the new connection can proceed
-          state.clients.delete(existingDeviceWs)
+          sc.clients.delete(existingDeviceWs)
           wsInfo.delete(existingDeviceWs)
         }
 
         // Register this connection
-        state.devices.set(clientIP, ws)
+        sc.devices.set(clientIP, ws)
         const info = wsInfo.get(ws)!
         info.cols = message.cols
         info.rows = message.rows
@@ -357,16 +293,18 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           clearSessionTimeout(shellId)
 
           // Re-attach broadcast callbacks if this is the first client reconnecting
-          if (state.clients.size === 0) {
+          if (sc.clients.size === 0) {
             const sid = shellId
-            const batchOutput = createBroadcastBatcher(sid)
-            attachSession(sid, batchOutput, (code) => {
-              broadcastExit(sid, code)
-            })
+            const scRef = sc
+            attachSession(
+              sid,
+              (data) => scRef.broadcast(data),
+              (code) => scRef.broadcastExit(code),
+            )
           }
-          state.clients.add(ws)
+          sc.clients.add(ws)
           log.info(
-            `[ws] Client connected to shell=${shellId} (reconnect, requestPrimary=${wantsPrimary}), clients=${state.clients.size}`,
+            `[ws] Client connected to shell=${shellId} (reconnect, requestPrimary=${wantsPrimary}), clients=${sc.clients.size}`,
           )
 
           // Replay buffer to this client only
@@ -375,11 +313,11 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
             sendMessage(ws, { type: 'output', data })
           }
 
-          if (wantsPrimary || !state.primary) {
+          if (wantsPrimary || !sc.primary) {
             // Client wants primary (or no primary exists) — promote it
             autoReleaseOtherShells(clientIP, shellId)
-            const previousPrimary = state.primary
-            state.primary = ws
+            const previousPrimary = sc.primary
+            sc.primary = ws
 
             // Send ready message — new primary
             sendMessage(ws, {
@@ -406,7 +344,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
             resizeSession(shellId, message.cols, message.rows)
           } else {
             // Client does NOT want primary and an existing primary exists — join passively
-            const primaryInfo = wsInfo.get(state.primary)
+            const primaryInfo = wsInfo.get(sc.primary)
             sendMessage(ws, {
               type: 'ready',
               isPrimary: false,
@@ -422,23 +360,21 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
 
         // Create new session
         const sid = shellId
-        state.clients.add(ws)
-        state.primary = ws
+        sc.clients.add(ws)
+        sc.primary = ws
         info.activeShellId = shellId
 
         log.info(
           `[ws] Client connected to shell=${sid} (new session), clients=1`,
         )
 
-        const batchOutput = createBroadcastBatcher(sid)
+        const scRef = sc
         const session = await createSession(
           sid,
           message.cols,
           message.rows,
-          batchOutput,
-          (code) => {
-            broadcastExit(sid, code)
-          },
+          (data) => scRef.broadcast(data),
+          (code) => scRef.broadcastExit(code),
         )
 
         if (!session) {
@@ -542,7 +478,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           return
         }
         const { cols, rows } = message
-        const state = shells.get(shellId)
+        const sc = shellClients.get(shellId)
 
         // Always track this client's latest dimensions
         const info = wsInfo.get(ws)
@@ -552,23 +488,11 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         }
 
         // Only the primary client can resize the PTY
-        if (!state || state.primary !== ws) {
+        if (!sc || sc.primary !== ws) {
           break
         }
 
-        // Debounce resize to prevent shell redraw spam during drag
-        const sid = shellId
-        const existingTimer = resizeTimers.get(sid)
-        if (existingTimer) {
-          clearTimeout(existingTimer)
-        }
-        resizeTimers.set(
-          sid,
-          setTimeout(() => {
-            resizeTimers.delete(sid)
-            resizeSession(sid, cols, rows)
-          }, RESIZE_DEBOUNCE_MS),
-        )
+        sc.queueResize(cols, rows)
         break
       }
 
@@ -577,13 +501,13 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
         }
-        const state = shells.get(shellId)
-        if (!state) break
+        const sc = shellClients.get(shellId)
+        if (!sc) break
 
         const claimInfo = wsInfo.get(ws)
         if (claimInfo) claimInfo.activeShellId = shellId
         autoReleaseOtherShells(clientIP, shellId)
-        state.primary = ws
+        sc.primary = ws
         const info = wsInfo.get(ws)
         if (info && info.cols > 0 && info.rows > 0) {
           resizeSession(shellId, info.cols, info.rows)
@@ -594,7 +518,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         const ptyCols = session?.cols ?? info?.cols ?? 80
         const ptyRows = session?.rows ?? info?.rows ?? 24
         const ptyFontSize = info?.fontSize || undefined
-        for (const client of state.clients) {
+        for (const client of sc.clients) {
           sendMessage(client, {
             type: 'primary-changed',
             isPrimary: client === ws,
@@ -612,12 +536,12 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           sendMessage(ws, { type: 'error', message: 'Not initialized' })
           return
         }
-        const state = shells.get(shellId)
-        if (!state || state.primary !== ws) break
+        const sc = shellClients.get(shellId)
+        if (!sc || sc.primary !== ws) break
 
         // Promote another client (first one that isn't the current primary)
         let next: WebSocket | null = null
-        for (const client of state.clients) {
+        for (const client of sc.clients) {
           if (client !== ws) {
             next = client
             break
@@ -625,7 +549,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
         }
 
         if (next) {
-          state.primary = next
+          sc.primary = next
           const nextInfo = wsInfo.get(next)
           if (nextInfo && nextInfo.cols > 0 && nextInfo.rows > 0) {
             resizeSession(shellId, nextInfo.cols, nextInfo.rows)
@@ -634,7 +558,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           const ptyCols = session?.cols ?? nextInfo?.cols ?? 80
           const ptyRows = session?.rows ?? nextInfo?.rows ?? 24
           const ptyFontSize = nextInfo?.fontSize || undefined
-          for (const client of state.clients) {
+          for (const client of sc.clients) {
             sendMessage(client, {
               type: 'primary-changed',
               isPrimary: client === next,
@@ -654,31 +578,32 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
 
   ws.on('close', () => {
     if (shellId !== null) {
-      const state = shells.get(shellId)
-      if (!state) return
+      const sc = shellClients.get(shellId)
+      if (!sc) return
 
       // Clean up device tracking — only remove if this ws is still the registered one
-      if (state.devices.get(clientIP) === ws) {
-        state.devices.delete(clientIP)
+      if (sc.devices.get(clientIP) === ws) {
+        sc.devices.delete(clientIP)
       }
 
       // Remove this client from the shell's set
-      state.clients.delete(ws)
+      sc.clients.delete(ws)
       log.info(
-        `[ws] Client disconnected from shell=${shellId}, clients=${state.clients.size}`,
+        `[ws] Client disconnected from shell=${shellId}, clients=${sc.clients.size}`,
       )
 
-      if (state.clients.size === 0) {
+      if (sc.clients.size === 0) {
         // No clients left — clean up and start timeout
-        shells.delete(shellId)
+        sc.dispose()
+        shellClients.delete(shellId)
         log.info(`[ws] No clients left for shell=${shellId}, starting timeout`)
         startSessionTimeout(shellId)
         broadcastShellClients(shellId)
       } else {
-        if (state.primary === ws) {
+        if (sc.primary === ws) {
           // Primary disconnected — promote next client and resize PTY
-          const next = state.clients.values().next().value as WebSocket
-          state.primary = next
+          const next = sc.clients.values().next().value as WebSocket
+          sc.primary = next
           const nextInfo = wsInfo.get(next)
           if (nextInfo) {
             resizeSession(shellId, nextInfo.cols, nextInfo.rows)
@@ -688,7 +613,7 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
           const ptyCols = session?.cols ?? nextInfo?.cols ?? 80
           const ptyRows = session?.rows ?? nextInfo?.rows ?? 24
           const ptyFontSize = nextInfo?.fontSize || undefined
-          for (const client of state.clients) {
+          for (const client of sc.clients) {
             sendMessage(client, {
               type: 'primary-changed',
               isPrimary: client === next,
@@ -708,11 +633,13 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
   })
 })
 
+// ── handleUpgrade (exported) ───────────────────────────────────────
+
 export function handleUpgrade(
   request: IncomingMessage,
   socket: Duplex,
   head: Buffer,
-): void {
+) {
   // Only handle /ws/terminal path
   const url = new URL(request.url || '', `http://${request.headers.host}`)
   if (url.pathname !== '/ws/terminal') {

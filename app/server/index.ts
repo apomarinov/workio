@@ -20,6 +20,7 @@ import {
   writeShellIntegrationScripts,
   writeToSession,
 } from '@domains/pty/session'
+import { emitAllShellClients, handleUpgrade } from '@domains/pty/websocket'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
@@ -53,7 +54,6 @@ import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
 import { createContext } from './trpc/init'
 import { appRouter } from './trpc/router'
-import { emitAllShellClients, handleUpgrade } from './ws/terminal'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

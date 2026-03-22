@@ -246,3 +246,100 @@ export const gitRemoteSyncPayloadSchema = z.object({
 })
 
 export type GitRemoteSyncPayload = z.infer<typeof gitRemoteSyncPayloadSchema>
+
+// ── WebSocket schemas ──────────────────────────────────────────────
+
+// Client messages
+export const wsInitMessageSchema = z.object({
+  type: z.literal('init'),
+  shellId: z.number(),
+  cols: z.number(),
+  rows: z.number(),
+  fontSize: z.number().optional(),
+  requestPrimary: z.boolean().optional(),
+})
+
+export const wsInputMessageSchema = z.object({
+  type: z.literal('input'),
+  data: z.string(),
+})
+
+export const wsResizeMessageSchema = z.object({
+  type: z.literal('resize'),
+  cols: z.number(),
+  rows: z.number(),
+})
+
+export const wsClaimPrimaryMessageSchema = z.object({
+  type: z.literal('claim-primary'),
+})
+
+export const wsReleasePrimaryMessageSchema = z.object({
+  type: z.literal('release-primary'),
+})
+
+export const wsClientMessageSchema = z.discriminatedUnion('type', [
+  wsInitMessageSchema,
+  wsInputMessageSchema,
+  wsResizeMessageSchema,
+  wsClaimPrimaryMessageSchema,
+  wsReleasePrimaryMessageSchema,
+])
+
+export type WsClientMessage = z.infer<typeof wsClientMessageSchema>
+
+// Server messages
+export const wsOutputMessageSchema = z.object({
+  type: z.literal('output'),
+  data: z.string(),
+})
+
+export const wsExitMessageSchema = z.object({
+  type: z.literal('exit'),
+  code: z.number(),
+})
+
+export const wsErrorMessageSchema = z.object({
+  type: z.literal('error'),
+  message: z.string(),
+  code: z.string().optional(),
+})
+
+export const wsReadyMessageSchema = z.object({
+  type: z.literal('ready'),
+  isPrimary: z.boolean(),
+  ptyCols: z.number(),
+  ptyRows: z.number(),
+  ptyFontSize: z.number().optional(),
+})
+
+export const wsPrimaryChangedMessageSchema = z.object({
+  type: z.literal('primary-changed'),
+  isPrimary: z.boolean(),
+  ptyCols: z.number(),
+  ptyRows: z.number(),
+  ptyFontSize: z.number().optional(),
+})
+
+export const wsServerMessageSchema = z.discriminatedUnion('type', [
+  wsOutputMessageSchema,
+  wsExitMessageSchema,
+  wsErrorMessageSchema,
+  wsReadyMessageSchema,
+  wsPrimaryChangedMessageSchema,
+])
+
+export type WsServerMessage = z.infer<typeof wsServerMessageSchema>
+
+// WebSocket client info (per-connection metadata)
+export const wsClientInfoSchema = z.object({
+  ip: z.string(),
+  device: z.string(),
+  browser: z.string(),
+  cols: z.number(),
+  rows: z.number(),
+  fontSize: z.number(),
+  activeShellId: z.number().nullable(),
+})
+
+export type WsClientInfo = z.infer<typeof wsClientInfoSchema>
