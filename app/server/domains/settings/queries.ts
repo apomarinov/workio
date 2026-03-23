@@ -35,6 +35,15 @@ export const get = publicProcedure.query(async () => {
     }
   }
 
+  // Strip ngrok token, expose only a flag
+  if (settings.ngrok) {
+    patches.ngrok = {
+      domain: settings.ngrok.domain,
+      token: '',
+      tokenPresent: !!settings.ngrok.token,
+    }
+  }
+
   return Object.keys(patches).length > 0
     ? { ...settings, ...patches }
     : settings

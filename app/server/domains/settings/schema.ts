@@ -110,6 +110,12 @@ const statusBarSectionSchema = z.object({
   order: z.number(),
 })
 
+const ngrokConfigSchema = z.object({
+  domain: z.string().optional(),
+  token: z.string().optional(),
+  tokenPresent: z.boolean().optional(),
+})
+
 const statusBarConfigSchema = z.object({
   enabled: z.boolean(),
   onTop: z.boolean(),
@@ -181,9 +187,9 @@ const settingsBaseSchema = z.object({
     .optional()
     .default(DEFAULT_GH_QUERY_LIMITS),
   ignore_external_sessions: z.boolean().default(false),
+  ngrok: ngrokConfigSchema.optional(),
   // Server-managed fields (not user-editable)
   webhook_secret: z.string().optional(),
-  ngrok_url: z.string().optional(),
   repo_webhooks: z.record(z.string(), repoWebhookStatusSchema).optional(),
   vapid_public_key: z.string().optional(),
   vapid_private_key: z.string().optional(),
@@ -217,7 +223,6 @@ export const settingsSchema = settingsBaseSchema.extend({
 /** Fields the client cannot set directly */
 const SERVER_ONLY_FIELDS = {
   webhook_secret: true,
-  ngrok_url: true,
   vapid_public_key: true,
   vapid_private_key: true,
 } as const
@@ -249,4 +254,5 @@ export type PushSubscriptionRecord = z.infer<
 export type StatusBarSectionName = z.infer<typeof statusBarSectionNameSchema>
 export type StatusBarSection = z.infer<typeof statusBarSectionSchema>
 export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
+export type NgrokConfig = z.infer<typeof ngrokConfigSchema>
 export type PreferredIDE = Settings['preferred_ide']

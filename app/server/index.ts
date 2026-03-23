@@ -37,18 +37,15 @@ import {
   initGitHubChecks,
   refreshPRChecks,
 } from './github/checks'
-import {
-  initNgrok,
-  startWebhookValidationPolling,
-  stopNgrok,
-} from './github/webhooks'
+import { startWebhookValidationPolling } from './github/webhooks'
 import { broadcastRefetch, type RefetchGroup, setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import claudeHookRoute from './routes/claude-hook'
 import githubRoutes from './routes/github'
 import terminalRoutes from './routes/terminals'
-import { getServicesStatus, updateNgrokStatus } from './services/status'
+import { getNgrokUrl, initNgrok, stopNgrok } from './services/ngrok'
+import { getServicesStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
 import { createContext } from './trpc/init'
@@ -152,7 +149,6 @@ if (env.BASIC_AUTH) {
   const [authUser, authPass] = env.BASIC_AUTH.split(':')
   const expected = `Basic ${Buffer.from(`${authUser}:${authPass}`).toString('base64')}`
 
-  const ngrokDomain = env.NGROK_DOMAIN
   const AUTH_MAX_FAILURES = 5
   const AUTH_LOCKOUT_MS = 10 * 60 * 1000
   const ipFailures = new Map<
@@ -163,7 +159,9 @@ if (env.BASIC_AUTH) {
   fastify.addHook('onRequest', async (request, reply) => {
     // Only require auth when accessed through the ngrok domain
     const host = (request.headers.host || '').split(':')[0]
-    if (host !== ngrokDomain) return
+    const ngrokUrl = getNgrokUrl()
+    const ngrokDomain = ngrokUrl ? new URL(ngrokUrl).hostname : null
+    if (!ngrokDomain || host !== ngrokDomain) return
 
     // Only require auth for API, WebSocket, and Socket.IO routes
     const url = request.url
@@ -477,13 +475,8 @@ const start = async () => {
     // Initialize GitHub PR checks polling
     initGitHubChecks()
 
-    try {
-      await initNgrok(env.CLIENT_PORT, !!httpsOptions)
-      startWebhookValidationPolling()
-    } catch (err) {
-      log.error({ err }, 'Failed to initialize ngrok')
-      updateNgrokStatus({ status: 'error', error: String(err) })
-    }
+    const ngrokStarted = await initNgrok(env.CLIENT_PORT, !!httpsOptions)
+    if (ngrokStarted) startWebhookValidationPolling()
   } catch (err) {
     log.error({ err }, 'Server startup failed')
     process.exit(1)

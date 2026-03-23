@@ -1,13 +1,9 @@
-import { type ChildProcess, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import { getSettings, updateSettings } from '@domains/settings/db'
 import { WEBHOOK_EVENTS } from '../../shared/types'
-import { env } from '../env'
+import serverEvents from '../lib/events'
 import { execFileAsync } from '../lib/exec'
 import { log } from '../logger'
-import { updateNgrokStatus } from '../services/status'
-
-let ngrokProcess: ChildProcess | null = null
 
 export async function getOrCreateWebhookSecret(): Promise<string> {
   const settings = await getSettings()
@@ -20,128 +16,26 @@ export async function getOrCreateWebhookSecret(): Promise<string> {
   return secret
 }
 
-export async function initNgrok(
-  port: number,
-  useHttps: boolean,
-): Promise<void> {
-  const token = env.NGROK_AUTHTOKEN
-  const domain = env.NGROK_DOMAIN
-  // Domain requires token
-  if (!token) {
-    await updateSettings({ ngrok_url: null } as Record<string, unknown>)
-    throw new Error('NGROK_DOMAIN requires NGROK_AUTHTOKEN')
-  }
-
-  if (!domain) {
-    throw new Error('NGROK_DOMAIN is required')
-  }
-
-  // Start ngrok via CLI (SDK has issues with HTTPS upstream in long-running processes)
-  const scheme = useHttps ? 'https' : 'http'
-  const args = [
-    'http',
-    `${scheme}://localhost:${port}`,
-    `--domain=${domain}`,
-    `--authtoken=${token}`,
-    '--log=stdout',
-    '--log-format=json',
-  ]
-  if (useHttps) {
-    args.push('--upstream-tls-verify=false')
-  }
-
-  updateNgrokStatus({ status: 'starting' })
-  const ngrokUrl = await new Promise<string>((resolve, reject) => {
-    ngrokProcess = spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] })
-
-    const timeout = setTimeout(() => {
-      reject(new Error('ngrok startup timed out'))
-    }, 10000)
-
-    ngrokProcess.stdout?.on('data', (data: Buffer) => {
-      for (const line of data.toString().split('\n').filter(Boolean)) {
-        try {
-          const entry = JSON.parse(line)
-          if (entry.msg === 'started tunnel' || entry.url) {
-            clearTimeout(timeout)
-            resolve(`https://${domain}`)
-          }
-        } catch {}
-      }
-    })
-
-    ngrokProcess.stderr?.on('data', (data: Buffer) => {
-      log.error(`[ngrok] ${data.toString().trim()}`)
-    })
-
-    ngrokProcess.on('error', (err) => {
-      clearTimeout(timeout)
-      updateNgrokStatus({ status: 'error', error: String(err) })
-      reject(err)
-    })
-
-    ngrokProcess.on('exit', (code) => {
-      clearTimeout(timeout)
-      if (code) {
-        updateNgrokStatus({
-          status: 'error',
-          error: `exited with code ${code}`,
-        })
-        reject(new Error(`ngrok exited with code ${code}`))
-      }
-    })
-  })
-  // Monitor ngrok process after startup — restart if it dies
-  const proc = ngrokProcess
-  if (!proc) return
-  proc.on('exit', (code) => {
-    log.warn(
-      `[ngrok] Process exited with code ${code} after startup, restarting...`,
-    )
-    updateNgrokStatus({
-      status: 'error',
-      error: `exited with code ${code}, restarting...`,
-    })
-    ngrokProcess = null
-    // Restart after a short delay
-    setTimeout(() => {
-      initNgrok(port, useHttps).catch((err) => {
-        log.error(err, '[ngrok] Failed to restart ngrok')
-        updateNgrokStatus({ status: 'error', error: String(err) })
-      })
-    }, 10_000)
-  })
-
-  updateNgrokStatus({ status: 'healthy', error: null, url: ngrokUrl })
-  log.info(
-    `[webhooks] ngrok tunnel started: ${ngrokUrl}${domain ? ' (static)' : ''}`,
-  )
-
-  // Check if URL changed - update webhooks if so
+/**
+ * Update all stored webhook URLs to point to the new ngrok URL.
+ * Called by the ngrok service when the tunnel URL changes.
+ */
+export async function updateAllWebhookUrls(newUrl: string) {
   const settings = await getSettings()
-  const storedUrl = settings.ngrok_url
   const repoWebhooks = settings.repo_webhooks ?? {}
 
-  if (ngrokUrl !== storedUrl && Object.keys(repoWebhooks).length > 0) {
-    log.info(
-      `[webhooks] ngrok URL changed from ${storedUrl} to ${ngrokUrl}, updating webhooks`,
-    )
+  if (Object.keys(repoWebhooks).length === 0) return
 
-    for (const [repo, webhook] of Object.entries(repoWebhooks)) {
-      if (webhook.missing) continue // Skip missing webhooks
+  log.info(`[webhooks] Updating webhook URLs to ${newUrl}`)
 
-      try {
-        await updateWebhookUrl(repo, webhook.id, ngrokUrl)
-        log.info(`[webhooks] Updated webhook URL for ${repo}`)
-      } catch (err) {
-        log.error(err, `[webhooks] Failed to update webhook URL for ${repo}`)
-      }
+  for (const [repo, webhook] of Object.entries(repoWebhooks)) {
+    if (webhook.missing) continue
+    try {
+      await updateWebhookUrl(repo, webhook.id, newUrl)
+      log.info(`[webhooks] Updated webhook URL for ${repo}`)
+    } catch (err) {
+      log.error(err, `[webhooks] Failed to update webhook URL for ${repo}`)
     }
-
-    await updateSettings({ ngrok_url: ngrokUrl } as Record<string, unknown>)
-  } else if (ngrokUrl !== storedUrl) {
-    // No webhooks, just store the URL
-    await updateSettings({ ngrok_url: ngrokUrl } as Record<string, unknown>)
   }
 }
 
@@ -265,12 +159,12 @@ export async function createRepoWebhook(
   repo: string,
 ): Promise<{ ok: boolean; error?: string; webhookId?: number }> {
   const settings = await getSettings()
-  const ngrokUrl = settings.ngrok_url
+  const domain = settings.ngrok?.domain
 
-  if (!ngrokUrl) {
+  if (!domain) {
     return {
       ok: false,
-      error: 'ngrok not running - set NGROK_AUTHTOKEN and restart server',
+      error: 'ngrok not configured — set domain and token in Settings',
     }
   }
 
@@ -280,7 +174,7 @@ export async function createRepoWebhook(
     return { ok: false, error: 'Invalid repo format' }
   }
 
-  const webhookUrl = `${ngrokUrl}/api/webhooks/github`
+  const webhookUrl = `https://${domain}/api/webhooks/github`
   const eventsArgs = WEBHOOK_EVENTS.flatMap((e) => ['-f', `events[]=${e}`])
 
   try {
@@ -424,14 +318,6 @@ export function stopWebhookValidationPolling(): void {
   }
 }
 
-export function stopNgrok(): void {
-  if (ngrokProcess) {
-    ngrokProcess.kill('SIGTERM')
-    ngrokProcess = null
-  }
-  updateNgrokStatus({ status: 'inactive', error: null, url: null })
-}
-
 async function validateStoredWebhooks(): Promise<void> {
   const settings = await getSettings()
   const repoWebhooks = settings.repo_webhooks ?? {}
@@ -504,3 +390,13 @@ export function verifyWebhookSignature(
   const expected = `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`
   return signature === expected
 }
+
+// Update webhook URLs when ngrok tunnel URL changes
+serverEvents.on('ngrok:url-changed', (newUrl: string) => {
+  updateAllWebhookUrls(newUrl).catch((err) => {
+    log.error(
+      err,
+      '[webhooks] Failed to update webhook URLs after ngrok URL change',
+    )
+  })
+})

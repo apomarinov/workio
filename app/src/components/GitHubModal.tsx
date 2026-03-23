@@ -92,7 +92,9 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
     })
   }, [subscribe, sendNotification])
 
-  const ngrokUrl = settings?.ngrok_url
+  const ngrokUrl = settings?.ngrok?.domain
+    ? `https://${settings.ngrok.domain}`
+    : null
   const repoWebhooks = settings?.repo_webhooks || {}
 
   // Get unique repos from terminals
@@ -298,8 +300,8 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
                     <div className="flex items-center gap-2 text-amber-500 text-sm bg-amber-500/10 p-2 rounded">
                       <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                       <span>
-                        ngrok not running. Set NGROK_AUTHTOKEN environment
-                        variable and restart the server.
+                        ngrok not running. Configure domain and token in
+                        Settings.
                       </span>
                     </div>
                   ) : (
@@ -697,7 +699,7 @@ export function useWebhookWarning(): {
     if (!terminalRepos.has(repo)) orphanedCount++
   }
 
-  const noNgrok = !settings?.ngrok_url
+  const noNgrok = !settings?.ngrok?.domain
   const hasWarning = missingCount > 0 || orphanedCount > 0 || noNgrok
 
   return { hasWarning, missingCount, orphanedCount, noNgrok }

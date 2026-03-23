@@ -10,6 +10,7 @@ import {
   Code,
   EyeOff,
   Github,
+  Globe,
   Keyboard,
   Settings,
   Smartphone,
@@ -47,6 +48,7 @@ import { CursorIcon, TerminalIcon2, VSCodeIcon } from './icons'
 import { KeymapModal } from './KeymapModal'
 import { MobileKeyboardCustomize } from './MobileKeyboardCustomize'
 import { PushNotificationModal } from './PushNotificationModal'
+import { RemoteAccessModal } from './RemoteAccessModal'
 
 interface SettingsModalProps {
   open: boolean
@@ -69,6 +71,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     'new-action' | boolean
   >(false)
   const [showKeymapModal, setShowKeymapModal] = useState(false)
+  const [showRemoteAccessModal, setShowRemoteAccessModal] = useState(false)
   const [showGitHubModal, setShowGitHubModal] = useState(false)
   const [showPushModal, setShowPushModal] = useState(false)
   const {
@@ -275,6 +278,21 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Remote Access</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setShowRemoteAccessModal(true)}
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Github
                   className={cn(
                     'w-4 h-4',
@@ -306,6 +324,11 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           <KeymapModal
             open={showKeymapModal}
             onOpenChange={setShowKeymapModal}
+          />
+
+          <RemoteAccessModal
+            open={showRemoteAccessModal}
+            onOpenChange={setShowRemoteAccessModal}
           />
 
           <GitHubModal

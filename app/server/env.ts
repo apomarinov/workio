@@ -18,8 +18,6 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  NGROK_AUTHTOKEN: z.string().optional(),
-  NGROK_DOMAIN: z.string().optional(),
   BASIC_AUTH: z.string().optional(), // "user:pass" — protects all routes except webhooks
 })
 
