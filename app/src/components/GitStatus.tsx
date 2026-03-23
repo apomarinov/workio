@@ -44,7 +44,7 @@ export function GitStatus({
         />
       )}
       {showRemoteSync && remoteSyncStat && (
-        <RemoteSyncBadge stat={remoteSyncStat} />
+        <RemoteSyncBadge stat={remoteSyncStat} terminalId={terminalId} />
       )}
     </span>
   )
@@ -83,12 +83,28 @@ function DirtyBadge({
   )
 }
 
-function RemoteSyncBadge({ stat }: { stat: GitRemoteSyncStat }) {
+function RemoteSyncBadge({
+  stat,
+  terminalId,
+}: {
+  stat: GitRemoteSyncStat
+  terminalId: number
+}) {
+  const openBranchActions = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    window.dispatchEvent(
+      new CustomEvent('open-branch-actions', { detail: { terminalId } }),
+    )
+  }
+
   if (stat.noRemote) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex gap-0 group/norem">
+          <div
+            className="flex gap-0 group/norem cursor-pointer"
+            onClick={openBranchActions}
+          >
             <ArrowDown className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500" />
             <ArrowUp className="w-3 h-3 text-yellow-500/80 group-hover/norem:text-yellow-500 translate-x-[-3px]" />
           </div>
@@ -99,7 +115,10 @@ function RemoteSyncBadge({ stat }: { stat: GitRemoteSyncStat }) {
   }
 
   return (
-    <span className="text-[11px] font-mono flex items-center gap-1">
+    <span
+      className="text-[11px] font-mono flex items-center gap-1 cursor-pointer"
+      onClick={openBranchActions}
+    >
       {stat.behind > 0 && <SyncCount count={stat.behind} direction="behind" />}
       {stat.ahead > 0 && <SyncCount count={stat.ahead} direction="ahead" />}
     </span>

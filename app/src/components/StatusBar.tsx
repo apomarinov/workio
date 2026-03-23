@@ -289,13 +289,19 @@ function GitDirtySection({
   return (
     <SortableStatusSection
       section={section}
-      onClick={() =>
+      onClick={() => {
+        if (!diffStat) {
+          window.dispatchEvent(
+            new CustomEvent('open-branch-actions', { detail: { terminalId } }),
+          )
+          return
+        }
         window.dispatchEvent(
           new CustomEvent('open-commit-dialog', {
             detail: { terminalId },
           }),
         )
-      }
+      }}
     >
       <GitStatus
         terminalId={terminalId}
