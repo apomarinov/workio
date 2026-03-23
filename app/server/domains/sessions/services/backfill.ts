@@ -2,12 +2,12 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import {
   getAllTerminals,
   getTerminalById,
   upsertProject,
 } from '@domains/workspace/db/terminals'
+import { env } from '@server/env'
 import { withTransaction } from '@server/lib/db'
 import { sanitizeName } from '@server/lib/strings'
 import { log } from '@server/logger'
@@ -16,8 +16,6 @@ import {
   insertBackfilledSession,
   updateSessionData,
 } from '../db'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export async function backfillCheck(weeksBack: number) {
   const cutoff = Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000
@@ -191,8 +189,7 @@ export async function backfillRun(
   })
 
   // Spawn workers for each session (fire and forget)
-  const projectRoot = path.resolve(__dirname, '..', '..', '..', '..')
-  const debounceDir = path.join(projectRoot, 'debounce')
+  const debounceDir = path.join(env.ROOT_DIR, 'debounce')
   try {
     await fs.promises.mkdir(debounceDir, { recursive: true })
   } catch {
@@ -216,7 +213,7 @@ export async function backfillRun(
     }
 
     try {
-      const workerPath = path.join(projectRoot, 'worker.py')
+      const workerPath = path.join(env.ROOT_DIR, 'worker.py')
       const child = spawn('python3', [workerPath, e.sessionId, now], {
         detached: true,
         stdio: 'ignore',
