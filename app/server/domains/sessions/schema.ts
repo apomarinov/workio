@@ -117,6 +117,18 @@ export const searchSessionMessagesInput = z.object({
   recentOnly: z.boolean().default(true),
 })
 
+export const backfillCheckInput = z.object({
+  weeksBack: z.number().min(1).default(4),
+})
+
+export const backfillRunInput = z.object({
+  encodedPath: z.string(),
+  cwd: z.string(),
+  terminalId: z.number(),
+  shellId: z.number(),
+  weeksBack: z.number().min(1),
+})
+
 // --- Types ---
 
 export type SessionBranchEntry = z.infer<typeof sessionBranchEntrySchema>

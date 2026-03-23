@@ -1,10 +1,12 @@
 import { publicProcedure } from '@server/trpc/init'
 import { getSessionById, getSessionMessages, searchSessionMessages } from './db'
 import {
+  backfillCheckInput,
   getByIdInput,
   getSessionMessagesInput,
   searchSessionMessagesInput,
 } from './schema'
+import { backfillCheck } from './services/backfill'
 import { listSessionsWithFavorites } from './services/favorites'
 
 export const list = publicProcedure.query(async () => {
@@ -43,4 +45,10 @@ export const search = publicProcedure
       hasFilter ? { repo: input.repo!, branch: input.branch! } : undefined,
       input.recentOnly,
     )
+  })
+
+export const backfillCheckQuery = publicProcedure
+  .input(backfillCheckInput)
+  .query(async ({ input }) => {
+    return backfillCheck(input.weeksBack)
   })

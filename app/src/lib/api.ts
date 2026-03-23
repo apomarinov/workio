@@ -600,34 +600,6 @@ export async function testWebhook(owner: string, repo: string): Promise<void> {
   })
 }
 
-// --- Session backfill ---
-
-export interface BackfillCheckResult {
-  cwd: string
-  encodedPath: string
-  terminalId: number
-  shellId: number
-  totalFiles: number
-  unbackfilledCount: number
-}
-
-export async function backfillCheck(
-  weeksBack?: number,
-): Promise<{ results: BackfillCheckResult[] }> {
-  const params = weeksBack ? `?weeksBack=${weeksBack}` : ''
-  return api(`${API_BASE}/sessions/backfill-check${params}`)
-}
-
-export async function backfillSessions(opts: {
-  encodedPath: string
-  cwd: string
-  terminalId: number
-  shellId: number
-  weeksBack: number
-}): Promise<{ backfilled: number }> {
-  return api(`${API_BASE}/sessions/backfill`, { body: opts })
-}
-
 // --- Session move ---
 
 export async function getMoveTargets(

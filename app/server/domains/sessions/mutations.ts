@@ -1,12 +1,14 @@
 import { publicProcedure } from '@server/trpc/init'
 import { deleteSession, deleteSessions, updateSession } from './db'
 import {
+  backfillRunInput,
   bulkDeleteSessionsInput,
   cleanupSessionsInput,
   deleteSessionInput,
   toggleFavoriteInput,
   updateSessionInput,
 } from './schema'
+import { backfillRun } from './services/backfill'
 import { cleanupOldSessions, toggleFavorite } from './services/favorites'
 
 export const update = publicProcedure
@@ -43,4 +45,16 @@ export const cleanup = publicProcedure
   .input(cleanupSessionsInput)
   .mutation(async ({ input }) => {
     return cleanupOldSessions(input.weeks)
+  })
+
+export const backfill = publicProcedure
+  .input(backfillRunInput)
+  .mutation(async ({ input }) => {
+    return backfillRun(
+      input.encodedPath,
+      input.cwd,
+      input.terminalId,
+      input.shellId,
+      input.weeksBack,
+    )
   })

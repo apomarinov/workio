@@ -85,63 +85,6 @@ export async function updateSessionMove(
   return (result.rowCount ?? 0) > 0
 }
 
-export async function withTransaction<T>(
-  fn: (client: pg.PoolClient) => Promise<T>,
-): Promise<T> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await fn(client)
-    await client.query('COMMIT')
-    return result
-  } catch (err) {
-    await client.query('ROLLBACK')
-    throw err
-  } finally {
-    client.release()
-  }
-}
-
-// Session backfill queries
-
-export async function getSessionTranscriptPaths(
-  encodedPath: string,
-): Promise<string[]> {
-  const { rows } = await pool.query(
-    `SELECT transcript_path FROM sessions WHERE transcript_path LIKE $1`,
-    [`%${encodedPath}%`],
-  )
-  return rows.map((r: { transcript_path: string }) => r.transcript_path)
-}
-
-export async function insertBackfilledSession(
-  sessionId: string,
-  projectId: number,
-  terminalId: number,
-  shellId: number,
-  transcriptPath: string,
-  timestamp: string | null,
-  client?: pg.PoolClient,
-): Promise<void> {
-  const db = client ?? pool
-  const { rowCount } = await db.query(
-    timestamp
-      ? `INSERT INTO sessions (session_id, project_id, terminal_id, shell_id, status, transcript_path, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 'ended', $5, $6, $6)
-         ON CONFLICT (session_id) DO NOTHING`
-      : `INSERT INTO sessions (session_id, project_id, terminal_id, shell_id, status, transcript_path)
-         VALUES ($1, $2, $3, $4, 'ended', $5)
-         ON CONFLICT (session_id) DO NOTHING`,
-    timestamp
-      ? [sessionId, projectId, terminalId, shellId, transcriptPath, timestamp]
-      : [sessionId, projectId, terminalId, shellId, transcriptPath],
-  )
-  // Create a prompt row so worker.py's process_transcript() can attach messages
-  if (rowCount && rowCount > 0) {
-    await db.query(`INSERT INTO prompts (session_id) VALUES ($1)`, [sessionId])
-  }
-}
-
 // Active permissions query
 
 export interface ActivePermission extends SessionWithProject {

@@ -1,3 +1,23 @@
+import pool from '@server/db'
+import type pg from 'pg'
+
+export async function withTransaction<T>(
+  fn: (client: pg.PoolClient) => Promise<T>,
+) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await fn(client)
+    await client.query('COMMIT')
+    return result
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 export function buildSetClauses(
   fields: Record<string, unknown>,
   opts?: { updatedAt?: boolean },

@@ -1,6 +1,5 @@
 import { AlertTriangle, Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import useSWR from 'swr'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -11,32 +10,27 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
-import {
-  type BackfillCheckResult,
-  backfillCheck,
-  backfillSessions,
-} from '@/lib/api'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { useSessionContext } from '../context/SessionContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 
 /**
  * Hook to check for unbackfilled sessions.
- * Uses SWR keyed on terminal IDs so it re-checks when terminals change.
+ * Uses tRPC query keyed on terminal IDs so it re-checks when terminals change.
  */
 export function useBackfillCheck() {
   const { terminals } = useWorkspaceContext()
-  const terminalKey = terminals.map((t) => t.id).join(',')
+  const hasTerminals = terminals.length > 0
 
-  const { data: results } = useSWR(
-    terminalKey ? `backfill-check:${terminalKey}` : null,
-    () => backfillCheck().then((d) => d.results),
-    { dedupingInterval: 30_000 },
+  const { data } = trpc.sessions.backfillCheckQuery.useQuery(
+    { weeksBack: 4 },
+    { enabled: hasTerminals, staleTime: 30_000 },
   )
 
   const totalCount =
-    results?.reduce((sum, r) => sum + r.unbackfilledCount, 0) ?? 0
+    data?.results.reduce((sum, r) => sum + r.unbackfilledCount, 0) ?? 0
 
   return { hasBackfill: totalCount > 0, totalCount }
 }
@@ -49,30 +43,30 @@ export function useBackfillCheck() {
 export function BackfillSection() {
   const { terminals } = useWorkspaceContext()
   const { refetch: refetchSessions } = useSessionContext()
-  const terminalKey = terminals.map((t) => t.id).join(',')
+  const hasTerminals = terminals.length > 0
 
   const [open, setOpen] = useState(false)
   const [weeksBack, setWeeksBack] = useState(4)
 
-  const {
-    data: results,
-    isLoading,
-    mutate,
-  } = useSWR(
-    terminalKey ? `backfill-check:${terminalKey}:${weeksBack}` : null,
-    () => backfillCheck(weeksBack).then((d) => d.results),
-    { dedupingInterval: 30_000 },
-  )
+  const { data, isLoading, refetch } =
+    trpc.sessions.backfillCheckQuery.useQuery(
+      { weeksBack },
+      { enabled: hasTerminals, staleTime: 30_000 },
+    )
+  const results = data?.results
+  const backfillMutation = trpc.sessions.backfill.useMutation()
   const [backfillingCwd, setBackfillingCwd] = useState<string | null>(null)
 
   const totalCount =
     results?.reduce((sum, r) => sum + r.unbackfilledCount, 0) ?? 0
   const hasBackfill = totalCount > 0
 
-  const handleBackfill = async (result: BackfillCheckResult) => {
+  const handleBackfill = async (
+    result: NonNullable<typeof results>[number],
+  ) => {
     setBackfillingCwd(result.cwd)
     try {
-      const data = await backfillSessions({
+      const data = await backfillMutation.mutateAsync({
         encodedPath: result.encodedPath,
         cwd: result.cwd,
         terminalId: result.terminalId,
@@ -82,7 +76,7 @@ export function BackfillSection() {
       toast.success(
         `Backfilled ${data.backfilled} session${data.backfilled === 1 ? '' : 's'}`,
       )
-      await mutate()
+      await refetch()
       refetchSessions()
     } catch (err) {
       toastError(err, 'Failed to backfill sessions')
