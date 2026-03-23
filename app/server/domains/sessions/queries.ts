@@ -4,10 +4,12 @@ import {
   backfillCheckInput,
   getByIdInput,
   getSessionMessagesInput,
+  moveTargetsInput,
   searchSessionMessagesInput,
 } from './schema'
 import { backfillCheck } from './services/backfill'
 import { listSessionsWithFavorites } from './services/favorites'
+import { getMoveTargets } from './services/move'
 
 export const list = publicProcedure.query(async () => {
   return listSessionsWithFavorites()
@@ -51,4 +53,10 @@ export const backfillCheckQuery = publicProcedure
   .input(backfillCheckInput)
   .query(async ({ input }) => {
     return backfillCheck(input.weeksBack)
+  })
+
+export const moveTargets = publicProcedure
+  .input(moveTargetsInput)
+  .query(async ({ input }) => {
+    return getMoveTargets(input.id)
   })

@@ -5,11 +5,13 @@ import {
   bulkDeleteSessionsInput,
   cleanupSessionsInput,
   deleteSessionInput,
+  moveSessionInput,
   toggleFavoriteInput,
   updateSessionInput,
 } from './schema'
 import { backfillRun } from './services/backfill'
 import { cleanupOldSessions, toggleFavorite } from './services/favorites'
+import { moveSession } from './services/move'
 
 export const update = publicProcedure
   .input(updateSessionInput)
@@ -56,5 +58,15 @@ export const backfill = publicProcedure
       input.terminalId,
       input.shellId,
       input.weeksBack,
+    )
+  })
+
+export const move = publicProcedure
+  .input(moveSessionInput)
+  .mutation(async ({ input }) => {
+    return moveSession(
+      input.id,
+      input.targetProjectPath,
+      input.targetTerminalId,
     )
   })

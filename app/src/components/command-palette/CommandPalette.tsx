@@ -27,8 +27,6 @@ import {
   editPR,
   fetchAll,
   getBranches,
-  getMoveTargets,
-  moveSession,
   pullBranch,
   pushBranch,
   rebaseBranch,
@@ -152,6 +150,8 @@ export function CommandPalette() {
   const killShellMutation = trpc.workspace.shells.killShell.useMutation()
   const createShellMutation = trpc.workspace.shells.createShell.useMutation()
   const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
+  const moveMutation = trpc.sessions.move.useMutation()
+  const sessionUtils = trpc.useUtils().sessions
   const openInExplorerMutation =
     trpc.workspace.system.openInExplorer.useMutation()
 
@@ -763,7 +763,8 @@ export function CommandPalette() {
         setTimeout(() => setDeleteSessionTarget(session), 150)
       },
       loadMoveTargets: (sessionId) => {
-        getMoveTargets(sessionId)
+        sessionUtils.moveTargets
+          .fetch({ id: sessionId })
           .then((data) => {
             setStack((prev) => {
               const current = prev[prev.length - 1]
@@ -1434,27 +1435,18 @@ export function CommandPalette() {
           onConfirm={async () => {
             const { session: s, target } = moveSessionTarget
             try {
-              const { snapshotDir } = await moveSession(
-                s.session_id,
-                target.projectPath,
-                target.terminalId,
-              )
+              const { snapshotDir } = await moveMutation.mutateAsync({
+                id: s.session_id,
+                targetProjectPath: target.projectPath,
+                targetTerminalId: target.terminalId,
+              })
               toast.success('Session moved successfully', {
                 description: snapshotDir
                   ? `Snapshot: ${snapshotDir}`
                   : undefined,
               })
             } catch (err) {
-              const snapshotDir = (err as Error & { snapshotDir?: string })
-                .snapshotDir
-              toast.error(
-                err instanceof Error ? err.message : 'Failed to move session',
-                {
-                  description: snapshotDir
-                    ? `Snapshot: ${snapshotDir}`
-                    : undefined,
-                },
-              )
+              toastError(err, 'Failed to move session')
             }
             refetchSessions()
             setMoveSessionTarget(null)

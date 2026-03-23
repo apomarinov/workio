@@ -129,6 +129,16 @@ export const backfillRunInput = z.object({
   weeksBack: z.number().min(1),
 })
 
+export const moveTargetsInput = z.object({
+  id: z.string(),
+})
+
+export const moveSessionInput = z.object({
+  id: z.string(),
+  targetProjectPath: z.string(),
+  targetTerminalId: z.number(),
+})
+
 // --- Types ---
 
 export type SessionBranchEntry = z.infer<typeof sessionBranchEntrySchema>

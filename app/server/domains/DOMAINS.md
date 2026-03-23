@@ -437,7 +437,7 @@ Note: `permission-scanner.ts` currently has a circular import on `manager.getSes
 | [x]  | **messages**    | 4     | getMessages, getByIds, getByUuid                                                          | SessionChat, paginated message viewer                          |
 | [x]  | **search**      | 2     | searchSessionMessages, buildResults                                                       | SessionSearchPanel — full-text search with repo/branch filters |
 | [x]  | **backfill**    | 5     | backfillCheck, backfillRun, isRealSession, readLastTimestamp, readSessionBranches         | BackfillModal — import sessions from JSONL files               |
-| [ ]  | **move**        | 9     | moveSession, moveTargets, appendMeta, updateIndex local/remote, snapshots                 | Command palette "Move To Project" action                       |
+| [x]  | **move**        | 9     | moveSession, moveTargets, appendMeta, updateIndex local/remote, snapshots                 | Command palette "Move To Project" action                       |
 | [ ]  | **permissions** | 4     | getActivePermissions, getLatestPromptId, insertPermissionMessage, resumePermissionSession | useActivePermissions hook — permission indicators on sessions  |
 | [ ]  | **hook**        | 2     | forwardToDaemon, handleClaudeHook                                                         | No direct client usage — receives from SSH reverse tunnel      |
 

@@ -4,7 +4,7 @@ import type {
   MergedPRSummary,
 } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
-import type { MoveTarget, SessionWithProject } from '../types'
+import type { SessionWithProject } from '../types'
 
 const API_BASE = '/api'
 
@@ -598,32 +598,4 @@ export async function testWebhook(owner: string, repo: string): Promise<void> {
   await api(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
     method: 'POST',
   })
-}
-
-// --- Session move ---
-
-export async function getMoveTargets(
-  sessionId: string,
-): Promise<{ targets: MoveTarget[] }> {
-  return api(`${API_BASE}/sessions/${sessionId}/move-targets`)
-}
-
-export async function moveSession(
-  sessionId: string,
-  targetProjectPath: string,
-  targetTerminalId: number,
-): Promise<{ snapshotDir?: string }> {
-  try {
-    return await api(`${API_BASE}/sessions/${sessionId}/move`, {
-      body: { targetProjectPath, targetTerminalId },
-    })
-  } catch (err) {
-    if (err instanceof ApiError) {
-      const newErr = new Error(err.message)
-      ;(newErr as Error & { snapshotDir?: string }).snapshotDir = err.data
-        ?.snapshotDir as string
-      throw newErr
-    }
-    throw err
-  }
 }

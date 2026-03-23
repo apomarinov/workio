@@ -70,21 +70,6 @@ export async function initDb() {
   }
 }
 
-export async function updateSessionMove(
-  sessionId: string,
-  projectId: number,
-  terminalId: number,
-  transcriptPath: string,
-  client?: pg.PoolClient,
-): Promise<boolean> {
-  const db = client ?? pool
-  const result = await db.query(
-    `UPDATE sessions SET project_id = $1, terminal_id = $2, transcript_path = $3, updated_at = NOW() WHERE session_id = $4`,
-    [projectId, terminalId, transcriptPath, sessionId],
-  )
-  return (result.rowCount ?? 0) > 0
-}
-
 // Active permissions query
 
 export interface ActivePermission extends SessionWithProject {
