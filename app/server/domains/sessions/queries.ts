@@ -1,5 +1,10 @@
 import { publicProcedure } from '@server/trpc/init'
-import { getSessionById, getSessionMessages, searchSessionMessages } from './db'
+import {
+  getActivePermissions,
+  getSessionById,
+  getSessionMessages,
+  searchSessionMessages,
+} from './db'
 import {
   backfillCheckInput,
   getByIdInput,
@@ -60,3 +65,7 @@ export const moveTargets = publicProcedure
   .query(async ({ input }) => {
     return getMoveTargets(input.id)
   })
+
+export const activePermissions = publicProcedure.query(async () => {
+  return getActivePermissions()
+})

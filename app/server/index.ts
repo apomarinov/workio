@@ -47,7 +47,6 @@ import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import claudeHookRoute from './routes/claude-hook'
 import githubRoutes from './routes/github'
-import sessionRoutes from './routes/sessions'
 import terminalRoutes from './routes/terminals'
 import { getServicesStatus, updateNgrokStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
@@ -363,7 +362,6 @@ fastify.get('/api/health', async () => {
 const REFETCH_ROUTES: [string, RefetchGroup][] = [
   ['/api/terminals', 'terminals'],
   ['/api/shells', 'terminals'],
-  ['/api/sessions', 'sessions'],
   ['/api/settings', 'settings'],
   ['/api/notifications', 'notifications'],
 ]
@@ -395,7 +393,6 @@ await fastify.register(fastifyTRPCPlugin, {
 // Routes
 await fastify.register(githubRoutes)
 await fastify.register(terminalRoutes)
-await fastify.register(sessionRoutes)
 await fastify.register(claudeHookRoute)
 
 // Start monitor daemon (persistent Python process for hook events)

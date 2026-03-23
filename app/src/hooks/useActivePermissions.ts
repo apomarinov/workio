@@ -1,30 +1,27 @@
 import { useEffect } from 'react'
-import useSWR from 'swr'
-import type { ActivePermission } from '../lib/api'
-import * as api from '../lib/api'
+import { trpc } from '@/lib/trpc'
 import { useSocket } from './useSocket'
 
 export function useActivePermissions() {
   const { subscribe } = useSocket()
-  const { data, mutate } = useSWR<ActivePermission[]>(
-    '/api/permissions/active',
-    api.getActivePermissions,
-    { revalidateOnFocus: false },
+  const { data, refetch } = trpc.sessions.activePermissions.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false },
   )
 
   // Refetch on session_update (new permission messages arrive)
   useEffect(() => {
     return subscribe('session_update', () => {
-      mutate()
+      refetch()
     })
-  }, [subscribe, mutate])
+  }, [subscribe, refetch])
 
   // Refetch on hook events (status changes like permission_needed → active)
   useEffect(() => {
     return subscribe('hook', () => {
-      mutate()
+      refetch()
     })
-  }, [subscribe, mutate])
+  }, [subscribe, refetch])
 
   return data ?? []
 }

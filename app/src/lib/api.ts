@@ -4,7 +4,6 @@ import type {
   MergedPRSummary,
 } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
-import type { SessionWithProject } from '../types'
 
 const API_BASE = '/api'
 
@@ -130,18 +129,6 @@ export async function checkConductor(repo: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-// --- Permissions ---
-
-export interface ActivePermission extends SessionWithProject {
-  message_id: number
-  source: 'ask_user_question' | 'terminal_prompt'
-  tools: Record<string, unknown>
-}
-
-export async function getActivePermissions(): Promise<ActivePermission[]> {
-  return api(`${API_BASE}/permissions/active`)
 }
 
 // --- GitHub ---

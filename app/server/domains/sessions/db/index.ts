@@ -1,5 +1,6 @@
 export * from './backfill'
 export * from './messages'
 export * from './move'
+export * from './permissions'
 export * from './search'
 export * from './sessions'
