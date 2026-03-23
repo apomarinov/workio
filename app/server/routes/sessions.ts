@@ -14,10 +14,8 @@ import {
 import type { FastifyInstance } from 'fastify'
 import {
   getActivePermissions,
-  getSessionMessages,
   getSessionTranscriptPaths,
   insertBackfilledSession,
-  searchSessionMessages,
   updateSessionMove,
   withTransaction,
 } from '../db'
@@ -31,34 +29,6 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
   // Get active permissions across all sessions
   fastify.get('/api/permissions/active', async () => {
     return await getActivePermissions()
-  })
-
-  // Search session messages
-  fastify.get<{
-    Querystring: { q?: string; repo?: string; branch?: string; all?: string }
-  }>('/api/sessions/search', async (request, reply) => {
-    const q = request.query.q?.trim()
-    const repo = request.query.repo?.trim()
-    const branch = request.query.branch?.trim()
-    const recentOnly = request.query.all !== '1'
-
-    const hasTextQuery = q != null && q.length >= 2
-    const hasFilter =
-      repo != null && repo.length > 0 && branch != null && branch.length > 0
-
-    if (!hasTextQuery && !hasFilter) {
-      return reply.status(400).send({
-        error:
-          'Query must be at least 2 characters or repo+branch filter is required',
-      })
-    }
-
-    return await searchSessionMessages(
-      hasTextQuery ? q! : null,
-      100,
-      hasFilter ? { repo: repo!, branch: branch! } : undefined,
-      recentOnly,
-    )
   })
 
   // Check for unbackfilled JSONL sessions
@@ -296,17 +266,6 @@ export default async function sessionRoutes(fastify: FastifyInstance) {
     }
 
     return { backfilled: eligible.length }
-  })
-
-  // Get paginated messages for a session
-  fastify.get<{
-    Params: { id: string }
-    Querystring: { limit?: string; offset?: string }
-  }>('/api/sessions/:id/messages', async (request) => {
-    const { id } = request.params
-    const limit = Math.min(Number(request.query.limit) || 30, 10000)
-    const offset = Number(request.query.offset) || 0
-    return await getSessionMessages(id, limit, offset)
   })
 
   // Get move targets for a session (other projects it can be moved to)

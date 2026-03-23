@@ -434,8 +434,8 @@ Note: `permission-scanner.ts` currently has a circular import on `manager.getSes
 | Done | Sub-group       | Count | What                                                                                      | Client usage                                                   |
 | ---- | --------------- | ----- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | [x]  | **crud**        | 12    | list, getById, update, delete, bulkDelete, cleanup, favorites                             | SessionContext sidebar, context menus, CleanupModal            |
-| [ ]  | **messages**    | 4     | getMessages, getByIds, getByUuid                                                          | SessionChat, paginated message viewer                          |
-| [ ]  | **search**      | 2     | searchSessionMessages, buildResults                                                       | SessionSearchPanel — full-text search with repo/branch filters |
+| [x]  | **messages**    | 4     | getMessages, getByIds, getByUuid                                                          | SessionChat, paginated message viewer                          |
+| [x]  | **search**      | 2     | searchSessionMessages, buildResults                                                       | SessionSearchPanel — full-text search with repo/branch filters |
 | [ ]  | **backfill**    | 5     | backfillCheck, backfillRun, isRealSession, readLastTimestamp, readSessionBranches         | BackfillModal — import sessions from JSONL files               |
 | [ ]  | **move**        | 9     | moveSession, moveTargets, appendMeta, updateIndex local/remote, snapshots                 | Command palette "Move To Project" action                       |
 | [ ]  | **permissions** | 4     | getActivePermissions, getLatestPromptId, insertPermissionMessage, resumePermissionSession | useActivePermissions hook — permission indicators on sessions  |

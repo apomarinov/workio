@@ -11,13 +11,12 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import { searchSessionMessages } from '@/lib/api'
 import { contextExcerpt, highlightMatch } from '@/lib/search-utils'
 import { formatDate } from '@/lib/time'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import type { SessionSearchMatch } from '../types'
 import { SessionChat } from './SessionChat'
@@ -60,8 +59,6 @@ export function SessionSearchPanel({
     onDismiss()
   }
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SessionSearchMatch[]>([])
-  const [loading, setLoading] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   )
@@ -145,7 +142,6 @@ export function SessionSearchPanel({
   })
 
   const inputRef = useRef<HTMLInputElement>(null)
-  const searchAbortRef = useRef<AbortController | null>(null)
   const resultsContainerRef = useRef<HTMLDivElement>(null)
 
   // Focus input when panel opens
@@ -155,49 +151,40 @@ export function SessionSearchPanel({
     }
   }, [open])
 
-  // Debounced search
-  const hasTextQuery = query.length >= 2
-  const hasFilter = selectedRepo != null && selectedBranch != null
+  // Debounce text query for search
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 400)
+    return () => clearTimeout(timer)
+  }, [query])
 
+  const hasTextQuery = query.length >= 2
+  const debouncedHasText = debouncedQuery.length >= 2
+  const hasFilter = selectedRepo != null && selectedBranch != null
+  const shouldSearch = debouncedHasText || hasFilter
+
+  const { data: searchResults, isFetching } = trpc.sessions.search.useQuery(
+    {
+      q: debouncedHasText ? debouncedQuery : null,
+      repo: selectedRepo ?? undefined,
+      branch: selectedBranch ?? undefined,
+      recentOnly,
+    },
+    { enabled: shouldSearch },
+  )
+
+  const results: SessionSearchMatch[] = shouldSearch
+    ? (searchResults ?? [])
+    : []
+  const loading = (hasTextQuery || hasFilter) && isFetching
+
+  // Reset selection when search is cleared
   useEffect(() => {
     if (!hasTextQuery && !hasFilter) {
-      setResults([])
-      setLoading(false)
       setSelectedSessionId(null)
       setSelectedMessageId(null)
-      return
     }
-    setLoading(true)
-    const timer = setTimeout(() => {
-      searchAbortRef.current?.abort()
-      const controller = new AbortController()
-      searchAbortRef.current = controller
-      searchSessionMessages(hasTextQuery ? query : null, {
-        repo: selectedRepo ?? undefined,
-        branch: selectedBranch ?? undefined,
-        recentOnly,
-        signal: controller.signal,
-      })
-        .then((data) => {
-          if (!controller.signal.aborted) {
-            setResults(data)
-            setLoading(false)
-          }
-        })
-        .catch((err) => {
-          if (!controller.signal.aborted) {
-            if (err instanceof Error && err.name !== 'AbortError') {
-              setLoading(false)
-              toast.error(err.message || 'Failed to search sessions')
-            }
-          }
-        })
-    }, 400)
-    return () => {
-      clearTimeout(timer)
-      searchAbortRef.current?.abort()
-    }
-  }, [query, selectedRepo, selectedBranch, recentOnly])
+  }, [hasTextQuery, hasFilter])
 
   // Sort results by terminal name
   const sorted = [...results].sort((a, b) => {

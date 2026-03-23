@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import useSWR from 'swr'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
-import * as api from '../lib/api'
-import type { SessionMessage, SessionMessagesResponse } from '../types'
+import { trpc } from '@/lib/trpc'
+import type { SessionMessage } from '../types'
 import { useSocket } from './useSocket'
 
 const PAGE_SIZE = 30
@@ -17,22 +16,17 @@ export function useSessionMessages(
   const [hasMore, setHasMore] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
-  // Fetch initial page of messages
-  // Use dedupingInterval to prevent duplicate requests from StrictMode double-renders
   const fetchLimit = options?.loadAll ? 10000 : PAGE_SIZE
-  const { data, error, isLoading, mutate } = useSWR<SessionMessagesResponse>(
-    sessionId
-      ? `/api/sessions/${sessionId}/messages?all=${options?.loadAll ?? false}`
-      : null,
-    () => api.getSessionMessages(sessionId!, fetchLimit, 0),
+  const { data, error, isLoading, refetch } = trpc.sessions.messages.useQuery(
+    { id: sessionId!, limit: fetchLimit, offset: 0 },
     {
-      dedupingInterval: 2000,
-      revalidateOnFocus: false,
+      enabled: !!sessionId,
+      staleTime: 2000,
+      refetchOnWindowFocus: false,
     },
   )
 
   // Reset state when session changes
-
   useEffect(() => {
     setAllMessages([])
     setOffset(0)
@@ -42,7 +36,7 @@ export function useSessionMessages(
   // Update all messages when initial data loads
   useEffect(() => {
     if (data) {
-      setAllMessages(data.messages)
+      setAllMessages(data.messages as SessionMessage[])
       setHasMore(data.hasMore)
       setOffset(data.messages.length)
     }
@@ -89,16 +83,25 @@ export function useSessionMessages(
   }, [subscribe, sessionId])
 
   // Load more messages (older messages)
+  const utils = trpc.useUtils()
+  const loadMoreRef = useRef({ sessionId, offset, isLoadingMore, hasMore })
+  loadMoreRef.current = { sessionId, offset, isLoadingMore, hasMore }
+
   const loadMore = useCallback(async () => {
+    const { sessionId, offset, isLoadingMore, hasMore } = loadMoreRef.current
     if (!sessionId || isLoadingMore || !hasMore) return
 
     setIsLoadingMore(true)
     try {
-      const result = await api.getSessionMessages(sessionId, PAGE_SIZE, offset)
+      const result = await utils.sessions.messages.fetch({
+        id: sessionId,
+        limit: PAGE_SIZE,
+        offset,
+      })
       setAllMessages((prev) => {
         // Deduplicate - only add messages not already in the list
         const existingIds = new Set(prev.map((m) => m.id))
-        const newMessages = result.messages.filter(
+        const newMessages = (result.messages as SessionMessage[]).filter(
           (m) => !existingIds.has(m.id),
         )
         return [...prev, ...newMessages]
@@ -112,7 +115,7 @@ export function useSessionMessages(
     } finally {
       setIsLoadingMore(false)
     }
-  }, [sessionId, offset, isLoadingMore, hasMore])
+  }, [utils])
 
   // Reverse messages for display (newest first in API, oldest first in UI)
   // Also deduplicate to prevent React key errors
@@ -135,6 +138,6 @@ export function useSessionMessages(
     hasMore,
     error: error?.message ?? null,
     loadMore,
-    refetch: mutate,
+    refetch,
   }
 }

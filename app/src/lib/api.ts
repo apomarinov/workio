@@ -4,12 +4,7 @@ import type {
   MergedPRSummary,
 } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
-import type {
-  MoveTarget,
-  SessionMessagesResponse,
-  SessionSearchMatch,
-  SessionWithProject,
-} from '../types'
+import type { MoveTarget, SessionWithProject } from '../types'
 
 const API_BASE = '/api'
 
@@ -147,37 +142,6 @@ export interface ActivePermission extends SessionWithProject {
 
 export async function getActivePermissions(): Promise<ActivePermission[]> {
   return api(`${API_BASE}/permissions/active`)
-}
-
-// --- Sessions ---
-
-export async function searchSessionMessages(
-  query: string | null,
-  opts?: {
-    repo?: string
-    branch?: string
-    recentOnly?: boolean
-    signal?: AbortSignal
-  },
-): Promise<SessionSearchMatch[]> {
-  const params = new URLSearchParams()
-  if (query) params.set('q', query)
-  if (opts?.repo) params.set('repo', opts.repo)
-  if (opts?.branch) params.set('branch', opts.branch)
-  if (opts?.recentOnly === false) params.set('all', '1')
-  return api(`${API_BASE}/sessions/search?${params.toString()}`, {
-    signal: opts?.signal,
-  })
-}
-
-export async function getSessionMessages(
-  sessionId: string,
-  limit: number,
-  offset: number,
-): Promise<SessionMessagesResponse> {
-  return api(
-    `${API_BASE}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
-  )
 }
 
 // --- GitHub ---

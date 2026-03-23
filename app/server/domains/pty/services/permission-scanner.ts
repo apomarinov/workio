@@ -1,10 +1,7 @@
 import crypto from 'node:crypto'
 import { getSessionBuffer } from '@domains/pty/session'
-import {
-  getLatestPromptId,
-  getMessageByUuid,
-  insertPermissionMessage,
-} from '@server/db'
+import { getMessageByUuid } from '@domains/sessions/db'
+import { getLatestPromptId, insertPermissionMessage } from '@server/db'
 import { getIO } from '@server/io'
 import { log } from '@server/logger'
 import type {

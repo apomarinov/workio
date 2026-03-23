@@ -1,6 +1,6 @@
 import pool from '@server/db'
 import { buildSetClauses } from '@server/lib/db'
-import type { SessionWithProject } from './schema'
+import type { SessionSearchMatch, SessionWithProject } from './schema'
 
 const SESSION_SELECT = `
   SELECT
@@ -123,4 +123,280 @@ export async function getOldSessionIds(weeks: number, excludeIds: string[]) {
 
 export async function deleteSessions(sessionIds: string[]) {
   return deleteSessionCascade(sessionIds)
+}
+
+// --- Messages ---
+
+const MESSAGE_SELECT = `
+  SELECT
+    m.id,
+    m.prompt_id,
+    m.uuid,
+    m.is_user,
+    m.thinking,
+    m.todo_id,
+    m.body,
+    m.tools,
+    m.images,
+    m.created_at,
+    m.updated_at,
+    p.prompt as prompt_text
+  FROM messages m
+  JOIN prompts p ON m.prompt_id = p.id
+`
+
+export async function getSessionMessages(
+  sessionId: string,
+  limit: number,
+  offset: number,
+) {
+  const countResult = await pool.query(
+    `
+      SELECT COUNT(*) as count
+      FROM messages m
+      JOIN prompts p ON m.prompt_id = p.id
+      WHERE p.session_id = $1
+    `,
+    [sessionId],
+  )
+  const total = Number.parseInt(countResult.rows[0].count, 10)
+
+  const { rows } = await pool.query<SessionMessageRow>(
+    `
+      ${MESSAGE_SELECT}
+      WHERE p.session_id = $1
+      ORDER BY m.created_at DESC
+      LIMIT $2 OFFSET $3
+    `,
+    [sessionId, limit, offset],
+  )
+
+  return {
+    messages: rows,
+    total,
+    hasMore: offset + rows.length < total,
+  }
+}
+
+export async function getMessagesByIds(ids: number[]) {
+  if (ids.length === 0) return [] as SessionMessageRow[]
+
+  const { rows } = await pool.query<SessionMessageRow>(
+    `
+      ${MESSAGE_SELECT}
+      WHERE m.id = ANY($1)
+      ORDER BY m.id
+    `,
+    [ids],
+  )
+  return rows
+}
+
+export async function getMessageByUuid(uuid: string) {
+  const { rows } = await pool.query<SessionMessageRow>(
+    `${MESSAGE_SELECT} WHERE m.uuid = $1`,
+    [uuid],
+  )
+  return rows[0] ?? null
+}
+
+// Row type for query results — matches sessionMessageSchema shape
+type SessionMessageRow = {
+  id: number
+  prompt_id: number
+  uuid: string
+  is_user: boolean
+  thinking: boolean
+  todo_id: string | null
+  body: string | null
+  tools: Record<string, unknown> | null
+  images: unknown[] | null
+  created_at: string
+  updated_at: string | null
+  prompt_text: string | null
+}
+
+// --- Search ---
+
+export async function searchSessionMessages(
+  query: string | null,
+  limit = 100,
+  filters?: { repo?: string; branch?: string },
+  recentOnly = true,
+) {
+  const hasTextQuery = query != null && query.length >= 2
+  const hasFilters = filters?.repo != null && filters?.branch != null
+
+  if (!hasTextQuery && !hasFilters) return [] as SessionSearchMatch[]
+
+  // Build optional containment filter fragment
+  const containmentParam: string[] = []
+  if (hasFilters) {
+    const containment: Record<string, string> = {
+      repo: filters.repo!,
+      branch: filters.branch!,
+    }
+    containmentParam.push(JSON.stringify([containment]))
+  }
+
+  const recentClause = recentOnly
+    ? `s.updated_at >= NOW() - INTERVAL '10 days'`
+    : ''
+
+  type SessionRow = {
+    session_id: string
+    name: string | null
+    status: string
+    terminal_id: number | null
+    updated_at: string
+    data: Record<string, unknown> | null
+    project_path: string
+    terminal_name: string | null
+  }
+
+  // Filter-only: single query on sessions
+  if (!hasTextQuery) {
+    const conditions = [`s.data->'branches' @> $1::jsonb`]
+    if (recentClause) conditions.push(recentClause)
+    const { rows } = await pool.query<SessionRow>(
+      `
+      SELECT s.session_id, s.name, s.status, s.terminal_id, s.updated_at, s.data,
+             p.path as project_path, t.name as terminal_name
+      FROM sessions s
+      JOIN projects p ON s.project_id = p.id
+      LEFT JOIN terminals t ON s.terminal_id = t.id
+      WHERE ${conditions.join(' AND ')}
+      `,
+      containmentParam,
+    )
+    return buildSearchResults(rows, new Map())
+  }
+
+  // Text search: 2 queries in parallel
+  // Query 1: message body ILIKE + session info (+ optional containment filter)
+  const msgConditions = [
+    'm.body ILIKE $1',
+    'm.thinking = false',
+    'm.body IS NOT NULL',
+  ]
+  if (recentClause) msgConditions.push(recentClause)
+  const msgParams: unknown[] = [`%${query}%`, limit]
+  let msgParamIdx = 3
+  if (hasFilters) {
+    msgConditions.push(`s.data->'branches' @> $${msgParamIdx++}::jsonb`)
+    msgParams.push(containmentParam[0])
+  }
+
+  // Query 2: session name/branch ILIKE + session info (+ optional containment filter)
+  const nameConditions = [`(s.name ILIKE $1 OR s.data->>'branch' ILIKE $1)`]
+  if (recentClause) nameConditions.push(recentClause)
+  const nameParams: unknown[] = [`%${query}%`, limit]
+  let nameParamIdx = 3
+  if (hasFilters) {
+    nameConditions.push(`s.data->'branches' @> $${nameParamIdx++}::jsonb`)
+    nameParams.push(containmentParam[0])
+  }
+
+  const [{ rows: msgRows }, { rows: nameRows }] = await Promise.all([
+    pool.query<
+      SessionRow & { message_id: number; body: string; is_user: boolean }
+    >(
+      `
+      SELECT m.id as message_id, m.body, m.is_user,
+             s.session_id, s.name, s.status, s.terminal_id, s.updated_at, s.data,
+             p.path as project_path, t.name as terminal_name
+      FROM messages m
+      JOIN prompts pr ON m.prompt_id = pr.id
+      JOIN sessions s ON pr.session_id = s.session_id
+      JOIN projects p ON s.project_id = p.id
+      LEFT JOIN terminals t ON s.terminal_id = t.id
+      WHERE ${msgConditions.join(' AND ')}
+      ORDER BY m.created_at DESC
+      LIMIT $2
+      `,
+      msgParams,
+    ),
+    pool.query<SessionRow>(
+      `
+      SELECT s.session_id, s.name, s.status, s.terminal_id, s.updated_at, s.data,
+             p.path as project_path, t.name as terminal_name
+      FROM sessions s
+      JOIN projects p ON s.project_id = p.id
+      LEFT JOIN terminals t ON s.terminal_id = t.id
+      WHERE ${nameConditions.join(' AND ')}
+      LIMIT $2
+      `,
+      nameParams,
+    ),
+  ])
+
+  // Group messages per session (cap 5)
+  const sessionMessages = new Map<
+    string,
+    { id: number; body: string; is_user: boolean }[]
+  >()
+  const sessionInfoMap = new Map<string, SessionRow>()
+
+  for (const row of msgRows) {
+    if (!sessionInfoMap.has(row.session_id))
+      sessionInfoMap.set(row.session_id, row)
+    const msgs = sessionMessages.get(row.session_id) || []
+    if (msgs.length < 5) {
+      msgs.push({ id: row.message_id, body: row.body, is_user: row.is_user })
+    }
+    sessionMessages.set(row.session_id, msgs)
+  }
+
+  // Merge name-matched sessions (empty messages if not already present)
+  for (const row of nameRows) {
+    if (!sessionInfoMap.has(row.session_id))
+      sessionInfoMap.set(row.session_id, row)
+    if (!sessionMessages.has(row.session_id)) {
+      sessionMessages.set(row.session_id, [])
+    }
+  }
+
+  return buildSearchResults([...sessionInfoMap.values()], sessionMessages)
+}
+
+function buildSearchResults(
+  sessionRows: {
+    session_id: string
+    name: string | null
+    status: string
+    terminal_id: number | null
+    updated_at: string
+    data: Record<string, unknown> | null
+    project_path: string
+    terminal_name: string | null
+  }[],
+  sessionMessages: Map<
+    string,
+    { id: number; body: string; is_user: boolean }[]
+  >,
+): SessionSearchMatch[] {
+  const results: SessionSearchMatch[] = sessionRows.map((info) => ({
+    session_id: info.session_id,
+    name: info.name,
+    terminal_name: info.terminal_name,
+    project_path: info.project_path,
+    status: info.status,
+    updated_at: info.updated_at,
+    data: info.data ?? null,
+    messages: sessionMessages.get(info.session_id) ?? [],
+  }))
+
+  results.sort((a, b) => {
+    const aInfo = sessionRows.find((r) => r.session_id === a.session_id)!
+    const bInfo = sessionRows.find((r) => r.session_id === b.session_id)!
+    const aHasTerminal = aInfo.terminal_id != null ? 0 : 1
+    const bHasTerminal = bInfo.terminal_id != null ? 0 : 1
+    if (aHasTerminal !== bHasTerminal) return aHasTerminal - bHasTerminal
+    return (
+      new Date(bInfo.updated_at).getTime() -
+      new Date(aInfo.updated_at).getTime()
+    )
+  })
+
+  return results
 }

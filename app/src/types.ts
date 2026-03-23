@@ -222,12 +222,6 @@ export type GroupedMessage =
   | { type: 'message'; message: SessionMessage }
   | { type: 'thinking'; messages: SessionMessage[] }
 
-export interface SessionMessagesResponse {
-  messages: SessionMessage[]
-  total: number
-  hasMore: boolean
-}
-
 export interface Hook {
   id: number
   session_id: string
