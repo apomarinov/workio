@@ -82,7 +82,9 @@ export function RemoteAccessModal({
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground flex items-center gap-1">
               ngrok Auth Token
-              {tokenPresent && !token && <Check className='w-3 h-3 text-green-400' />}
+              {tokenPresent && !token && (
+                <Check className="w-3 h-3 text-green-400" />
+              )}
             </label>
             <Input
               type="password"

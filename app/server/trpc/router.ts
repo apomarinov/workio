@@ -1,3 +1,4 @@
+import { githubRouter } from '@domains/github/router'
 import { logsRouter } from '@domains/logs/router'
 import { notificationsRouter } from '@domains/notifications/router'
 import { sessionsRouter } from '@domains/sessions/router'
@@ -7,6 +8,7 @@ import { router } from './init'
 import { healthRouter } from './routers/health'
 
 export const appRouter = router({
+  github: githubRouter,
   health: healthRouter,
   logs: logsRouter,
   notifications: notificationsRouter,

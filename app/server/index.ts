@@ -3,6 +3,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  detectAllTerminalBranches,
+  emitCachedPRChecks,
+  initGitHubChecks,
+  refreshPRChecks,
+} from '@domains/github/services/checks/polling'
+import { startWebhookValidationPolling } from '@domains/github/services/webhooks'
+import {
   emitNotification,
   initWebPush,
   markDesktopActive,
@@ -31,18 +38,11 @@ import pino from 'pino'
 import { Server as SocketIOServer } from 'socket.io'
 import { initDb } from './db'
 import { env } from './env'
-import {
-  detectAllTerminalBranches,
-  emitCachedPRChecks,
-  initGitHubChecks,
-  refreshPRChecks,
-} from './github/checks'
-import { startWebhookValidationPolling } from './github/webhooks'
 import { broadcastRefetch, type RefetchGroup, setIO } from './io'
 import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import claudeHookRoute from './routes/claude-hook'
-import githubRoutes from './routes/github'
+import githubWebhookRoute from './routes/github-webhook'
 import terminalRoutes from './routes/terminals'
 import { getNgrokUrl, initNgrok, stopNgrok } from './services/ngrok'
 import { getServicesStatus } from './services/status'
@@ -389,7 +389,7 @@ await fastify.register(fastifyTRPCPlugin, {
 })
 
 // Routes
-await fastify.register(githubRoutes)
+await fastify.register(githubWebhookRoute)
 await fastify.register(terminalRoutes)
 await fastify.register(claudeHookRoute)
 

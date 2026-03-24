@@ -1,11 +1,11 @@
 import crypto from 'node:crypto'
 import { getSettings, updateSettings } from '@domains/settings/db'
-import { WEBHOOK_EVENTS } from '../../shared/types'
-import serverEvents from '../lib/events'
-import { execFileAsync } from '../lib/exec'
-import { log } from '../logger'
+import serverEvents from '@server/lib/events'
+import { execFileAsync } from '@server/lib/exec'
+import { log } from '@server/logger'
+import { WEBHOOK_EVENTS } from '../schema'
 
-export async function getOrCreateWebhookSecret(): Promise<string> {
+export async function getOrCreateWebhookSecret() {
   const settings = await getSettings()
   if (settings.webhook_secret) {
     return settings.webhook_secret
@@ -16,10 +16,6 @@ export async function getOrCreateWebhookSecret(): Promise<string> {
   return secret
 }
 
-/**
- * Update all stored webhook URLs to point to the new ngrok URL.
- * Called by the ngrok service when the tunnel URL changes.
- */
 export async function updateAllWebhookUrls(newUrl: string) {
   const settings = await getSettings()
   const repoWebhooks = settings.repo_webhooks ?? {}
@@ -43,7 +39,7 @@ async function updateWebhookUrl(
   repo: string,
   hookId: number,
   ngrokUrl: string,
-): Promise<void> {
+) {
   const [owner, repoName] = repo.split('/')
   const webhookUrl = `${ngrokUrl}/api/webhooks/github`
   const secret = await getOrCreateWebhookSecret()
@@ -62,54 +58,39 @@ async function updateWebhookUrl(
   ])
 }
 
-/**
- * Check if a webhook exists. Returns:
- * - 'exists' if the webhook is accessible
- * - 'missing' if it was deleted (404)
- * - 'no_access' if the user lacks admin permissions (403)
- * - 'error' if the check failed due to a transient error (network, timeout, etc.)
- */
-async function checkWebhookExists(
-  repo: string,
-  hookId: number,
-): Promise<'exists' | 'missing' | 'no_access' | 'error'> {
+async function checkWebhookExists(repo: string, hookId: number) {
   try {
     const [owner, repoName] = repo.split('/')
     await execFileAsync('gh', [
       'api',
       `repos/${owner}/${repoName}/hooks/${hookId}`,
     ])
-    return 'exists'
+    return 'exists' as const
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    // No admin access: gh returns 404 with scope hint, or 403
     if (
       message.includes('admin:repo_hook') ||
       message.includes('403') ||
       message.includes('Resource not accessible')
     ) {
-      return 'no_access'
+      return 'no_access' as const
     }
-    // Actual 404 — webhook was deleted
     if (message.includes('404') || message.includes('Not Found')) {
-      return 'missing'
+      return 'missing' as const
     }
-    // Network errors, timeouts, DNS failures — don't mark as missing
     log.warn(
       `[webhooks] Transient error checking webhook ${hookId} for ${repo}: ${message}`,
     )
-    return 'error'
+    return 'error' as const
   }
 }
 
-/**
- * Find an existing webhook matching our URL on the repo, update its config, and store it.
- */
+/** Try to find and adopt an existing webhook matching our URL. Returns webhookId or null. */
 async function adoptExistingWebhook(
   repo: string,
   webhookUrl: string,
   secret: string,
-): Promise<{ ok: boolean; webhookId?: number } | null> {
+) {
   const [owner, repoName] = repo.split('/')
   try {
     const { stdout } = await execFileAsync('gh', [
@@ -123,7 +104,6 @@ async function adoptExistingWebhook(
     const match = hooks.find((h) => h.config?.url === webhookUrl)
     if (!match) return null
 
-    // Update the existing hook's secret and events
     const eventsArgs = WEBHOOK_EVENTS.flatMap((e) => ['-f', `events[]=${e}`])
     await execFileAsync('gh', [
       'api',
@@ -148,30 +128,26 @@ async function adoptExistingWebhook(
     } as Record<string, unknown>)
 
     log.info(`[webhooks] Adopted existing webhook ${match.id} for ${repo}`)
-    return { ok: true, webhookId: match.id }
+    return match.id
   } catch (err) {
     log.error(err, `[webhooks] Failed to adopt existing webhook for ${repo}`)
     return null
   }
 }
 
-export async function createRepoWebhook(
-  repo: string,
-): Promise<{ ok: boolean; error?: string; webhookId?: number }> {
+/** Create a webhook for a repo. Returns the webhook ID. */
+export async function createRepoWebhook(repo: string) {
   const settings = await getSettings()
   const domain = settings.ngrok?.domain
 
   if (!domain) {
-    return {
-      ok: false,
-      error: 'ngrok not configured — set domain and token in Settings',
-    }
+    throw new Error('ngrok not configured — set domain and token in Settings')
   }
 
   const secret = await getOrCreateWebhookSecret()
   const [owner, repoName] = repo.split('/')
   if (!owner || !repoName) {
-    return { ok: false, error: 'Invalid repo format' }
+    throw new Error('Invalid repo format')
   }
 
   const webhookUrl = `https://${domain}/api/webhooks/github`
@@ -204,36 +180,33 @@ export async function createRepoWebhook(
     } as Record<string, unknown>)
 
     log.info(`[webhooks] Created webhook ${hook.id} for ${repo}`)
-    return { ok: true, webhookId: hook.id }
+    return hook.id
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     const stdout = (err as { stdout?: string }).stdout ?? ''
 
-    // Hook already exists on this repo — find it and adopt it
     if (
       message.includes('Hook already exists') ||
       stdout.includes('Hook already exists')
     ) {
-      const adopted = await adoptExistingWebhook(repo, webhookUrl, secret)
-      if (adopted) return adopted
+      const adoptedId = await adoptExistingWebhook(repo, webhookUrl, secret)
+      if (adoptedId != null) return adoptedId
     }
 
     log.error(err, `[webhooks] Failed to create webhook for ${repo}`)
-    return { ok: false, error: message }
+    throw new Error(message)
   }
 }
 
-export async function deleteRepoWebhook(
-  repo: string,
-): Promise<{ ok: boolean; error?: string }> {
+export async function deleteRepoWebhook(repo: string) {
   const settings = await getSettings()
   const webhook = settings.repo_webhooks?.[repo]
 
-  if (!webhook) return { ok: true }
+  if (!webhook) return
 
   const [owner, repoName] = repo.split('/')
   if (!owner || !repoName) {
-    return { ok: false, error: 'Invalid repo format' }
+    throw new Error('Invalid repo format')
   }
 
   try {
@@ -249,34 +222,28 @@ export async function deleteRepoWebhook(
     )
   }
 
-  // Always remove from DB
   const { [repo]: _, ...rest } = settings.repo_webhooks ?? {}
   await updateSettings({ repo_webhooks: rest } as Record<string, unknown>)
 
   log.info(`[webhooks] Deleted webhook for ${repo}`)
-  return { ok: true }
 }
 
-export async function recreateRepoWebhook(
-  repo: string,
-): Promise<{ ok: boolean; error?: string; webhookId?: number }> {
+export async function recreateRepoWebhook(repo: string) {
   await deleteRepoWebhook(repo)
   return createRepoWebhook(repo)
 }
 
-export async function testWebhook(
-  repo: string,
-): Promise<{ ok: boolean; error?: string }> {
+export async function testWebhook(repo: string) {
   const settings = await getSettings()
   const webhook = settings.repo_webhooks?.[repo]
 
   if (!webhook || webhook.missing) {
-    return { ok: false, error: 'Webhook not found' }
+    throw new Error('Webhook not found')
   }
 
   const [owner, repoName] = repo.split('/')
   if (!owner || !repoName) {
-    return { ok: false, error: 'Invalid repo format' }
+    throw new Error('Invalid repo format')
   }
 
   try {
@@ -287,23 +254,19 @@ export async function testWebhook(
       'POST',
     ])
     log.info(`[webhooks] Pinged webhook for ${repo}`)
-    return { ok: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     log.error(err, `[webhooks] Failed to ping webhook for ${repo}`)
-    return { ok: false, error: message }
+    throw new Error(message)
   }
 }
 
-// Background polling - validate webhooks every 5 minutes
+// Background polling
 const WEBHOOK_VALIDATION_INTERVAL = 5 * 60 * 1000
-
 let validationPollingId: NodeJS.Timeout | null = null
 
-export function startWebhookValidationPolling(): void {
+export function startWebhookValidationPolling() {
   if (validationPollingId) return
-
-  // Run immediately, then every 5 min
   validateStoredWebhooks()
   validationPollingId = setInterval(
     validateStoredWebhooks,
@@ -311,14 +274,14 @@ export function startWebhookValidationPolling(): void {
   )
 }
 
-export function stopWebhookValidationPolling(): void {
+export function stopWebhookValidationPolling() {
   if (validationPollingId) {
     clearInterval(validationPollingId)
     validationPollingId = null
   }
 }
 
-async function validateStoredWebhooks(): Promise<void> {
+async function validateStoredWebhooks() {
   const settings = await getSettings()
   const repoWebhooks = settings.repo_webhooks ?? {}
 
@@ -338,8 +301,6 @@ async function validateStoredWebhooks(): Promise<void> {
     const result = await checkWebhookExists(repo, webhook.id)
 
     if (result === 'no_access') {
-      // User doesn't have admin access to check webhooks - skip validation
-      // If it was previously marked missing due to this, clear the flag
       if (webhook.missing) {
         updatedWebhooks[repo] = { id: webhook.id }
         hasChanges = true
@@ -351,7 +312,6 @@ async function validateStoredWebhooks(): Promise<void> {
     }
 
     if (result === 'error') {
-      // Transient error (network, timeout, DNS) — don't change webhook state
       continue
     }
 
@@ -362,7 +322,6 @@ async function validateStoredWebhooks(): Promise<void> {
         `[webhooks] Webhook ${webhook.id} for ${repo} not found in GitHub, marked as missing`,
       )
     } else if (result === 'exists' && webhook.missing) {
-      // Webhook exists again (recreated externally?) - clear missing flag
       updatedWebhooks[repo] = { id: webhook.id }
       hasChanges = true
       log.info(
@@ -386,7 +345,7 @@ export function verifyWebhookSignature(
   payload: string,
   signature: string,
   secret: string,
-): boolean {
+) {
   const expected = `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`
   return signature === expected
 }

@@ -1,13 +1,11 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
-import { toast } from '@/components/ui/sonner'
 import { trpc } from '@/lib/trpc'
 import type {
   InvolvedPRSummary,
@@ -140,9 +138,7 @@ export function GitHubProvider({ children }: { children: React.ReactNode }) {
 
   const hasAnyUnseenPRs = Object.keys(unreadPRData).length > 0
 
-  // Fetch merged PRs for all repos
-  const [mergedPRs, setMergedPRs] = useState<MergedPRSummary[]>([])
-
+  // Derive repos from tracked PRs
   const repos = useMemo(() => {
     const repoSet = new Set<string>()
     for (const pr of githubPRs) {
@@ -151,238 +147,188 @@ export function GitHubProvider({ children }: { children: React.ReactNode }) {
     return Array.from(repoSet)
   }, [githubPRs])
 
-  useEffect(() => {
-    if (repos.length === 0) {
-      setMergedPRs([])
-      return
+  const limit = Math.min(repos.length * 10, 100)
+
+  // Fetch closed/merged PRs and involved PRs via tRPC
+  const { data: closedPRsData } = trpc.github.closedPRs.useQuery(
+    { repos, limit },
+    { enabled: repos.length > 0 },
+  )
+
+  const { data: involvedPRsData } = trpc.github.involvedPRs.useQuery(
+    { repos, limit },
+    { enabled: repos.length > 0 },
+  )
+
+  // Filter merged PRs to exclude already-tracked open PRs
+  const mergedPRs = useMemo(() => {
+    if (!closedPRsData?.prs) return [] as MergedPRSummary[]
+    const existingPRs = new Set(
+      githubPRs.map((pr) => `${pr.repo}#${pr.prNumber}`),
+    )
+    const seen = new Set<string>()
+    const result: MergedPRSummary[] = []
+    for (const pr of closedPRsData.prs) {
+      const key = `${pr.repo}#${pr.prNumber}`
+      if (!seen.has(key) && !existingPRs.has(key)) {
+        seen.add(key)
+        result.push(pr)
+      }
     }
+    return result
+  }, [closedPRsData, githubPRs])
 
-    let cancelled = false
+  const involvedPRs = involvedPRsData?.prs ?? ([] as InvolvedPRSummary[])
 
-    async function fetchMergedPRs() {
-      try {
-        const limit = Math.min(repos.length * 10, 100)
-        const prs = await api.getClosedPRs(repos, limit)
+  const updatePRReaction = (
+    repo: string,
+    prNumber: number,
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove: boolean,
+  ) => {
+    setGithubPRs((prev) =>
+      prev.map((pr) => {
+        if (pr.repo !== repo || pr.prNumber !== prNumber) return pr
 
-        if (!cancelled) {
-          const existingPRs = new Set(
-            githubPRs.map((pr) => `${pr.repo}#${pr.prNumber}`),
-          )
-          const seen = new Set<string>()
-          const allPRs: MergedPRSummary[] = []
-          for (const pr of prs) {
-            const key = `${pr.repo}#${pr.prNumber}`
-            if (!seen.has(key) && !existingPRs.has(key)) {
-              seen.add(key)
-              allPRs.push(pr)
+        const patchReactions = (
+          reactions: PRReaction[] | undefined,
+        ): PRReaction[] | undefined => {
+          const result = (reactions || []).map((r) => ({
+            ...r,
+            users: [...r.users],
+          }))
+          const idx = result.findIndex((r) => r.content === content)
+          if (remove) {
+            if (idx >= 0 && result[idx].viewerHasReacted) {
+              result[idx].count--
+              result[idx].viewerHasReacted = false
+              result[idx].users = result[idx].users.filter(
+                (u) => u !== ghUsername,
+              )
+              if (result[idx].count <= 0) result.splice(idx, 1)
             }
-          }
-          setMergedPRs(allPRs)
-        }
-      } catch {
-        toast.error('Failed to fetch merged PRs')
-      }
-    }
-
-    fetchMergedPRs()
-
-    return () => {
-      cancelled = true
-    }
-  }, [repos, githubPRs])
-
-  // Fetch involved PRs (review-requested / mentioned) for all repos
-  const [involvedPRs, setInvolvedPRs] = useState<InvolvedPRSummary[]>([])
-
-  useEffect(() => {
-    if (repos.length === 0) {
-      setInvolvedPRs([])
-      return
-    }
-
-    let cancelled = false
-
-    async function fetchInvolvedPRs() {
-      try {
-        const limit = Math.min(repos.length * 10, 100)
-        const prs = await api.getInvolvedPRs(repos, limit)
-        if (!cancelled) {
-          setInvolvedPRs(prs)
-        }
-      } catch {
-        toast.error('Failed to fetch involved PRs')
-      }
-    }
-
-    fetchInvolvedPRs()
-
-    return () => {
-      cancelled = true
-    }
-  }, [repos])
-
-  const updatePRReaction = useCallback(
-    (
-      repo: string,
-      prNumber: number,
-      subjectId: number,
-      subjectType: 'issue_comment' | 'review_comment' | 'review',
-      content: string,
-      remove: boolean,
-    ) => {
-      setGithubPRs((prev) =>
-        prev.map((pr) => {
-          if (pr.repo !== repo || pr.prNumber !== prNumber) return pr
-
-          const patchReactions = (
-            reactions: PRReaction[] | undefined,
-          ): PRReaction[] | undefined => {
-            const result = (reactions || []).map((r) => ({
-              ...r,
-              users: [...r.users],
-            }))
-            const idx = result.findIndex((r) => r.content === content)
-            if (remove) {
-              if (idx >= 0 && result[idx].viewerHasReacted) {
-                result[idx].count--
-                result[idx].viewerHasReacted = false
-                result[idx].users = result[idx].users.filter(
-                  (u) => u !== ghUsername,
-                )
-                if (result[idx].count <= 0) result.splice(idx, 1)
+          } else {
+            if (idx >= 0) {
+              if (!result[idx].viewerHasReacted) {
+                result[idx].count++
+                result[idx].viewerHasReacted = true
+                if (ghUsername) result[idx].users.push(ghUsername)
               }
             } else {
-              if (idx >= 0) {
-                if (!result[idx].viewerHasReacted) {
-                  result[idx].count++
-                  result[idx].viewerHasReacted = true
-                  if (ghUsername) result[idx].users.push(ghUsername)
-                }
-              } else {
-                result.push({
-                  content,
-                  count: 1,
-                  viewerHasReacted: true,
-                  users: ghUsername ? [ghUsername] : [],
-                })
-              }
-            }
-            return result.length > 0 ? result : undefined
-          }
-
-          const patchComment = <
-            T extends { id?: number; reactions?: PRReaction[] },
-          >(
-            c: T,
-          ): T =>
-            c.id === subjectId
-              ? { ...c, reactions: patchReactions(c.reactions) }
-              : c
-
-          if (subjectType === 'review') {
-            return {
-              ...pr,
-              reviews: pr.reviews.map((r) =>
-                r.id === subjectId
-                  ? { ...r, reactions: patchReactions(r.reactions) }
-                  : r,
-              ),
-              discussion: pr.discussion.map((item) => {
-                if (item.type === 'review' && item.review.id === subjectId) {
-                  return {
-                    ...item,
-                    review: {
-                      ...item.review,
-                      reactions: patchReactions(item.review.reactions),
-                    },
-                  }
-                }
-                return item
-              }),
+              result.push({
+                content,
+                count: 1,
+                viewerHasReacted: true,
+                users: ghUsername ? [ghUsername] : [],
+              })
             }
           }
+          return result.length > 0 ? result : undefined
+        }
 
+        const patchComment = <
+          T extends { id?: number; reactions?: PRReaction[] },
+        >(
+          c: T,
+        ): T =>
+          c.id === subjectId
+            ? { ...c, reactions: patchReactions(c.reactions) }
+            : c
+
+        if (subjectType === 'review') {
           return {
             ...pr,
-            comments: pr.comments.map(patchComment),
+            reviews: pr.reviews.map((r) =>
+              r.id === subjectId
+                ? { ...r, reactions: patchReactions(r.reactions) }
+                : r,
+            ),
             discussion: pr.discussion.map((item) => {
-              if (item.type === 'comment' && item.comment.id === subjectId) {
-                return { ...item, comment: patchComment(item.comment) }
-              }
-              if (item.type === 'review') {
+              if (item.type === 'review' && item.review.id === subjectId) {
                 return {
                   ...item,
-                  threads: item.threads.map((thread) => ({
-                    ...thread,
-                    comments: thread.comments.map(patchComment),
-                  })),
-                }
-              }
-              if (item.type === 'thread') {
-                return {
-                  ...item,
-                  thread: {
-                    ...item.thread,
-                    comments: item.thread.comments.map(patchComment),
+                  review: {
+                    ...item.review,
+                    reactions: patchReactions(item.review.reactions),
                   },
                 }
               }
               return item
             }),
           }
-        }),
-      )
-    },
-    [ghUsername],
-  )
-
-  const reactToPR = useCallback(
-    async (
-      repo: string,
-      prNumber: number,
-      subjectId: number,
-      subjectType: 'issue_comment' | 'review_comment' | 'review',
-      content: string,
-      remove: boolean,
-    ) => {
-      updatePRReaction(repo, prNumber, subjectId, subjectType, content, remove)
-
-      const [owner, repoName] = repo.split('/')
-      const prNum = subjectType === 'review' ? prNumber : undefined
-      try {
-        if (remove) {
-          await api.removeReaction(
-            owner,
-            repoName,
-            subjectId,
-            subjectType,
-            content,
-            prNum,
-          )
-        } else {
-          await api.addReaction(
-            owner,
-            repoName,
-            subjectId,
-            subjectType,
-            content,
-            prNum,
-          )
         }
-      } catch (err) {
-        updatePRReaction(
-          repo,
-          prNumber,
+
+        return {
+          ...pr,
+          comments: pr.comments.map(patchComment),
+          discussion: pr.discussion.map((item) => {
+            if (item.type === 'comment' && item.comment.id === subjectId) {
+              return { ...item, comment: patchComment(item.comment) }
+            }
+            if (item.type === 'review') {
+              return {
+                ...item,
+                threads: item.threads.map((thread) => ({
+                  ...thread,
+                  comments: thread.comments.map(patchComment),
+                })),
+              }
+            }
+            if (item.type === 'thread') {
+              return {
+                ...item,
+                thread: {
+                  ...item.thread,
+                  comments: item.thread.comments.map(patchComment),
+                },
+              }
+            }
+            return item
+          }),
+        }
+      }),
+    )
+  }
+
+  const reactToPR = async (
+    repo: string,
+    prNumber: number,
+    subjectId: number,
+    subjectType: 'issue_comment' | 'review_comment' | 'review',
+    content: string,
+    remove: boolean,
+  ) => {
+    updatePRReaction(repo, prNumber, subjectId, subjectType, content, remove)
+
+    const [owner, repoName] = repo.split('/')
+    const prNum = subjectType === 'review' ? prNumber : undefined
+    try {
+      if (remove) {
+        await api.removeReaction(
+          owner,
+          repoName,
           subjectId,
           subjectType,
           content,
-          !remove,
+          prNum,
         )
-        throw err
+      } else {
+        await api.addReaction(
+          owner,
+          repoName,
+          subjectId,
+          subjectType,
+          content,
+          prNum,
+        )
       }
-    },
-    [updatePRReaction],
-  )
+    } catch (err) {
+      updatePRReaction(repo, prNumber, subjectId, subjectType, content, !remove)
+      throw err
+    }
+  }
 
   const value = useMemo(
     () => ({

@@ -1,5 +1,10 @@
 import { execFile } from 'node:child_process'
 import os from 'node:os'
+import {
+  refreshPRChecks,
+  untrackTerminal,
+} from '@domains/github/services/checks/polling'
+import { getGhUsername } from '@domains/github/services/checks/state'
 import type {
   ActiveProcess,
   CommandEvent,
@@ -42,11 +47,6 @@ import {
   updateTerminal,
 } from '@domains/workspace/db/terminals'
 import { emitWorkspace } from '@domains/workspace/services/emit'
-import {
-  getGhUsername,
-  refreshPRChecks,
-  untrackTerminal,
-} from '@server/github/checks'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { sanitizeName } from '@server/lib/strings'

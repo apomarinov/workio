@@ -1,9 +1,6 @@
-import type {
-  ChangedFile,
-  InvolvedPRSummary,
-  MergedPRSummary,
-} from '../../shared/types'
+import type { ChangedFile } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
+import { api as gh } from './trpc'
 
 const API_BASE = '/api'
 
@@ -108,51 +105,22 @@ async function api<T = void>(
 
 // --- GitHub ---
 
-export async function getGitHubRepos(query?: string): Promise<string[]> {
+export async function getGitHubRepos(query?: string) {
   try {
-    const params = query ? `?q=${encodeURIComponent(query)}` : ''
-    const { repos } = await api<{ repos: string[] }>(
-      `${API_BASE}/github/repos${params}`,
-    )
+    const { repos } = await gh.github.repos.query({ q: query })
     return repos
   } catch {
-    return []
+    return [] as string[]
   }
 }
 
-export async function checkConductor(repo: string): Promise<boolean> {
+export async function checkConductor(repo: string) {
   try {
-    const data = await api<{ hasConductor: boolean }>(
-      `${API_BASE}/github/conductor?repo=${encodeURIComponent(repo)}`,
-    )
-    return data.hasConductor === true
+    const { hasConductor } = await gh.github.conductor.query({ repo })
+    return hasConductor
   } catch {
     return false
   }
-}
-
-// --- GitHub ---
-
-export async function getClosedPRs(
-  repos: string[],
-  limit: number,
-): Promise<MergedPRSummary[]> {
-  const { prs } = await api<{ prs: MergedPRSummary[] }>(
-    `${API_BASE}/github/closed-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
-    { retry: true },
-  )
-  return prs
-}
-
-export async function getInvolvedPRs(
-  repos: string[],
-  limit: number,
-): Promise<InvolvedPRSummary[]> {
-  const { prs } = await api<{ prs: InvolvedPRSummary[] }>(
-    `${API_BASE}/github/involved-prs?repos=${encodeURIComponent(repos.join(','))}&limit=${limit}`,
-    { retry: true },
-  )
-  return prs
 }
 
 export async function requestPRReview(
@@ -160,11 +128,8 @@ export async function requestPRReview(
   repo: string,
   prNumber: number,
   reviewer: string,
-): Promise<void> {
-  await api(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/request-review`,
-    { body: { reviewer } },
-  )
+) {
+  await gh.github.requestReview.mutate({ owner, repo, prNumber, reviewer })
 }
 
 export async function mergePR(
@@ -172,20 +137,12 @@ export async function mergePR(
   repo: string,
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase' = 'squash',
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/merge`, {
-    body: { method },
-  })
+) {
+  await gh.github.merge.mutate({ owner, repo, prNumber, method })
 }
 
-export async function closePR(
-  owner: string,
-  repo: string,
-  prNumber: number,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/close`, {
-    method: 'POST',
-  })
+export async function closePR(owner: string, repo: string, prNumber: number) {
+  await gh.github.close.mutate({ owner, repo, prNumber })
 }
 
 export async function renamePR(
@@ -193,10 +150,8 @@ export async function renamePR(
   repo: string,
   prNumber: number,
   title: string,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rename`, {
-    body: { title },
-  })
+) {
+  await gh.github.rename.mutate({ owner, repo, prNumber, title })
 }
 
 export async function editPR(
@@ -206,10 +161,8 @@ export async function editPR(
   title: string,
   body: string,
   draft?: boolean,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/edit`, {
-    body: { title, body, draft },
-  })
+) {
+  await gh.github.edit.mutate({ owner, repo, prNumber, title, body, draft })
 }
 
 export async function rerunFailedCheck(
@@ -217,10 +170,8 @@ export async function rerunFailedCheck(
   repo: string,
   prNumber: number,
   checkUrl: string,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-check`, {
-    body: { checkUrl },
-  })
+) {
+  await gh.github.rerunCheck.mutate({ owner, repo, prNumber, checkUrl })
 }
 
 export async function rerunAllFailedChecks(
@@ -228,11 +179,8 @@ export async function rerunAllFailedChecks(
   repo: string,
   prNumber: number,
   checkUrls: string[],
-): Promise<{ rerunCount: number }> {
-  return api(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/rerun-all-checks`,
-    { body: { checkUrls } },
-  )
+) {
+  return gh.github.rerunAllChecks.mutate({ owner, repo, prNumber, checkUrls })
 }
 
 export async function addPRComment(
@@ -240,10 +188,8 @@ export async function addPRComment(
   repo: string,
   prNumber: number,
   body: string,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment`, {
-    body: { body },
-  })
+) {
+  await gh.github.comment.mutate({ owner, repo, prNumber, body })
 }
 
 export async function replyToReviewComment(
@@ -252,11 +198,14 @@ export async function replyToReviewComment(
   prNumber: number,
   commentId: number,
   body: string,
-): Promise<void> {
-  await api(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/reply/${commentId}`,
-    { body: { body } },
-  )
+) {
+  await gh.github.replyToComment.mutate({
+    owner,
+    repo,
+    prNumber,
+    commentId,
+    body,
+  })
 }
 
 export async function editComment(
@@ -266,11 +215,15 @@ export async function editComment(
   commentId: number,
   body: string,
   type: 'issue_comment' | 'review_comment' | 'review',
-): Promise<void> {
-  await api(
-    `${API_BASE}/github/${owner}/${repo}/pr/${prNumber}/comment/${commentId}`,
-    { method: 'PATCH', body: { body, type } },
-  )
+) {
+  await gh.github.editComment.mutate({
+    owner,
+    repo,
+    prNumber,
+    commentId,
+    body,
+    type,
+  })
 }
 
 export async function addReaction(
@@ -280,9 +233,14 @@ export async function addReaction(
   subjectType: 'issue_comment' | 'review_comment' | 'review',
   content: string,
   prNumber?: number,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/reaction`, {
-    body: { subjectId, subjectType, content, prNumber },
+) {
+  await gh.github.addReactionMutation.mutate({
+    owner,
+    repo,
+    subjectId,
+    subjectType,
+    content,
+    prNumber,
   })
 }
 
@@ -293,10 +251,14 @@ export async function removeReaction(
   subjectType: 'issue_comment' | 'review_comment' | 'review',
   content: string,
   prNumber?: number,
-): Promise<void> {
-  await api(`${API_BASE}/github/${owner}/${repo}/reaction`, {
-    method: 'DELETE',
-    body: { subjectId, subjectType, content, prNumber },
+) {
+  await gh.github.removeReactionMutation.mutate({
+    owner,
+    repo,
+    subjectId,
+    subjectType,
+    content,
+    prNumber,
   })
 }
 
@@ -308,9 +270,15 @@ export async function createPR(
   title: string,
   body: string,
   draft: boolean,
-): Promise<{ prNumber: number }> {
-  return api(`${API_BASE}/github/${owner}/${repo}/pr/create`, {
-    body: { head, base, title, body, draft },
+) {
+  return gh.github.create.mutate({
+    owner,
+    repo,
+    head,
+    base,
+    title,
+    body,
+    draft,
   })
 }
 
@@ -554,35 +522,18 @@ export async function getAllFilesDiff(
 
 // --- Webhooks ---
 
-export async function createWebhook(
-  owner: string,
-  repo: string,
-): Promise<{ webhookId?: number }> {
-  return api(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
-    method: 'POST',
-  })
+export async function createWebhook(owner: string, repo: string) {
+  return gh.github.createWebhook.mutate({ owner, repo })
 }
 
-export async function deleteWebhook(
-  owner: string,
-  repo: string,
-): Promise<void> {
-  await api(`${API_BASE}/github/webhooks/${owner}/${repo}`, {
-    method: 'DELETE',
-  })
+export async function deleteWebhook(owner: string, repo: string) {
+  await gh.github.deleteWebhook.mutate({ owner, repo })
 }
 
-export async function recreateWebhook(
-  owner: string,
-  repo: string,
-): Promise<{ webhookId?: number }> {
-  return api(`${API_BASE}/github/webhooks/${owner}/${repo}/recreate`, {
-    method: 'POST',
-  })
+export async function recreateWebhook(owner: string, repo: string) {
+  await gh.github.recreateWebhook.mutate({ owner, repo })
 }
 
-export async function testWebhook(owner: string, repo: string): Promise<void> {
-  await api(`${API_BASE}/github/webhooks/${owner}/${repo}/test`, {
-    method: 'POST',
-  })
+export async function testWebhook(owner: string, repo: string) {
+  await gh.github.testWebhookMutation.mutate({ owner, repo })
 }

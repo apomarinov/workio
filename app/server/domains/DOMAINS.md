@@ -386,7 +386,7 @@ These files stay in place — they're cross-cutting concerns used by all domains
 | 3   | **pty**       | [x]    | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
 | 4   | **git**       | [ ]    | Depends on workspace + logs, both done by now                                                                                                                   |
 | 5   | **sessions**  | [x]    | Depends on workspace + settings (already done). Large but self-contained                                                                                        |
-| 6   | **github**    | [ ]    | Depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers                          |
+| 6   | **github**    | [x]    | Depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers                          |
 
 
 Steps 4 and 5 can be done in either order or in parallel since they don't depend on each other.
@@ -447,11 +447,11 @@ Note: `permission-scanner.ts` currently has a circular import on `manager.getSes
 
 | Done | Sub-group     | Count | What                                                                                   | Client usage                                                          |
 | ---- | ------------- | ----- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [ ]  | **pr-data**   | 8     | fetchClosedPRs, fetchInvolvedPRs, refreshPRChecks, polling, branch detection, caching  | GitHubContext — sidebar PR list, socket `github:pr-checks`            |
-| [ ]  | **pr-ops**    | 8     | merge, close, create, edit, rename, requestReview                                      | MergeDialog, EditPRDialog, ReReviewDialog, command palette            |
-| [ ]  | **comments**  | 6     | addComment, replyToReview, editIssueComment, editReviewComment, editReview             | PRStatusContent — discussion timeline, ReplyDialog, EditCommentDialog |
-| [ ]  | **reactions** | 2     | addReaction, removeReaction                                                            | PRStatusContent — emoji reaction badges                               |
-| [ ]  | **webhooks**  | 10    | ngrok init/stop, webhook CRUD, signature verify, validation polling, secret management | CreateTerminalModal (webhook setup), no direct UI for most            |
+| [x]  | **pr-data**   | 8     | fetchClosedPRs, fetchInvolvedPRs, refreshPRChecks, polling, branch detection, caching  | GitHubContext — sidebar PR list, socket `github:pr-checks`            |
+| [x]  | **pr-ops**    | 8     | merge, close, create, edit, rename, requestReview                                      | MergeDialog, EditPRDialog, ReReviewDialog, command palette            |
+| [x]  | **comments**  | 6     | addComment, replyToReview, editIssueComment, editReviewComment, editReview             | PRStatusContent — discussion timeline, ReplyDialog, EditCommentDialog |
+| [x]  | **reactions** | 2     | addReaction, removeReaction                                                            | PRStatusContent — emoji reaction badges                               |
+| [x]  | **webhooks**  | 10    | ngrok init/stop, webhook CRUD, signature verify, validation polling, secret management | CreateTerminalModal (webhook setup), no direct UI for most            |
 
 
 Plus `repos` and `conductor` queries used only by CreateTerminalModal for repo selection.
