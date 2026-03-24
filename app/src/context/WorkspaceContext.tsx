@@ -14,7 +14,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { ServicesStatus } from '../../shared/types'
+import type { ServicesStatus } from '../../server/services/status'
 import { useActiveShells } from '../hooks/useActiveShells'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'
