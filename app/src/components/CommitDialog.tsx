@@ -12,13 +12,9 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import {
-  commitChanges,
-  discardChanges,
-  getChangedFiles,
-  getHeadMessage,
-} from '@/lib/api'
+import { getChangedFiles, getHeadMessage } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { BranchDiffPanel } from './BranchDiffPanel'
 import { ConfirmModal } from './ConfirmModal'
@@ -53,12 +49,10 @@ export function CommitDialog({
   const [message, setMessage] = useState('')
   const [amend, setAmend] = useState(false)
   const [noVerify, setNoVerify] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [fetchingMessage, setFetchingMessage] = useState(false)
   const [changedFiles, setChangedFiles] = useState<ChangedFile[]>([])
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [hasSelection, setHasSelection] = useState(false)
-  const [discarding, setDiscarding] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [discardFiles, setDiscardFiles] = useState<Set<string>>(new Set())
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
@@ -228,27 +222,37 @@ export function CommitDialog({
     }
   }
 
+  const commitMutation = trpc.git.commit.commitMutation.useMutation()
+  const discardMutation = trpc.git.commit.discardMutation.useMutation()
+  const loading = commitMutation.isPending
+  const discarding = discardMutation.isPending
+
   const handleCommit = async () => {
-    setLoading(true)
     try {
       const selected = fileListRef.current?.getSelectedFiles() ?? new Set()
       const filesToSend =
         selected.size === changedFiles.length ? undefined : Array.from(selected)
-      await commitChanges(terminalId, message, amend, noVerify, filesToSend)
+      await commitMutation.mutateAsync({
+        terminalId,
+        message,
+        amend,
+        noVerify,
+        files: filesToSend,
+      })
       toast.success(amend ? 'Amended commit' : 'Changes committed')
       onClose()
       onSuccess?.()
     } catch (err) {
       toastError(err, 'Failed to commit')
-    } finally {
-      setLoading(false)
     }
   }
 
   const handleDiscard = async () => {
-    setDiscarding(true)
     try {
-      await discardChanges(terminalId, Array.from(discardFiles))
+      await discardMutation.mutateAsync({
+        terminalId,
+        files: Array.from(discardFiles),
+      })
       toast.success(
         `Discarded ${discardFiles.size} file${discardFiles.size > 1 ? 's' : ''}`,
       )
@@ -260,8 +264,6 @@ export function CommitDialog({
       refreshFiles(!clearViewer)
     } catch (err) {
       toastError(err, 'Failed to discard changes')
-    } finally {
-      setDiscarding(false)
     }
   }
 

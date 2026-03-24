@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import { dropCommit, getBranchCommits, undoCommit } from '@/lib/api'
+import { getBranchCommits } from '@/lib/api'
 import { formatDate } from '@/lib/time'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
@@ -311,15 +311,24 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
     ? `${selectedCommitObj.hash.slice(0, 7)} ${selectedCommitObj.message.length > 30 ? `${selectedCommitObj.message.slice(0, 30)}...` : selectedCommitObj.message}`
     : `All changes (${commits.length} commits)`
 
-  // ── Confirm modal handler ──
+  // ── Commit mutations ──
+  const undoMutation = trpc.git.commit.undoCommitMutation.useMutation()
+  const dropMutation = trpc.git.commit.dropCommitMutation.useMutation()
+
   async function handleConfirmAction() {
     if (!confirmAction) return
     try {
       if (confirmAction.type === 'undo') {
-        await undoCommit(terminalId, confirmAction.hash)
+        await undoMutation.mutateAsync({
+          terminalId,
+          commitHash: confirmAction.hash,
+        })
         toast.success('Commit undone — changes are staged')
       } else {
-        await dropCommit(terminalId, confirmAction.hash)
+        await dropMutation.mutateAsync({
+          terminalId,
+          commitHash: confirmAction.hash,
+        })
         toast.success('Commit dropped')
       }
       setConfirmAction(null)

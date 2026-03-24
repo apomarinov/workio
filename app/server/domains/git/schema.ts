@@ -105,6 +105,23 @@ export const branchConflictsInput = terminalIdInput.extend({
   base: z.string().min(1),
 })
 
+// Commit inputs
+
+export const commitInput = terminalIdInput.extend({
+  message: z.string(),
+  amend: z.boolean().optional(),
+  noVerify: z.boolean().optional(),
+  files: z.array(z.string()).optional(),
+})
+
+export const discardInput = terminalIdInput.extend({
+  files: z.array(z.string()).min(1),
+})
+
+export const commitHashInput = terminalIdInput.extend({
+  commitHash: z.string().min(1),
+})
+
 // --- Types ---
 
 export type BranchInfo = z.infer<typeof branchInfoSchema>

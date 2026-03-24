@@ -1,106 +1,4 @@
-import { getSocketId } from '../hooks/useSocket'
 import { api as gh } from './trpc'
-
-const API_BASE = '/api'
-
-export class ApiError extends Error {
-  status: number
-  data: Record<string, unknown> | null
-
-  constructor(status: number, data: Record<string, unknown> | null) {
-    super(
-      (data?.message || data?.error || `Request failed (${status})`) as string,
-    )
-    this.name = 'ApiError'
-    this.status = status
-    this.data = data
-  }
-}
-
-interface ApiInit extends Omit<RequestInit, 'body'> {
-  body?: RequestInit['body'] | Record<string, unknown>
-  retry?: boolean
-}
-
-/**
- * Low-level fetch wrapper: attaches socket ID on mutations,
- * handles retries, and throws ApiError on non-OK responses.
- * Returns the raw Response for callers that need status codes.
- *
- * When `body` is a plain object, it is JSON-stringified and the
- * Content-Type / method headers are set automatically (defaults to POST).
- */
-async function apiFetch(
-  input: RequestInfo | URL,
-  init?: ApiInit,
-): Promise<Response> {
-  // Auto-serialize plain-object bodies as JSON
-  if (
-    init?.body != null &&
-    Object.getPrototypeOf(init.body) === Object.prototype
-  ) {
-    init = {
-      method: 'POST',
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...init.headers },
-      body: JSON.stringify(init.body),
-    }
-  }
-
-  const method = init?.method?.toUpperCase()
-  if (method && method !== 'GET' && method !== 'HEAD') {
-    const socketId = getSocketId()
-    if (socketId) {
-      const headers = new Headers(init?.headers)
-      headers.set('x-socket-id', socketId)
-      init = { ...init, headers }
-    }
-  }
-
-  // Body is now guaranteed to be serialized; safe to pass to fetch
-  const fetchInit = init as RequestInit | undefined
-
-  if (init?.retry) {
-    let lastError: unknown
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch(input, fetchInit)
-        if (!res.ok) {
-          const data = await res.json().catch(() => null)
-          throw new ApiError(res.status, data)
-        }
-        return res
-      } catch (err) {
-        if (err instanceof ApiError) throw err
-        lastError = err
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
-        }
-      }
-    }
-    throw lastError
-  }
-
-  const res = await fetch(input, fetchInit)
-  if (!res.ok) {
-    const data = await res.json().catch(() => null)
-    throw new ApiError(res.status, data)
-  }
-  return res
-}
-
-/**
- * High-level API helper: calls apiFetch and parses JSON.
- * Handles 204 No Content by returning undefined.
- */
-async function api<T = void>(
-  input: RequestInfo | URL,
-  init?: ApiInit,
-): Promise<T> {
-  const res = await apiFetch(input, init)
-  if (res.status === 204) return undefined as T
-  return res.json()
-}
 
 // --- GitHub ---
 
@@ -349,27 +247,6 @@ export async function renameBranch(
   })
 }
 
-export async function commitChanges(
-  terminalId: number,
-  message: string,
-  amend?: boolean,
-  noVerify?: boolean,
-  files?: string[],
-): Promise<{ success: boolean; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/commit`, {
-    body: { message, amend, noVerify, files },
-  })
-}
-
-export async function discardChanges(
-  terminalId: number,
-  files: string[],
-): Promise<{ success: boolean; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/discard`, {
-    body: { files },
-  })
-}
-
 // --- Git diff operations (imperative callers only) ---
 
 export async function getHeadMessage(terminalId: number) {
@@ -395,24 +272,6 @@ export async function getBranchCommits(
 
 export async function getChangedFiles(terminalId: number, base?: string) {
   return gh.git.diff.changedFiles.query({ terminalId, base })
-}
-
-export async function undoCommit(
-  terminalId: number,
-  commitHash: string,
-): Promise<{ success: boolean; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/undo-commit`, {
-    body: { commitHash },
-  })
-}
-
-export async function dropCommit(
-  terminalId: number,
-  commitHash: string,
-): Promise<{ success: boolean; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/drop-commit`, {
-    body: { commitHash },
-  })
 }
 
 // --- Webhooks ---

@@ -384,7 +384,7 @@ These files stay in place — they're cross-cutting concerns used by all domains
 | 1   | **logs**      | [x]    | Smallest (3 functions), no deps on other unmigrated domains, good warmup to establish the pattern                                                               |
 | 2   | **workspace** | [x]    | Leaf node, no domain deps, but large. Must be done before pty/git/sessions/github since they all import from it                                                 |
 | 3   | **pty**       | [x]    | Depends on workspace + sessions, but sessions only for permission-scanner (can stub/defer that one call). Doing it 3rd unblocks the PTY-related shell mutations |
-| 4   | **git**       | [ ]    | Depends on workspace + logs, both done by now                                                                                                                   |
+| 4   | **git**       | [x]    | Depends on workspace + logs, both done by now                                                                                                                   |
 | 5   | **sessions**  | [x]    | Depends on workspace + settings (already done). Large but self-contained                                                                                        |
 | 6   | **github**    | [x]    | Depends on workspace + logs, both done. Last because it's mostly already isolated in `server/github/` and the routes are thin wrappers                          |
 
@@ -463,7 +463,7 @@ Plus `repos` and `conductor` queries used only by CreateTerminalModal for repo s
 | ---- | ------------ | ----- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
 | [x]  | **branches** | 10    | list, checkout, create, delete, rename, fetch-all, pull, push, rebase                            | Branch palette, command palette actions       |
 | [x]  | **diff**     | 6     | changedFiles, fileDiff, headMessage, commits, branchCommits, branchConflicts                     | CommitDialog, FileDiffViewer, BranchDiffPanel |
-| [ ]  | **commit**   | 6     | commit, discard, undoCommit, dropCommit, fetchOriginIfNeeded, parseChangedFiles/parseUntrackedWc | CommitDialog stage/commit/discard             |
+| [x]  | **commit**   | 6     | commit, discard, undoCommit, dropCommit, fetchOriginIfNeeded, parseChangedFiles/parseUntrackedWc | CommitDialog stage/commit/discard             |
 
 
 ### logs (3 functions)

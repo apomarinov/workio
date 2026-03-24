@@ -43,7 +43,6 @@ import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import claudeHookRoute from './routes/claude-hook'
 import githubWebhookRoute from './routes/github-webhook'
-import terminalRoutes from './routes/terminals'
 import { getNgrokUrl, initNgrok, stopNgrok } from './services/ngrok'
 import { getServicesStatus } from './services/status'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
@@ -356,18 +355,19 @@ fastify.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
-// Broadcast refetch events to all clients after successful mutations
+// Broadcast refetch events to all clients after successful mutations.
+// Maps URL prefixes to refetch groups — covers both legacy REST and tRPC routes.
 const REFETCH_ROUTES: [string, RefetchGroup][] = [
-  ['/api/terminals', 'terminals'],
-  ['/api/shells', 'terminals'],
-  ['/api/settings', 'settings'],
-  ['/api/notifications', 'notifications'],
+  // tRPC mutations
+  ['/api/trpc/workspace.', 'terminals'],
+  ['/api/trpc/settings.', 'settings'],
+  ['/api/trpc/notifications.', 'notifications'],
+  ['/api/trpc/sessions.', 'sessions'],
 ]
-const MUTATION_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
 
 fastify.addHook('onResponse', (request, reply, done) => {
   if (
-    MUTATION_METHODS.has(request.method) &&
+    request.method === 'POST' &&
     reply.statusCode >= 200 &&
     reply.statusCode < 300
   ) {
@@ -390,7 +390,6 @@ await fastify.register(fastifyTRPCPlugin, {
 
 // Routes
 await fastify.register(githubWebhookRoute)
-await fastify.register(terminalRoutes)
 await fastify.register(claudeHookRoute)
 
 // Start monitor daemon (persistent Python process for hook events)
