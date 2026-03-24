@@ -8,37 +8,6 @@ export interface ChangedFile {
   oldPath?: string
 }
 
-export interface WorkspacePayload {
-  terminalId: number
-  name: string
-  git_repo?: {
-    repo: string
-    status: 'setup' | 'done' | 'failed'
-    workspaces_root?: string
-    error?: string
-  }
-  setup?: {
-    conductor?: boolean
-    setup?: string
-    delete?: string
-    status: 'setup' | 'delete' | 'done' | 'failed'
-    error?: string
-  }
-  deleted?: boolean
-}
-
-export interface ShellClient {
-  device: string
-  browser: string
-  ip: string
-  isPrimary?: boolean
-}
-
-export interface ShellClientsPayload {
-  shellId: number
-  clients: ShellClient[]
-}
-
 // Service status types
 export type ServiceStatus = 'inactive' | 'starting' | 'healthy' | 'degraded' | 'error'
 

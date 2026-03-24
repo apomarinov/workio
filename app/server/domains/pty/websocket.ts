@@ -2,6 +2,7 @@ import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { sendPushNotification } from '@domains/notifications/service'
 import type {
+  ShellClient,
   WsClientInfo,
   WsClientMessage,
   WsServerMessage,
@@ -22,7 +23,6 @@ import {
 } from '@domains/sessions/db'
 import { getIO, parseUserAgent } from '@server/io'
 import { log } from '@server/logger'
-import type { ShellClient } from '@shared/types'
 import { WebSocket, WebSocketServer } from 'ws'
 
 // ── ShellClients class ─────────────────────────────────────────────

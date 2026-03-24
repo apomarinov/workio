@@ -1,6 +1,10 @@
+import type { ShellClient, ShellClientsPayload } from '@domains/pty/schema'
 import type { SettingsUpdate } from '@domains/settings/schema'
 import type { Shell } from '@domains/workspace/schema/shells'
-import type { Terminal } from '@domains/workspace/schema/terminals'
+import type {
+  Terminal,
+  WorkspacePayload,
+} from '@domains/workspace/schema/terminals'
 import {
   createContext,
   useCallback,
@@ -10,12 +14,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type {
-  ServicesStatus,
-  ShellClient,
-  ShellClientsPayload,
-  WorkspacePayload,
-} from '../../shared/types'
+import type { ServicesStatus } from '../../shared/types'
 import { useActiveShells } from '../hooks/useActiveShells'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSettings } from '../hooks/useSettings'

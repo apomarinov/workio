@@ -247,6 +247,24 @@ export const gitRemoteSyncPayloadSchema = z.object({
 
 export type GitRemoteSyncPayload = z.infer<typeof gitRemoteSyncPayloadSchema>
 
+// ── Shell client schemas ──────────────────────────────────────────
+
+export const shellClientSchema = z.object({
+  device: z.string(),
+  browser: z.string(),
+  ip: z.string(),
+  isPrimary: z.boolean().optional(),
+})
+
+export type ShellClient = z.infer<typeof shellClientSchema>
+
+export const shellClientsPayloadSchema = z.object({
+  shellId: z.number(),
+  clients: z.array(shellClientSchema),
+})
+
+export type ShellClientsPayload = z.infer<typeof shellClientsPayloadSchema>
+
 // ── WebSocket schemas ──────────────────────────────────────────────
 
 // Client messages
