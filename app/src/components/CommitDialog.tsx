@@ -1,3 +1,4 @@
+import type { ChangedFile } from '@domains/git/schema'
 import type { PRCheckStatus } from '@domains/github/schema'
 import {
   ChevronDown,
@@ -19,7 +20,6 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import type { ChangedFile } from '../../shared/types'
 import { BranchDiffPanel } from './BranchDiffPanel'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel, type FileListHandle } from './DiffViewerPanel'

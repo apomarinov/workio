@@ -1,3 +1,4 @@
+import type { ChangedFile } from '@domains/git/schema'
 import {
   ChevronDown,
   ChevronsDownUp,
@@ -16,7 +17,6 @@ import {
   Separator,
   useDefaultLayout,
 } from 'react-resizable-panels'
-import useSWR from 'swr'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -26,9 +26,8 @@ import {
 } from '@/components/ui/tooltip'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
-import { getChangedFiles } from '@/lib/api'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import type { ChangedFile } from '../../shared/types'
 import { FileDiffViewer } from './FileDiffViewer'
 import { FileStatusBadge } from './FileStatusBadge'
 import { MobileSlidePanel } from './MobileSlidePanel'
@@ -556,7 +555,7 @@ export function DiffViewerPanel({
   onRequestDiscard,
   externalFiles,
   externalLoadingFiles,
-  cacheKey,
+  cacheKey: _cacheKey,
 }: DiffViewerPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
@@ -566,23 +565,18 @@ export function DiffViewerPanel({
   const { settings } = useSettings()
   const isMobile = useIsMobile()
 
-  // Fetch changed files via SWR (only when managing internally)
-  const swrKey =
-    externalFiles === undefined && base
-      ? ['changed-files', terminalId, base, cacheKey ?? '']
-      : null
+  // Fetch changed files via tRPC (only when managing internally)
+  const fetchInternally = externalFiles === undefined && !!base
   const {
-    data: internalData,
+    data: internalQueryData,
     isLoading: internalLoadingFiles,
-    mutate: mutateFiles,
-  } = useSWR(
-    swrKey,
-    async ([, tid, b]) => {
-      const data = await getChangedFiles(tid as number, b as string)
-      return data.files
-    },
-    { revalidateOnFocus: false, keepPreviousData: true },
+    refetch: refetchFiles,
+  } = trpc.git.diff.changedFiles.useQuery(
+    { terminalId, base: base ?? undefined },
+    { enabled: fetchInternally, placeholderData: (prev) => prev },
   )
+  const internalData = internalQueryData?.files
+  const mutateFiles = () => refetchFiles()
 
   const changedFiles = externalFiles ?? internalData ?? []
   const loadingFiles = externalLoadingFiles ?? internalLoadingFiles

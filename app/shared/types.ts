@@ -1,13 +1,3 @@
-export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
-
-export interface ChangedFile {
-  path: string
-  status: FileStatus
-  added: number
-  removed: number
-  oldPath?: string
-}
-
 // Service status types
 export type ServiceStatus = 'inactive' | 'starting' | 'healthy' | 'degraded' | 'error'
 

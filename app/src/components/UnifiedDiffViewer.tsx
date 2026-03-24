@@ -2,8 +2,7 @@ import { ColorSchemeType } from 'diff2html/lib-esm/types'
 import { Diff2HtmlUI } from 'diff2html/lib-esm/ui/js/diff2html-ui-slim'
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import useSWR from 'swr'
-import { getAllFilesDiff } from '@/lib/api'
+import { trpc } from '@/lib/trpc'
 
 const UNIFIED_D2H_CONFIG = {
   outputFormat: 'line-by-line' as const,
@@ -34,12 +33,9 @@ export function UnifiedDiffViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const prevDiffRef = useRef<string>('')
 
-  const { data, isLoading } = useSWR(
-    ['all-files-diff', terminalId, base ?? ''],
-    async ([, tid, b]) => {
-      return await getAllFilesDiff(tid as number, (b as string) || undefined)
-    },
-    { revalidateOnFocus: false, keepPreviousData: true },
+  const { data, isLoading } = trpc.git.diff.fileDiff.useQuery(
+    { terminalId, base: base ?? undefined },
+    { placeholderData: (prev) => prev },
   )
 
   // Render diff2html when diff changes

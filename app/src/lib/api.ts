@@ -1,4 +1,3 @@
-import type { ChangedFile } from '../../shared/types'
 import { getSocketId } from '../hooks/useSocket'
 import { api as gh } from './trpc'
 
@@ -371,37 +370,18 @@ export async function discardChanges(
   })
 }
 
-export async function getHeadMessage(
-  terminalId: number,
-): Promise<{ message: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/head-message`)
-}
+// --- Git diff operations (imperative callers only) ---
 
-export interface PRCommit {
-  hash: string
-  message: string
-  author: string
-  date: string
+export async function getHeadMessage(terminalId: number) {
+  return gh.git.diff.headMessage.query({ terminalId })
 }
 
 export async function checkBranchConflicts(
   terminalId: number,
   head: string,
   base: string,
-): Promise<{ hasConflicts: boolean }> {
-  const params = new URLSearchParams({ head, base })
-  return api(
-    `${API_BASE}/terminals/${terminalId}/branch-conflicts?${params.toString()}`,
-  )
-}
-
-export async function getCommitsBetween(
-  terminalId: number,
-  base: string,
-  head: string,
-): Promise<{ commits: PRCommit[]; noRemote?: boolean }> {
-  const params = new URLSearchParams({ head, base })
-  return api(`${API_BASE}/terminals/${terminalId}/commits?${params.toString()}`)
+) {
+  return gh.git.diff.branchConflicts.query({ terminalId, head, base })
 }
 
 export async function getBranchCommits(
@@ -409,20 +389,12 @@ export async function getBranchCommits(
   branch: string,
   limit = 20,
   offset = 0,
-): Promise<{
-  commits: PRCommit[]
-  hasMore: boolean
-  mergeBase?: string
-  mergeBaseBranch?: string
-}> {
-  const params = new URLSearchParams({
-    branch,
-    limit: String(limit),
-    offset: String(offset),
-  })
-  return api(
-    `${API_BASE}/terminals/${terminalId}/branch-commits?${params.toString()}`,
-  )
+) {
+  return gh.git.diff.branchCommits.query({ terminalId, branch, limit, offset })
+}
+
+export async function getChangedFiles(terminalId: number, base?: string) {
+  return gh.git.diff.changedFiles.query({ terminalId, base })
 }
 
 export async function undoCommit(
@@ -441,39 +413,6 @@ export async function dropCommit(
   return api(`${API_BASE}/terminals/${terminalId}/drop-commit`, {
     body: { commitHash },
   })
-}
-
-export async function getChangedFiles(
-  terminalId: number,
-  base?: string,
-): Promise<{ files: ChangedFile[] }> {
-  const params = base ? `?base=${encodeURIComponent(base)}` : ''
-  return api(`${API_BASE}/terminals/${terminalId}/changed-files${params}`)
-}
-
-export async function getFileDiff(
-  terminalId: number,
-  filePath: string,
-  fullFile?: boolean,
-  base?: string,
-): Promise<{ diff: string }> {
-  const context = fullFile ? '99999' : '5'
-  const params = new URLSearchParams({ path: filePath, context })
-  if (base) params.set('base', base)
-  return api(
-    `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
-  )
-}
-
-export async function getAllFilesDiff(
-  terminalId: number,
-  base?: string,
-): Promise<{ diff: string }> {
-  const params = new URLSearchParams({ context: '5' })
-  if (base) params.set('base', base)
-  return api(
-    `${API_BASE}/terminals/${terminalId}/file-diff?${params.toString()}`,
-  )
 }
 
 // --- Webhooks ---

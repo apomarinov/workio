@@ -462,7 +462,7 @@ Plus `repos` and `conductor` queries used only by CreateTerminalModal for repo s
 | Done | Sub-group    | Count | What                                                                                             | Client usage                                  |
 | ---- | ------------ | ----- | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
 | [x]  | **branches** | 10    | list, checkout, create, delete, rename, fetch-all, pull, push, rebase                            | Branch palette, command palette actions       |
-| [ ]  | **diff**     | 6     | changedFiles, fileDiff, headMessage, commits, branchCommits, branchConflicts                     | CommitDialog, FileDiffViewer, BranchDiffPanel |
+| [x]  | **diff**     | 6     | changedFiles, fileDiff, headMessage, commits, branchCommits, branchConflicts                     | CommitDialog, FileDiffViewer, BranchDiffPanel |
 | [ ]  | **commit**   | 6     | commit, discard, undoCommit, dropCommit, fetchOriginIfNeeded, parseChangedFiles/parseUntrackedWc | CommitDialog stage/commit/discard             |
 
 

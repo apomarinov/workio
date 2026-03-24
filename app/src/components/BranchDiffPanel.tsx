@@ -1,3 +1,4 @@
+import type { Commit } from '@domains/git/schema'
 import { GitCommitHorizontal, Loader2, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -6,19 +7,13 @@ import {
   Separator,
   useDefaultLayout,
 } from 'react-resizable-panels'
-import useSWR from 'swr'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { useIsMobile } from '@/hooks/useMediaQuery'
-import {
-  dropCommit,
-  getBranchCommits,
-  getCommitsBetween,
-  type PRCommit,
-  undoCommit,
-} from '@/lib/api'
+import { dropCommit, getBranchCommits, undoCommit } from '@/lib/api'
 import { formatDate } from '@/lib/time'
 import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel } from './DiffViewerPanel'
@@ -65,29 +60,19 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
     message: string
   } | null>(null)
 
-  // ── Mode A: SWR fetch for base..head comparison ──
-  const { data: compareData, isLoading: loadingCompare } = useSWR(
-    !isBranchMode
-      ? [
-          'commits-between',
-          terminalId,
-          props.baseBranch,
-          props.headBranch,
-          props.cacheKey ?? '',
-        ]
-      : null,
-    async ([, tid, base, head]) => {
-      return await getCommitsBetween(
-        tid as number,
-        base as string,
-        head as string,
-      )
-    },
-    { revalidateOnFocus: false },
-  )
+  // ── Mode A: tRPC query for base..head comparison ──
+  const { data: compareData, isLoading: loadingCompare } =
+    trpc.git.diff.commits.useQuery(
+      {
+        terminalId,
+        base: props.baseBranch!,
+        head: props.headBranch!,
+      },
+      { enabled: !isBranchMode },
+    )
 
   // ── Mode B: paginated fetch for single branch ──
-  const [branchCommits, setBranchCommits] = useState<PRCommit[]>([])
+  const [branchCommits, setBranchCommits] = useState<Commit[]>([])
   const [mergeBase, setMergeBase] = useState<string | undefined>()
   const [mergeBaseBranch, setMergeBaseBranch] = useState<string | undefined>()
   const [hasMore, setHasMore] = useState(false)

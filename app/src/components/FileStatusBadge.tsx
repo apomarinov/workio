@@ -1,5 +1,5 @@
+import type { FileStatus } from '@domains/git/schema'
 import { cn } from '@/lib/utils'
-import type { FileStatus } from '../../shared/types'
 
 export const STATUS_CONFIG: Record<
   FileStatus,

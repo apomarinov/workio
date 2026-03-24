@@ -11,7 +11,6 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import useSWR from 'swr'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { getFileDiff } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 
@@ -176,28 +174,24 @@ export function FileDiffViewer({
   const [currentHunkIndex, setCurrentHunkIndex] = useState(0)
   const hunkCountRef = useRef(0)
 
-  const swrKey =
-    filePath != null
-      ? ['file-diff', terminalId, filePath, showFullFile, base ?? null]
-      : null
-
+  const context = showFullFile ? '99999' : '5'
   const {
-    data: diffString,
+    data: diffData,
     isLoading,
     error,
-  } = useSWR(
-    swrKey,
-    async ([, tid, fp, full, b]) => {
-      const { diff } = await getFileDiff(
-        tid as number,
-        fp as string,
-        full as boolean,
-        (b as string) ?? undefined,
-      )
-      return diff
+  } = trpc.git.diff.fileDiff.useQuery(
+    {
+      terminalId,
+      path: filePath ?? undefined,
+      context,
+      base: base ?? undefined,
     },
-    { revalidateOnFocus: false, keepPreviousData: true },
+    {
+      enabled: filePath != null,
+      placeholderData: (prev) => prev,
+    },
   )
+  const diffString = diffData?.diff
 
   // Count hunks in raw diff for navigation
   useEffect(() => {
