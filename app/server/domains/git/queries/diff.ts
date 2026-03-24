@@ -117,7 +117,14 @@ export const fileDiff = publicProcedure
     ) =>
       gitExec(terminal, args, { timeout: 10000, ...extraOpts }).then(
         (r) => r.stdout,
-        () => '',
+        (err) => {
+          // git diff --no-index exits with code 1 when differences exist,
+          // but stdout still contains the diff output
+          if (err && typeof err === 'object' && 'stdout' in err) {
+            return String(err.stdout)
+          }
+          return ''
+        },
       )
 
     if (input.base) {

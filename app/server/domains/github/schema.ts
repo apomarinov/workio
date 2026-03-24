@@ -252,7 +252,7 @@ export const webhookPayloadSchema = z.object({
       html_url: z.string().optional(),
       user: z.object({ login: z.string() }),
       state: z.string(),
-      body: z.string(),
+      body: z.string().nullable(),
       submitted_at: z.string(),
     })
     .optional(),
