@@ -1,3 +1,4 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import {
   CornerDownLeft,
   GitBranch,
@@ -12,7 +13,6 @@ import {
 } from 'lucide-react'
 import { SessionStatusIcon, TerminalIcon2 } from '@/components/icons'
 import { getPRStatusInfo } from '@/lib/pr-status'
-import type { PRCheckStatus } from '../../../../shared/types'
 import { PRTabButton } from '../../PRStatusContent'
 import type { AppActions, AppData } from '../createPaletteModes'
 import { getLastPathSegment } from '../createPaletteModes'

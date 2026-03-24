@@ -1,3 +1,4 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import {
   ArrowLeftRight,
   Check,
@@ -10,7 +11,6 @@ import {
 } from 'lucide-react'
 import { GithubDrafPrIcon, RefreshIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
-import type { PRCheckStatus } from '../../shared/types'
 
 export function getPRStatusInfo(pr?: PRCheckStatus) {
   const iconClass = 'w-5 h-5'

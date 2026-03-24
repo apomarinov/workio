@@ -1,20 +1,3 @@
-// GitHub types — canonical source is @domains/github/schema
-// Re-exported here for client compatibility (will be updated in client migration)
-export type {
-  FailedPRCheck,
-  PRReaction,
-  PRComment,
-  PRReview,
-  PRReviewThread,
-  PRDiscussionItem,
-  PRCheckStatus,
-  PRChecksPayload,
-  MergedPRSummary,
-  InvolvedPRSummary,
-} from '../server/domains/github/schema'
-
-export { WEBHOOK_EVENTS } from '../server/domains/github/schema'
-
 export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
 
 export interface ChangedFile {

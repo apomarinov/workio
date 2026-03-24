@@ -1,3 +1,10 @@
+import type {
+  PRCheckStatus,
+  PRDiscussionItem,
+  PRReaction,
+  PRReview,
+  PRReviewThread,
+} from '@domains/github/schema'
 import {
   BellOff,
   Check,
@@ -43,13 +50,6 @@ import { getPRStatusInfo } from '@/lib/pr-status'
 import { formatTimeAgo } from '@/lib/time'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import type {
-  PRCheckStatus,
-  PRDiscussionItem,
-  PRReaction,
-  PRReview,
-  PRReviewThread,
-} from '../../shared/types'
 import * as api from '../lib/api'
 import {
   ContentDialog,

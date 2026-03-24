@@ -11,6 +11,7 @@ import {
   restrictToVerticalAxis,
 } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import type { PRCheckStatus } from '@domains/github/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   Bell,
@@ -47,7 +48,6 @@ import {
 } from '@/components/ui/popover'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
-import type { PRCheckStatus } from '../../shared/types'
 import { useDocumentPip } from '../context/DocumentPipContext'
 import { useGitHubContext } from '../context/GitHubContext'
 import { useNotificationDataContext } from '../context/NotificationDataContext'

@@ -1,7 +1,7 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { toastError } from '@/lib/toastError'
-import type { PRCheckStatus } from '../../shared/types'
 import { useSessionContext } from '../context/SessionContext'
 import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { CreateTerminalModal } from './CreateTerminalModal'

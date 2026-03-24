@@ -1,3 +1,4 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import { Loader2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,6 @@ import {
 import { toast } from '@/components/ui/sonner'
 import { rerunAllFailedChecks } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
-import type { PRCheckStatus } from '../../shared/types'
 
 interface RerunChecksModalProps {
   open: boolean

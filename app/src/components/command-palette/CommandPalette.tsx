@@ -1,3 +1,4 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import { DEFAULT_KEYMAP } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
@@ -34,7 +35,6 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
-import type { PRCheckStatus } from '../../../shared/types'
 import type { MoveTarget, SessionWithProject } from '../../types'
 
 const CreatePRDialog = lazy(() =>

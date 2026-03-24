@@ -1,3 +1,4 @@
+import type { InvolvedPRSummary, MergedPRSummary } from '@domains/github/schema'
 import {
   AtSign,
   ChevronDown,
@@ -8,7 +9,6 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import type { InvolvedPRSummary, MergedPRSummary } from '../../shared/types'
 import { TruncatedPath } from './TruncatedPath'
 
 interface OlderMergedPRsListProps {

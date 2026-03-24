@@ -1,3 +1,10 @@
+import type {
+  InvolvedPRSummary,
+  MergedPRSummary,
+  PRCheckStatus,
+  PRChecksPayload,
+  PRReaction,
+} from '@domains/github/schema'
 import {
   createContext,
   useContext,
@@ -7,13 +14,6 @@ import {
   useState,
 } from 'react'
 import { trpc } from '@/lib/trpc'
-import type {
-  InvolvedPRSummary,
-  MergedPRSummary,
-  PRCheckStatus,
-  PRChecksPayload,
-  PRReaction,
-} from '../../shared/types'
 import { useSocket } from '../hooks/useSocket'
 import * as api from '../lib/api'
 import { useWorkspaceContext } from './WorkspaceContext'

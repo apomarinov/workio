@@ -1,3 +1,4 @@
+import { WEBHOOK_EVENTS } from '@domains/github/schema'
 import {
   DEFAULT_GH_QUERY_LIMITS,
   type GHQueryLimits,
@@ -38,7 +39,6 @@ import { useSocket } from '@/hooks/useSocket'
 import * as api from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import { WEBHOOK_EVENTS } from '../../shared/types'
 import { RefreshIcon } from './icons'
 
 interface GitHubModalProps {

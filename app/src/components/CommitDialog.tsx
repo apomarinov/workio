@@ -1,3 +1,4 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import {
   ChevronDown,
   GitCommitHorizontal,
@@ -18,7 +19,7 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import type { ChangedFile, PRCheckStatus } from '../../shared/types'
+import type { ChangedFile } from '../../shared/types'
 import { BranchDiffPanel } from './BranchDiffPanel'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel, type FileListHandle } from './DiffViewerPanel'

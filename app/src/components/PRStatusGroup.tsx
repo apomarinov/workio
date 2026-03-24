@@ -1,3 +1,4 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import {
   ChevronDown,
   ChevronRight,
@@ -9,7 +10,6 @@ import { memo } from 'react'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
-import type { PRCheckStatus } from '../../shared/types'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'
 
 interface PRStatusGroupProps {
