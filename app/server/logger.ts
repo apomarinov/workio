@@ -1,4 +1,11 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { format } from 'date-fns'
 import type { FastifyBaseLogger } from 'fastify'
+import pino from 'pino'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let _logger: FastifyBaseLogger | null = null
 
@@ -29,4 +36,33 @@ export const log = {
       _logger ? _logger.error(objOrMsg as string) : console.error(objOrMsg)
     }
   },
+}
+
+/**
+ * Creates a pino multistream that writes to a timestamped log file
+ * (and stdout in development). Rotates to keep only the last 10 logs.
+ */
+export function createLogStream(isDev: boolean): pino.MultiStreamRes {
+  const logsDir = path.join(__dirname, 'logs')
+  fs.mkdirSync(logsDir, { recursive: true })
+
+  // Keep only the last 10 server logs
+  const existingLogs = fs
+    .readdirSync(logsDir)
+    .filter((f) => f.startsWith('server-') && f.endsWith('.jsonl'))
+    .sort()
+    .reverse()
+  for (const oldLog of existingLogs.slice(10)) {
+    fs.unlinkSync(path.join(logsDir, oldLog))
+  }
+
+  const logFile = path.join(
+    logsDir,
+    `server-${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.jsonl`,
+  )
+  const logStreams: pino.StreamEntry[] = [{ stream: pino.destination(logFile) }]
+  if (isDev) {
+    logStreams.unshift({ stream: process.stdout })
+  }
+  return pino.multistream(logStreams)
 }

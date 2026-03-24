@@ -1,50 +1,29 @@
-import { type ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  detectAllTerminalBranches,
-  emitCachedPRChecks,
-  initGitHubChecks,
-  refreshPRChecks,
-} from '@domains/github/services/checks/polling'
+import { initGitHubChecks } from '@domains/github/services/checks/polling'
 import { startWebhookValidationPolling } from '@domains/github/services/webhooks'
-import {
-  emitNotification,
-  initWebPush,
-  markDesktopActive,
-} from '@domains/notifications/service'
-import { startGitDirtyPolling } from '@domains/pty/monitor'
-import { getActiveZellijSessionNames } from '@domains/pty/services/process-tree'
+import { initWebPush } from '@domains/notifications/service'
 import {
   destroyAllSessions,
-  getBellSubscribedShellIds,
-  getSession,
-  getSessionByTerminalId,
-  setPendingCommand,
-  subscribeBell,
-  unsubscribeBell,
   writeShellIntegrationScripts,
-  writeToSession,
 } from '@domains/pty/session'
-import { emitAllShellClients, handleUpgrade } from '@domains/pty/websocket'
+import { handleUpgrade } from '@domains/pty/websocket'
 import { initSessionListener } from '@domains/sessions/services/realtime-listener'
-import { getTerminalById } from '@domains/workspace/db/terminals'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
-import { format } from 'date-fns'
-import Fastify from 'fastify'
+import Fastify, { type FastifyBaseLogger } from 'fastify'
 import pino from 'pino'
-import { Server as SocketIOServer } from 'socket.io'
+import { createAuthHook } from './auth'
+import { startDaemon, stopDaemon } from './daemon'
 import { initDb } from './db'
 import { env } from './env'
-import { broadcastRefetch, type RefetchGroup, setIO } from './io'
-import { log, setLogger } from './logger'
+import { onMutationResponse, setupSocketIO } from './io'
+import { createLogStream, log, setLogger } from './logger'
 import claudeHookRoute from './routes/claude-hook'
 import githubWebhookRoute from './routes/github-webhook'
-import { getNgrokUrl, initNgrok, stopNgrok } from './services/ngrok'
-import { getServicesStatus } from './services/status'
+import { initNgrok, stopNgrok } from './services/ngrok'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
 import { createContext } from './trpc/init'
@@ -56,28 +35,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const port = env.NODE_ENV === 'production' ? env.CLIENT_PORT : env.SERVER_PORT
 
 // Write logs to file (and stdout in development)
-const logsDir = path.join(__dirname, 'logs')
-fs.mkdirSync(logsDir, { recursive: true })
-
-// Keep only the last 10 server logs
-const existingLogs = fs
-  .readdirSync(logsDir)
-  .filter((f) => f.startsWith('server-') && f.endsWith('.jsonl'))
-  .sort()
-  .reverse()
-for (const oldLog of existingLogs.slice(10)) {
-  fs.unlinkSync(path.join(logsDir, oldLog))
-}
-
-const logFile = path.join(
-  logsDir,
-  `server-${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.jsonl`,
-)
-const logStreams: pino.StreamEntry[] = [{ stream: pino.destination(logFile) }]
-if (env.NODE_ENV !== 'production') {
-  logStreams.unshift({ stream: process.stdout })
-}
-const logStream = pino.multistream(logStreams)
+const logStream = createLogStream(env.NODE_ENV !== 'production')
 
 // Try to load HTTPS certs
 const certsDir = path.join(__dirname, '../../certs')
@@ -105,7 +63,7 @@ const fastify = Fastify({
       },
     },
     logStream,
-  ),
+  ) as FastifyBaseLogger,
   disableRequestLogging: true, // Disable default verbose request logging
 })
 setLogger(fastify.log)
@@ -144,78 +102,8 @@ fastify.addHook('onResponse', async (request, reply) => {
 await fastify.register(rateLimit, { global: false })
 
 // Basic auth protection (when BASIC_AUTH env is set)
-if (env.BASIC_AUTH) {
-  const [authUser, authPass] = env.BASIC_AUTH.split(':')
-  const expected = `Basic ${Buffer.from(`${authUser}:${authPass}`).toString('base64')}`
-
-  const AUTH_MAX_FAILURES = 5
-  const AUTH_LOCKOUT_MS = 10 * 60 * 1000
-  const ipFailures = new Map<
-    string,
-    { attempts: number; lockedUntil: number }
-  >()
-
-  fastify.addHook('onRequest', async (request, reply) => {
-    // Only require auth when accessed through the ngrok domain
-    const host = (request.headers.host || '').split(':')[0]
-    const ngrokUrl = getNgrokUrl()
-    const ngrokDomain = ngrokUrl ? new URL(ngrokUrl).hostname : null
-    if (!ngrokDomain || host !== ngrokDomain) return
-
-    // Only require auth for API, WebSocket, and Socket.IO routes
-    const url = request.url
-    if (
-      !url.startsWith('/api/') &&
-      !url.startsWith('/ws/') &&
-      !url.startsWith('/socket.io/')
-    )
-      return
-    // GitHub webhooks must pass through without auth
-    if (url.startsWith('/api/webhooks/github')) return
-
-    const deny = () => {
-      reply.code(401).header('WWW-Authenticate', 'Basic').send('Unauthorized')
-    }
-
-    // Valid credentials always pass
-    if (request.headers.authorization === expected) return
-
-    const ip =
-      request.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
-      request.ip
-    const entry = ipFailures.get(ip) ?? { attempts: 0, lockedUntil: 0 }
-
-    // Lockout: deny this IP
-    if (Date.now() < entry.lockedUntil) {
-      deny()
-      return
-    }
-
-    // Only count as brute-force if credentials were actually sent
-    // (no header = browser's initial challenge, not a failed login)
-    if (request.headers.authorization) {
-      entry.attempts++
-      if (entry.attempts >= AUTH_MAX_FAILURES) {
-        entry.lockedUntil = Date.now() + AUTH_LOCKOUT_MS
-        log.warn(
-          `[auth] IP ${ip} locked out after ${entry.attempts} failed attempts`,
-        )
-        emitNotification(
-          'auth_lockout',
-          undefined,
-          { attempts: entry.attempts },
-          `lockout:${ip}:${Date.now()}`,
-        )
-        entry.attempts = 0
-      }
-      ipFailures.set(ip, entry)
-    }
-
-    deny()
-  })
-
-  log.info(`[auth] Basic auth enabled for user "${authUser}"`)
-}
+const authHook = createAuthHook()
+if (authHook) fastify.addHook('onRequest', authHook)
 
 // Initialize database
 await initDb()
@@ -227,120 +115,7 @@ await writeShellIntegrationScripts()
 await initWebPush()
 
 // Setup Socket.IO
-const io = new SocketIOServer(fastify.server, {
-  cors: {
-    origin:
-      env.NODE_ENV === 'production'
-        ? false
-        : (origin, callback) => callback(null, origin || true),
-    methods: ['GET', 'POST'],
-  },
-})
-setIO(io)
-
-io.on('connection', (socket) => {
-  log.info(`Client connected: ${socket.id}`)
-  emitAllShellClients(socket)
-  emitCachedPRChecks(socket)
-  refreshPRChecks()
-  startGitDirtyPolling()
-  socket.emit('services:status', getServicesStatus())
-
-  // Bell subscriptions
-  socket.emit('bell:subscriptions', getBellSubscribedShellIds())
-  socket.on(
-    'bell:subscribe',
-    (data: {
-      shellId: number
-      terminalId: number
-      command: string
-      terminalName: string
-    }) => {
-      subscribeBell(data)
-    },
-  )
-  socket.on('bell:unsubscribe', (data: { shellId: number }) => {
-    unsubscribeBell(data.shellId)
-  })
-
-  socket.on('detect-branches', () => {
-    detectAllTerminalBranches()
-  })
-
-  socket.on('zellij-attach', async (data: { terminalId: number }) => {
-    const { terminalId } = data
-    const session = getSessionByTerminalId(terminalId)
-    if (!session) return
-    const sessionName =
-      session.sessionName ||
-      (await getTerminalById(terminalId))?.name ||
-      `terminal-${terminalId}`
-    writeToSession(session.shell.id, `zellij attach '${sessionName}'\n`)
-  })
-
-  socket.on(
-    'run-in-shell',
-    async (data: { shellId: number; command: string; terminalId?: number }) => {
-      const { shellId: targetShellId, command, terminalId } = data
-
-      const ptySession = getSession(targetShellId)
-
-      // If the PTY session doesn't exist yet (e.g. newly created shell),
-      // queue the command to run after shell integration injection
-      if (!ptySession) {
-        setPendingCommand(targetShellId, command)
-        return
-      }
-
-      const zellijName = terminalId
-        ? ptySession.sessionName ||
-          (await getTerminalById(terminalId))?.name ||
-          `terminal-${terminalId}`
-        : ptySession.sessionName
-      const zellijSessions = await getActiveZellijSessionNames()
-      const hasZellij = zellijName && zellijSessions.has(zellijName)
-
-      if (hasZellij) {
-        writeToSession(targetShellId, 'zellij action new-tab\n')
-        setTimeout(() => {
-          writeToSession(targetShellId, `${command}\n`)
-        }, 300)
-      } else {
-        writeToSession(targetShellId, `${command}\n`)
-      }
-    },
-  )
-
-  socket.on(
-    'kill-process',
-    (data: { pid: number }, callback?: (result: { ok: boolean }) => void) => {
-      const { pid } = data
-      if (!pid || pid <= 0) {
-        callback?.({ ok: false })
-        return
-      }
-      try {
-        process.kill(pid, 'SIGTERM')
-        log.info(`[socket] Killed process ${pid}`)
-        callback?.({ ok: true })
-      } catch (err) {
-        log.error({ err }, `[socket] Failed to kill process ${pid}`)
-        callback?.({ ok: false })
-      }
-    },
-  )
-
-  socket.on('desktop:active', () => {
-    markDesktopActive()
-  })
-
-  socket.on('disconnect', () => {
-    log.info(`Client disconnected: ${socket.id}`)
-  })
-})
-
-// Export io for use in other modules
-export { io }
+setupSocketIO(fastify.server)
 
 // In production, serve built static files
 if (env.NODE_ENV === 'production') {
@@ -355,32 +130,8 @@ fastify.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
-// Broadcast refetch events to all clients after successful mutations.
-// Maps URL prefixes to refetch groups — covers both legacy REST and tRPC routes.
-const REFETCH_ROUTES: [string, RefetchGroup][] = [
-  // tRPC mutations
-  ['/api/trpc/workspace.', 'terminals'],
-  ['/api/trpc/settings.', 'settings'],
-  ['/api/trpc/notifications.', 'notifications'],
-  ['/api/trpc/sessions.', 'sessions'],
-]
-
-fastify.addHook('onResponse', (request, reply, done) => {
-  if (
-    request.method === 'POST' &&
-    reply.statusCode >= 200 &&
-    reply.statusCode < 300
-  ) {
-    const excludeSocketId = request.headers['x-socket-id'] as string | undefined
-    for (const [prefix, group] of REFETCH_ROUTES) {
-      if (request.url.startsWith(prefix)) {
-        broadcastRefetch(group, excludeSocketId)
-        break
-      }
-    }
-  }
-  done()
-})
+// Broadcast refetch events to all clients after successful mutations
+fastify.addHook('onResponse', onMutationResponse)
 
 // tRPC
 await fastify.register(fastifyTRPCPlugin, {
@@ -392,45 +143,7 @@ await fastify.register(fastifyTRPCPlugin, {
 await fastify.register(githubWebhookRoute)
 await fastify.register(claudeHookRoute)
 
-// Start monitor daemon (persistent Python process for hook events)
-const projectRoot = path.resolve(__dirname, '../..')
-const daemonScript = path.join(projectRoot, 'monitor_daemon.py')
-let daemonProcess: ChildProcess | null = null
-
-function startDaemon() {
-  daemonProcess = spawn('python3', [daemonScript], {
-    cwd: projectRoot,
-    stdio: ['ignore', 'ignore', 'pipe'],
-  })
-  daemonProcess.stderr?.on('data', (data: Buffer) => {
-    const msg = data.toString().trim()
-    if (msg) log.info(`[daemon] ${msg}`)
-  })
-  daemonProcess.on('exit', (code) => {
-    log.info(`[daemon] Monitor daemon exited with code ${code}`)
-    daemonProcess = null
-  })
-}
-
-function stopDaemon() {
-  if (daemonProcess) {
-    daemonProcess.kill('SIGTERM')
-    daemonProcess = null
-  }
-  // Clean up socket file
-  const sockPath = path.join(projectRoot, 'daemon.sock')
-  try {
-    fs.unlinkSync(sockPath)
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      (err as NodeJS.ErrnoException).code !== 'ENOENT'
-    ) {
-      log.error({ err }, '[daemon] Failed to clean up socket file')
-    }
-  }
-}
-
+// Shutdown handling
 process.on('exit', stopDaemon)
 function shutdown() {
   destroyAllSessions()
@@ -469,7 +182,7 @@ const start = async () => {
     log.info('[ws] Terminal WebSocket handler registered at /ws/terminal')
 
     // Initialize PostgreSQL NOTIFY/LISTEN
-    await initSessionListener(io, env.DATABASE_URL)
+    await initSessionListener(env.DATABASE_URL)
 
     // Initialize GitHub PR checks polling
     initGitHubChecks()

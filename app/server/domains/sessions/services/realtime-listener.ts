@@ -2,9 +2,9 @@ import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
 import { scanAndStorePermissionPrompt } from '@domains/pty/services/permission-scanner'
 import { getTerminalById } from '@domains/workspace/db/terminals'
+import { getIO } from '@server/io'
 import { log } from '@server/logger'
 import pg from 'pg'
-import type { Server as SocketIOServer } from 'socket.io'
 import { getActivePermissions, getMessagesByIds } from '../db'
 import { detectSessionBranch } from './branch-tracking'
 
@@ -15,10 +15,8 @@ let listenerClient: pg.Client | null = null
  * deletions) and handles branch detection on session start, push notifications
  * on stop/permission prompts, and live UI updates via socket.io.
  */
-export async function initSessionListener(
-  io: SocketIOServer,
-  connectionString: string,
-) {
+export async function initSessionListener(connectionString: string) {
+  const io = getIO()!
   listenerClient = new pg.Client({ connectionString })
   await listenerClient.connect()
 
@@ -200,7 +198,7 @@ export async function initSessionListener(
   listenerClient.on('error', (err) => {
     log.error({ err }, 'LISTEN: connection error, reconnecting...')
     listenerClient = null
-    setTimeout(() => initSessionListener(io, connectionString), 1000)
+    setTimeout(() => initSessionListener(connectionString), 1000)
   })
 
   log.info(
