@@ -396,7 +396,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       ? bindingToHotkeyString(customCommandsBinding)
       : '',
     (e) => {
-      if (disabledRef.current) return
+      if (disabledRef.current || commitDialogOpenRef.current) return
       e.stopPropagation()
       handlersRef.current.customCommands?.()
     },

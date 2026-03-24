@@ -1,99 +1,21 @@
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
 import { scanAndStorePermissionPrompt } from '@domains/pty/services/permission-scanner'
-import {
-  getActivePermissions,
-  getMessagesByIds,
-  getSessionById,
-  updateSessionData,
-} from '@domains/sessions/db'
 import { getTerminalById } from '@domains/workspace/db/terminals'
+import { log } from '@server/logger'
 import pg from 'pg'
 import type { Server as SocketIOServer } from 'socket.io'
-import { execFileAsync } from './lib/exec'
-import { log } from './logger'
-import { execSSHCommand } from './ssh/exec'
-
-async function detectLocalBranch(cwd: string): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync(
-      'git',
-      ['rev-parse', '--abbrev-ref', 'HEAD'],
-      { cwd, timeout: 5000 },
-    )
-    if (stdout.trim()) return stdout.trim()
-  } catch {
-    // Fall through to symbolic-ref
-  }
-  const { stdout } = await execFileAsync(
-    'git',
-    ['symbolic-ref', '--short', 'HEAD'],
-    { cwd, timeout: 5000 },
-  )
-  return stdout.trim()
-}
-
-async function detectSessionBranch(
-  io: SocketIOServer,
-  sessionId: string,
-  terminalId: number | null,
-  projectPath: string,
-) {
-  try {
-    let branch: string
-    const terminal = terminalId ? await getTerminalById(terminalId) : null
-
-    if (terminal) {
-      if (terminal.ssh_host) {
-        const cmd =
-          'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null'
-        const { stdout } = await execSSHCommand(terminal.ssh_host, cmd, {
-          cwd: terminal.cwd,
-        })
-        branch = stdout.trim()
-      } else {
-        const cwd = terminal.cwd || projectPath
-        branch = await detectLocalBranch(cwd)
-      }
-    } else {
-      branch = await detectLocalBranch(projectPath)
-    }
-
-    if (!branch) return
-
-    const repo = terminal?.git_repo?.repo ?? ''
-
-    // Build unique branches list
-    const existing = await getSessionById(sessionId)
-    let branches = existing?.data?.branches ?? []
-
-    // Backfill old branch if it was set before branches tracking existed
-    const oldBranch = existing?.data?.branch
-    if (oldBranch && !branches.some((e) => e.branch === oldBranch)) {
-      branches = [...branches, { branch: oldBranch, repo }]
-    }
-
-    if (!branches.some((e) => e.branch === branch && e.repo === repo)) {
-      branches = [...branches, { branch, repo }]
-    }
-
-    const data = { branch, repo, branches }
-    await updateSessionData(sessionId, data)
-    io.emit('session:updated', { sessionId, data })
-    log.info(
-      `[listen] Detected branch="${branch}" repo="${repo}" for session=${sessionId}`,
-    )
-  } catch (err) {
-    log.error(
-      { err, sessionId },
-      '[listen] Failed to detect branch for session',
-    )
-  }
-}
+import { getActivePermissions, getMessagesByIds } from '../db'
+import { detectSessionBranch } from './branch-tracking'
 
 let listenerClient: pg.Client | null = null
 
-export async function initPgListener(
+/**
+ * Listens for real-time session events (hook status changes, message updates,
+ * deletions) and handles branch detection on session start, push notifications
+ * on stop/permission prompts, and live UI updates via socket.io.
+ */
+export async function initSessionListener(
   io: SocketIOServer,
   connectionString: string,
 ) {
@@ -112,7 +34,6 @@ export async function initPgListener(
 
       if (msg.channel === 'hook') {
         io.emit('hook', payload)
-        // log.info(`LISTEN: hook event session=${payload.session_id}`)
 
         if (payload.hook_type === 'SessionStart') {
           // Fire-and-forget branch detection
@@ -213,7 +134,7 @@ export async function initPgListener(
               } catch (err) {
                 log.error(
                   { err },
-                  '[listen] Failed to build enriched notification',
+                  '[realtime-listener] Failed to build enriched notification',
                 )
               }
 
@@ -279,7 +200,7 @@ export async function initPgListener(
   listenerClient.on('error', (err) => {
     log.error({ err }, 'LISTEN: connection error, reconnecting...')
     listenerClient = null
-    setTimeout(() => initPgListener(io, connectionString), 1000)
+    setTimeout(() => initSessionListener(io, connectionString), 1000)
   })
 
   log.info(

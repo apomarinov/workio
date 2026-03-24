@@ -28,6 +28,7 @@ import {
   writeToSession,
 } from '@domains/pty/session'
 import { emitAllShellClients, handleUpgrade } from '@domains/pty/websocket'
+import { initSessionListener } from '@domains/sessions/services/realtime-listener'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
@@ -39,7 +40,6 @@ import { Server as SocketIOServer } from 'socket.io'
 import { initDb } from './db'
 import { env } from './env'
 import { broadcastRefetch, type RefetchGroup, setIO } from './io'
-import { initPgListener } from './listen'
 import { log, setLogger } from './logger'
 import claudeHookRoute from './routes/claude-hook'
 import githubWebhookRoute from './routes/github-webhook'
@@ -469,7 +469,7 @@ const start = async () => {
     log.info('[ws] Terminal WebSocket handler registered at /ws/terminal')
 
     // Initialize PostgreSQL NOTIFY/LISTEN
-    await initPgListener(io, env.DATABASE_URL)
+    await initSessionListener(io, env.DATABASE_URL)
 
     // Initialize GitHub PR checks polling
     initGitHubChecks()
