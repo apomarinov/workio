@@ -282,99 +282,57 @@ export async function createPR(
   })
 }
 
-// --- Git operations ---
+// --- Git branch operations ---
 
-export interface BranchInfo {
-  name: string
-  current: boolean
-  commitDate: string
+export async function getBranches(terminalId: number) {
+  return gh.git.branches.list.query({ terminalId })
 }
 
-export interface BranchesResponse {
-  local: BranchInfo[]
-  remote: BranchInfo[]
-}
-
-export async function getBranches(
-  terminalId: number,
-): Promise<BranchesResponse> {
-  return api(`${API_BASE}/terminals/${terminalId}/branches`)
-}
-
-export async function fetchAll(
-  terminalId: number,
-): Promise<{ success: boolean }> {
-  return api(`${API_BASE}/terminals/${terminalId}/fetch-all`, {
-    method: 'POST',
-  })
+export async function fetchAll(terminalId: number) {
+  await gh.git.branches.fetchAllMutation.mutate({ terminalId })
 }
 
 export async function checkoutBranch(
   terminalId: number,
   branch: string,
-  isRemote: boolean,
-): Promise<{ success: boolean; branch: string; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/checkout`, {
-    body: { branch, isRemote },
-  })
+  _isRemote: boolean,
+) {
+  await gh.git.branches.checkoutMutation.mutate({ terminalId, branch })
 }
 
-export async function pullBranch(
-  terminalId: number,
-  branch: string,
-): Promise<{ success: boolean; branch: string; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/pull`, {
-    body: { branch },
-  })
+export async function pullBranch(terminalId: number, branch: string) {
+  await gh.git.branches.pullMutation.mutate({ terminalId, branch })
 }
 
 export async function pushBranch(
   terminalId: number,
   branch: string,
   force?: boolean,
-): Promise<{ success: boolean; branch: string; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/push`, {
-    body: { branch, force },
-  })
+) {
+  await gh.git.branches.pushMutation.mutate({ terminalId, branch, force })
 }
 
-export async function rebaseBranch(
-  terminalId: number,
-  branch: string,
-): Promise<{
-  success: boolean
-  branch: string
-  onto: string
-  error?: string
-}> {
-  return api(`${API_BASE}/terminals/${terminalId}/rebase`, {
-    body: { branch },
-  })
+export async function rebaseBranch(terminalId: number, branch: string) {
+  return gh.git.branches.rebaseMutation.mutate({ terminalId, branch })
 }
 
 export async function createBranch(
   terminalId: number,
   name: string,
   from: string,
-): Promise<{ success: boolean; branch: string; error?: string }> {
-  return api(`${API_BASE}/terminals/${terminalId}/create-branch`, {
-    body: { name, from },
-  })
+) {
+  await gh.git.branches.createBranchMutation.mutate({ terminalId, name, from })
 }
 
 export async function deleteBranch(
   terminalId: number,
   branch: string,
   deleteRemote?: boolean,
-): Promise<{
-  success: boolean
-  branch: string
-  deletedRemote?: boolean
-  error?: string
-}> {
-  return api(`${API_BASE}/terminals/${terminalId}/branch`, {
-    method: 'DELETE',
-    body: { branch, deleteRemote },
+) {
+  return gh.git.branches.deleteBranchMutation.mutate({
+    terminalId,
+    branch,
+    deleteRemote,
   })
 }
 
@@ -383,14 +341,12 @@ export async function renameBranch(
   branch: string,
   newName: string,
   renameRemote?: boolean,
-): Promise<{
-  success: boolean
-  branch: string
-  newName: string
-  renamedRemote?: boolean
-}> {
-  return api(`${API_BASE}/terminals/${terminalId}/rename-branch`, {
-    body: { branch, newName, renameRemote },
+) {
+  return gh.git.branches.renameBranchMutation.mutate({
+    terminalId,
+    branch,
+    newName,
+    renameRemote,
   })
 }
 

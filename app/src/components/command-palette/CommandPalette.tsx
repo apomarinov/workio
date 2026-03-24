@@ -1,3 +1,4 @@
+import type { BranchesResponse } from '@domains/git/schema'
 import type { PRCheckStatus } from '@domains/github/schema'
 import { DEFAULT_KEYMAP } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
@@ -20,7 +21,6 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import { useSocket } from '@/hooks/useSocket'
 import {
-  type BranchesResponse,
   checkoutBranch,
   closePR,
   createBranch,
