@@ -1,6 +1,6 @@
 import { execFileAsync } from '@server/lib/exec'
 import { log } from '@server/logger'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import {
   closedPRsInput,
   conductorInput,

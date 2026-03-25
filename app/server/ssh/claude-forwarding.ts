@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { env } from '../env'
 import { shellEscape } from '../lib/strings'
 import { log } from '../logger'
-import { updateClaudeBootstrap, updateClaudeTunnel } from '../services/status'
+import { updateClaudeBootstrap, updateClaudeTunnel } from '../status'
 import { resolveStableHostId } from './config'
 import { poolExecSSHCommand } from './pool'
 

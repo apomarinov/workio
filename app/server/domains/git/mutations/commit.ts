@@ -9,7 +9,7 @@ import { gitExec, gitExecLogged } from '@server/lib/git'
 import { expandPath, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
 import { execSSHCommand } from '@server/ssh/exec'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { resolveGitTerminal } from '../resolve'
 import { commitHashInput, commitInput, discardInput } from '../schema'
 

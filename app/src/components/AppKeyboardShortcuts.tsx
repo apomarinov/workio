@@ -202,7 +202,9 @@ export function AppKeyboardShortcuts() {
         )
       } else if (t.git_branch) {
         window.dispatchEvent(
-          new CustomEvent('open-branch-actions', { detail: { terminalId: t.id } }),
+          new CustomEvent('open-branch-actions', {
+            detail: { terminalId: t.id },
+          }),
         )
       }
     },

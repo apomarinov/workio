@@ -1,7 +1,7 @@
 import { env } from '@server/env'
 import serverEvents from '@server/lib/events'
+import { publicProcedure } from '@server/trpc'
 import { execFileAsync } from '../../lib/exec'
-import { publicProcedure } from '../../trpc/init'
 import { getSettings, updateSettings } from './db'
 import { updateSettingsInput } from './schema'
 

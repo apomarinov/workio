@@ -1,4 +1,4 @@
-import { router } from '@server/trpc/init'
+import { router } from '@server/trpc'
 import * as setupMutations from './mutations/setup'
 import * as shellMutations from './mutations/shells'
 import * as systemMutations from './mutations/system'

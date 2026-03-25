@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "check": "biome check src server && npm run typecheck",
     "lint:fix": "biome check --write src server",
-    "certs": "bash scripts/generate-certs.sh"
+    "certs": "bash server/scripts/generate-certs.sh"
   },
   "keywords": [],
   "author": "",

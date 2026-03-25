@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { getAllTerminals } from '../db/terminals'
 
 export const listTerminals = publicProcedure.query(async () => {

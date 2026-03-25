@@ -1,5 +1,5 @@
 import { gitExec } from '@server/lib/git'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { resolveGitTerminal } from '../resolve'
 import { type BranchInfo, terminalIdInput } from '../schema'
 

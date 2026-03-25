@@ -2,7 +2,7 @@ import { emitNotification } from '@domains/notifications/service'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { env } from './env'
 import { log } from './logger'
-import { getNgrokUrl } from './services/ngrok'
+import { getNgrokUrl } from './ngrok'
 
 /**
  * Creates the basic auth onRequest hook. Returns undefined if BASIC_AUTH is not set.

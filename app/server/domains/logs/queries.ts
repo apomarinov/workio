@@ -1,4 +1,4 @@
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { getCommandLogs, getLogTerminals } from './db'
 import { listInput } from './schema'
 

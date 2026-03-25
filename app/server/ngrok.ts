@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { getSettings } from '@domains/settings/db'
-import serverEvents from '../lib/events'
-import { log } from '../logger'
+import serverEvents from './lib/events'
+import { log } from './logger'
 import { updateNgrokStatus } from './status'
 
 let ngrokProcess: ChildProcess | null = null

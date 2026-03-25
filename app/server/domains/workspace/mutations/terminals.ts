@@ -10,7 +10,7 @@ import serverEvents from '@server/lib/events'
 import { expandPath, sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
 import { validateSSHHost } from '@server/ssh/config'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import {
   createTerminal as dbCreateTerminal,
   deleteTerminal as dbDeleteTerminal,

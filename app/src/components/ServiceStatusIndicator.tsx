@@ -26,7 +26,7 @@ import type {
   NgrokStatus,
   ServiceStatus,
   ServicesStatus,
-} from '../../server/services/status'
+} from '../../server/status'
 import { useWebhookWarning } from './GitHubModal'
 import { ClaudeIcon } from './icons'
 

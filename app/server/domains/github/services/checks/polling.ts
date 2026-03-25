@@ -10,8 +10,8 @@ import {
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
-import { updateGithubGraphql, updateGithubRest } from '@server/services/status'
 import { execSSHCommand } from '@server/ssh/exec'
+import { updateGithubGraphql, updateGithubRest } from '@server/status'
 import type { PRCheckStatus } from '../../schema'
 import {
   checkGhAvailable,

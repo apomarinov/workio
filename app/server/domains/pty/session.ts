@@ -951,7 +951,13 @@ export function getAllSessions() {
 // ── File helpers ────────────────────────────────────────────────────
 
 export async function writeShellIntegrationScripts() {
-  const srcDir = path.join(__dirname, '..', '..', 'pty', 'shell-integration')
+  const srcDir = path.join(
+    __dirname,
+    '..',
+    '..',
+    'scripts',
+    'shell-integration',
+  )
   await fs.promises.mkdir(WORKIO_INTEGRATION_DIR, { recursive: true })
   const files = ['bash.sh', 'zsh.sh', 'ssh-inline.sh']
   await Promise.all(

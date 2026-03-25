@@ -4,7 +4,7 @@ import { getShellById } from '@domains/workspace/db/shells'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import { getIO } from '@server/io'
 import { log } from '@server/logger'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import {
   deleteAllNotifications,
   deleteNotification,

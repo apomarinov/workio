@@ -1,4 +1,4 @@
-import { router } from '../../trpc/init'
+import { router } from '@server/trpc'
 import * as mutations from './mutations'
 import * as queries from './queries'
 

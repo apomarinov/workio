@@ -1,4 +1,4 @@
-import { router } from '@server/trpc/init'
+import { router } from '@server/trpc'
 import * as queries from './queries'
 
 export const logsRouter = router({

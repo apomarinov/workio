@@ -1,4 +1,4 @@
-import { router } from '@server/trpc/init'
+import { router } from '@server/trpc'
 import * as branchMutations from './mutations/branches'
 import * as commitMutations from './mutations/commit'
 import * as branchQueries from './queries/branches'

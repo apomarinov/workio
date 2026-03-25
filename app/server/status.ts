@@ -1,4 +1,4 @@
-import { getIO } from '../io'
+import serverEvents from './lib/events'
 
 // Service status types
 export type ServiceStatus =
@@ -71,7 +71,7 @@ const servicesStatus: ServicesStatus = {
 }
 
 function emit() {
-  getIO()?.emit('services:status', servicesStatus)
+  serverEvents.emit('services:status', servicesStatus)
 }
 
 export function updateGithubRest(patch: Partial<GitHubApiStatus>) {

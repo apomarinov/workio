@@ -1,4 +1,4 @@
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { deleteSession, deleteSessions, updateSession } from './db'
 import {
   backfillRunInput,

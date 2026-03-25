@@ -1,7 +1,7 @@
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import { gitExec } from '@server/lib/git'
 import { expandPath } from '@server/lib/strings'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { resolveGitTerminal } from '../resolve'
 import {
   branchCommitsInput,

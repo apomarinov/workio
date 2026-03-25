@@ -22,8 +22,9 @@ import { getTerminalById } from '@domains/workspace/db/terminals'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { type Socket, Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
+import serverEvents from './lib/events'
 import { log } from './logger'
-import { getServicesStatus } from './services/status'
+import { getServicesStatus } from './status'
 
 let io: SocketIOServer | null = null
 
@@ -107,6 +108,11 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     },
   })
   io = server
+
+  // Forward status updates from serverEvents to all Socket.IO clients
+  serverEvents.on('services:status', (status) => {
+    server.emit('services:status', status)
+  })
 
   server.on('connection', (socket) => {
     log.info(`Client connected: ${socket.id}`)

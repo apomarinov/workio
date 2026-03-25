@@ -1,5 +1,5 @@
 import { log } from '@server/logger'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { z } from 'zod'
 import { getTerminalById, updateTerminal } from '../db/terminals'
 import { emitWorkspace } from '../services/emit'

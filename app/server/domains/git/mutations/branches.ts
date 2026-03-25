@@ -4,7 +4,7 @@ import {
 } from '@domains/pty/monitor'
 import { gitExec, gitExecLogged } from '@server/lib/git'
 import { log } from '@server/logger'
-import { publicProcedure } from '@server/trpc/init'
+import { publicProcedure } from '@server/trpc'
 import { resolveGitTerminal } from '../resolve'
 import {
   checkoutInput,
