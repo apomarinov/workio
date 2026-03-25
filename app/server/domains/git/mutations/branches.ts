@@ -10,7 +10,7 @@ import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
   checkAndEmitSingleGitDirty,
   detectGitBranch,
-} from '@domains/pty/monitor'
+} from '@domains/git/services/status'
 import { gitExec, gitExecLogged } from '@server/lib/git'
 import { log } from '@server/logger'
 import { publicProcedure } from '@server/trpc'

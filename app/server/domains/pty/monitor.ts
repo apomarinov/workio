@@ -1,12 +1,8 @@
-import { execFile } from 'node:child_process'
 import os from 'node:os'
-import { getGhUsername } from '@domains/github/services/checks/state'
+import { disposeGitState } from '@domains/git/services/status'
 import type {
   ActiveProcess,
   CommandEvent,
-  GitDiffStat,
-  GitLastCommit,
-  GitRemoteSyncStat,
   HostResourceInfo,
   PortForwardStatus,
   RemoteProcessInfo,
@@ -40,14 +36,11 @@ import { updateShell } from '@domains/workspace/db/shells'
 import {
   getAllTerminals,
   getTerminalById,
-  updateTerminal,
 } from '@domains/workspace/db/terminals'
-import { emitWorkspace } from '@domains/workspace/services/emit'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { sanitizeName } from '@server/lib/strings'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
 import { closeConnection } from '@server/ssh/pool'
 import {
   getTunnelStatuses,
@@ -72,7 +65,6 @@ const sshHostInfoCache = new Map<
 const processFirstSeen = new Map<string, number>()
 
 let globalProcessPollingId: NodeJS.Timeout | null = null
-let gitDirtyPollingId: NodeJS.Timeout | null = null
 
 // ── TerminalMonitor class ────────────────────────────────────────────
 
@@ -80,135 +72,10 @@ const monitors = new Map<number, TerminalMonitor>()
 
 export class TerminalMonitor {
   readonly terminalId: number
-  lastDirty: GitDiffStat | null = null
-  lastRemoteSync: GitRemoteSyncStat | null = null
-  lastCommit: GitLastCommit | null = null
   processPollTimeout: NodeJS.Timeout | null = null
 
   constructor(terminalId: number) {
     this.terminalId = terminalId
-  }
-
-  async checkAndEmitGitDirty(force?: boolean) {
-    try {
-      const terminal = await getTerminalById(this.terminalId)
-      if (!terminal || !terminal.git_branch) return
-
-      const [stat, syncStat, commit] = await Promise.all([
-        checkGitDirty(terminal.cwd, terminal.ssh_host),
-        checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
-        checkLastCommit(terminal.cwd, terminal.ssh_host),
-      ])
-
-      const dirtyChanged =
-        !this.lastDirty ||
-        this.lastDirty.added !== stat.added ||
-        this.lastDirty.removed !== stat.removed ||
-        this.lastDirty.untracked !== stat.untracked ||
-        this.lastDirty.untrackedLines !== stat.untrackedLines
-      const commitChanged = commit
-        ? !this.lastCommit || this.lastCommit.hash !== commit.hash
-        : false
-
-      if (force || dirtyChanged || commitChanged) {
-        this.lastDirty = stat
-        if (commit) this.lastCommit = commit
-        const dirtyStatus: Record<number, GitDiffStat> = {}
-        const lastCommit: Record<number, GitLastCommit> = {}
-        for (const [id, m] of monitors) {
-          if (m.lastDirty) dirtyStatus[id] = m.lastDirty
-          if (m.lastCommit) lastCommit[id] = m.lastCommit
-        }
-        getIO()?.emit('git:dirty-status', { dirtyStatus, lastCommit })
-      }
-
-      const syncChanged =
-        !this.lastRemoteSync ||
-        this.lastRemoteSync.behind !== syncStat.behind ||
-        this.lastRemoteSync.ahead !== syncStat.ahead ||
-        this.lastRemoteSync.noRemote !== syncStat.noRemote
-
-      if (force || syncChanged) {
-        this.lastRemoteSync = syncStat
-        const syncStatus: Record<number, GitRemoteSyncStat> = {}
-        for (const [id, m] of monitors) {
-          if (m.lastRemoteSync) syncStatus[id] = m.lastRemoteSync
-        }
-        getIO()?.emit('git:remote-sync', { syncStatus })
-      }
-    } catch (err) {
-      log.error({ err }, '[pty] Failed to scan and emit git dirty status')
-    }
-  }
-
-  async detectGitBranch(options?: { skipPRRefresh?: boolean }) {
-    try {
-      const terminal = await getTerminalById(this.terminalId)
-      if (!terminal) return
-
-      let branch: string | null = null
-
-      if (terminal.ssh_host) {
-        const result = await execSSHCommand(
-          terminal.ssh_host,
-          'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null',
-          terminal.cwd,
-        )
-        branch = result.stdout.trim() || null
-      } else {
-        branch = await new Promise<string | null>((resolve) => {
-          execFile(
-            'git',
-            ['rev-parse', '--abbrev-ref', 'HEAD'],
-            { cwd: terminal.cwd },
-            (err, stdout) => {
-              if (!err && stdout?.trim()) return resolve(stdout.trim())
-              execFile(
-                'git',
-                ['symbolic-ref', '--short', 'HEAD'],
-                { cwd: terminal.cwd },
-                (err2, stdout2) => {
-                  if (err2 || !stdout2) return resolve(null)
-                  resolve(stdout2.trim() || null)
-                },
-              )
-            },
-          )
-        })
-      }
-
-      if (branch) {
-        await updateTerminal(this.terminalId, { git_branch: branch })
-        getIO()?.emit('terminal:updated', {
-          terminalId: this.terminalId,
-          data: { git_branch: branch },
-        })
-        if (!options?.skipPRRefresh) {
-          serverEvents.emit('github:refresh-pr-checks')
-        }
-
-        if (!terminal.git_repo) {
-          try {
-            const repo = await detectRepoSlug(terminal.cwd, terminal.ssh_host)
-            if (repo) {
-              const gitRepo = { repo, status: 'done' as const }
-              await updateTerminal(this.terminalId, { git_repo: gitRepo })
-              await emitWorkspace(this.terminalId, { git_repo: gitRepo })
-            }
-          } catch (err) {
-            log.error(
-              { err, terminalId: this.terminalId },
-              '[pty] Failed to detect repo slug',
-            )
-          }
-        }
-      }
-    } catch (err) {
-      log.error(
-        { err },
-        `[pty] Failed to detect git branch for terminal ${this.terminalId}`,
-      )
-    }
   }
 
   clearProcessPollTimeout() {
@@ -220,9 +87,6 @@ export class TerminalMonitor {
 
   dispose() {
     this.clearProcessPollTimeout()
-    this.lastDirty = null
-    this.lastRemoteSync = null
-    this.lastCommit = null
   }
 }
 
@@ -796,449 +660,6 @@ function stopGlobalProcessPolling() {
   }
 }
 
-// ── Git helpers (stateless I/O) ──────────────────────────────────────
-
-function parseDiffNumstat(stdout: string) {
-  let added = 0
-  let removed = 0
-  for (const line of stdout.trim().split('\n')) {
-    if (!line) continue
-    const parts = line.split('\t')
-    if (parts[0] !== '-') added += Number(parts[0]) || 0
-    if (parts[1] !== '-') removed += Number(parts[1]) || 0
-  }
-  return { added, removed }
-}
-
-function countUntracked(stdout: string) {
-  if (!stdout.trim()) return 0
-  return stdout.trim().split('\n').length
-}
-
-async function checkLastCommit(cwd: string, sshHost?: string | null) {
-  try {
-    let logOut: string
-    let userName: string
-    if (sshHost) {
-      const [logResult, userResult] = await Promise.all([
-        execSSHCommand(sshHost, 'git log -1 --format="%H%n%an%n%aI%n%s"', cwd),
-        execSSHCommand(sshHost, 'git config user.name || true', cwd),
-      ])
-      logOut = logResult.stdout
-      userName = userResult.stdout.trim()
-    } else {
-      ;[logOut, userName] = await Promise.all([
-        new Promise<string>((resolve, reject) => {
-          execFile(
-            'git',
-            ['log', '-1', '--format=%H%n%an%n%aI%n%s'],
-            { cwd, timeout: 5000 },
-            (err, out) => (err ? reject(err) : resolve(out)),
-          )
-        }),
-        new Promise<string>((resolve) => {
-          execFile(
-            'git',
-            ['config', 'user.name'],
-            { cwd, timeout: 5000 },
-            (err, out) => resolve(err ? '' : out.trim()),
-          )
-        }),
-      ])
-    }
-    const lines = logOut.trim().split('\n')
-    if (lines.length < 4) return null
-    const author = lines[1]
-    return {
-      hash: lines[0],
-      author,
-      date: lines[2],
-      subject: lines.slice(3).join('\n'),
-      isLocal: !!userName && author === userName,
-    }
-  } catch {
-    return null
-  }
-}
-
-async function checkGitDirty(cwd: string, sshHost?: string | null) {
-  const zero = { added: 0, removed: 0, untracked: 0, untrackedLines: 0 }
-  try {
-    if (sshHost) {
-      const [diffResult, untrackedResult, untrackedLinesResult] =
-        await Promise.all([
-          execSSHCommand(
-            sshHost,
-            'git diff --numstat HEAD 2>/dev/null || git diff --numstat',
-            cwd,
-          ),
-          execSSHCommand(
-            sshHost,
-            'git ls-files --others --exclude-standard',
-            cwd,
-          ),
-          execSSHCommand(
-            sshHost,
-            'git ls-files -z --others --exclude-standard | xargs -0 cat 2>/dev/null | wc -l',
-            cwd,
-          ),
-        ])
-      const diff = parseDiffNumstat(diffResult.stdout)
-      const untrackedLines =
-        Number.parseInt(untrackedLinesResult.stdout.trim(), 10) || 0
-      return {
-        added: diff.added,
-        removed: diff.removed,
-        untracked: countUntracked(untrackedResult.stdout),
-        untrackedLines,
-      }
-    }
-    return await new Promise<{
-      added: number
-      removed: number
-      untracked: number
-      untrackedLines: number
-    }>((resolve) => {
-      let diff = { added: 0, removed: 0 }
-      let untracked = 0
-      let untrackedLines = 0
-      let completed = 0
-      const checkDone = () => {
-        if (++completed === 3)
-          resolve({
-            added: diff.added,
-            removed: diff.removed,
-            untracked,
-            untrackedLines,
-          })
-      }
-
-      execFile(
-        'git',
-        ['diff', '--numstat', 'HEAD'],
-        { cwd, timeout: 5000 },
-        (err, stdout) => {
-          if (err) {
-            execFile(
-              'git',
-              ['diff', '--numstat'],
-              { cwd, timeout: 5000 },
-              (err2, stdout2) => {
-                if (!err2) diff = parseDiffNumstat(stdout2)
-                checkDone()
-              },
-            )
-          } else {
-            diff = parseDiffNumstat(stdout)
-            checkDone()
-          }
-        },
-      )
-
-      execFile(
-        'git',
-        ['ls-files', '--others', '--exclude-standard'],
-        { cwd, timeout: 5000 },
-        (err, stdout) => {
-          if (!err) untracked = countUntracked(stdout)
-          checkDone()
-        },
-      )
-
-      execFile(
-        'sh',
-        [
-          '-c',
-          'git ls-files -z --others --exclude-standard | xargs -0 cat 2>/dev/null | wc -l',
-        ],
-        { cwd, timeout: 5000 },
-        (err, stdout) => {
-          if (!err) untrackedLines = Number.parseInt(stdout.trim(), 10) || 0
-          checkDone()
-        },
-      )
-    })
-  } catch (err) {
-    log.error({ err, cwd }, '[pty] Failed to check git dirty status')
-    return zero
-  }
-}
-
-async function checkGitRemoteSync(cwd: string, sshHost?: string | null) {
-  const noRemote = { behind: 0, ahead: 0, noRemote: true }
-  try {
-    if (sshHost) {
-      const refCmd =
-        'REF=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || (git rev-parse --abbrev-ref HEAD | xargs -I {} git rev-parse --verify origin/{} >/dev/null 2>&1 && git rev-parse --abbrev-ref HEAD | xargs -I {} echo origin/{}))'
-      const [behindResult, aheadResult] = await Promise.all([
-        execSSHCommand(
-          sshHost,
-          `${refCmd}; [ -n "$REF" ] && git rev-list --count HEAD..$REF || true`,
-          cwd,
-        ),
-        execSSHCommand(
-          sshHost,
-          `${refCmd}; [ -n "$REF" ] && git rev-list --count $REF..HEAD || true`,
-          cwd,
-        ),
-      ])
-      if (!behindResult.stdout.trim() || !aheadResult.stdout.trim()) {
-        return noRemote
-      }
-      return {
-        behind: Number.parseInt(behindResult.stdout.trim(), 10) || 0,
-        ahead: Number.parseInt(aheadResult.stdout.trim(), 10) || 0,
-        noRemote: false,
-      }
-    }
-    return await new Promise<{
-      behind: number
-      ahead: number
-      noRemote: boolean
-    }>((resolve) => {
-      execFile(
-        'git',
-        ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
-        { cwd, timeout: 5000 },
-        (upstreamErr, upstreamRef) => {
-          if (!upstreamErr && upstreamRef.trim()) {
-            countRemoteSync(cwd, upstreamRef.trim(), resolve, noRemote)
-          } else {
-            execFile(
-              'git',
-              ['rev-parse', '--abbrev-ref', 'HEAD'],
-              { cwd, timeout: 5000 },
-              (branchErr, branch) => {
-                if (branchErr || !branch.trim()) {
-                  resolve(noRemote)
-                  return
-                }
-                const remoteBranch = `origin/${branch.trim()}`
-                execFile(
-                  'git',
-                  ['rev-parse', '--verify', remoteBranch],
-                  { cwd, timeout: 5000 },
-                  (verifyErr) => {
-                    if (verifyErr) {
-                      resolve(noRemote)
-                    } else {
-                      countRemoteSync(cwd, remoteBranch, resolve, noRemote)
-                    }
-                  },
-                )
-              },
-            )
-          }
-        },
-      )
-    })
-  } catch (err) {
-    log.error({ err, cwd }, '[pty] Failed to check git remote sync')
-    return noRemote
-  }
-}
-
-function countRemoteSync(
-  cwd: string,
-  remoteRef: string,
-  resolve: (value: {
-    behind: number
-    ahead: number
-    noRemote: boolean
-  }) => void,
-  noRemote: { behind: number; ahead: number; noRemote: boolean },
-) {
-  let behind = 0
-  let ahead = 0
-  let completed = 0
-  const checkDone = () => {
-    if (++completed === 2) {
-      resolve({ behind, ahead, noRemote: false })
-    }
-  }
-
-  execFile(
-    'git',
-    ['rev-list', '--count', `HEAD..${remoteRef}`],
-    { cwd, timeout: 5000 },
-    (err, stdout) => {
-      if (err) {
-        resolve(noRemote)
-        return
-      }
-      behind = Number.parseInt(stdout.trim(), 10) || 0
-      checkDone()
-    },
-  )
-
-  execFile(
-    'git',
-    ['rev-list', '--count', `${remoteRef}..HEAD`],
-    { cwd, timeout: 5000 },
-    (err, stdout) => {
-      if (err) {
-        resolve(noRemote)
-        return
-      }
-      ahead = Number.parseInt(stdout.trim(), 10) || 0
-      checkDone()
-    },
-  )
-}
-
-async function detectRepoSlug(cwd: string, sshHost: string | null) {
-  let remoteUrl: string | null = null
-  if (sshHost) {
-    const result = await execSSHCommand(
-      sshHost,
-      'git remote get-url origin',
-      cwd,
-    )
-    remoteUrl = result.stdout.trim() || null
-  } else {
-    remoteUrl = await new Promise<string | null>((resolve) => {
-      execFile(
-        'git',
-        ['remote', 'get-url', 'origin'],
-        { cwd },
-        (err, stdout) => {
-          if (err || !stdout) return resolve(null)
-          resolve(stdout.trim() || null)
-        },
-      )
-    })
-  }
-
-  if (remoteUrl) {
-    const match = remoteUrl.match(
-      /(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/,
-    )
-    if (match) return match[1]
-  }
-
-  const ghUser = getGhUsername()
-  const folderName = cwd.split('/').filter(Boolean).pop()
-  if (ghUser && folderName) return `${ghUser}/${folderName}`
-
-  return null
-}
-
-// ── Git dirty polling ────────────────────────────────────────────────
-
-async function scanAndEmitGitDirty() {
-  const checks: Promise<void>[] = []
-
-  try {
-    const terminals = await getAllTerminals()
-    for (const terminal of terminals) {
-      if (!terminal.git_branch) continue
-      if (terminal.ssh_host && getSessionsForTerminal(terminal.id).length === 0)
-        continue
-      const monitor = getOrCreateMonitor(terminal.id)
-      checks.push(
-        (async () => {
-          try {
-            const [stat, syncStat, commit] = await Promise.all([
-              checkGitDirty(terminal.cwd, terminal.ssh_host),
-              checkGitRemoteSync(terminal.cwd, terminal.ssh_host),
-              checkLastCommit(terminal.cwd, terminal.ssh_host),
-            ])
-            monitor.lastDirty = stat
-            monitor.lastRemoteSync = syncStat
-            if (commit) monitor.lastCommit = commit
-
-            let branch: string | null = null
-            if (terminal.ssh_host) {
-              const result = await execSSHCommand(
-                terminal.ssh_host,
-                'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null',
-                terminal.cwd,
-              )
-              branch = result.stdout.trim() || null
-            } else {
-              branch = await new Promise<string | null>((resolve) => {
-                execFile(
-                  'git',
-                  ['rev-parse', '--abbrev-ref', 'HEAD'],
-                  { cwd: terminal.cwd },
-                  (err, stdout) => {
-                    if (!err && stdout?.trim()) return resolve(stdout.trim())
-                    execFile(
-                      'git',
-                      ['symbolic-ref', '--short', 'HEAD'],
-                      { cwd: terminal.cwd },
-                      (err2, stdout2) => {
-                        if (err2 || !stdout2) return resolve(null)
-                        resolve(stdout2.trim() || null)
-                      },
-                    )
-                  },
-                )
-              })
-            }
-
-            if (branch && branch !== terminal.git_branch) {
-              await updateTerminal(terminal.id, { git_branch: branch })
-              getIO()?.emit('terminal:updated', {
-                terminalId: terminal.id,
-                data: { git_branch: branch },
-              })
-            }
-          } catch (err) {
-            log.error(
-              { err, terminalId: terminal.id },
-              '[pty] Failed to detect branch for terminal',
-            )
-          }
-        })(),
-      )
-    }
-  } catch (err) {
-    log.error({ err }, '[pty] Failed to detect terminal branches')
-    return
-  }
-
-  await Promise.all(checks)
-
-  const dirtyStatus: Record<number, GitDiffStat> = {}
-  const lastCommit: Record<number, GitLastCommit> = {}
-  const syncStatus: Record<number, GitRemoteSyncStat> = {}
-  for (const [id, m] of monitors) {
-    if (m.lastDirty) dirtyStatus[id] = m.lastDirty
-    if (m.lastCommit) lastCommit[id] = m.lastCommit
-    if (m.lastRemoteSync) syncStatus[id] = m.lastRemoteSync
-  }
-
-  getIO()?.emit('git:dirty-status', { dirtyStatus, lastCommit })
-  getIO()?.emit('git:remote-sync', { syncStatus })
-}
-
-export function startGitDirtyPolling() {
-  if (gitDirtyPollingId) return
-  scanAndEmitGitDirty()
-  gitDirtyPollingId = setInterval(scanAndEmitGitDirty, 10000)
-}
-
-// ── Exported wrappers for backward compat ────────────────────────────
-// These are used by routes/terminals.ts and github/checks.ts which call
-// by terminalId. They delegate to the monitor instance.
-
-export async function checkAndEmitSingleGitDirty(
-  terminalId: number,
-  force?: boolean,
-) {
-  const monitor = getOrCreateMonitor(terminalId)
-  return monitor.checkAndEmitGitDirty(force)
-}
-
-export async function detectGitBranch(
-  terminalId: number,
-  options?: { skipPRRefresh?: boolean },
-) {
-  const monitor = getOrCreateMonitor(terminalId)
-  return monitor.detectGitBranch(options)
-}
-
 // ── Worker command event handler ─────────────────────────────────────
 
 function handleWorkerCommandEvent(
@@ -1275,8 +696,7 @@ function handleWorkerCommandEvent(
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
       monitor.clearProcessPollTimeout()
 
-      monitor.detectGitBranch()
-      monitor.checkAndEmitGitDirty()
+      serverEvents.emit('pty:command-end', { terminalId })
       setTimeout(() => {
         scanAndEmitProcessesForTerminal(terminalId)
       }, 1000)
@@ -1323,8 +743,7 @@ serverEvents.on(
 serverEvents.on(
   'pty:session-created',
   ({ terminalId }: { terminalId: number }) => {
-    const monitor = getOrCreateMonitor(terminalId)
-    monitor.detectGitBranch()
+    getOrCreateMonitor(terminalId)
   },
 )
 
@@ -1336,6 +755,7 @@ serverEvents.on(
   'pty:terminal-sessions-destroyed',
   ({ terminalId, sshHost }: { terminalId: number; sshHost: string | null }) => {
     disposeMonitor(terminalId)
+    disposeGitState(terminalId)
     stopGlobalProcessPolling()
     stopAllTunnelsForTerminal(terminalId)
 

@@ -2,11 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { commitHashInput, commitInput, discardInput } from '@domains/git/schema'
 import { resolveGitTerminal } from '@domains/git/services/resolve'
-import { logCommand } from '@domains/logs/db'
 import {
   checkAndEmitSingleGitDirty,
   detectGitBranch,
-} from '@domains/pty/monitor'
+} from '@domains/git/services/status'
+import { logCommand } from '@domains/logs/db'
 import { gitExec, gitExecLogged } from '@server/lib/git'
 import { expandPath, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'

@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { detectGitHubRepo } from '@domains/git/services/resolve'
+import { detectGitBranch } from '@domains/git/services/status'
 import type { PRCheckStatus } from '@domains/github/schema'
-import { detectGitBranch } from '@domains/pty/monitor'
 import { getSettings } from '@domains/settings/db'
 import {
   getAllTerminals,
@@ -15,7 +16,6 @@ import { execSSHCommand } from '@server/ssh/exec'
 import { updateGithubGraphql, updateGithubRest } from '@server/status'
 import {
   checkGhAvailable,
-  detectGitHubRepo,
   fetchAllPRsViaGraphQL,
   fetchGhUsername,
   ghExec,

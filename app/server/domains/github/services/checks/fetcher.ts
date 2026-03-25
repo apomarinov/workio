@@ -16,13 +16,11 @@ import {
 } from '@domains/settings/schema'
 import { execFileAsync } from '@server/lib/exec'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
 import {
   CACHE_TTL,
   getGhUsername,
   getLastFetchedAt,
   getLastFetchedPRs,
-  repoCache,
   setLastFetchedAt,
   setLastFetchedPRs,
 } from './state'
@@ -160,53 +158,6 @@ export async function fetchGhUsername() {
     )
     return stdout.trim() || null
   } catch {
-    return null
-  }
-}
-
-export function parseGitHubRemoteUrl(url: string) {
-  const match = url.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/)
-  if (match) return { owner: match[1], repo: match[2] }
-  return null
-}
-
-export async function detectGitHubRepo(cwd: string, sshHost?: string | null) {
-  const cacheKey = sshHost ? `${sshHost}:${cwd}` : cwd
-
-  if (repoCache.has(cacheKey)) {
-    return repoCache.get(cacheKey)!
-  }
-
-  try {
-    let stdout: string
-
-    if (sshHost) {
-      const result = await execSSHCommand(
-        sshHost,
-        'git remote get-url origin',
-        cwd,
-      )
-      stdout = result.stdout
-    } else {
-      const result = await execFileAsync(
-        'git',
-        ['remote', 'get-url', 'origin'],
-        { cwd, timeout: 5000 },
-      )
-      stdout = result.stdout
-    }
-
-    const result = parseGitHubRemoteUrl(stdout.trim())
-    repoCache.set(cacheKey, result)
-    return result
-  } catch (err) {
-    if (sshHost) {
-      log.error(
-        { err },
-        `[github] Failed to detect repo via SSH (${sshHost}:${cwd})`,
-      )
-    }
-    repoCache.set(cacheKey, null)
     return null
   }
 }

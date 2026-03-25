@@ -1,11 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { initGitStatus } from '@domains/git/services/status'
 import { initGitHubChecks } from '@domains/github/services/checks/polling'
+import { getGhUsername } from '@domains/github/services/checks/state'
 import { startWebhookValidationPolling } from '@domains/github/services/webhooks'
 import { initWebPush } from '@domains/notifications/service'
 import {
   destroyAllSessions,
+  getSessionsForTerminal,
   writeShellIntegrationScripts,
 } from '@domains/pty/session'
 import { handleUpgrade } from '@domains/pty/websocket'
@@ -114,6 +117,13 @@ await writeShellIntegrationScripts()
 
 // Initialize Web Push
 await initWebPush()
+
+// Initialize git status tracking (inject pty session check to avoid circular imports)
+initGitStatus({
+  hasActiveSessions: (terminalId) =>
+    getSessionsForTerminal(terminalId).length > 0,
+  getFallbackUsername: () => getGhUsername(),
+})
 
 // Setup Socket.IO
 setupSocketIO(fastify.server)

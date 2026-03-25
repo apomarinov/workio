@@ -197,36 +197,6 @@ export type ProcessesPayload = {
   portForwardStatus?: Record<string, PortForwardStatus[]>
 }
 
-export type GitDiffStat = {
-  added: number
-  removed: number
-  untracked: number
-  untrackedLines: number
-}
-
-export type GitLastCommit = {
-  hash: string
-  author: string
-  date: string
-  subject: string
-  isLocal: boolean
-}
-
-export type GitDirtyPayload = {
-  dirtyStatus: Record<string, GitDiffStat>
-  lastCommit?: Record<string, GitLastCommit>
-}
-
-export type GitRemoteSyncStat = {
-  behind: number
-  ahead: number
-  noRemote: boolean
-}
-
-export type GitRemoteSyncPayload = {
-  syncStatus: Record<string, GitRemoteSyncStat>
-}
-
 // ── Shell client types ───────────────────────────────────────────
 
 export type ShellClient = {

@@ -1,11 +1,11 @@
 import type { Server as HttpServer } from 'node:http'
+import { startGitDirtyPolling } from '@domains/git/services/status'
 import {
   detectAllTerminalBranches,
   emitCachedPRChecks,
   refreshPRChecks,
 } from '@domains/github/services/checks/polling'
 import { markDesktopActive } from '@domains/notifications/service'
-import { startGitDirtyPolling } from '@domains/pty/monitor'
 import { getActiveZellijSessionNames } from '@domains/pty/services/process-tree'
 import {
   getBellSubscribedShellIds,

@@ -1,4 +1,4 @@
-import type { GitDiffStat, GitRemoteSyncStat } from '@domains/pty/schema'
+import type { GitDiffStat, GitRemoteSyncStat } from '@domains/git/schema'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import {
   Tooltip,

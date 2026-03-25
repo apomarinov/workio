@@ -1,5 +1,6 @@
+import type { GitDiffStat } from '@domains/git/schema'
 import type { MergedPRSummary, PRCheckStatus } from '@domains/github/schema'
-import type { ActiveProcess, GitDiffStat } from '@domains/pty/schema'
+import type { ActiveProcess } from '@domains/pty/schema'
 import type { MoveTarget, SessionWithProject } from '@domains/sessions/schema'
 import type {
   CustomTerminalAction,

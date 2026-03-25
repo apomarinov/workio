@@ -1,4 +1,5 @@
 import { getTerminalById } from '@domains/workspace/db/terminals'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import { execFileAsync } from '@server/lib/exec'
 import { execSSHCommand } from '@server/ssh/exec'
 
@@ -24,24 +25,28 @@ async function detectLocalBranch(cwd: string): Promise<string> {
 /**
  * Detects the current git branch for a terminal (local or SSH).
  * Returns the branch name and repo, or null if detection fails.
+ *
+ * Pass an already-fetched `terminal` to avoid a redundant DB read.
  */
 export async function detectBranch(
   terminalId: number | null,
   projectPath: string,
+  terminal?: Terminal | null,
 ): Promise<{ branch: string; repo: string } | null> {
-  const terminal = terminalId ? await getTerminalById(terminalId) : null
+  const resolved =
+    terminal ?? (terminalId ? await getTerminalById(terminalId) : null)
   let branch: string
 
-  if (terminal) {
-    if (terminal.ssh_host) {
+  if (resolved) {
+    if (resolved.ssh_host) {
       const cmd =
         'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null'
-      const { stdout } = await execSSHCommand(terminal.ssh_host, cmd, {
-        cwd: terminal.cwd,
+      const { stdout } = await execSSHCommand(resolved.ssh_host, cmd, {
+        cwd: resolved.cwd,
       })
       branch = stdout.trim()
     } else {
-      const cwd = terminal.cwd || projectPath
+      const cwd = resolved.cwd || projectPath
       branch = await detectLocalBranch(cwd)
     }
   } else {
@@ -50,6 +55,6 @@ export async function detectBranch(
 
   if (!branch) return null
 
-  const repo = terminal?.git_repo?.repo ?? ''
+  const repo = resolved?.git_repo?.repo ?? ''
   return { branch, repo }
 }

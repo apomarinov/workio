@@ -1,10 +1,12 @@
-import { resolveNotification } from '@domains/notifications/registry'
 import type {
-  ActiveProcess,
   GitDiffStat,
   GitDirtyPayload,
   GitLastCommit,
   GitRemoteSyncPayload,
+} from '@domains/git/schema'
+import { resolveNotification } from '@domains/notifications/registry'
+import type {
+  ActiveProcess,
   HostResourceInfo,
   PortForwardStatus,
   ProcessesPayload,

@@ -9,12 +9,6 @@ export const WEBHOOK_THROTTLE_MS = 2000 // 2 seconds
 
 // --- Module-level state ---
 
-/** Cache: cwd -> { owner, repo } or null */
-export const repoCache = new Map<
-  string,
-  { owner: string; repo: string } | null
->()
-
 /** Monitored terminals: terminalId -> cwd */
 export const monitoredTerminals = new Map<number, string>()
 

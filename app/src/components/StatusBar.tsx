@@ -13,11 +13,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type {
-  ActiveProcess,
-  GitDiffStat,
-  GitLastCommit,
-} from '@domains/pty/schema'
+import type { GitDiffStat, GitLastCommit } from '@domains/git/schema'
+import type { ActiveProcess } from '@domains/pty/schema'
 import type {
   StatusBarConfig,
   StatusBarSection,
