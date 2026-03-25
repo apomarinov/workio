@@ -1,9 +1,9 @@
+import type { SessionMessage } from '@domains/sessions/message-types'
 import { ChevronDown, User } from 'lucide-react'
 import { useState } from 'react'
 import { ClaudeIcon } from '@/components/icons'
 import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
-import type { SessionMessage } from '@/types'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCallDisplay } from './ToolCallDisplay'
 

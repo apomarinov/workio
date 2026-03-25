@@ -1,7 +1,7 @@
+import type { SessionMessage } from '@domains/sessions/message-types'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { trpc } from '@/lib/trpc'
-import type { SessionMessage } from '@/types'
 import { useSocket } from './useSocket'
 
 const PAGE_SIZE = 30
@@ -36,7 +36,7 @@ export function useSessionMessages(
   // Update all messages when initial data loads
   useEffect(() => {
     if (data) {
-      setAllMessages(data.messages as SessionMessage[])
+      setAllMessages(data.messages)
       setHasMore(data.hasMore)
       setOffset(data.messages.length)
     }
@@ -101,7 +101,7 @@ export function useSessionMessages(
       setAllMessages((prev) => {
         // Deduplicate - only add messages not already in the list
         const existingIds = new Set(prev.map((m) => m.id))
-        const newMessages = (result.messages as SessionMessage[]).filter(
+        const newMessages = result.messages.filter(
           (m) => !existingIds.has(m.id),
         )
         return [...prev, ...newMessages]

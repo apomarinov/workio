@@ -1,4 +1,7 @@
-import type { GroupedMessage, SessionMessage } from '@/types'
+import type {
+  GroupedMessage,
+  SessionMessage,
+} from '@domains/sessions/message-types'
 
 export function groupMessages(messages: SessionMessage[]): GroupedMessage[] {
   const result: GroupedMessage[] = []

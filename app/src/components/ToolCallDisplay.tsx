@@ -1,3 +1,14 @@
+import type {
+  BashTool,
+  EditTool,
+  GenericTool,
+  GrepTool,
+  ReadTool,
+  TaskTool,
+  TodoWriteTool,
+  ToolData,
+  WriteTool,
+} from '@domains/sessions/message-types'
 import {
   CheckCircle2,
   ChevronDown,
@@ -23,17 +34,6 @@ import {
 } from '@/components/ui/dialog'
 import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
-import type {
-  BashTool,
-  EditTool,
-  GenericTool,
-  GrepTool,
-  ReadTool,
-  TaskTool,
-  TodoWriteTool,
-  ToolData,
-  WriteTool,
-} from '@/types'
 import { DiffView } from './DiffView'
 
 interface ToolCallDisplayProps {

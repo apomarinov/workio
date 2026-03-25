@@ -1,3 +1,7 @@
+import type {
+  SessionMessage,
+  TodoWriteTool,
+} from '@domains/sessions/message-types'
 import { Folder, Loader2, MoreVertical } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { SessionStatusIcon } from '@/components/icons'
@@ -5,7 +9,6 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useSessionMessages } from '@/hooks/useSessionMessages'
 import { useSettings } from '@/hooks/useSettings'
 import { groupMessages } from '@/lib/messageUtils'
-import type { SessionMessage, TodoWriteTool } from '@/types'
 import { MessageBubble, ThinkingGroup } from './MessageBubble'
 import { Button } from './ui/button'
 

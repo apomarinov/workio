@@ -1,4 +1,4 @@
-import type { SessionMessage } from '@domains/sessions/schema'
+import type { SessionMessage } from '@domains/sessions/message-types'
 import pool from '@server/db'
 
 const MESSAGE_SELECT = `

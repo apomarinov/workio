@@ -1,7 +1,5 @@
-import type {
-  SessionMessage,
-  SessionWithProject,
-} from '@domains/sessions/schema'
+import type { SessionMessage } from '@domains/sessions/message-types'
+import type { SessionWithProject } from '@domains/sessions/schema'
 import pool from '@server/db'
 
 type ActivePermissionRow = SessionWithProject & {

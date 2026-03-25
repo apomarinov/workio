@@ -42,21 +42,6 @@ export type SessionWithProject = Session & {
   is_favorite: boolean
 }
 
-export type SessionMessage = {
-  id: number
-  prompt_id: number
-  uuid: string
-  is_user: boolean
-  thinking: boolean
-  todo_id: string | null
-  body: string | null
-  tools: Record<string, unknown> | null
-  images: unknown[] | null
-  created_at: string
-  updated_at: string | null
-  prompt_text: string | null
-}
-
 export type SearchMatchMessage = {
   id: number
   body: string

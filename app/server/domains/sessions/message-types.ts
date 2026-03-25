@@ -3,64 +3,66 @@ import type {
   PermissionPromptType,
 } from '@domains/pty/schema'
 
-// Tool input types
-export interface BashInput {
+// --- Tool input types ---
+
+export type BashInput = {
   command: string
   description?: string | null
 }
 
-export interface EditInput {
+export type EditInput = {
   file_path: string
   replace_all?: boolean
 }
 
-export interface ReadInput {
+export type ReadInput = {
   file_path: string
   offset?: number | null
   limit?: number | null
 }
 
-export interface WriteInput {
+export type WriteInput = {
   file_path: string
 }
 
-export interface GrepInput {
+export type GrepInput = {
   pattern: string
   path?: string | null
   glob?: string | null
   output_mode?: string | null
 }
 
-export interface TaskInput {
+export type TaskInput = {
   description: string
   subagent_type: string
 }
 
-export interface TodoItem {
+export type TodoItem = {
   content: string
   status: 'pending' | 'in_progress' | 'completed'
   activeForm: string
 }
 
-export interface TodoWriteInput {
+export type TodoWriteInput = {
   todos: TodoItem[]
 }
 
-// Tool data types
-interface BaseTool {
+// --- Tool data types ---
+
+type BaseTool = {
   tool_use_id: string
   name: string
   status: 'success' | 'error' | 'pending'
 }
 
-export interface BashTool extends BaseTool {
+export type BashTool = BaseTool & {
   name: 'Bash'
   input: BashInput
   output: string
   output_truncated: boolean
 }
 
-export interface EditTool extends BaseTool {
+export type EditTool = BaseTool & {
   name: 'Edit'
   input: EditInput
   diff: string
@@ -69,49 +71,47 @@ export interface EditTool extends BaseTool {
   diff_truncated: boolean
 }
 
-export interface ReadTool extends BaseTool {
+export type ReadTool = BaseTool & {
   name: 'Read'
   input: ReadInput
   output?: string
   output_truncated: boolean
 }
 
-export interface WriteTool extends BaseTool {
+export type WriteTool = BaseTool & {
   name: 'Write'
   input: WriteInput
   content: string
   content_truncated: boolean
 }
 
-export interface GrepTool extends BaseTool {
+export type GrepTool = BaseTool & {
   name: 'Grep' | 'Glob'
   input: GrepInput
   output: string
   output_truncated: boolean
 }
 
-export interface TaskTool extends BaseTool {
+export type TaskTool = BaseTool & {
   name: 'Task'
   input: TaskInput
   output: string
   output_truncated: boolean
 }
 
-export interface TodoWriteTool extends BaseTool {
+export type TodoWriteTool = BaseTool & {
   name: 'TodoWrite'
   input: TodoWriteInput
 }
 
-export interface GenericTool extends BaseTool {
+export type GenericTool = BaseTool & {
   input: Record<string, unknown>
   output?: string
   output_truncated?: boolean
   answers?: Record<string, string>
 }
 
-export type { PermissionOption, PermissionPromptType }
-
-export interface PermissionPromptInput {
+export type PermissionPromptInput = {
   type: PermissionPromptType
   title: string
   question: string
@@ -119,7 +119,7 @@ export interface PermissionPromptInput {
   options: PermissionOption[]
 }
 
-export interface PermissionPromptTool extends BaseTool {
+export type PermissionPromptTool = BaseTool & {
   name: 'PermissionPrompt'
   input: PermissionPromptInput
 }
@@ -135,12 +135,14 @@ export type ToolData =
   | PermissionPromptTool
   | GenericTool
 
-export interface MessageImage {
+// --- Message types ---
+
+export type MessageImage = {
   media_type: string
   data: string
 }
 
-export interface Message {
+export type Message = {
   id: number
   prompt_id: number
   uuid: string
@@ -154,7 +156,7 @@ export interface Message {
   updated_at: string | null
 }
 
-export interface SessionMessage extends Message {
+export type SessionMessage = Message & {
   prompt_text: string | null
 }
 

@@ -1,9 +1,9 @@
-import type { Session } from '@domains/sessions/schema'
 import type {
   PermissionOption,
   PermissionPromptType,
-  SessionMessage,
-} from '@/types'
+} from '@domains/pty/schema'
+import type { SessionMessage } from '@domains/sessions/message-types'
+import type { Session } from '@domains/sessions/schema'
 
 export interface AskUserQuestionOption {
   label: string

@@ -10,9 +10,9 @@ import {
   getMessageByUuid,
   insertPermissionMessage,
 } from '@domains/sessions/db'
+import type { PermissionPromptInput } from '@domains/sessions/message-types'
 import { getIO } from '@server/io'
 import { log } from '@server/logger'
-import type { PermissionPromptInput } from '@/types'
 
 /**
  * Render raw PTY buffer through a minimal virtual terminal emulator.
