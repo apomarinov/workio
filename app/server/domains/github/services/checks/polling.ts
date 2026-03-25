@@ -377,6 +377,12 @@ export async function initGitHubChecks() {
 
   serverEvents.on('github:refresh-pr-checks', () => refreshPRChecks(true))
   serverEvents.on(
+    'pty:terminal-sessions-destroyed',
+    ({ terminalId }: { terminalId: number }) => {
+      untrackTerminal(terminalId)
+    },
+  )
+  serverEvents.on(
     'github:track-terminal',
     ({
       terminalId,

@@ -1,9 +1,5 @@
 import { execFile } from 'node:child_process'
 import os from 'node:os'
-import {
-  refreshPRChecks,
-  untrackTerminal,
-} from '@domains/github/services/checks/polling'
 import { getGhUsername } from '@domains/github/services/checks/state'
 import type {
   ActiveProcess,
@@ -188,7 +184,7 @@ export class TerminalMonitor {
           data: { git_branch: branch },
         })
         if (!options?.skipPRRefresh) {
-          refreshPRChecks()
+          serverEvents.emit('github:refresh-pr-checks')
         }
 
         if (!terminal.git_repo) {
@@ -1341,7 +1337,6 @@ serverEvents.on(
   ({ terminalId, sshHost }: { terminalId: number; sshHost: string | null }) => {
     disposeMonitor(terminalId)
     stopGlobalProcessPolling()
-    untrackTerminal(terminalId)
     stopAllTunnelsForTerminal(terminalId)
 
     // Close SSH pool connection and clear cache if no other terminals use the same host
