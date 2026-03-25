@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { PRCheckStatus } from '@domains/github/schema'
+import type { SessionWithProject } from '@domains/sessions/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   Bell,
@@ -56,7 +57,6 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
-import type { SessionWithProject } from '@/types'
 import { useBackfillCheck } from './BackfillModal'
 import { useWebhookWarning } from './GitHubModal'
 import { LogsModal } from './LogsModal'

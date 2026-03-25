@@ -1,3 +1,4 @@
+import type { SessionWithProject } from '@domains/sessions/schema'
 import {
   AlertTriangle,
   ChevronDown,
@@ -17,7 +18,6 @@ import {
 import { useSessionContext } from '@/context/SessionContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
-import type { SessionWithProject } from '@/types'
 import { MarkdownContent } from './MarkdownContent'
 import { TruncatedPath } from './TruncatedPath'
 

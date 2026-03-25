@@ -1,81 +1,78 @@
 import { z } from 'zod'
 
-export const sessionBranchEntrySchema = z.object({
-  branch: z.string(),
-  repo: z.string(),
-})
+// --- Data types ---
 
-export const sessionDataSchema = z.object({
-  branch: z.string().optional(),
-  repo: z.string().optional(),
-  branches: z.array(sessionBranchEntrySchema).optional(),
-})
+export type SessionBranchEntry = {
+  branch: string
+  repo: string
+}
 
-export const sessionStatusSchema = z.enum([
-  'started',
-  'active',
-  'done',
-  'ended',
-  'permission_needed',
-  'idle',
-])
+export type SessionData = {
+  branch?: string
+  repo?: string
+  branches?: SessionBranchEntry[]
+}
 
-export const sessionSchema = z.object({
-  session_id: z.string(),
-  project_id: z.number(),
-  terminal_id: z.number().nullable(),
-  shell_id: z.number().nullable(),
-  name: z.string().nullable(),
-  message_count: z.number().nullable(),
-  status: sessionStatusSchema,
-  transcript_path: z.string().nullable(),
-  data: sessionDataSchema.nullable(),
-  created_at: z.string(),
-  updated_at: z.string(),
-})
+export type SessionStatus =
+  | 'started'
+  | 'active'
+  | 'done'
+  | 'ended'
+  | 'permission_needed'
+  | 'idle'
 
-export const sessionWithProjectSchema = sessionSchema.extend({
-  project_path: z.string(),
-  latest_user_message: z.string().nullable(),
-  latest_agent_message: z.string().nullable(),
-  is_favorite: z.boolean(),
-})
+export type Session = {
+  session_id: string
+  project_id: number
+  terminal_id: number | null
+  shell_id: number | null
+  name: string | null
+  message_count: number | null
+  status: SessionStatus
+  transcript_path: string | null
+  data: SessionData | null
+  created_at: string
+  updated_at: string
+}
 
-// --- Message schemas ---
+export type SessionWithProject = Session & {
+  project_path: string
+  latest_user_message: string | null
+  latest_agent_message: string | null
+  is_favorite: boolean
+}
 
-export const sessionMessageSchema = z.object({
-  id: z.number(),
-  prompt_id: z.number(),
-  uuid: z.string(),
-  is_user: z.boolean(),
-  thinking: z.boolean(),
-  todo_id: z.string().nullable(),
-  body: z.string().nullable(),
-  tools: z.record(z.string(), z.unknown()).nullable(),
-  images: z.array(z.unknown()).nullable(),
-  created_at: z.string(),
-  updated_at: z.string().nullable(),
-  prompt_text: z.string().nullable(),
-})
+export type SessionMessage = {
+  id: number
+  prompt_id: number
+  uuid: string
+  is_user: boolean
+  thinking: boolean
+  todo_id: string | null
+  body: string | null
+  tools: Record<string, unknown> | null
+  images: unknown[] | null
+  created_at: string
+  updated_at: string | null
+  prompt_text: string | null
+}
 
-// --- Search schemas ---
+export type SearchMatchMessage = {
+  id: number
+  body: string
+  is_user: boolean
+}
 
-export const searchMatchMessageSchema = z.object({
-  id: z.number(),
-  body: z.string(),
-  is_user: z.boolean(),
-})
-
-export const sessionSearchMatchSchema = z.object({
-  session_id: z.string(),
-  name: z.string().nullable(),
-  terminal_name: z.string().nullable(),
-  project_path: z.string(),
-  status: z.string(),
-  updated_at: z.string(),
-  data: sessionDataSchema.nullable(),
-  messages: z.array(searchMatchMessageSchema),
-})
+export type SessionSearchMatch = {
+  session_id: string
+  name: string | null
+  terminal_name: string | null
+  project_path: string
+  status: string
+  updated_at: string
+  data: SessionData | null
+  messages: SearchMatchMessage[]
+}
 
 // --- Input schemas ---
 
@@ -138,19 +135,3 @@ export const moveSessionInput = z.object({
   targetProjectPath: z.string(),
   targetTerminalId: z.number(),
 })
-
-// --- Types ---
-
-export type SessionBranchEntry = z.infer<typeof sessionBranchEntrySchema>
-export type SessionData = z.infer<typeof sessionDataSchema>
-export type SessionStatus = z.infer<typeof sessionStatusSchema>
-export type Session = z.infer<typeof sessionSchema>
-export type SessionWithProject = z.infer<typeof sessionWithProjectSchema>
-export type UpdateSessionInput = z.infer<typeof updateSessionInput>
-export type DeleteSessionInput = z.infer<typeof deleteSessionInput>
-export type BulkDeleteSessionsInput = z.infer<typeof bulkDeleteSessionsInput>
-export type ToggleFavoriteInput = z.infer<typeof toggleFavoriteInput>
-export type CleanupSessionsInput = z.infer<typeof cleanupSessionsInput>
-export type SessionMessage = z.infer<typeof sessionMessageSchema>
-export type SearchMatchMessage = z.infer<typeof searchMatchMessageSchema>
-export type SessionSearchMatch = z.infer<typeof sessionSearchMatchSchema>

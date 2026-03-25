@@ -1,7 +1,7 @@
+import type { Session } from '@domains/sessions/schema'
 import type {
   PermissionOption,
   PermissionPromptType,
-  Session,
   SessionMessage,
 } from '@/types'
 

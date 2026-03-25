@@ -1,3 +1,4 @@
+import type { SessionSearchMatch } from '@domains/sessions/schema'
 import {
   ArrowLeft,
   Check,
@@ -18,7 +19,6 @@ import { contextExcerpt, highlightMatch } from '@/lib/search-utils'
 import { formatDate } from '@/lib/time'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import type { SessionSearchMatch } from '@/types'
 import { SessionChat } from './SessionChat'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'

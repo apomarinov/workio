@@ -1,5 +1,6 @@
 import type { BranchesResponse } from '@domains/git/schema'
 import type { PRCheckStatus } from '@domains/github/schema'
+import type { SessionWithProject } from '@domains/sessions/schema'
 import { DEFAULT_KEYMAP } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
@@ -35,7 +36,7 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
-import type { MoveTarget, SessionWithProject } from '@/types'
+import type { MoveTarget } from '@/types'
 
 const CreatePRDialog = lazy(() =>
   import('@/components/dialogs/CreatePRDialog').then((m) => ({

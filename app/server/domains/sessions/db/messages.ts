@@ -1,3 +1,4 @@
+import type { SessionMessage } from '@domains/sessions/schema'
 import pool from '@server/db'
 
 const MESSAGE_SELECT = `
@@ -34,7 +35,7 @@ export async function getSessionMessages(
   )
   const total = Number.parseInt(countResult.rows[0].count, 10)
 
-  const { rows } = await pool.query<SessionMessageRow>(
+  const { rows } = await pool.query<SessionMessage>(
     `
       ${MESSAGE_SELECT}
       WHERE p.session_id = $1
@@ -52,9 +53,9 @@ export async function getSessionMessages(
 }
 
 export async function getMessagesByIds(ids: number[]) {
-  if (ids.length === 0) return [] as SessionMessageRow[]
+  if (ids.length === 0) return [] as SessionMessage[]
 
-  const { rows } = await pool.query<SessionMessageRow>(
+  const { rows } = await pool.query<SessionMessage>(
     `
       ${MESSAGE_SELECT}
       WHERE m.id = ANY($1)
@@ -66,25 +67,9 @@ export async function getMessagesByIds(ids: number[]) {
 }
 
 export async function getMessageByUuid(uuid: string) {
-  const { rows } = await pool.query<SessionMessageRow>(
+  const { rows } = await pool.query<SessionMessage>(
     `${MESSAGE_SELECT} WHERE m.uuid = $1`,
     [uuid],
   )
   return rows[0] ?? null
-}
-
-// Row type for query results — matches sessionMessageSchema shape
-type SessionMessageRow = {
-  id: number
-  prompt_id: number
-  uuid: string
-  is_user: boolean
-  thinking: boolean
-  todo_id: string | null
-  body: string | null
-  tools: Record<string, unknown> | null
-  images: unknown[] | null
-  created_at: string
-  updated_at: string | null
-  prompt_text: string | null
 }

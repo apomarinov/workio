@@ -1,3 +1,4 @@
+import type { SessionWithProject } from '@domains/sessions/schema'
 import {
   ArrowLeft,
   Eye,
@@ -28,7 +29,6 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
-import type { SessionWithProject } from '@/types'
 import { SessionItem } from './SessionItem'
 
 const SessionChat = lazy(() =>

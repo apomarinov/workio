@@ -1,3 +1,4 @@
+import type { SessionWithProject } from '@domains/sessions/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import {
   AlertTriangle,
@@ -28,7 +29,6 @@ import { getPRStatusInfo } from '@/lib/pr-status'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import type { SessionWithProject } from '@/types'
 import { GitStatus } from './GitStatus'
 import { TerminalIcon2 } from './icons'
 import { PRStatusContent, PRTabButton } from './PRStatusContent'

@@ -1,35 +1,3 @@
-export interface SessionBranchEntry {
-  branch: string
-  repo: string
-}
-
-export interface SessionData {
-  branch?: string
-  repo?: string
-  branches?: SessionBranchEntry[]
-}
-
-export interface Session {
-  session_id: string
-  project_id: number
-  terminal_id: number | null
-  shell_id: number | null
-  name: string | null
-  message_count: number | null
-  status: 'started' | 'active' | 'done' | 'ended' | 'permission_needed' | 'idle'
-  transcript_path: string | null
-  data: SessionData | null
-  created_at: string
-  updated_at: string
-}
-
-export interface SessionWithProject extends Session {
-  project_path: string
-  latest_user_message: string | null
-  latest_agent_message: string | null
-  is_favorite: boolean
-}
-
 export interface MoveTarget {
   projectPath: string
   encodedPath: string
@@ -37,17 +5,6 @@ export interface MoveTarget {
   terminalName: string | null
   sshHost: string | null
   claudeDirExists: boolean
-}
-
-export interface SessionSearchMatch {
-  session_id: string
-  name: string | null
-  terminal_name: string | null
-  project_path: string
-  status: string
-  updated_at: string
-  data: SessionData | null
-  messages: { id: number; body: string; is_user: boolean }[]
 }
 
 export interface Prompt {
