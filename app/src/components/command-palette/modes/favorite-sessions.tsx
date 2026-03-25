@@ -1,13 +1,16 @@
 import { GitBranch, HeartOff } from 'lucide-react'
-import { SessionStatusIcon } from '@/components/icons'
-import type { AppActions, AppData } from '../createPaletteModes'
-import { ItemActions } from '../ItemActions'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
+import { ItemActions } from '@/components/command-palette/ItemActions'
 import type {
   PaletteAPI,
   PaletteGroup,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
+import { SessionStatusIcon } from '@/components/icons'
 
 export function createFavoriteSessionsMode(
   data: AppData,

@@ -1,10 +1,10 @@
+import { BranchDiffPanel } from '@/components/BranchDiffPanel'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { BranchDiffPanel } from '../BranchDiffPanel'
 
 interface BranchCommitsDialogProps {
   open: boolean

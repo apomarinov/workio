@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
-import { useSettings } from '../hooks/useSettings'
 
 export function RemoteAccessModal({
   open,

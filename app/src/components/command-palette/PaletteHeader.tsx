@@ -1,6 +1,6 @@
 import { CommandInput } from '@/components/ui/command'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
-import { useIsMobile } from '../../hooks/useMediaQuery'
 
 type Props = {
   breadcrumbs: string[]

@@ -1,9 +1,9 @@
 import { resolveNotification } from '@domains/notifications/registry'
 import type { Notification } from '@domains/notifications/schema'
 import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
+import { useSocket } from '@/hooks/useSocket'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
-import { useSocket } from '../hooks/useSocket'
 import { useNotifications } from './NotificationContext'
 
 export type UnreadPRData = Record<string, { count: number; itemIds: string[] }>

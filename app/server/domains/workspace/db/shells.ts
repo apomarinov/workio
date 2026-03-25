@@ -1,7 +1,7 @@
+import type { Shell } from '@domains/workspace/schema/shells'
 import pool from '@server/db'
 import { buildSetClauses } from '@server/lib/db'
 import { log } from '@server/logger'
-import type { Shell } from '../schema/shells'
 
 export async function createShell(terminalId: number, name = 'main') {
   const { rows } = await pool.query<Shell>(

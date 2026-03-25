@@ -1,13 +1,13 @@
-import { emitNotification } from '@domains/notifications/service'
-import { getIO } from '@server/io'
-import { log } from '@server/logger'
 import type {
   PRCheckStatus,
   PRComment,
   PRReview,
   PRReviewThread,
   WebhookPayload,
-} from '../schema'
+} from '@domains/github/schema'
+import { emitNotification } from '@domains/notifications/service'
+import { getIO } from '@server/io'
+import { log } from '@server/logger'
 import { sortDiscussion } from './checks/fetcher'
 import { processNewPRData } from './checks/notifications'
 import { emitPRChecks, refreshPRChecks } from './checks/polling'

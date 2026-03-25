@@ -35,23 +35,23 @@ import {
 } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
-import type { MoveTarget, SessionWithProject } from '../../types'
+import type { MoveTarget, SessionWithProject } from '@/types'
 
 const CreatePRDialog = lazy(() =>
-  import('../dialogs/CreatePRDialog').then((m) => ({
+  import('@/components/dialogs/CreatePRDialog').then((m) => ({
     default: m.CreatePRDialog,
   })),
 )
 
-import { CleanupSessionsModal } from '../CleanupSessionsModal'
-import { ConfirmModal } from '../ConfirmModal'
-import { CreateBranchDialog } from '../CreateBranchDialog'
-import { DirectoryBrowser } from '../DirectoryBrowser'
-import { EditPRDialog } from '../dialogs/EditPRDialog'
-import { RenameModal } from '../EditSessionModal'
-import { EditTerminalModal } from '../EditTerminalModal'
-import { MergePRModal } from '../MergePRModal'
-import { RerunChecksModal } from '../RerunChecksModal'
+import { CleanupSessionsModal } from '@/components/CleanupSessionsModal'
+import { ConfirmModal } from '@/components/ConfirmModal'
+import { CreateBranchDialog } from '@/components/CreateBranchDialog'
+import { DirectoryBrowser } from '@/components/DirectoryBrowser'
+import { EditPRDialog } from '@/components/dialogs/EditPRDialog'
+import { RenameModal } from '@/components/EditSessionModal'
+import { EditTerminalModal } from '@/components/EditTerminalModal'
+import { MergePRModal } from '@/components/MergePRModal'
+import { RerunChecksModal } from '@/components/RerunChecksModal'
 import { CommandPaletteCore } from './CommandPaletteCore'
 import {
   type AppActions,

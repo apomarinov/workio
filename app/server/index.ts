@@ -22,11 +22,12 @@ import { env } from './env'
 import { onMutationResponse, setupSocketIO } from './io'
 import { createLogStream, log, setLogger } from './logger'
 import { initNgrok, stopNgrok } from './ngrok'
+import { appRouter } from './router'
 import claudeHookRoute from './routes/claude-hook-ssh'
 import githubWebhookRoute from './routes/github-webhook'
 import { shutdownAllTunnels } from './ssh/claude-forwarding'
 import { closeAllConnections } from './ssh/pool'
-import { appRouter, createContext } from './trpc'
+import { createContext } from './trpc'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

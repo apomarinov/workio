@@ -1,7 +1,7 @@
 // OSC 133 Shell Integration Parser
 // Parses OSC escape sequences from terminal output to extract command events
 
-import type { CommandEventCallback } from '../schema'
+import type { CommandEventCallback } from '@domains/pty/schema'
 
 // Character codes
 const ESC = '\x1b'

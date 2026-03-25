@@ -1,5 +1,5 @@
-import { useProcessContext } from '../context/ProcessContext'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
+import { useProcessContext } from '@/context/ProcessContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 
 export function useMountedShells(): Set<number> {
   const {

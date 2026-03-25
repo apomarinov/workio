@@ -3,6 +3,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {
+  getSessionTranscriptPaths,
+  insertBackfilledSession,
+  updateSessionData,
+} from '@domains/sessions/db'
+import {
   getAllTerminals,
   getTerminalById,
   upsertProject,
@@ -11,11 +16,6 @@ import { env } from '@server/env'
 import { withTransaction } from '@server/lib/db'
 import { sanitizeName } from '@server/lib/strings'
 import { log } from '@server/logger'
-import {
-  getSessionTranscriptPaths,
-  insertBackfilledSession,
-  updateSessionData,
-} from '../db'
 
 export async function backfillCheck(weeksBack: number) {
   const cutoff = Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000

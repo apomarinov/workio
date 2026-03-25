@@ -1,8 +1,8 @@
 import crypto from 'node:crypto'
+import type { Shell } from '@domains/workspace/schema/shells'
+import type { Project, Terminal } from '@domains/workspace/schema/terminals'
 import pool from '@server/db'
 import { buildSetClauses, jsonOrNull } from '@server/lib/db'
-import type { Shell } from '../schema/shells'
-import type { Project, Terminal } from '../schema/terminals'
 
 async function attachShellsToTerminals(terminals: Terminal[]) {
   if (terminals.length === 0) return terminals

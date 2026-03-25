@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { trpc } from '@/lib/trpc'
-import type { SessionMessage } from '../types'
+import type { SessionMessage } from '@/types'
 import { useSocket } from './useSocket'
 
 const PAGE_SIZE = 30

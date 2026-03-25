@@ -1,18 +1,18 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { expandPath, shellEscape } from '@server/lib/strings'
-import { log } from '@server/logger'
-import { validateSSHHost } from '@server/ssh/config'
-import { execSSHCommand } from '@server/ssh/exec'
-import { publicProcedure } from '@server/trpc'
-import { getTerminalById } from '../db/terminals'
+import { getTerminalById } from '@domains/workspace/db/terminals'
 import {
   createDirectoryInput,
   openInExplorerInput,
   openInIdeInput,
   sshHostInput,
-} from '../schema/system'
+} from '@domains/workspace/schema/system'
+import { expandPath, shellEscape } from '@server/lib/strings'
+import { log } from '@server/logger'
+import { validateSSHHost } from '@server/ssh/config'
+import { execSSHCommand } from '@server/ssh/exec'
+import { publicProcedure } from '@server/trpc'
 
 export const browseFolder = publicProcedure.mutation(() => {
   return new Promise<{ path: string } | null>((resolve) => {

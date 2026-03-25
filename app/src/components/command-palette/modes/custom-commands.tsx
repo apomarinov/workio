@@ -1,11 +1,14 @@
 import { Plus, Terminal } from 'lucide-react'
-import type { AppActions, AppData } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteGroup,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
 
 export function createCustomCommandsMode(
   data: AppData,

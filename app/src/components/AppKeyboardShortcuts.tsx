@@ -2,12 +2,12 @@ import type { Shell } from '@domains/workspace/schema/shells'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import { useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
-import { useProcessContext } from '../context/ProcessContext'
-import { useSessionContext } from '../context/SessionContext'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
-import { useSettings } from '../hooks/useSettings'
-import { pullBranch } from '../lib/api'
+import { useProcessContext } from '@/context/ProcessContext'
+import { useSessionContext } from '@/context/SessionContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useSettings } from '@/hooks/useSettings'
+import { pullBranch } from '@/lib/api'
 
 /** Return shells in DnD-reordered display order for a terminal */
 function getSortedShells(

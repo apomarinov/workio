@@ -14,10 +14,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useSessionContext } from '@/context/SessionContext'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
-import { useSessionContext } from '../context/SessionContext'
-import { useLocalStorage } from '../hooks/useLocalStorage'
-import type { SessionWithProject } from '../types'
+import type { SessionWithProject } from '@/types'
 import { MarkdownContent } from './MarkdownContent'
 import { TruncatedPath } from './TruncatedPath'
 

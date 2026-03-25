@@ -1,4 +1,4 @@
-import type { PRCheckStatus } from '../../schema'
+import type { PRCheckStatus } from '@domains/github/schema'
 
 // --- Constants ---
 

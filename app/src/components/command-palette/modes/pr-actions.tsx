@@ -9,14 +9,17 @@ import {
   Pencil,
   ScrollText,
 } from 'lucide-react'
-import { RefreshIcon } from '@/components/icons'
-import type { AppActions, AppData } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
+import { RefreshIcon } from '@/components/icons'
 
 export function createPRActionsMode(
   data: AppData,

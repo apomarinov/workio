@@ -1,5 +1,9 @@
+import {
+  deleteSessions,
+  getAllSessions,
+  getOldSessionIds,
+} from '@domains/sessions/db'
 import { getSettings, updateSettings } from '@domains/settings/db'
-import { deleteSessions, getAllSessions, getOldSessionIds } from '../db'
 
 export async function listSessionsWithFavorites() {
   const [sessions, settings] = await Promise.all([

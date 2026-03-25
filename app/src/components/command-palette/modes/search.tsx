@@ -11,17 +11,20 @@ import {
   Terminal as TerminalIcon,
   Trash2,
 } from 'lucide-react'
-import { SessionStatusIcon, TerminalIcon2 } from '@/components/icons'
-import { getPRStatusInfo } from '@/lib/pr-status'
-import { PRTabButton } from '../../PRStatusContent'
-import type { AppActions, AppData } from '../createPaletteModes'
-import { getLastPathSegment } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
+import { getLastPathSegment } from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
+import { SessionStatusIcon, TerminalIcon2 } from '@/components/icons'
+import { PRTabButton } from '@/components/PRStatusContent'
+import { getPRStatusInfo } from '@/lib/pr-status'
 
 export function createSearchMode(
   data: AppData,

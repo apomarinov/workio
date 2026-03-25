@@ -1,6 +1,13 @@
 import { LayoutTemplate } from 'lucide-react'
-import type { AppActions, AppData } from '../createPaletteModes'
-import type { PaletteAPI, PaletteLevel, PaletteMode } from '../types'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
+import type {
+  PaletteAPI,
+  PaletteLevel,
+  PaletteMode,
+} from '@/components/command-palette/types'
 
 export function createShellTemplatesMode(
   data: AppData,

@@ -1,13 +1,16 @@
 import { AlertCircle, CornerDownLeft, GitBranch } from 'lucide-react'
-import { TerminalIcon2 } from '@/components/icons'
-import type { AppActions, AppData } from '../createPaletteModes'
-import { getLastPathSegment } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
+import { getLastPathSegment } from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
+import { TerminalIcon2 } from '@/components/icons'
 
 export function createPRCheckoutMode(
   data: AppData,

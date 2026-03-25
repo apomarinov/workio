@@ -46,11 +46,11 @@ import { useGitHubContext } from '@/context/GitHubContext'
 import { useNotificationDataContext } from '@/context/NotificationDataContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
+import * as api from '@/lib/api'
 import { getPRStatusInfo } from '@/lib/pr-status'
 import { formatTimeAgo } from '@/lib/time'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import * as api from '../lib/api'
 import {
   ContentDialog,
   EditCommentDialog,

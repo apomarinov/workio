@@ -5,6 +5,7 @@ import type {
   Terminal,
   WorkspacePayload,
 } from '@domains/workspace/schema/terminals'
+import type { ServicesStatus } from '@server/status'
 import {
   createContext,
   useCallback,
@@ -14,13 +15,12 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { ServicesStatus } from '../../server/status'
-import { useActiveShells } from '../hooks/useActiveShells'
-import { useLocalStorage } from '../hooks/useLocalStorage'
-import { useSettings } from '../hooks/useSettings'
-import { useShellLastActive } from '../hooks/useShellLastActive'
-import { useSocket } from '../hooks/useSocket'
-import { trpc } from '../lib/trpc'
+import { useActiveShells } from '@/hooks/useActiveShells'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useSettings } from '@/hooks/useSettings'
+import { useShellLastActive } from '@/hooks/useShellLastActive'
+import { useSocket } from '@/hooks/useSocket'
+import { trpc } from '@/lib/trpc'
 
 interface WorkspaceContextValue {
   terminals: Terminal[]

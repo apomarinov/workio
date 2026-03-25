@@ -1,7 +1,7 @@
+import { resolveGitTerminal } from '@domains/git/services/resolve'
+import { type BranchInfo, terminalIdInput } from '@domains/git/schema'
 import { gitExec } from '@server/lib/git'
 import { publicProcedure } from '@server/trpc'
-import { resolveGitTerminal } from '../resolve'
-import { type BranchInfo, terminalIdInput } from '../schema'
 
 export const list = publicProcedure
   .input(terminalIdInput)

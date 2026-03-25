@@ -10,24 +10,24 @@ import {
   writeToSession,
 } from '@domains/pty/session'
 import { setActiveSessionDone } from '@domains/sessions/db'
-import { getIO } from '@server/io'
-import { sanitizeName, shellEscape } from '@server/lib/strings'
-import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
-import { publicProcedure } from '@server/trpc'
 import {
   createShell as dbCreateShell,
   deleteShell as dbDeleteShell,
   getShellById,
   updateShellName,
-} from '../db/shells'
-import { getTerminalById } from '../db/terminals'
+} from '@domains/workspace/db/shells'
+import { getTerminalById } from '@domains/workspace/db/terminals'
 import {
   createShellInput,
   renameShellInput,
   shellIdInput,
   writeShellInput,
-} from '../schema/shells'
+} from '@domains/workspace/schema/shells'
+import { getIO } from '@server/io'
+import { sanitizeName, shellEscape } from '@server/lib/strings'
+import { log } from '@server/logger'
+import { execSSHCommand } from '@server/ssh/exec'
+import { publicProcedure } from '@server/trpc'
 
 async function resolveShell(id: number) {
   const shell = await getShellById(id)

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import type { PRCheckStatus } from '@domains/github/schema'
 import { detectGitBranch } from '@domains/pty/monitor'
 import { getSettings } from '@domains/settings/db'
 import {
@@ -12,7 +13,6 @@ import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
 import { execSSHCommand } from '@server/ssh/exec'
 import { updateGithubGraphql, updateGithubRest } from '@server/status'
-import type { PRCheckStatus } from '../../schema'
 import {
   checkGhAvailable,
   detectGitHubRepo,

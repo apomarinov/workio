@@ -1,9 +1,9 @@
 import crypto from 'node:crypto'
+import { WEBHOOK_EVENTS } from '@domains/github/schema'
 import { getSettings, updateSettings } from '@domains/settings/db'
 import serverEvents from '@server/lib/events'
 import { execFileAsync } from '@server/lib/exec'
 import { log } from '@server/logger'
-import { WEBHOOK_EVENTS } from '../schema'
 
 export async function getOrCreateWebhookSecret() {
   const settings = await getSettings()

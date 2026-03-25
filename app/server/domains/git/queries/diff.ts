@@ -1,8 +1,4 @@
-import { getTerminalById } from '@domains/workspace/db/terminals'
-import { gitExec } from '@server/lib/git'
-import { expandPath } from '@server/lib/strings'
-import { publicProcedure } from '@server/trpc'
-import { resolveGitTerminal } from '../resolve'
+import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
   branchCommitsInput,
   branchConflictsInput,
@@ -10,8 +6,15 @@ import {
   commitsInput,
   fileDiffInput,
   terminalIdInput,
-} from '../schema'
-import { fetchOriginIfNeeded, parseChangedFiles } from '../services/git-utils'
+} from '@domains/git/schema'
+import {
+  fetchOriginIfNeeded,
+  parseChangedFiles,
+} from '@domains/git/services/git-utils'
+import { getTerminalById } from '@domains/workspace/db/terminals'
+import { gitExec } from '@server/lib/git'
+import { expandPath } from '@server/lib/strings'
+import { publicProcedure } from '@server/trpc'
 
 export const headMessage = publicProcedure
   .input(terminalIdInput)
@@ -46,7 +49,7 @@ export const changedFiles = publicProcedure
           await gitExec(terminal, [], {
             timeout: 15000,
             sshCmd: `git fetch origin ${refspecs} 2>/dev/null || true`,
-          }).catch(() => {})
+          }).catch(() => { })
         } else {
           const refspecs = refs.map(
             (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,

@@ -1,5 +1,5 @@
+import type { ChangedFile, FileStatus } from '@domains/git/schema'
 import { execFileAsync } from '@server/lib/exec'
-import type { ChangedFile, FileStatus } from '../schema'
 
 // --- Fetch cache ---
 

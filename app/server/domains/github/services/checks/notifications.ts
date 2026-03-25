@@ -1,7 +1,7 @@
+import type { PRCheckStatus } from '@domains/github/schema'
 import { emitNotification } from '@domains/notifications/service'
 import { getSettings } from '@domains/settings/db'
 import type { HiddenGHAuthor, HiddenPR } from '@domains/settings/schema'
-import type { PRCheckStatus } from '../../schema'
 import {
   checkFailedOnCommit,
   getGhUsername,

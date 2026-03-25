@@ -10,11 +10,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/sonner'
+import { useSessionContext } from '@/context/SessionContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import { useSessionContext } from '../context/SessionContext'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
 
 /**
  * Hook to check for unbackfilled sessions.

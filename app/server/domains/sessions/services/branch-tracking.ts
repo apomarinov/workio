@@ -1,7 +1,7 @@
 import { detectBranch } from '@domains/git/services/branch-detection'
+import { getSessionById, updateSessionData } from '@domains/sessions/db'
 import { log } from '@server/logger'
 import type { Server as SocketIOServer } from 'socket.io'
-import { getSessionById, updateSessionData } from '../db'
 
 /**
  * Detects the git branch for a session and tracks it in the

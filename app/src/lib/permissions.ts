@@ -3,7 +3,7 @@ import type {
   PermissionPromptType,
   Session,
   SessionMessage,
-} from '../types'
+} from '@/types'
 
 export interface AskUserQuestionOption {
   label: string

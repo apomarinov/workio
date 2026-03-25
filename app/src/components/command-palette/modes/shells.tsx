@@ -1,12 +1,15 @@
 import { CornerDownLeft, Terminal as TerminalIcon } from 'lucide-react'
-import type { AppActions, AppData } from '../createPaletteModes'
-import { getLastPathSegment } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
+import { getLastPathSegment } from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
 
 export function createShellsMode(
   data: AppData,

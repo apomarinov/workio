@@ -11,7 +11,7 @@ import type {
   ResourceUsage,
 } from '@domains/pty/schema'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { useSocket } from '../hooks/useSocket'
+import { useSocket } from '@/hooks/useSocket'
 import { useNotifications } from './NotificationContext'
 
 export interface ResourceInfo {

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
+import { getAllTerminals } from '@domains/workspace/db/terminals'
 import { publicProcedure } from '@server/trpc'
-import { getAllTerminals } from '../db/terminals'
 
 export const listTerminals = publicProcedure.query(async () => {
   const terminals = await getAllTerminals()

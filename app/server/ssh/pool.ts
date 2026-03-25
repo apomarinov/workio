@@ -1,7 +1,7 @@
 import fs from 'node:fs'
+import { shellEscape } from '@server/lib/strings'
+import { log } from '@server/logger'
 import { Client } from 'ssh2'
-import { shellEscape } from '../lib/strings'
-import { log } from '../logger'
 import { type ResolvedSSHConfig, validateSSHHost } from './config'
 
 // Max concurrent exec channels per pooled connection.

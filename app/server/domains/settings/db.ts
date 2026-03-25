@@ -1,4 +1,4 @@
-import pool from '../../db'
+import pool from '@server/db'
 import { DEFAULT_CONFIG, type SettingsUpdateInternal } from './schema'
 
 export async function getSettings() {

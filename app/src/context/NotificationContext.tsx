@@ -7,8 +7,8 @@ import {
   useState,
 } from 'react'
 import { toast } from 'sonner'
-import { NotificationPrompt } from '../components/NotificationPrompt'
-import { useSettings } from '../hooks/useSettings'
+import { NotificationPrompt } from '@/components/NotificationPrompt'
+import { useSettings } from '@/hooks/useSettings'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
 

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { MarkdownContent } from '@/components/MarkdownContent'
 import {
   Dialog,
   DialogContent,
@@ -6,7 +7,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useDialog } from '@/hooks/useDialog'
-import { MarkdownContent } from '../MarkdownContent'
 
 interface ContentDialogProps {
   author: string | ReactNode

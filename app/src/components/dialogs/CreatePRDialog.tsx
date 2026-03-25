@@ -2,6 +2,7 @@ import type { BranchesResponse } from '@domains/git/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import { Check, ChevronDown, Loader2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { BranchDiffPanel } from '@/components/BranchDiffPanel'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -28,7 +29,6 @@ import { toast } from '@/components/ui/sonner'
 import { checkBranchConflicts, createPR } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import { BranchDiffPanel } from '../BranchDiffPanel'
 
 interface CreatePRDialogProps {
   open: boolean

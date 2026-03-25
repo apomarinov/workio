@@ -30,9 +30,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
 import { cn } from '@/lib/utils'
-import { useSettings } from '../hooks/useSettings'
 import { ConfirmModal } from './ConfirmModal'
 
 const CODE_TO_DISPLAY: Record<string, string> = {

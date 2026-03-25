@@ -1,11 +1,14 @@
 import { FolderOutput } from 'lucide-react'
-import type { AppActions, AppData } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
 
 export function createMoveToProjectMode(
   _data: AppData,

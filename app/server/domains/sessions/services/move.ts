@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { getSessionById, updateSessionMove } from '@domains/sessions/db'
 import {
   getAllTerminals,
   getProjectByPath,
@@ -10,7 +11,6 @@ import {
 import { withTransaction } from '@server/lib/db'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
 import { execSSHCommand } from '@server/ssh/exec'
-import { getSessionById, updateSessionMove } from '../db'
 
 export async function getMoveTargets(sessionId: string) {
   const session = await getSessionById(sessionId)

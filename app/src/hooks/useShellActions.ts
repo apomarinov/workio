@@ -3,9 +3,9 @@ import type { Shell } from '@domains/workspace/schema/shells'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
 import { useSettings } from './useSettings'
 
 /** Return shells in DnD-reordered display order for a terminal */

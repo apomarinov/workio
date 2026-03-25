@@ -1,5 +1,5 @@
+import { stripDefaults } from '@server/lib/zod'
 import { z } from 'zod'
-import { stripDefaults } from '../../lib/zod'
 
 // --- Sub-schemas ---
 

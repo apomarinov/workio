@@ -1,5 +1,5 @@
+import type { SessionSearchMatch } from '@domains/sessions/schema'
 import pool from '@server/db'
-import type { SessionSearchMatch } from '../schema'
 
 export async function searchSessionMessages(
   query: string | null,

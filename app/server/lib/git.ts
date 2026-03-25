@@ -1,5 +1,5 @@
 import { logCommand } from '@domains/logs/db'
-import { execSSHCommand } from '../ssh/exec'
+import { execSSHCommand } from '@server/ssh/exec'
 import { execFileAsync } from './exec'
 import { expandPath, shellEscape } from './strings'
 

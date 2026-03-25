@@ -1,9 +1,15 @@
+import {
+  getTerminalById,
+  updateTerminal,
+} from '@domains/workspace/db/terminals'
+import { emitWorkspace } from '@domains/workspace/services/emit'
+import {
+  cancelWorkspaceOperation,
+  rerunSetupScript,
+} from '@domains/workspace/services/setup'
 import { log } from '@server/logger'
 import { publicProcedure } from '@server/trpc'
 import { z } from 'zod'
-import { getTerminalById, updateTerminal } from '../db/terminals'
-import { emitWorkspace } from '../services/emit'
-import { cancelWorkspaceOperation, rerunSetupScript } from '../services/setup'
 
 const terminalIdInput = z.object({
   id: z.number(),

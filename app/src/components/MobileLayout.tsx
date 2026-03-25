@@ -4,12 +4,12 @@ import {
   Terminal as TerminalNoBorder,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { useSessionContext } from '../context/SessionContext'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
-import { useEdgeSwipe } from '../hooks/useEdgeSwipe'
-import { useSettings } from '../hooks/useSettings'
-import { useShellActions } from '../hooks/useShellActions'
-import { cn } from '../lib/utils'
+import { useSessionContext } from '@/context/SessionContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
+import { useSettings } from '@/hooks/useSettings'
+import { useShellActions } from '@/hooks/useShellActions'
+import { cn } from '@/lib/utils'
 import { ShellTabs } from './ShellTabs'
 import { Sidebar } from './Sidebar'
 

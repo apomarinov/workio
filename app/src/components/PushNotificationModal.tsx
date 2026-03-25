@@ -18,9 +18,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/sonner'
+import { useNotifications } from '@/context/NotificationContext'
+import { useSettings } from '@/hooks/useSettings'
 import { trpc } from '@/lib/trpc'
-import { useNotifications } from '../context/NotificationContext'
-import { useSettings } from '../hooks/useSettings'
 
 interface PushNotificationModalProps {
   open: boolean

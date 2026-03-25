@@ -37,7 +37,7 @@ A developer dashboard that brings together your projects, terminals, Claude AI s
 - `claude-skill` - add to your global Claude skills for additional functionality
 
 ### GitHub PRs
-- PR updates via `gh` CLI polling or real-time repo webhooks (ngrok)
+- PR updates via `gh` CLI polling or real-time repo webhooks
 - View PR status of the current branch in your project
 - View PR list of all repos you have projects in
 - View reviews, comments, running/failed checks
@@ -157,9 +157,7 @@ You also need to set up environment variables. Create a `.env.local` file in the
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string (e.g., `postgresql://localhost/workio`) |
-| `NGROK_AUTHTOKEN` | No | Enables GitHub webhook support for real-time PR updates. Get a token from [ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken). Without this, PR data only refreshes on interval poll and manual actions. |
-| `NGROK_DOMAIN` | No | Use a static ngrok domain instead of a random URL. Requires `NGROK_AUTHTOKEN`. Get a free static domain from your [ngrok dashboard](https://dashboard.ngrok.com/domains). |
-| `BASIC_AUTH` | No | Protect the app with HTTP basic auth when accessed via the ngrok domain (format: `user:pass`). Local/LAN connections are not affected. GitHub webhook route is excluded. Per-IP lockout after repeated failed attempts. |
+| `BASIC_AUTH` | No | Protect the app with HTTP basic auth when accessed remotely via ngrok (format: `user:pass`). Required before enabling ngrok. Local/LAN connections are not affected. GitHub webhook route is excluded. Per-IP lockout after repeated failed attempts. |
 
 ---
 
@@ -219,7 +217,7 @@ graph LR
 - **Fastify backend** manages shell sessions, runs git/gh commands, and serves the API. Each shell PTY is forked into its own child process to prevent event loop starvation.
 - **PTY workers** — one Node.js child process per shell, spawned via `fork()`. Each worker owns a `node-pty` instance (or SSH session), handles OSC parsing for command detection, maintains an output buffer, and communicates with the master over IPC.
 - **Python monitor daemon** listens for Claude Code hook events via a Unix socket, processes tool calls, and writes to PostgreSQL. The server is notified of changes via `NOTIFY`/`LISTEN`.
-- **ngrok tunnel** (optional) exposes a webhook endpoint for real-time GitHub PR updates.
+- **ngrok tunnel** - expose the app for remote access and enables real-time GitHub PR webhook updates.
 
 ---
 

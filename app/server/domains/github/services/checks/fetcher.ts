@@ -1,11 +1,3 @@
-import { getSettings } from '@domains/settings/db'
-import {
-  DEFAULT_GH_QUERY_LIMITS,
-  type GHQueryLimits,
-} from '@domains/settings/schema'
-import { execFileAsync } from '@server/lib/exec'
-import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
 import type {
   FailedPRCheck,
   InvolvedPRSummary,
@@ -16,7 +8,15 @@ import type {
   PRReaction,
   PRReview,
   PRReviewThread,
-} from '../../schema'
+} from '@domains/github/schema'
+import { getSettings } from '@domains/settings/db'
+import {
+  DEFAULT_GH_QUERY_LIMITS,
+  type GHQueryLimits,
+} from '@domains/settings/schema'
+import { execFileAsync } from '@server/lib/exec'
+import { log } from '@server/logger'
+import { execSSHCommand } from '@server/ssh/exec'
 import {
   CACHE_TTL,
   getGhUsername,

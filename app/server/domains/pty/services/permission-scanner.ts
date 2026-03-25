@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import type { ParsedPermissionPrompt } from '@domains/pty/schema'
 import { getSessionBuffer } from '@domains/pty/session'
 import {
   getLatestPromptId,
@@ -12,7 +13,6 @@ import type {
   PermissionPromptInput,
   PermissionPromptType,
 } from '@/types'
-import type { ParsedPermissionPrompt } from '../schema'
 
 /**
  * Render raw PTY buffer through a minimal virtual terminal emulator.

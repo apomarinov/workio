@@ -39,12 +39,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useSettings } from '@/hooks/useSettings'
+import { checkConductor, getGitHubRepos } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
-import { useSettings } from '../hooks/useSettings'
-import { checkConductor, getGitHubRepos } from '../lib/api'
 import { DirectoryBrowser } from './DirectoryBrowser'
 import { TerminalIcon2 } from './icons'
 

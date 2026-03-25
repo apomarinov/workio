@@ -7,7 +7,7 @@ import {
   CommandGroup,
   CommandList,
 } from '@/components/ui/command'
-import { useIsMobile } from '../../hooks/useMediaQuery'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 
 // Simple fuzzy filter: requires all search characters to appear in order
 function fuzzyFilter(

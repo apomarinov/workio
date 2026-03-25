@@ -5,14 +5,14 @@
  * Communicates with the master process via Node.js IPC (fork channel).
  */
 
-import type { TerminalBackend } from '@server/ssh/ssh-pty-adapter'
-import { createSSHSession } from '@server/ssh/ssh-pty-adapter'
-import * as pty from 'node-pty'
 import type {
   MasterToWorkerMessage,
   WorkerInitConfig,
   WorkerToMasterMessage,
-} from '../schema'
+} from '@domains/pty/schema'
+import type { TerminalBackend } from '@server/ssh/ssh-pty-adapter'
+import { createSSHSession } from '@server/ssh/ssh-pty-adapter'
+import * as pty from 'node-pty'
 import { createOscParser } from './osc-parser'
 import { getChildPids } from './process-tree'
 

@@ -13,14 +13,14 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { DEFAULT_FONT_SIZE } from '@/constants'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useIsMobile } from '@/hooks/useMediaQuery'
+import { useSettings } from '@/hooks/useSettings'
+import { useTerminalSocket } from '@/hooks/useTerminalSocket'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import { DEFAULT_FONT_SIZE } from '../constants'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
-import { useIsMobile } from '../hooks/useMediaQuery'
-import { useSettings } from '../hooks/useSettings'
-import { useTerminalSocket } from '../hooks/useTerminalSocket'
 
 interface TerminalProps {
   terminalId: number

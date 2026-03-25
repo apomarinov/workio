@@ -1,6 +1,6 @@
 import { handleClaudeHook } from '@domains/sessions/services/hook'
+import { log } from '@server/logger'
 import type { FastifyInstance } from 'fastify'
-import { log } from '../logger'
 
 interface ClaudeHookBody {
   event: Record<string, unknown>

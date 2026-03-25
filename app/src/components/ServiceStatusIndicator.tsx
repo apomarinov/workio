@@ -1,3 +1,11 @@
+import type {
+  ClaudeSubStatus,
+  ClaudeTunnelStatus,
+  GitHubApiStatus,
+  NgrokStatus,
+  ServiceStatus,
+  ServicesStatus,
+} from '@server/status'
 import {
   AlertTriangle,
   CircleHelp,
@@ -19,14 +27,6 @@ import {
 } from '@/components/ui/popover'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { cn } from '@/lib/utils'
-import type {
-  ClaudeSubStatus,
-  ClaudeTunnelStatus,
-  GitHubApiStatus,
-  NgrokStatus,
-  ServiceStatus,
-  ServicesStatus,
-} from '../../server/status'
 import { useWebhookWarning } from './GitHubModal'
 import { ClaudeIcon } from './icons'
 

@@ -23,12 +23,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useDocumentPip } from '@/context/DocumentPipContext'
+import { useSessionContext } from '@/context/SessionContext'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { cn } from '@/lib/utils'
-import { useDocumentPip } from '../context/DocumentPipContext'
-import { useSessionContext } from '../context/SessionContext'
-import { useWorkspaceContext } from '../context/WorkspaceContext'
-import { useLocalStorage } from '../hooks/useLocalStorage'
-import type { SessionWithProject } from '../types'
+import type { SessionWithProject } from '@/types'
 import { SessionItem } from './SessionItem'
 
 const SessionChat = lazy(() =>

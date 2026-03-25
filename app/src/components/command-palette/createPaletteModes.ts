@@ -6,7 +6,7 @@ import type {
   ShellTemplate,
 } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
-import type { MoveTarget, SessionWithProject } from '../../types'
+import type { MoveTarget, SessionWithProject } from '@/types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createCustomCommandsMode } from './modes/custom-commands'

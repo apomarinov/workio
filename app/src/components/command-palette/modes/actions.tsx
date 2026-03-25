@@ -16,15 +16,18 @@ import {
   ScrollText,
   Trash2,
 } from 'lucide-react'
-import { toast } from '@/components/ui/sonner'
-import { CursorIcon, FinderIcon, VSCodeIcon } from '../../icons'
-import type { AppActions, AppData } from '../createPaletteModes'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
+import { CursorIcon, FinderIcon, VSCodeIcon } from '@/components/icons'
+import { toast } from '@/components/ui/sonner'
 
 export function createActionsMode(
   data: AppData,

@@ -1,6 +1,6 @@
 import net from 'node:net'
 import type { PortForwardStatus } from '@domains/pty/schema'
-import { log } from '../logger'
+import { log } from '@server/logger'
 import { getConnection } from './pool'
 
 interface TunnelEntry {

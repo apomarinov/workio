@@ -1,11 +1,4 @@
-import {
-  checkAndEmitSingleGitDirty,
-  detectGitBranch,
-} from '@domains/pty/monitor'
-import { gitExec, gitExecLogged } from '@server/lib/git'
-import { log } from '@server/logger'
-import { publicProcedure } from '@server/trpc'
-import { resolveGitTerminal } from '../resolve'
+import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
   checkoutInput,
   createBranchInput,
@@ -15,7 +8,14 @@ import {
   rebaseInput,
   renameBranchInput,
   terminalIdInput,
-} from '../schema'
+} from '@domains/git/schema'
+import {
+  checkAndEmitSingleGitDirty,
+  detectGitBranch,
+} from '@domains/pty/monitor'
+import { gitExec, gitExecLogged } from '@server/lib/git'
+import { log } from '@server/logger'
+import { publicProcedure } from '@server/trpc'
 
 export const fetchAllMutation = publicProcedure
   .input(terminalIdInput)
@@ -96,7 +96,7 @@ export const pushMutation = publicProcedure
       terminal,
       ['update-ref', `refs/remotes/origin/${input.branch}`, 'HEAD'],
       { timeout: 5000 },
-    ).catch(() => {})
+    ).catch(() => { })
 
     detectGitBranch(input.terminalId)
     checkAndEmitSingleGitDirty(input.terminalId)
@@ -123,7 +123,7 @@ export const rebaseMutation = publicProcedure
     } catch (err) {
       await gitExec(terminal, ['rebase', '--abort'], {
         timeout: 10000,
-      }).catch(() => {})
+      }).catch(() => { })
       throw err
     }
 

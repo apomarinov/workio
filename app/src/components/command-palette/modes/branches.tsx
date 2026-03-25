@@ -12,15 +12,18 @@ import {
   Star,
   Trash2,
 } from 'lucide-react'
-import { ClaudeIcon } from '@/components/icons'
-import type { AppActions, AppData } from '../createPaletteModes'
-import { ItemActions } from '../ItemActions'
+import type {
+  AppActions,
+  AppData,
+} from '@/components/command-palette/createPaletteModes'
+import { ItemActions } from '@/components/command-palette/ItemActions'
 import type {
   PaletteAPI,
   PaletteItem,
   PaletteLevel,
   PaletteMode,
-} from '../types'
+} from '@/components/command-palette/types'
+import { ClaudeIcon } from '@/components/icons'
 
 export function createBranchesMode(
   data: AppData,

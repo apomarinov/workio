@@ -21,8 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
-import { useSettings } from '../hooks/useSettings'
 import type {
   BashTool,
   EditTool,
@@ -33,7 +33,7 @@ import type {
   TodoWriteTool,
   ToolData,
   WriteTool,
-} from '../types'
+} from '@/types'
 import { DiffView } from './DiffView'
 
 interface ToolCallDisplayProps {

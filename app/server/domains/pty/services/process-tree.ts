@@ -1,10 +1,13 @@
 import fs from 'node:fs'
 import os from 'node:os'
-import type { ActiveProcess } from '@domains/pty/schema'
+import type {
+  ActiveProcess,
+  RemoteProcessInfo,
+  ZellijPaneProcess,
+} from '@domains/pty/schema'
 import { execFileAsync } from '@server/lib/exec'
 import { log } from '@server/logger'
 import { poolExecSSHCommand } from '@server/ssh/pool'
-import type { RemoteProcessInfo, ZellijPaneProcess } from '../schema'
 
 export async function getChildPids(pid: number) {
   try {

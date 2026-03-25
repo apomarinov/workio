@@ -13,9 +13,9 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useSocket } from '@/hooks/useSocket'
+import * as api from '@/lib/api'
 import { trpc } from '@/lib/trpc'
-import { useSocket } from '../hooks/useSocket'
-import * as api from '../lib/api'
 import { useWorkspaceContext } from './WorkspaceContext'
 
 const RECENT_PR_THRESHOLD_MS = 15 * 60 * 1000

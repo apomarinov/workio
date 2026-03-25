@@ -1,6 +1,6 @@
+import type { SessionWithProject } from '@domains/sessions/schema'
 import pool from '@server/db'
 import { buildSetClauses } from '@server/lib/db'
-import type { SessionWithProject } from '../schema'
 
 const SESSION_SELECT = `
   SELECT
