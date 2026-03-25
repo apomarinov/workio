@@ -1,16 +1,15 @@
-import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
   branchCommitsInput,
-  branchConflictsInput,
   changedFilesInput,
-  commitsInput,
   fileDiffInput,
+  headBaseInput,
   terminalIdInput,
 } from '@domains/git/schema'
 import {
   fetchOriginIfNeeded,
   parseChangedFiles,
 } from '@domains/git/services/git-utils'
+import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import { gitExec } from '@server/lib/git'
 import { expandPath } from '@server/lib/strings'
@@ -49,7 +48,7 @@ export const changedFiles = publicProcedure
           await gitExec(terminal, [], {
             timeout: 15000,
             sshCmd: `git fetch origin ${refspecs} 2>/dev/null || true`,
-          }).catch(() => { })
+          }).catch(() => {})
         } else {
           const refspecs = refs.map(
             (r) => `+refs/heads/${r}:refs/remotes/origin/${r}`,
@@ -179,7 +178,7 @@ export const fileDiff = publicProcedure
   })
 
 export const commits = publicProcedure
-  .input(commitsInput)
+  .input(headBaseInput)
   .query(async ({ input }) => {
     const terminal = await getTerminalById(input.terminalId)
     if (!terminal) throw new Error('Terminal not found')
@@ -284,7 +283,7 @@ export const branchCommits = publicProcedure
   })
 
 export const branchConflicts = publicProcedure
-  .input(branchConflictsInput)
+  .input(headBaseInput)
   .query(async ({ input }) => {
     const terminal = await getTerminalById(input.terminalId)
     if (!terminal) throw new Error('Terminal not found')

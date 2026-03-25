@@ -1,14 +1,12 @@
-import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
-  checkoutInput,
+  branchInput,
   createBranchInput,
   deleteBranchInput,
-  pullInput,
   pushInput,
-  rebaseInput,
   renameBranchInput,
   terminalIdInput,
 } from '@domains/git/schema'
+import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
   checkAndEmitSingleGitDirty,
   detectGitBranch,
@@ -29,7 +27,7 @@ export const fetchAllMutation = publicProcedure
   })
 
 export const checkoutMutation = publicProcedure
-  .input(checkoutInput)
+  .input(branchInput)
   .mutation(async ({ input }) => {
     const terminal = await resolveGitTerminal(input.terminalId)
 
@@ -52,7 +50,7 @@ export const checkoutMutation = publicProcedure
   })
 
 export const pullMutation = publicProcedure
-  .input(pullInput)
+  .input(branchInput)
   .mutation(async ({ input }) => {
     const terminal = await resolveGitTerminal(input.terminalId)
 
@@ -96,14 +94,14 @@ export const pushMutation = publicProcedure
       terminal,
       ['update-ref', `refs/remotes/origin/${input.branch}`, 'HEAD'],
       { timeout: 5000 },
-    ).catch(() => { })
+    ).catch(() => {})
 
     detectGitBranch(input.terminalId)
     checkAndEmitSingleGitDirty(input.terminalId)
   })
 
 export const rebaseMutation = publicProcedure
-  .input(rebaseInput)
+  .input(branchInput)
   .mutation(async ({ input }) => {
     const terminal = await resolveGitTerminal(input.terminalId)
 
@@ -123,7 +121,7 @@ export const rebaseMutation = publicProcedure
     } catch (err) {
       await gitExec(terminal, ['rebase', '--abort'], {
         timeout: 10000,
-      }).catch(() => { })
+      }).catch(() => {})
       throw err
     }
 

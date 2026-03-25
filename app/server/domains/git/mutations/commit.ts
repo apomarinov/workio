@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { commitHashInput, commitInput, discardInput } from '@domains/git/schema'
+import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { logCommand } from '@domains/logs/db'
 import {
   checkAndEmitSingleGitDirty,
@@ -218,7 +218,7 @@ export const dropCommitMutation = publicProcedure
     } catch (err) {
       await gitExec(terminal, ['rebase', '--abort'], {
         timeout: 10000,
-      }).catch(() => { })
+      }).catch(() => {})
       throw err
     }
 

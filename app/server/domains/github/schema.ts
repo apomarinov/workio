@@ -1,119 +1,109 @@
 import { z } from 'zod'
 
-// --- PR data schemas ---
+// --- PR data types ---
 
-export const failedPRCheckSchema = z.object({
-  name: z.string(),
-  status: z.string(),
-  conclusion: z.string(),
-  detailsUrl: z.string(),
-  startedAt: z.string(),
-})
+export interface FailedPRCheck {
+  name: string
+  status: string
+  conclusion: string
+  detailsUrl: string
+  startedAt: string
+}
 
-export const prReactionSchema = z.object({
-  content: z.string(),
-  count: z.number(),
-  viewerHasReacted: z.boolean(),
-  users: z.array(z.string()),
-})
+export interface PRReaction {
+  content: string
+  count: number
+  viewerHasReacted: boolean
+  users: string[]
+}
 
-export const prCommentSchema = z.object({
-  id: z.number().optional(),
-  url: z.string().optional(),
-  author: z.string(),
-  avatarUrl: z.string(),
-  body: z.string(),
-  createdAt: z.string(),
-  path: z.string().optional(),
-  isUnread: z.boolean().optional(),
-  reactions: z.array(prReactionSchema).optional(),
-})
+export interface PRComment {
+  id?: number
+  url?: string
+  author: string
+  avatarUrl: string
+  body: string
+  createdAt: string
+  path?: string
+  isUnread?: boolean
+  reactions?: PRReaction[]
+}
 
-export const prReviewSchema = z.object({
-  id: z.number().optional(),
-  url: z.string().optional(),
-  author: z.string(),
-  avatarUrl: z.string(),
-  state: z.string(),
-  body: z.string(),
-  submittedAt: z.string().optional(),
-  isUnread: z.boolean().optional(),
-  reactions: z.array(prReactionSchema).optional(),
-})
+export interface PRReview {
+  id?: number
+  url?: string
+  author: string
+  avatarUrl: string
+  state: string
+  body: string
+  submittedAt?: string
+  isUnread?: boolean
+  reactions?: PRReaction[]
+}
 
-export const prReviewThreadSchema = z.object({
-  path: z.string(),
-  comments: z.array(prCommentSchema),
-})
+export interface PRReviewThread {
+  path: string
+  comments: PRComment[]
+}
 
-export const prDiscussionItemSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('review'),
-    review: prReviewSchema,
-    threads: z.array(prReviewThreadSchema),
-  }),
-  z.object({ type: z.literal('comment'), comment: prCommentSchema }),
-  z.object({ type: z.literal('thread'), thread: prReviewThreadSchema }),
-])
+export type PRDiscussionItem =
+  | { type: 'review'; review: PRReview; threads: PRReviewThread[] }
+  | { type: 'comment'; comment: PRComment }
+  | { type: 'thread'; thread: PRReviewThread }
 
-export const prCheckStatusSchema = z.object({
-  prNumber: z.number(),
-  prTitle: z.string(),
-  prUrl: z.string(),
-  prBody: z.string(),
-  branch: z.string(),
-  baseBranch: z.string(),
-  repo: z.string(),
-  state: z.enum(['OPEN', 'MERGED', 'CLOSED']),
-  reviewDecision: z.enum([
-    'APPROVED',
-    'CHANGES_REQUESTED',
-    'REVIEW_REQUIRED',
-    '',
-  ]),
-  reviews: z.array(prReviewSchema),
-  checks: z.array(failedPRCheckSchema),
-  comments: z.array(prCommentSchema),
-  discussion: z.array(prDiscussionItemSchema),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  areAllChecksOk: z.boolean(),
-  mergeable: z.enum(['MERGEABLE', 'CONFLICTING', 'UNKNOWN']).optional(),
-  isMerged: z.boolean(),
-  isApproved: z.boolean(),
-  hasChangesRequested: z.boolean(),
-  hasConflicts: z.boolean(),
-  hasPendingReviews: z.boolean(),
-  hasFailedChecks: z.boolean(),
-  runningChecksCount: z.number(),
-  failedChecksCount: z.number(),
-  headCommitSha: z.string(),
-  isDraft: z.boolean(),
-  hasUnreadNotifications: z.boolean().optional(),
-})
+export interface PRCheckStatus {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  prBody: string
+  branch: string
+  baseBranch: string
+  repo: string
+  state: 'OPEN' | 'MERGED' | 'CLOSED'
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | ''
+  reviews: PRReview[]
+  checks: FailedPRCheck[]
+  comments: PRComment[]
+  discussion: PRDiscussionItem[]
+  createdAt: string
+  updatedAt: string
+  areAllChecksOk: boolean
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
+  isMerged: boolean
+  isApproved: boolean
+  hasChangesRequested: boolean
+  hasConflicts: boolean
+  hasPendingReviews: boolean
+  hasFailedChecks: boolean
+  runningChecksCount: number
+  failedChecksCount: number
+  headCommitSha: string
+  isDraft: boolean
+  hasUnreadNotifications?: boolean
+}
 
-export const prChecksPayloadSchema = z.object({
-  prs: z.array(prCheckStatusSchema),
-  username: z.string().nullable(),
-})
+export interface PRChecksPayload {
+  prs: PRCheckStatus[]
+  username: string | null
+}
 
-export const mergedPRSummarySchema = z.object({
-  prNumber: z.number(),
-  prTitle: z.string(),
-  prUrl: z.string(),
-  branch: z.string(),
-  repo: z.string(),
-  state: z.enum(['MERGED', 'CLOSED']),
-})
+export interface MergedPRSummary {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  branch: string
+  repo: string
+  state: 'MERGED' | 'CLOSED'
+}
 
-export const involvedPRSummarySchema = z.object({
-  prNumber: z.number(),
-  prTitle: z.string(),
-  prUrl: z.string(),
-  repo: z.string(),
-  author: z.string(),
-  involvement: z.enum(['review-requested', 'mentioned']),
-})
+export interface InvolvedPRSummary {
+  prNumber: number
+  prTitle: string
+  prUrl: string
+  repo: string
+  author: string
+  involvement: 'review-requested' | 'mentioned'
+}
 
 export const WEBHOOK_EVENTS = [
   'pull_request',
@@ -280,14 +270,4 @@ export const webhookPayloadSchema = z.object({
 
 // --- Types ---
 
-export type FailedPRCheck = z.infer<typeof failedPRCheckSchema>
-export type PRReaction = z.infer<typeof prReactionSchema>
-export type PRComment = z.infer<typeof prCommentSchema>
-export type PRReview = z.infer<typeof prReviewSchema>
-export type PRReviewThread = z.infer<typeof prReviewThreadSchema>
-export type PRDiscussionItem = z.infer<typeof prDiscussionItemSchema>
-export type PRCheckStatus = z.infer<typeof prCheckStatusSchema>
-export type PRChecksPayload = z.infer<typeof prChecksPayloadSchema>
-export type MergedPRSummary = z.infer<typeof mergedPRSummarySchema>
-export type InvolvedPRSummary = z.infer<typeof involvedPRSummarySchema>
 export type WebhookPayload = z.infer<typeof webhookPayloadSchema>

@@ -1,5 +1,5 @@
-import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { type BranchInfo, terminalIdInput } from '@domains/git/schema'
+import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { gitExec } from '@server/lib/git'
 import { publicProcedure } from '@server/trpc'
 

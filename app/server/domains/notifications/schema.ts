@@ -1,53 +1,41 @@
 import { z } from 'zod'
 
-// --- Row schemas ---
+// --- Row types ---
 
-export const notificationDataSchema = z.object({
+export interface NotificationData {
   // Auth fields
-  attempts: z.number().optional(),
+  attempts?: number
   // PR fields
-  prTitle: z.string().optional(),
-  prUrl: z.string().optional(),
-  prNumber: z.number().optional(),
-  reviewer: z.string().optional(),
-  approver: z.string().optional(),
-  author: z.string().optional(),
-  body: z.string().optional(),
-  commentUrl: z.string().optional(),
-  commentId: z.number().optional(),
-  checkName: z.string().optional(),
-  checkUrl: z.string().optional(),
-  state: z.string().optional(),
-  reviewId: z.number().optional(),
+  prTitle?: string
+  prUrl?: string
+  prNumber?: number
+  reviewer?: string
+  approver?: string
+  author?: string
+  body?: string
+  commentUrl?: string
+  commentId?: number
+  checkName?: string
+  checkUrl?: string
+  state?: string
+  reviewId?: number
   // Workspace fields
-  terminalId: z.number().optional(),
-  name: z.string().optional(),
-  deleted: z.boolean().optional(),
-  git_repo: z.record(z.string(), z.unknown()).optional(),
-  setup: z.record(z.string(), z.unknown()).optional(),
-})
+  terminalId?: number
+  name?: string
+  deleted?: boolean
+  git_repo?: Record<string, unknown>
+  setup?: Record<string, unknown>
+}
 
-export const notificationSchema = z.object({
-  id: z.number(),
-  dedup_hash: z.string().nullable(),
-  type: z.string(),
-  repo: z.string().nullable(),
-  read: z.boolean(),
-  created_at: z.string(),
-  data: notificationDataSchema,
-})
-
-export const unreadPRNotificationSchema = z.object({
-  repo: z.string(),
-  prNumber: z.number(),
-  count: z.number(),
-  items: z.array(
-    z.object({
-      commentId: z.number().optional(),
-      reviewId: z.number().optional(),
-    }),
-  ),
-})
+export interface Notification {
+  id: number
+  dedup_hash: string | null
+  type: string
+  repo: string | null
+  read: boolean
+  created_at: string
+  data: NotificationData
+}
 
 // --- Input schemas ---
 
@@ -88,10 +76,3 @@ export const pushSubscribeInput = z.object({
 export const pushUnsubscribeInput = z.object({
   endpoint: z.string(),
 })
-
-// --- Types ---
-
-export type Notification = z.infer<typeof notificationSchema>
-export type NotificationData = z.infer<typeof notificationDataSchema>
-export type UnreadPRNotification = z.infer<typeof unreadPRNotificationSchema>
-export type PushSubscribeInput = z.infer<typeof pushSubscribeInput>

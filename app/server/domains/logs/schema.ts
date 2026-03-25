@@ -1,31 +1,31 @@
 import { z } from 'zod'
 
-// --- Row schemas ---
+// --- Row types ---
 
-export const commandLogDataSchema = z.object({
-  command: z.string(),
-  stdout: z.string().optional(),
-  stderr: z.string().optional(),
-  sshHost: z.string().optional(),
-  terminalName: z.string().optional(),
-  prName: z.string().optional(),
-})
+export interface CommandLogData {
+  command: string
+  stdout?: string
+  stderr?: string
+  sshHost?: string
+  terminalName?: string
+  prName?: string
+}
 
-export const commandLogSchema = z.object({
-  id: z.number(),
-  terminal_id: z.number().nullable(),
-  pr_id: z.string().nullable(),
-  exit_code: z.number(),
-  category: z.string(),
-  data: commandLogDataSchema,
-  created_at: z.string(),
-})
+export interface CommandLog {
+  id: number
+  terminal_id: number | null
+  pr_id: string | null
+  exit_code: number
+  category: string
+  data: CommandLogData
+  created_at: string
+}
 
-export const logTerminalSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  deleted: z.boolean(),
-})
+export interface LogTerminal {
+  id: number
+  name: string
+  deleted: boolean
+}
 
 // --- Input schemas ---
 
@@ -42,9 +42,4 @@ export const listInput = z.object({
   limit: z.number().min(1).max(100).default(50),
 })
 
-// --- Types ---
-
-export type CommandLog = z.infer<typeof commandLogSchema>
-export type CommandLogData = z.infer<typeof commandLogDataSchema>
-export type LogTerminal = z.infer<typeof logTerminalSchema>
 export type ListInput = z.infer<typeof listInput>
