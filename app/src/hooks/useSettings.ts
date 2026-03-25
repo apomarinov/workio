@@ -1,4 +1,4 @@
-import type { SettingsUpdate } from '@domains/settings/schema'
+import { DEFAULT_CONFIG, type SettingsUpdate } from '@domains/settings/schema'
 import { useEffect } from 'react'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
@@ -26,7 +26,7 @@ export function useSettings() {
   }
 
   return {
-    settings: data,
+    settings: data ?? DEFAULT_CONFIG,
     loading: isLoading || updateMutation.isPending,
     error: error?.message ?? null,
     updateSettings,

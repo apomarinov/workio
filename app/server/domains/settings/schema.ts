@@ -175,8 +175,8 @@ export const DEFAULT_STATUS_BAR: z.input<typeof statusBarConfigSchema> = {
 
 const settingsBaseSchema = z.object({
   default_shell: z.string().default('/bin/bash'),
-  font_size: z.number().min(8).max(32).nullable().default(null),
-  mobile_font_size: z.number().min(8).max(32).nullable().default(null),
+  font_size: z.number().min(8).max(32).default(13),
+  mobile_font_size: z.number().min(8).max(32).default(10),
   show_thinking: z.boolean().default(false),
   show_tools: z.boolean().default(true),
   show_tool_output: z.boolean().default(false),

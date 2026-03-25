@@ -2,6 +2,7 @@ import type {
   CustomTerminalAction,
   PreferredIDE,
 } from '@domains/settings/schema'
+import { DEFAULT_CONFIG } from '@domains/settings/schema'
 import {
   AlertTriangle,
   AlignLeft,
@@ -36,7 +37,6 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/sonner'
 import { Switch } from '@/components/ui/switch'
-import { DEFAULT_FONT_SIZE } from '@/constants'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { DEFAULT_KEYBOARD_ROWS } from '@/lib/terminalActions'
@@ -112,11 +112,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
     setSaving(true)
     try {
-      const fontSizeValue = fontSize.trim() ? parseInt(fontSize, 10) : null
+      const fontSizeValue = fontSize.trim() ? parseInt(fontSize, 10) : undefined
       const mobileFontSizeValue = mobileFontSize.trim()
         ? parseInt(mobileFontSize, 10)
-        : null
-      const lineClampValue = parseInt(messageLineClamp, 10) || 5
+        : undefined
+      const lineClampValue =
+        parseInt(messageLineClamp, 10) || DEFAULT_CONFIG.message_line_clamp
       await updateSettings({
         default_shell: defaultShell.trim(),
         font_size: fontSizeValue,
@@ -184,7 +185,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   max={32}
                   value={fontSize}
                   onChange={(e) => setFontSize(e.target.value)}
-                  placeholder={DEFAULT_FONT_SIZE.toString()}
+                  placeholder={String(DEFAULT_CONFIG.font_size)}
                   className="pl-10"
                 />
               </div>

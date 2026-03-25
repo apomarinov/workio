@@ -247,7 +247,7 @@ export const wsClientMessageSchema = z.discriminatedUnion('type', [
     shellId: z.number(),
     cols: z.number(),
     rows: z.number(),
-    fontSize: z.number().optional(),
+    fontSize: z.number().nullable().optional(),
     requestPrimary: z.boolean().optional(),
   }),
   z.object({

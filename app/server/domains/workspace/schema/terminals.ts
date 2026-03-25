@@ -48,11 +48,11 @@ export const terminalSchema = z.object({
   updated_at: z.string(),
 })
 
-export const projectSchema = z.object({
-  id: z.number(),
-  host: z.string(),
-  path: z.string(),
-})
+export type Project = {
+  id: number
+  host: string
+  path: string
+}
 
 // --- Input schemas ---
 
@@ -78,25 +78,23 @@ export const deleteTerminalInput = terminalSchema
   .pick({ id: true })
   .extend({ deleteDirectory: z.boolean().optional() })
 
-// --- Socket event schemas ---
+// --- Socket event types ---
 
-export const workspacePayloadSchema = z.object({
-  terminalId: z.number(),
-  name: z.string(),
-  git_repo: gitRepoStatusSchema.optional(),
-  setup: setupStatusSchema.optional(),
-  deleted: z.boolean().optional(),
-})
+export type WorkspacePayload = {
+  terminalId: number
+  name: string
+  git_repo?: GitRepoStatus
+  setup?: SetupStatus
+  deleted?: boolean
+}
 
 // --- Types ---
 
-export type WorkspacePayload = z.infer<typeof workspacePayloadSchema>
 export type GitRepoStatus = z.infer<typeof gitRepoStatusSchema>
 export type SetupStatus = z.infer<typeof setupStatusSchema>
 export type PortMapping = z.infer<typeof portMappingSchema>
 export type TerminalSettings = z.infer<typeof terminalSettingsSchema>
 export type Terminal = z.infer<typeof terminalSchema>
-export type Project = z.infer<typeof projectSchema>
 export type CreateTerminalInput = z.infer<typeof createTerminalInput>
 export type UpdateTerminalInput = z.infer<typeof updateTerminalInput>
 export type DeleteTerminalInput = z.infer<typeof deleteTerminalInput>

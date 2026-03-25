@@ -2,18 +2,18 @@ import { z } from 'zod'
 
 export const PAGE_SIZE = 100
 
-// --- Directory listing ---
+// --- Directory listing types ---
 
-export const dirEntrySchema = z.object({
-  name: z.string(),
-  isDir: z.boolean(),
-})
+export type DirEntry = {
+  name: string
+  isDir: boolean
+}
 
-export const dirResultSchema = z.object({
-  entries: z.array(dirEntrySchema).optional(),
-  hasMore: z.boolean().optional(),
-  error: z.string().nullable().optional(),
-})
+export type DirResult = {
+  entries?: DirEntry[]
+  hasMore?: boolean
+  error?: string | null
+}
 
 export const listDirectoriesInput = z.object({
   paths: z.array(z.string()),
@@ -48,18 +48,12 @@ export const openInExplorerInput = z.object({
 
 // --- SSH ---
 
-export const sshHostSchema = z.object({
-  alias: z.string(),
-  hostname: z.string(),
-  user: z.string().nullable(),
-})
+export type SSHHost = {
+  alias: string
+  hostname: string
+  user: string | null
+}
 
 export const sshHostInput = z.object({
   host: z.string(),
 })
-
-// --- Types ---
-
-export type DirEntry = z.infer<typeof dirEntrySchema>
-export type DirResult = z.infer<typeof dirResultSchema>
-export type SSHHost = z.infer<typeof sshHostSchema>

@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
-import { DEFAULT_FONT_SIZE } from '@/constants'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
@@ -62,9 +61,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const pendingWritesRef = useRef<string[]>([])
   const { settings } = useSettings()
 
-  const fontSize = isMobile
-    ? (settings?.mobile_font_size ?? 10)
-    : (settings?.font_size ?? DEFAULT_FONT_SIZE)
+  const fontSize = isMobile ? settings.mobile_font_size : settings.font_size
   const fontSizeRef = useRef(fontSize)
   const settingsRef = useRef(settings)
   const terminalIdRef = useRef(terminalId)
