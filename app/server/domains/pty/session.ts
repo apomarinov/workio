@@ -15,11 +15,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
-import type {
-  BellSubscription,
-  CommandEvent,
-  WorkerInitConfig,
-  WorkerToMasterMessage,
+import {
+  type BellSubscription,
+  type CommandEvent,
+  type WorkerInitConfig,
+  type WorkerToMasterMessage,
+  workerToMasterMessageSchema,
 } from '@domains/pty/schema'
 import { getSettings } from '@domains/settings/db'
 import { getShellById } from '@domains/workspace/db/shells'
@@ -563,7 +564,17 @@ export async function createSession(
   sessions.set(shellId, session)
 
   // Handle worker messages
-  child.on('message', (msg: WorkerToMasterMessage) => {
+  child.on('message', (raw: unknown) => {
+    let msg: WorkerToMasterMessage
+    try {
+      msg = workerToMasterMessageSchema.parse(raw)
+    } catch (err) {
+      log.error(
+        { err, raw },
+        `[pty] Invalid worker→master message for shell=${shellId}`,
+      )
+      return
+    }
     handleWorkerMessage(session, msg)
   })
 

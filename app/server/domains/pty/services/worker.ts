@@ -5,10 +5,11 @@
  * Communicates with the master process via Node.js IPC (fork channel).
  */
 
-import type {
-  MasterToWorkerMessage,
-  WorkerInitConfig,
-  WorkerToMasterMessage,
+import {
+  type MasterToWorkerMessage,
+  masterToWorkerMessageSchema,
+  type WorkerInitConfig,
+  type WorkerToMasterMessage,
 } from '@domains/pty/schema'
 import type { TerminalBackend } from '@server/ssh/ssh-pty-adapter'
 import { createSSHSession } from '@server/ssh/ssh-pty-adapter'
@@ -184,7 +185,17 @@ async function init(config: WorkerInitConfig) {
 
 // ── Message handler ─────────────────────────────────────────────────
 
-process.on('message', async (msg: MasterToWorkerMessage) => {
+process.on('message', async (raw: unknown) => {
+  let msg: MasterToWorkerMessage
+  try {
+    msg = masterToWorkerMessageSchema.parse(raw)
+  } catch (err) {
+    workerLog(
+      'error',
+      `[worker] Invalid master→worker message: ${err instanceof Error ? err.message : String(err)}`,
+    )
+    return
+  }
   switch (msg.type) {
     case 'init':
       await init(msg.config)

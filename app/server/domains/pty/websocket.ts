@@ -1,11 +1,12 @@
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { sendPushNotification } from '@domains/notifications/service'
-import type {
-  ShellClient,
-  WsClientInfo,
-  WsClientMessage,
-  WsServerMessage,
+import {
+  type ShellClient,
+  type WsClientInfo,
+  type WsClientMessage,
+  type WsServerMessage,
+  wsClientMessageSchema,
 } from '@domains/pty/schema'
 import {
   attachSession,
@@ -247,9 +248,10 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
   ws.on('message', async (rawData) => {
     let message: WsClientMessage
     try {
-      message = JSON.parse(rawData.toString()) as WsClientMessage
-    } catch {
-      sendMessage(ws, { type: 'error', message: 'Invalid JSON' })
+      message = wsClientMessageSchema.parse(JSON.parse(rawData.toString()))
+    } catch (err) {
+      log.error({ err }, '[ws] Invalid client message')
+      sendMessage(ws, { type: 'error', message: 'Invalid message' })
       return
     }
 
