@@ -825,7 +825,7 @@ export async function fetchAllClosedPRs(repos: string[], limit: number) {
 
   const author = getGhUsername() || '@me'
   const repoFilter = repos.map((r) => `repo:${r}`).join(' ')
-  const searchQuery = `is:pr is:closed author:${author} ${repoFilter}`
+  const searchQuery = `is:pr is:closed author:${author} ${repoFilter} sort:updated-desc`
   const graphqlQuery = `query($q: String!, $first: Int!) {
   search(query: $q, type: ISSUE, first: $first) {
     nodes {

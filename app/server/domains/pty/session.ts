@@ -654,9 +654,8 @@ export async function createSession(
     child.send({ type: 'set-pending-command', command: pending })
   }
 
-  // Notify listeners to detect git branch and track for PR checks (fire-and-forget)
+  // Notify listeners: git detects branch, workspace runs auto-detect, github registers for PR polling
   serverEvents.emit('pty:session-created', { terminalId })
-  serverEvents.emit('github:track-terminal', { terminalId })
 
   return session
 }

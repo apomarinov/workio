@@ -19,6 +19,7 @@ import {
   deleteTerminalInput,
   updateTerminalInput,
 } from '@domains/workspace/schema/terminals'
+import { autoDetectTerminal } from '@domains/workspace/services/auto-detect'
 import { emitWorkspace } from '@domains/workspace/services/emit'
 import {
   deleteTerminalWorkspace,
@@ -111,11 +112,8 @@ export const createTerminal = publicProcedure
         ),
       )
 
-      serverEvents.emit('github:track-terminal', {
-        terminalId: terminal.id,
-        forceRefreshPrs: true,
-      })
-      return terminal
+      await autoDetectTerminal(terminal.id, { refreshPRChecks: true })
+      return (await getTerminalById(terminal.id)) ?? terminal
     }
 
     if (git_repo) {
@@ -182,11 +180,8 @@ export const createTerminal = publicProcedure
           `[terminals] Workspace setup error: ${err instanceof Error ? err.message : err}`,
         ),
       )
-      serverEvents.emit('github:track-terminal', {
-        terminalId: terminal.id,
-        forceRefreshPrs: true,
-      })
-      return terminal
+      await autoDetectTerminal(terminal.id, { refreshPRChecks: true })
+      return (await getTerminalById(terminal.id)) ?? terminal
     }
 
     if (ssh_host) {
@@ -207,11 +202,8 @@ export const createTerminal = publicProcedure
         null,
         trimmedHost,
       )
-      serverEvents.emit('github:track-terminal', {
-        terminalId: terminal.id,
-        forceRefreshPrs: true,
-      })
-      return terminal
+      await autoDetectTerminal(terminal.id, { refreshPRChecks: true })
+      return (await getTerminalById(terminal.id)) ?? terminal
     }
 
     // --- Local terminal creation ---
@@ -246,11 +238,8 @@ export const createTerminal = publicProcedure
     }
 
     const terminal = await dbCreateTerminal(cwd, name || null, shell || null)
-    serverEvents.emit('github:track-terminal', {
-      terminalId: terminal.id,
-      forceRefreshPrs: true,
-    })
-    return terminal
+    await autoDetectTerminal(terminal.id, { refreshPRChecks: true })
+    return (await getTerminalById(terminal.id)) ?? terminal
   })
 
 export const updateTerminal = publicProcedure

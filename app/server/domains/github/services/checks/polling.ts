@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { detectGitHubRepo } from '@domains/git/services/resolve'
 import { detectGitBranch } from '@domains/git/services/status'
 import type { PRCheckStatus } from '@domains/github/schema'
@@ -7,12 +5,10 @@ import { getSettings } from '@domains/settings/db'
 import {
   getAllTerminals,
   getTerminalById,
-  updateTerminal,
 } from '@domains/workspace/db/terminals'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
 import { updateGithubGraphql, updateGithubRest } from '@server/status'
 import {
   checkGhAvailable,
@@ -44,32 +40,6 @@ import {
   setLastRESTRateRemaining,
   setLastRefreshAt,
 } from './state'
-
-async function refreshSSHBranch(terminalId: number) {
-  try {
-    const terminal = await getTerminalById(terminalId)
-    if (!terminal?.ssh_host) return
-
-    const result = await execSSHCommand(
-      terminal.ssh_host,
-      'git rev-parse --abbrev-ref HEAD',
-      terminal.cwd,
-    )
-    const branch = result.stdout.trim()
-    if (branch) {
-      await updateTerminal(terminalId, { git_branch: branch })
-      getIO()?.emit('terminal:updated', {
-        terminalId,
-        data: { git_branch: branch },
-      })
-    }
-  } catch (err) {
-    log.error(
-      { err },
-      `[github] Failed to refresh SSH branch for terminal ${terminalId}`,
-    )
-  }
-}
 
 async function emitPRChecks(allPRs: PRCheckStatus[]) {
   const settings = await getSettings()
@@ -105,7 +75,7 @@ async function pollAllPRChecks(force = false) {
       if (!terminal) continue
 
       if (terminal.ssh_host) {
-        await refreshSSHBranch(terminalId)
+        await detectGitBranch(terminalId, { skipPRRefresh: true })
       }
 
       const repo = await detectGitHubRepo(terminal.cwd, terminal.ssh_host)
@@ -269,55 +239,6 @@ export async function trackTerminal(terminalId: number) {
   const terminal = await getTerminalById(terminalId)
   if (!terminal) return
 
-  if (!terminal.git_repo) {
-    const repo = await detectGitHubRepo(terminal.cwd, terminal.ssh_host)
-    if (repo) {
-      const gitRepoObj = {
-        repo: `${repo.owner}/${repo.repo}`,
-        status: 'done' as const,
-      }
-      await updateTerminal(terminalId, { git_repo: gitRepoObj })
-      getIO()?.emit('terminal:workspace', {
-        terminalId,
-        name: terminal.name || terminal.cwd,
-        git_repo: gitRepoObj,
-      })
-    }
-  }
-
-  if (!terminal.setup) {
-    let hasConductor = false
-    if (terminal.ssh_host) {
-      try {
-        const conductorPath = `${terminal.cwd.replace(/\/+$/, '')}/conductor.json`
-        const result = await execSSHCommand(
-          terminal.ssh_host,
-          `test -f "${conductorPath}" && echo "yes"`,
-          terminal.cwd,
-        )
-        hasConductor = result.stdout.trim() === 'yes'
-      } catch (err) {
-        log.error({ err }, '[github] Failed to check conductor.json via SSH')
-      }
-    } else {
-      hasConductor = fs.existsSync(path.join(terminal.cwd, 'conductor.json'))
-    }
-
-    if (hasConductor) {
-      const setupObj = { conductor: true, status: 'done' as const }
-      await updateTerminal(terminalId, { setup: setupObj })
-      getIO()?.emit('terminal:workspace', {
-        terminalId,
-        name: terminal.name || terminal.cwd,
-        setup: setupObj,
-      })
-    }
-  }
-
-  if (terminal.ssh_host && !terminal.git_branch) {
-    detectGitBranch(terminalId, { skipPRRefresh: true })
-  }
-
   if (getGhAvailable() === null) {
     setGhAvailable(await checkGhAvailable())
   }
@@ -383,17 +304,10 @@ export async function initGitHubChecks() {
     },
   )
   serverEvents.on(
-    'github:track-terminal',
-    ({
-      terminalId,
-      forceRefreshPrs,
-    }: {
-      terminalId: number
-      forceRefreshPrs?: boolean
-    }) => {
+    'pty:session-created',
+    ({ terminalId }: { terminalId: number }) => {
       trackTerminal(terminalId).then(() => {
         startChecksPolling()
-        if (forceRefreshPrs) refreshPRChecks(true)
       })
     },
   )

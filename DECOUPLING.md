@@ -135,7 +135,7 @@ Option B keeps command_end handler calling git domain directly.
 
 ---
 
-## 2. Workspace Initialization in GitHub Polling
+## 2. Workspace Initialization in GitHub Polling ✅ Done
 
 **Problem**: `github/services/checks/polling.ts` has two functions that do workspace DB writes and initialization that don't belong in the github domain.
 
