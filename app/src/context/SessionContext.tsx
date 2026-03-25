@@ -1,8 +1,7 @@
-import type { SessionWithProject } from '@domains/sessions/schema'
+import type { HookEvent, SessionWithProject } from '@domains/sessions/schema'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useSocket } from '@/hooks/useSocket'
 import { trpc } from '@/lib/trpc'
-import type { HookEvent } from '@/types'
 
 interface SessionUpdateEvent {
   session_id: string

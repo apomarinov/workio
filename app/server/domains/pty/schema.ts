@@ -1,5 +1,14 @@
 import { z } from 'zod'
-import type { PermissionOption, PermissionPromptType } from '@/types'
+
+// ── Permission types ─────────────────────────────────────────────
+
+export type PermissionPromptType = 'plan_mode' | 'tool_permission'
+
+export type PermissionOption = {
+  number: number
+  label: string
+  keySequence: string
+}
 
 // ── Shell integration schemas ────────────────────────────────────
 

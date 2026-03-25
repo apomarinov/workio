@@ -1,9 +1,8 @@
 import type { BranchInfo } from '@domains/git/schema'
 import type { PRCheckStatus } from '@domains/github/schema'
-import type { SessionWithProject } from '@domains/sessions/schema'
+import type { MoveTarget, SessionWithProject } from '@domains/sessions/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import type { ReactNode } from 'react'
-import type { MoveTarget } from '@/types'
 
 // Generic types - the palette core knows nothing about terminals, sessions, etc.
 

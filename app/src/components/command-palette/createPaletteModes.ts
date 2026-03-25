@@ -1,13 +1,12 @@
 import type { MergedPRSummary, PRCheckStatus } from '@domains/github/schema'
 import type { ActiveProcess, GitDiffStat } from '@domains/pty/schema'
-import type { SessionWithProject } from '@domains/sessions/schema'
+import type { MoveTarget, SessionWithProject } from '@domains/sessions/schema'
 import type {
   CustomTerminalAction,
   PreferredIDE,
   ShellTemplate,
 } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
-import type { MoveTarget } from '@/types'
 import { createActionsMode } from './modes/actions'
 import { createBranchActionsMode, createBranchesMode } from './modes/branches'
 import { createCustomCommandsMode } from './modes/custom-commands'

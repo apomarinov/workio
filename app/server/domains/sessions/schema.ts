@@ -74,6 +74,37 @@ export type SessionSearchMatch = {
   messages: SearchMatchMessage[]
 }
 
+// --- Move target types ---
+
+export type MoveTarget = {
+  projectPath: string
+  encodedPath: string
+  terminalId: number
+  terminalName: string | null
+  sshHost: string | null
+  claudeDirExists: boolean
+}
+
+// --- Hook types ---
+
+export type Hook = {
+  id: number
+  session_id: string
+  hook_type: string
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+export type HookEvent = {
+  session_id: string
+  hook_type: string
+  status: string | null
+  project_path: string
+  terminal_id: number | null
+  shell_id: number | null
+  last_message?: string
+}
+
 // --- Input schemas ---
 
 export const updateSessionInput = z.object({

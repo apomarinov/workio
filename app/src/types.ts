@@ -1,18 +1,7 @@
-export interface MoveTarget {
-  projectPath: string
-  encodedPath: string
-  terminalId: number
-  terminalName: string | null
-  sshHost: string | null
-  claudeDirExists: boolean
-}
-
-export interface Prompt {
-  id: number
-  session_id: string
-  prompt: string | null
-  created_at: string
-}
+import type {
+  PermissionOption,
+  PermissionPromptType,
+} from '@domains/pty/schema'
 
 // Tool input types
 export interface BashInput {
@@ -120,13 +109,7 @@ export interface GenericTool extends BaseTool {
   answers?: Record<string, string>
 }
 
-export type PermissionPromptType = 'plan_mode' | 'tool_permission'
-
-export interface PermissionOption {
-  number: number
-  label: string
-  keySequence: string
-}
+export type { PermissionOption, PermissionPromptType }
 
 export interface PermissionPromptInput {
   type: PermissionPromptType
@@ -178,21 +161,3 @@ export interface SessionMessage extends Message {
 export type GroupedMessage =
   | { type: 'message'; message: SessionMessage }
   | { type: 'thinking'; messages: SessionMessage[] }
-
-export interface Hook {
-  id: number
-  session_id: string
-  hook_type: string
-  payload: Record<string, unknown>
-  created_at: string
-}
-
-export interface HookEvent {
-  session_id: string
-  hook_type: string
-  status: string | null
-  project_path: string
-  terminal_id: number | null
-  shell_id: number | null
-  last_message?: string
-}

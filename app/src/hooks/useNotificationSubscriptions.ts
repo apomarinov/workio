@@ -1,8 +1,8 @@
 import { resolveNotification } from '@domains/notifications/registry'
+import type { HookEvent } from '@domains/sessions/schema'
 import { useEffect } from 'react'
 import { useNotifications } from '@/context/NotificationContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
-import type { HookEvent } from '@/types'
 import { useSocket } from './useSocket'
 
 export function useNotificationSubscriptions() {
