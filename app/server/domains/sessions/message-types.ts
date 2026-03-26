@@ -1,7 +1,20 @@
-import type {
-  PermissionOption,
-  PermissionPromptType,
-} from '@domains/pty/schema'
+// --- Permission types ---
+
+export type PermissionPromptType = 'plan_mode' | 'tool_permission'
+
+export type PermissionOption = {
+  number: number
+  label: string
+  keySequence: string
+}
+
+export type ParsedPermissionPrompt = {
+  type: PermissionPromptType
+  title: string
+  question: string
+  context: string
+  options: PermissionOption[]
+}
 
 // --- Tool input types ---
 

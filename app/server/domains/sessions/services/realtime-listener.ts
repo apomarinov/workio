@@ -1,7 +1,7 @@
 import { resolveNotification } from '@domains/notifications/registry'
 import { sendPushNotification } from '@domains/notifications/service'
-import { scanAndStorePermissionPrompt } from '@domains/pty/services/permission-scanner'
 import { getActivePermissions, getMessagesByIds } from '@domains/sessions/db'
+import { scanAndStorePermissionPrompt } from '@domains/sessions/services/permission-scanner'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import { getIO } from '@server/io'
 import { log } from '@server/logger'

@@ -206,7 +206,7 @@ Remove `detectRepoSlug` from pty/monitor. Remove `detectGitHubRepo` + `parseGitH
 
 ---
 
-## 4. Permission Scanner Split
+## 4. Permission Scanner Split ✅ Done
 
 **Problem**: `pty/services/permission-scanner.ts` has two concerns mixed together:
 - **PTY concern**: Reading terminal buffer, rendering TUI output into text, pattern-matching permission prompts

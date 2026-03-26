@@ -1,15 +1,5 @@
 import { z } from 'zod'
 
-// ── Permission types ─────────────────────────────────────────────
-
-export type PermissionPromptType = 'plan_mode' | 'tool_permission'
-
-export type PermissionOption = {
-  number: number
-  label: string
-  keySequence: string
-}
-
 // ── Shell integration schemas ────────────────────────────────────
 
 const commandEventSchema = z.object({
@@ -121,16 +111,6 @@ export type BellSubscription = {
   terminalId: number
   command: string
   terminalName: string
-}
-
-// ── Permission scanner types ─────────────────────────────────────
-
-export type ParsedPermissionPrompt = {
-  type: PermissionPromptType
-  title: string
-  question: string
-  context: string
-  options: PermissionOption[]
 }
 
 // ── Process tree types ───────────────────────────────────────────
