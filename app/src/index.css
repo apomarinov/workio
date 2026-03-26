@@ -237,6 +237,20 @@ body {
   background: #3b82f6; /* blue-500 */
 }
 
+/* Horizontal panel resize handle (bottom panel) */
+.panel-resize-handle-horizontal {
+  height: 1px;
+  background: var(--sidebar-border);
+  transition: background 0.15s, height 0.15s;
+  outline: #3b82f6;
+}
+
+.panel-resize-handle-horizontal:hover,
+.panel-resize-handle-horizontal[data-resize-handle-state="drag"] {
+  height: 3px;
+  background: #3b82f6; /* blue-500 */
+}
+
 /* Flash animation for session items */
 @keyframes flash {
   0%, 100% { background-color: transparent; }

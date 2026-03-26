@@ -10,6 +10,7 @@ import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useSettings } from '@/hooks/useSettings'
 import { useShellActions } from '@/hooks/useShellActions'
 import { cn } from '@/lib/utils'
+import { BottomPanelLoader } from './BottomPanelLoader'
 import { ShellTabs } from './ShellTabs'
 import { Sidebar } from './Sidebar'
 
@@ -198,6 +199,8 @@ export function MobileLayout({ children }: MobileLayoutProps) {
             </div>
           )
         })()}
+      {/* Bottom panel overlay */}
+      <BottomPanelLoader mobile />
       {/* Sidebar overlay */}
       <div
         className={cn(

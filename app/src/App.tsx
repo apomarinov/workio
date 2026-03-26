@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { AppKeyboardShortcuts } from './components/AppKeyboardShortcuts'
 import { AppModals } from './components/AppModals'
+import { BottomPanelLoader } from './components/BottomPanelLoader'
 import { CommandPalette } from './components/command-palette'
 import { DesktopLayout } from './components/DesktopLayout'
 import { MobileLayout } from './components/MobileLayout'
@@ -164,6 +165,7 @@ function AppContent() {
                   />
                 )
               })}
+              <BottomPanelLoader />
             </div>
             {showStatusBar &&
               statusBarOnTop !== effectiveTabsTop &&

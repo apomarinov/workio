@@ -1612,7 +1612,7 @@ export function PRStatusContent({
                     check.status === 'QUEUED' ? (
                       <Loader2 className="w-3 h-3 flex-shrink-0 text-yellow-500 animate-spin" />
                     ) : (
-                      <CircleX className="w-3 h-3 flex-shrink-0 text-red-500" />
+                      <CircleX className="w-3 h-3 flex-shrink-0 text-red-400/80" />
                     )}
                     <span className="text-xs truncate">{check.name}</span>
                     {check.startedAt &&
@@ -1633,13 +1633,13 @@ export function PRStatusContent({
                         })
                       }
                       className={cn(
-                        'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer',
+                        'text-[10px] text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 transition-opacity cursor-pointer  group/check-btn',
                         isMobile
                           ? 'block opacity-100'
                           : 'hidden group-hover/check:block opacity-0 group-hover/check:opacity-100',
                       )}
                     >
-                      <RefreshIcon className="w-3 h-3" />
+                      <RefreshIcon className="w-3 h-3 duration-300 transition-all group-hover/check-btn:-rotate-180" />
                     </button>
                   )}
                 </div>

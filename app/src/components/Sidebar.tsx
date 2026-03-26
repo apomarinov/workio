@@ -26,6 +26,7 @@ import {
   GitPullRequest,
   Globe,
   Loader2,
+  PanelBottom,
   PictureInPicture2,
   Plus,
   Search,
@@ -652,6 +653,15 @@ export function Sidebar({ width }: SidebarProps) {
                   </button>
                 )}
                 <button
+                  onClick={() =>
+                    window.dispatchEvent(new Event('toggle-bottom-panel'))
+                  }
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                >
+                  <PanelBottom className="w-4 h-4" />
+                  Panel
+                </button>
+                <button
                   onClick={() => setShowSettingsModal(true)}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
                 >
@@ -695,6 +705,17 @@ export function Sidebar({ width }: SidebarProps) {
                 <PictureInPicture2 className="w-4 h-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() =>
+                window.dispatchEvent(new Event('toggle-bottom-panel'))
+              }
+              title="Toggle Panel"
+            >
+              <PanelBottom className="w-4 h-4" />
+            </Button>
             {(hasAnyUnseenPRs || hasNotifications) && (
               <Popover open={bellOpen} onOpenChange={setBellOpen}>
                 <PopoverTrigger asChild>
