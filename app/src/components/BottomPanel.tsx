@@ -92,16 +92,16 @@ function DesktopPanel({ onClose }: { onClose: () => void }) {
 
 function PanelHeader({ onClose }: { onClose: () => void }) {
   return (
-    <div className="flex items-center justify-between px-2 h-[35px] shrink-0 border-b border-zinc-700/50 bg-[#1e1e1e]">
+    <div className="flex items-center justify-between px-1 h-[28px] shrink-0 border-b border-zinc-700/50 bg-[#1e1e1e]">
       {/* Left: tabs */}
-      <div className="flex items-center gap-1 flex-wrap min-w-0">
+      <div className="flex items-center min-w-0">
         {TABS.map((tab) => (
           <button
             key={tab}
             type="button"
             className={cn(
-              'px-2 py-1 text-xs font-medium transition-colors cursor-pointer',
-              'text-white border-b-2 border-blue-500',
+              'px-1.5 py-1 text-[11px] font-medium transition-colors cursor-pointer',
+              'text-white border-b border-blue-500',
             )}
           >
             {tab}
@@ -109,14 +109,14 @@ function PanelHeader({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       {/* Right: actions */}
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center">
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center justify-center w-6 h-6 text-zinc-400 hover:text-white transition-colors cursor-pointer rounded hover:bg-zinc-700/50"
+          className="flex items-center justify-center w-5 h-5 text-zinc-400 hover:text-white transition-colors cursor-pointer rounded hover:bg-zinc-700/50"
           title="Close panel"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-3 h-3" />
         </button>
       </div>
     </div>
