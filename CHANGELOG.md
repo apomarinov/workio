@@ -1,5 +1,40 @@
 # Changelog
 
+## [v0.7.0](../../compare/v0.6.0...v0.7.0) — 2026-03-26
+
+### Features
+- Add typed `ServerEventMap` for compile-time event safety across all Socket.IO emissions
+- Add notification grouping — multiple failed checks are batched into a single notification
+- Open branch actions panel when clicking remote sync arrows in status bar
+- Add session search panel integration replacing the old branch-claude-sessions palette mode
+
+### Improvements
+- Migrate entire backend to tRPC domain architecture — sessions, PTY, git, GitHub, workspace, settings, logs, and notifications each live in their own domain with colocated schema, db, service, and router
+- Replace Zod data schemas with plain TypeScript types across all domains, keeping runtime validation only at trust boundaries
+- Break all circular dependencies in server (11 → 0) with EventEmitter decoupling and path alias restructuring
+- Remove SWR — all data fetching now uses React Query via tRPC
+- Delete `shared/types.ts` and `src/types.ts` — all types moved into their owning domains
+- Split permission scanner — PTY keeps buffer renderer, sessions owns parsing and storage
+- Move workspace initialization out of GitHub polling into workspace domain
+- Extract git status logic from PTY monitor into git domain
+- Flatten server structure: separate `server/index.ts` by concern into focused modules
+- Replace all relative imports with `@domains`/`@server` path aliases
+- Extract ngrok into standalone service with settings UI configuration
+- Centralize API error handling and JSON serialization in `apiFetch`/`api` helpers
+- Extract shared `execFileAsync`, `gitExec`, `shellEscape` helpers to eliminate duplication
+- Deduplicate dialog boilerplate, error toasts, and dynamic UPDATE builders
+- Extract GitHub and notification routes from `index.ts` into route plugins
+- Derive session search repo/branch filters from session data instead of git
+- Improve shell template execution and mutation error handling with `toastError`
+
+### Bug Fixes
+- Fix untracked file diff display and nullable review body
+- Fix PR activity dots not updating by replacing Map/Set with plain objects in SWR cache
+- Fix dynamic Tailwind `group-hover` classes not generating CSS
+- Fix settings partial update overwriting unrelated fields
+- Fix file picker escaping digit 2, refocus terminal on close, and defer session select until expanded
+- Fix mutation error handling with try/catch and `toastError` across all mutations
+
 ## [v0.6.0](../../compare/v0.5.0...v0.6.0) — 2026-03-15
 
 ### Features
