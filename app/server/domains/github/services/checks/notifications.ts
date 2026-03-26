@@ -78,29 +78,52 @@ export async function processNewPRData(newPRs: PRCheckStatus[]) {
       )
     }
 
-    // Check failed
-    if (prev && !prev.hasFailedChecks && pr.hasFailedChecks) {
-      const failedCheck = pr.checks.find(
-        (c) =>
-          c.status === 'COMPLETED' &&
-          c.conclusion !== 'SUCCESS' &&
-          c.conclusion !== 'SKIPPED' &&
-          c.conclusion !== 'NEUTRAL',
+    // Check failed — single notification for 1, grouped for 2+
+    if (prev && pr.hasFailedChecks) {
+      const isFailedConclusion = (c: { status: string; conclusion: string }) =>
+        c.status === 'COMPLETED' &&
+        c.conclusion !== 'SUCCESS' &&
+        c.conclusion !== 'SKIPPED' &&
+        c.conclusion !== 'NEUTRAL'
+
+      const prevFailedNames = new Set(
+        prev.checks.filter(isFailedConclusion).map((c) => c.name),
       )
-      await emitNotification(
-        'check_failed',
-        pr.repo,
-        {
-          prTitle: pr.prTitle,
-          prUrl: pr.prUrl,
-          prNumber: pr.prNumber,
-          checkName: failedCheck?.name,
-          checkUrl: failedCheck?.detailsUrl,
-        },
-        `${failedCheck?.detailsUrl || failedCheck?.name}:${pr.updatedAt}`,
-        pr.prNumber,
+      const newlyFailed = pr.checks.filter(
+        (c) => isFailedConclusion(c) && !prevFailedNames.has(c.name),
       )
-      if (pr.headCommitSha) {
+
+      if (newlyFailed.length === 1) {
+        const failedCheck = newlyFailed[0]
+        await emitNotification(
+          'check_failed',
+          pr.repo,
+          {
+            prTitle: pr.prTitle,
+            prUrl: pr.prUrl,
+            prNumber: pr.prNumber,
+            checkName: failedCheck.name,
+            checkUrl: failedCheck.detailsUrl,
+          },
+          `${failedCheck.detailsUrl || failedCheck.name}:${pr.updatedAt}`,
+          pr.prNumber,
+        )
+      } else if (newlyFailed.length > 1) {
+        await emitNotification(
+          'checks_failed',
+          pr.repo,
+          {
+            prTitle: pr.prTitle,
+            prUrl: pr.prUrl,
+            prNumber: pr.prNumber,
+            failedCount: newlyFailed.length,
+            checkNames: newlyFailed.map((c) => c.name).join(', '),
+          },
+          `checks_failed:${pr.prNumber}:${pr.updatedAt}`,
+          pr.prNumber,
+        )
+      }
+      if (newlyFailed.length > 0 && pr.headCommitSha) {
         checkFailedOnCommit.set(key, pr.headCommitSha)
       }
     }

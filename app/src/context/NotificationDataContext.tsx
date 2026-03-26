@@ -78,6 +78,7 @@ export function NotificationDataProvider({
 
       let url: string | undefined = prUrl || undefined
       if (type === 'check_failed') url = data.checkUrl || prUrl
+      else if (type === 'checks_failed') url = prUrl || undefined
       else if (type === 'new_comment' || type === 'pr_mentioned')
         url = data.commentUrl || prUrl
       else if (

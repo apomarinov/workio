@@ -48,6 +48,14 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationDef> = {
     bodyTemplate: '{prTitle}',
     audio: 'error',
   },
+  checks_failed: {
+    emoji: '❌',
+    icon: 'CircleX',
+    iconColor: 'text-red-400',
+    titleTemplate: '{failedCount} checks in {prTitle}',
+    bodyTemplate: '{checkNames}',
+    audio: 'error',
+  },
   changes_requested: {
     emoji: '🔄',
     icon: 'RefreshIcon',

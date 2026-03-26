@@ -112,6 +112,8 @@ function getNotificationUrl(notification: Notification): string | undefined {
       return data.prUrl
     case 'check_failed':
       return data.checkUrl || data.prUrl
+    case 'checks_failed':
+      return data.prUrl
     case 'changes_requested':
     case 'pr_approved':
       if (data.reviewId && data.prUrl) {
