@@ -326,7 +326,6 @@ function handleWorkerMessage(session: PtySession, msg: WorkerToMasterMessage) {
         terminalId: session.terminalId,
         shellId: session.shellId,
         event: msg.event,
-        session,
       })
       break
 

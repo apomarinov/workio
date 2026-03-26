@@ -91,9 +91,6 @@ export async function autoDetectTerminal(
 
 // Re-run auto-detect when a PTY session connects (covers terminals
 // that existed before the server started or where detection failed initially)
-serverEvents.on(
-  'pty:session-created',
-  ({ terminalId }: { terminalId: number }) => {
-    autoDetectTerminal(terminalId)
-  },
-)
+serverEvents.on('pty:session-created', ({ terminalId }) => {
+  autoDetectTerminal(terminalId)
+})

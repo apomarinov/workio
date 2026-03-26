@@ -297,20 +297,14 @@ export async function initGitHubChecks() {
   }
 
   serverEvents.on('github:refresh-pr-checks', () => refreshPRChecks(true))
-  serverEvents.on(
-    'pty:terminal-sessions-destroyed',
-    ({ terminalId }: { terminalId: number }) => {
-      untrackTerminal(terminalId)
-    },
-  )
-  serverEvents.on(
-    'pty:session-created',
-    ({ terminalId }: { terminalId: number }) => {
-      trackTerminal(terminalId).then(() => {
-        startChecksPolling()
-      })
-    },
-  )
+  serverEvents.on('pty:terminal-sessions-destroyed', ({ terminalId }) => {
+    untrackTerminal(terminalId)
+  })
+  serverEvents.on('pty:session-created', ({ terminalId }) => {
+    trackTerminal(terminalId).then(() => {
+      startChecksPolling()
+    })
+  })
 
   const terminals = await getAllTerminals()
   for (const terminal of terminals) {

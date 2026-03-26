@@ -30,7 +30,7 @@ mkcert -install
 
 # Create certs directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CERTS_DIR="$(dirname "$SCRIPT_DIR")/../certs"
+CERTS_DIR="$(dirname "$SCRIPT_DIR")/../../../certs"
 mkdir -p "$CERTS_DIR"
 
 # Generate certificate

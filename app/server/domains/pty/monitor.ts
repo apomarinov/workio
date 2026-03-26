@@ -28,6 +28,7 @@ import {
 } from '@domains/pty/services/process-tree'
 import {
   getAllSessions,
+  getSession,
   getSessionsForTerminal,
   handleBellNotification,
   type PtySession,
@@ -723,29 +724,18 @@ function handleWorkerCommandEvent(
 
 // ── Server event listeners ────────────────────────────────────────────
 
-serverEvents.on(
-  'pty:command-event',
-  ({
-    terminalId,
-    shellId,
-    event,
-    session,
-  }: {
-    terminalId: number
-    shellId: number
-    event: CommandEvent
-    session: PtySession
-  }) => {
-    handleWorkerCommandEvent(terminalId, shellId, event, session)
-  },
-)
+serverEvents.on('pty:command-event', ({ terminalId, shellId, event }) => {
+  const session = getSession(shellId)
+  if (!session) {
+    log.error(`[pty] command-event for unknown shell ${shellId}`)
+    return
+  }
+  handleWorkerCommandEvent(terminalId, shellId, event, session)
+})
 
-serverEvents.on(
-  'pty:session-created',
-  ({ terminalId }: { terminalId: number }) => {
-    getOrCreateMonitor(terminalId)
-  },
-)
+serverEvents.on('pty:session-created', ({ terminalId }) => {
+  getOrCreateMonitor(terminalId)
+})
 
 serverEvents.on('pty:session-destroyed', () => {
   stopGlobalProcessPolling()
@@ -753,7 +743,7 @@ serverEvents.on('pty:session-destroyed', () => {
 
 serverEvents.on(
   'pty:terminal-sessions-destroyed',
-  ({ terminalId, sshHost }: { terminalId: number; sshHost: string | null }) => {
+  ({ terminalId, sshHost }) => {
     disposeMonitor(terminalId)
     disposeGitState(terminalId)
     stopGlobalProcessPolling()

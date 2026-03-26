@@ -5,7 +5,7 @@ import type {
   NgrokStatus,
   ServiceStatus,
   ServicesStatus,
-} from '@server/status'
+} from '@server/types/status'
 import {
   AlertTriangle,
   CircleHelp,

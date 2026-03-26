@@ -351,7 +351,7 @@ export function verifyWebhookSignature(
 }
 
 // Update webhook URLs when ngrok tunnel URL changes
-serverEvents.on('ngrok:url-changed', (newUrl: string) => {
+serverEvents.on('ngrok:url-changed', (newUrl) => {
   updateAllWebhookUrls(newUrl).catch((err) => {
     log.error(
       err,

@@ -535,14 +535,11 @@ export function startGitDirtyPolling() {
 
 // ── Event listeners ──────────────────────────────────────────────────
 
-serverEvents.on(
-  'pty:session-created',
-  ({ terminalId }: { terminalId: number }) => {
-    detectGitBranch(terminalId)
-  },
-)
+serverEvents.on('pty:session-created', ({ terminalId }) => {
+  detectGitBranch(terminalId)
+})
 
-serverEvents.on('pty:command-end', ({ terminalId }: { terminalId: number }) => {
+serverEvents.on('pty:command-end', ({ terminalId }) => {
   detectGitBranch(terminalId)
   checkAndEmitSingleGitDirty(terminalId)
 })

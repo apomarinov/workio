@@ -5,7 +5,7 @@ import type {
   Terminal,
   WorkspacePayload,
 } from '@domains/workspace/schema/terminals'
-import type { ServicesStatus } from '@server/status'
+import type { ServicesStatus } from '@server/types/status'
 import {
   createContext,
   useCallback,
