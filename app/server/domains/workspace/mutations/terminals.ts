@@ -30,6 +30,7 @@ import serverEvents from '@server/lib/events'
 import { expandPath, sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
 import { validateSSHHost } from '@server/ssh/config'
+import { poolExecSSHCommand } from '@server/ssh/pool'
 import { publicProcedure } from '@server/trpc'
 
 function isLocalPortAvailable(port: number): Promise<boolean> {
@@ -287,13 +288,11 @@ export const updateTerminal = publicProcedure
       // Also write name file on remote host for SSH terminals (fire-and-forget)
       if (terminal.ssh_host) {
         const sanitized = sanitizeName(newName)
-        import('@server/ssh/pool').then(({ poolExecSSHCommand }) => {
-          poolExecSSHCommand(
-            terminal.ssh_host!,
-            `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(sanitized)} > ~/.workio/terminals/${id}`,
-            { timeout: 5000 },
-          ).catch(() => {})
-        })
+        poolExecSSHCommand(
+          terminal.ssh_host!,
+          `mkdir -p ~/.workio/terminals && printf '%s' ${shellEscape(sanitized)} > ~/.workio/terminals/${id}`,
+          { timeout: 5000 },
+        ).catch(() => {})
       }
 
       // Rename zellij session if it exists

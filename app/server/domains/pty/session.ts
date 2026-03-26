@@ -33,8 +33,10 @@ import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
+import { bootstrapRemoteHost } from '@server/ssh/claude-forwarding'
 import { validateSSHHost } from '@server/ssh/config'
 import { execSSHCommandLogged } from '@server/ssh/exec'
+import { poolExecSSHCommand } from '@server/ssh/pool'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WORKER_PATH = path.join(__dirname, 'services', 'worker.ts')
@@ -631,20 +633,16 @@ export async function createSession(
 
   // Also write name files on the remote host for SSH terminals (fire-and-forget)
   if (terminal.ssh_host) {
-    import('@server/ssh/pool').then(({ poolExecSSHCommand }) => {
-      const tn = sanitizeName(terminalName)
-      const sn = sanitizeName(shellRecord.name)
-      poolExecSSHCommand(
-        terminal.ssh_host!,
-        `mkdir -p ~/.workio/terminals ~/.workio/shells && printf '%s' ${shellEscape(tn)} > ~/.workio/terminals/${terminalId} && printf '%s' ${shellEscape(sn)} > ~/.workio/shells/${shellId}`,
-        { timeout: 5000 },
-      ).catch(() => {})
-    })
+    const tn = sanitizeName(terminalName)
+    const sn = sanitizeName(shellRecord.name)
+    poolExecSSHCommand(
+      terminal.ssh_host!,
+      `mkdir -p ~/.workio/terminals ~/.workio/shells && printf '%s' ${shellEscape(tn)} > ~/.workio/terminals/${terminalId} && printf '%s' ${shellEscape(sn)} > ~/.workio/shells/${shellId}`,
+      { timeout: 5000 },
+    ).catch(() => {})
 
     // Bootstrap Claude hook forwarding for this SSH host (fire-and-forget)
-    import('@server/ssh/claude-forwarding').then(({ bootstrapRemoteHost }) => {
-      bootstrapRemoteHost(terminal.ssh_host!).catch(() => {})
-    })
+    bootstrapRemoteHost(terminal.ssh_host!).catch(() => {})
   }
 
   // Flush any pending command queued before the worker was ready
