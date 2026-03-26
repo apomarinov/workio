@@ -6,6 +6,7 @@ import type {
 } from '@domains/git/schema'
 import { detectBranch } from '@domains/git/services/branch-detection'
 import { detectGitHubRepo } from '@domains/git/services/resolve'
+import { logCommand } from '@domains/logs/db'
 import {
   getAllTerminals,
   getTerminalById,
@@ -400,8 +401,22 @@ export async function checkAndEmitSingleGitDirty(
       }
       getIO()?.emit('git:remote-sync', { syncStatus })
     }
+    logCommand({
+      terminalId,
+      category: 'git',
+      command: 'git status polling (diff, remote-sync, last-commit)',
+      dedupeKey: `git:poll:${terminalId}`,
+    })
   } catch (err) {
     log.error({ err }, '[git] Failed to scan and emit git dirty status')
+    logCommand({
+      terminalId,
+      category: 'git',
+      command: 'git status polling (diff, remote-sync, last-commit)',
+      stderr: err instanceof Error ? err.message : String(err),
+      failed: true,
+      dedupeKey: `git:poll:${terminalId}`,
+    })
   }
 }
 
@@ -448,11 +463,25 @@ export async function detectGitBranch(
         log.error({ err, terminalId }, '[git] Failed to detect repo slug')
       }
     }
+    logCommand({
+      terminalId,
+      category: 'git',
+      command: 'git branch detection (rev-parse, symbolic-ref)',
+      dedupeKey: `git:branch-detect:${terminalId}`,
+    })
   } catch (err) {
     log.error(
       { err },
       `[git] Failed to detect git branch for terminal ${terminalId}`,
     )
+    logCommand({
+      terminalId,
+      category: 'git',
+      command: 'git branch detection (rev-parse, symbolic-ref)',
+      stderr: err instanceof Error ? err.message : String(err),
+      failed: true,
+      dedupeKey: `git:branch-detect:${terminalId}`,
+    })
   }
 }
 
@@ -498,11 +527,25 @@ async function scanAndEmitGitDirty() {
                 data: { git_branch: branchResult.branch },
               })
             }
+            logCommand({
+              terminalId: terminal.id,
+              category: 'git',
+              command: 'git status polling (diff, remote-sync, last-commit)',
+              dedupeKey: `git:poll:${terminal.id}`,
+            })
           } catch (err) {
             log.error(
               { err, terminalId: terminal.id },
               '[git] Failed to detect branch for terminal',
             )
+            logCommand({
+              terminalId: terminal.id,
+              category: 'git',
+              command: 'git status polling (diff, remote-sync, last-commit)',
+              stderr: err instanceof Error ? err.message : String(err),
+              failed: true,
+              dedupeKey: `git:poll:${terminal.id}`,
+            })
           }
         })(),
       )

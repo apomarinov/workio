@@ -1,5 +1,5 @@
 import { logCommand } from '@domains/logs/db'
-import { execFileAsync, getExecStderr } from '@server/lib/exec'
+import { execFileAsyncLogged, getExecStderr } from '@server/lib/exec'
 import { ghExec } from './checks/fetcher'
 import { getGhUsername, invalidateChecksCache } from './checks/state'
 
@@ -21,7 +21,7 @@ async function getReviewNodeId(
   reviewId: number,
 ) {
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'gh',
       [
         'api',
@@ -29,7 +29,7 @@ async function getReviewNodeId(
         '--jq',
         '.node_id',
       ],
-      { timeout: 15000 },
+      { timeout: 15000, category: 'github', errorOnly: true },
     )
     if (!stdout.trim()) return null
     return stdout.trim()
@@ -47,10 +47,10 @@ async function graphqlReaction(
   const mutation = remove ? 'removeReaction' : 'addReaction'
   const query = `mutation { ${mutation}(input: { subjectId: "${nodeId}", content: ${gqlContent} }) { reaction { content } } }`
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'gh',
       ['api', 'graphql', '-f', `query=${query}`],
-      { timeout: 15000 },
+      { timeout: 15000, category: 'github', errorOnly: true },
     )
     const result = JSON.parse(stdout)
     if (result.errors?.length) {
@@ -68,6 +68,34 @@ async function graphqlReaction(
   }
 }
 
+/** Run a GraphQL reaction mutation and log the result. */
+async function graphqlReactionLogged(
+  nodeId: string,
+  content: string,
+  remove: boolean,
+  logOpts: { prId: string; cmd: string },
+) {
+  try {
+    await graphqlReaction(nodeId, content, remove)
+    logCommand({
+      prId: logOpts.prId,
+      category: 'github',
+      command: logOpts.cmd,
+      stdout: 'ok',
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logCommand({
+      prId: logOpts.prId,
+      category: 'github',
+      command: logOpts.cmd,
+      stderr: message,
+      failed: true,
+    })
+    throw err
+  }
+}
+
 export async function addReaction(
   owner: string,
   repo: string,
@@ -76,6 +104,8 @@ export async function addReaction(
   content: string,
   prNumber?: number,
 ) {
+  const prId = `${owner}/${repo}`
+
   // Reviews use GraphQL
   if (subjectType === 'review') {
     if (!prNumber) {
@@ -85,27 +115,11 @@ export async function addReaction(
     if (!nodeId) {
       throw new Error('Failed to get review node ID')
     }
-    const cmd = `gh graphql addReaction(review=${subjectId}, content=${content})`
-    try {
-      await graphqlReaction(nodeId, content, false)
-      logCommand({
-        prId: `${owner}/${repo}`,
-        category: 'github',
-        command: cmd,
-        stdout: 'ok',
-      })
-      invalidateChecksCache()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      logCommand({
-        prId: `${owner}/${repo}`,
-        category: 'github',
-        command: cmd,
-        stderr: message,
-        failed: true,
-      })
-      throw err
-    }
+    await graphqlReactionLogged(nodeId, content, false, {
+      prId,
+      cmd: `gh graphql addReaction(review=${subjectId}, content=${content})`,
+    })
+    invalidateChecksCache()
     return
   }
 
@@ -119,34 +133,17 @@ export async function addReaction(
       break
   }
 
-  const cmd = `gh api --method POST ${endpoint} -f content=${content}`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      ['api', '--method', 'POST', endpoint, '-f', `content=${content}`],
-      { timeout: 15000 },
-    )
-    logCommand({
-      prId: `${owner}/${repo}`,
+  await execFileAsyncLogged(
+    'gh',
+    ['api', '--method', 'POST', endpoint, '-f', `content=${content}`],
+    {
+      timeout: 15000,
       category: 'github',
-      command: cmd,
-      stdout,
-      stderr,
-    })
-    invalidateChecksCache()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    const stderr = getExecStderr(err)
-    logCommand({
-      prId: `${owner}/${repo}`,
-      category: 'github',
-      command: cmd,
-      stdout: '',
-      stderr: stderr || message,
-      failed: true,
-    })
-    throw new Error(stderr || message)
-  }
+      logCmd: `gh api --method POST ${endpoint} -f content=${content}`,
+      prId,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function removeReaction(
@@ -157,6 +154,8 @@ export async function removeReaction(
   content: string,
   prNumber?: number,
 ) {
+  const prId = `${owner}/${repo}`
+
   // Reviews use GraphQL
   if (subjectType === 'review') {
     if (!prNumber) {
@@ -166,27 +165,11 @@ export async function removeReaction(
     if (!nodeId) {
       throw new Error('Failed to get review node ID')
     }
-    const cmd = `gh graphql removeReaction(review=${subjectId}, content=${content})`
-    try {
-      await graphqlReaction(nodeId, content, true)
-      logCommand({
-        prId: `${owner}/${repo}`,
-        category: 'github',
-        command: cmd,
-        stdout: 'ok',
-      })
-      invalidateChecksCache()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      logCommand({
-        prId: `${owner}/${repo}`,
-        category: 'github',
-        command: cmd,
-        stderr: message,
-        failed: true,
-      })
-      throw err
-    }
+    await graphqlReactionLogged(nodeId, content, true, {
+      prId,
+      cmd: `gh graphql removeReaction(review=${subjectId}, content=${content})`,
+    })
+    invalidateChecksCache()
     return
   }
 
@@ -226,27 +209,15 @@ export async function removeReaction(
   }
 
   const deleteEndpoint = `${listEndpoint}/${myReaction.id}`
-  const prId = `${owner}/${repo}`
-  const cmd = `gh api --method DELETE ${deleteEndpoint}`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      ['api', '--method', 'DELETE', deleteEndpoint],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    const stderr = getExecStderr(err)
-    logCommand({
-      prId,
+  await execFileAsyncLogged(
+    'gh',
+    ['api', '--method', 'DELETE', deleteEndpoint],
+    {
+      timeout: 15000,
       category: 'github',
-      command: cmd,
-      stdout: '',
-      stderr: stderr || message,
-      failed: true,
-    })
-    throw new Error(stderr || message)
-  }
+      logCmd: `gh api --method DELETE ${deleteEndpoint}`,
+      prId,
+    },
+  )
+  invalidateChecksCache()
 }

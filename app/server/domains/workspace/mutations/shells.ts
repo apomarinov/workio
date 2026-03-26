@@ -26,7 +26,7 @@ import {
 import { getIO } from '@server/io'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 import { publicProcedure } from '@server/trpc'
 
 async function resolveShell(id: number) {
@@ -99,10 +99,10 @@ export const renameShell = publicProcedure
 
     // Also write on remote host for SSH terminals (fire-and-forget)
     if (terminal.ssh_host) {
-      execSSHCommand(
+      execSSHCommandLogged(
         terminal.ssh_host,
         `mkdir -p ~/.workio/shells && printf '%s' ${shellEscape(sanitizedName)} > ~/.workio/shells/${shell.id}`,
-        { timeout: 5000 },
+        { category: 'workspace', errorOnly: true, timeout: 5000 },
       ).catch(() => {})
     }
 

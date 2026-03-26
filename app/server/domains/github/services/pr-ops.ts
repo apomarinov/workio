@@ -1,21 +1,6 @@
-import { logCommand } from '@domains/logs/db'
-import { execFileAsync, getExecStderr } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { emitPRChecks } from './checks/polling'
 import { getLastFetchedPRs, invalidateChecksCache } from './checks/state'
-
-function logAndThrow(err: unknown, cmd: string, prId?: string): never {
-  const message = err instanceof Error ? err.message : String(err)
-  const stderr = getExecStderr(err)
-  logCommand({
-    prId,
-    category: 'github',
-    command: cmd,
-    stdout: '',
-    stderr: stderr || message,
-    failed: true,
-  })
-  throw new Error(stderr || message)
-}
 
 export async function requestPRReview(
   owner: string,
@@ -23,26 +8,24 @@ export async function requestPRReview(
   prNumber: number,
   reviewer: string,
 ) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api --method POST repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers -f reviewers[]=${reviewer}`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'POST',
-        `repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`,
-        '-f',
-        `reviewers[]=${reviewer}`,
-      ],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`,
+      '-f',
+      `reviewers[]=${reviewer}`,
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh api --method POST repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers -f reviewers[]=${reviewer}`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function mergePR(
@@ -51,49 +34,45 @@ export async function mergePR(
   prNumber: number,
   method: 'merge' | 'squash' | 'rebase',
 ) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api --method PUT repos/${owner}/${repo}/pulls/${prNumber}/merge -f merge_method=${method}`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'PUT',
-        `repos/${owner}/${repo}/pulls/${prNumber}/merge`,
-        '-f',
-        `merge_method=${method}`,
-      ],
-      { timeout: 30000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'PUT',
+      `repos/${owner}/${repo}/pulls/${prNumber}/merge`,
+      '-f',
+      `merge_method=${method}`,
+    ],
+    {
+      timeout: 30000,
+      category: 'github',
+      logCmd: `gh api --method PUT repos/${owner}/${repo}/pulls/${prNumber}/merge -f merge_method=${method}`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function closePR(owner: string, repo: string, prNumber: number) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f state=closed`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'PATCH',
-        `repos/${owner}/${repo}/pulls/${prNumber}`,
-        '-f',
-        'state=closed',
-      ],
-      { timeout: 30000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'PATCH',
+      `repos/${owner}/${repo}/pulls/${prNumber}`,
+      '-f',
+      'state=closed',
+    ],
+    {
+      timeout: 30000,
+      category: 'github',
+      logCmd: `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f state=closed`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function renamePR(
@@ -102,32 +81,30 @@ export async function renamePR(
   prNumber: number,
   title: string,
 ) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=...`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'PATCH',
-        `repos/${owner}/${repo}/pulls/${prNumber}`,
-        '-f',
-        `title=${title}`,
-      ],
-      { timeout: 30000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    const existing = getLastFetchedPRs().find(
-      (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
-    )
-    if (existing) {
-      existing.prTitle = title
-    }
-    emitPRChecks(getLastFetchedPRs())
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'PATCH',
+      `repos/${owner}/${repo}/pulls/${prNumber}`,
+      '-f',
+      `title=${title}`,
+    ],
+    {
+      timeout: 30000,
+      category: 'github',
+      logCmd: `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=...`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  const existing = getLastFetchedPRs().find(
+    (p) => p.repo === `${owner}/${repo}` && p.prNumber === prNumber,
+  )
+  if (existing) {
+    existing.prTitle = title
   }
+  emitPRChecks(getLastFetchedPRs())
 }
 
 export async function editPR(
@@ -141,65 +118,62 @@ export async function editPR(
   const prId = `${owner}/${repo}#${prNumber}`
 
   // Update title + body via REST API
-  const patchCmd = `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'PATCH',
-        `repos/${owner}/${repo}/pulls/${prNumber}`,
-        '-f',
-        `title=${title}`,
-        '-f',
-        `body=${body}`,
-      ],
-      { timeout: 30000 },
-    )
-    logCommand({ prId, category: 'github', command: patchCmd, stdout, stderr })
-  } catch (err) {
-    logAndThrow(err, patchCmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'PATCH',
+      `repos/${owner}/${repo}/pulls/${prNumber}`,
+      '-f',
+      `title=${title}`,
+      '-f',
+      `body=${body}`,
+    ],
+    {
+      timeout: 30000,
+      category: 'github',
+      logCmd: `gh api --method PATCH repos/${owner}/${repo}/pulls/${prNumber} -f title=... -f body=...`,
+      prId,
+    },
+  )
 
   // Draft status requires GraphQL mutations
   if (draft !== undefined) {
     if (draft) {
-      const { stdout: nodeIdStdout } = await execFileAsync(
+      const { stdout: nodeIdStdout } = await execFileAsyncLogged(
         'gh',
         ['api', `repos/${owner}/${repo}/pulls/${prNumber}`, '--jq', '.node_id'],
-        { timeout: 15000 },
+        {
+          timeout: 15000,
+          category: 'github',
+          logCmd: `gh api repos/${owner}/${repo}/pulls/${prNumber} --jq .node_id`,
+          prId,
+        },
       )
       const nodeId = nodeIdStdout.trim()
       const mutation = `mutation { convertPullRequestToDraft(input: {pullRequestId: "${nodeId}"}) { pullRequest { isDraft } } }`
-      try {
-        const { stdout: gqlStdout, stderr: gqlStderr } = await execFileAsync(
-          'gh',
-          ['api', 'graphql', '-f', `query=${mutation}`],
-          { timeout: 15000 },
-        )
-        logCommand({
-          prId,
+      await execFileAsyncLogged(
+        'gh',
+        ['api', 'graphql', '-f', `query=${mutation}`],
+        {
+          timeout: 15000,
           category: 'github',
-          command: 'gh api graphql convertPullRequestToDraft',
-          stdout: gqlStdout,
-          stderr: gqlStderr,
-        })
-      } catch (err) {
-        logAndThrow(err, 'gh api graphql convertPullRequestToDraft', prId)
-      }
+          logCmd: 'gh api graphql convertPullRequestToDraft',
+          prId,
+        },
+      )
     } else {
-      const cmd = `gh pr ready ${prNumber} -R ${owner}/${repo}`
-      try {
-        const { stdout, stderr } = await execFileAsync(
-          'gh',
-          ['pr', 'ready', String(prNumber), '-R', `${owner}/${repo}`],
-          { timeout: 15000 },
-        )
-        logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-      } catch (err) {
-        logAndThrow(err, cmd, prId)
-      }
+      await execFileAsyncLogged(
+        'gh',
+        ['pr', 'ready', String(prNumber), '-R', `${owner}/${repo}`],
+        {
+          timeout: 15000,
+          category: 'github',
+          logCmd: `gh pr ready ${prNumber} -R ${owner}/${repo}`,
+          prId,
+        },
+      )
     }
   }
 
@@ -224,36 +198,34 @@ export async function createPR(
   body: string,
   draft: boolean,
 ) {
-  const prId = `${owner}/${repo}`
-  const cmd = `gh api --method POST repos/${owner}/${repo}/pulls -f head=... -f base=... -f title=... -f body=... -F draft=...`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'POST',
-        `repos/${owner}/${repo}/pulls`,
-        '-f',
-        `head=${head}`,
-        '-f',
-        `base=${base}`,
-        '-f',
-        `title=${title}`,
-        '-f',
-        `body=${body}`,
-        '-F',
-        `draft=${draft}`,
-      ],
-      { timeout: 30000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    const data = JSON.parse(stdout)
-    invalidateChecksCache()
-    return data.number as number
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  const { stdout } = await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/${owner}/${repo}/pulls`,
+      '-f',
+      `head=${head}`,
+      '-f',
+      `base=${base}`,
+      '-f',
+      `title=${title}`,
+      '-f',
+      `body=${body}`,
+      '-F',
+      `draft=${draft}`,
+    ],
+    {
+      timeout: 30000,
+      category: 'github',
+      logCmd: `gh api --method POST repos/${owner}/${repo}/pulls -f head=... -f base=... -f title=... -f body=... -F draft=...`,
+      prId: `${owner}/${repo}`,
+    },
+  )
+  const data = JSON.parse(stdout)
+  invalidateChecksCache()
+  return data.number as number
 }
 
 export async function rerunFailedCheck(
@@ -267,24 +239,22 @@ export async function rerunFailedCheck(
     throw new Error('Cannot rerun: unsupported check type')
   }
   const runId = runMatch[1]
-  const prId = prNumber ? `${owner}/${repo}#${prNumber}` : undefined
-  const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        '--method',
-        'POST',
-        `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
-      ],
-      { timeout: 30000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+    ],
+    {
+      timeout: 30000,
+      category: 'github',
+      logCmd: `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+      prId: prNumber ? `${owner}/${repo}#${prNumber}` : undefined,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function rerunAllFailedChecks(
@@ -311,9 +281,8 @@ export async function rerunAllFailedChecks(
 
   await Promise.all(
     [...runIds].map(async (runId) => {
-      const cmd = `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`
       try {
-        const { stdout, stderr } = await execFileAsync(
+        await execFileAsyncLogged(
           'gh',
           [
             'api',
@@ -321,22 +290,17 @@ export async function rerunAllFailedChecks(
             'POST',
             `repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
           ],
-          { timeout: 30000 },
+          {
+            timeout: 30000,
+            category: 'github',
+            logCmd: `gh api --method POST repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+            prId,
+          },
         )
-        logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
         successCount++
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        const stderr = getExecStderr(err)
-        logCommand({
-          prId,
-          category: 'github',
-          command: cmd,
-          stdout: '',
-          stderr: stderr || message,
-          failed: true,
-        })
-        errors.push(stderr || message)
+        // Already logged by execFileAsyncLogged
+        errors.push(err instanceof Error ? err.message : String(err))
       }
     }),
   )

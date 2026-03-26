@@ -1,6 +1,6 @@
 ---
 name: wio
-description: Workio utilities — notifications, and more
+description: Workio utilities — notifications, session search, and more
 ---
 
 A collection of skills for interacting with the Workio dashboard. Workio is a terminal management app running locally.
@@ -12,11 +12,13 @@ Send notifications to the Workio dashboard (browser + push) via the API.
 ### API
 
 ```
-POST https://localhost:5176/api/notifications/send
+POST https://localhost:5176/api/trpc/notifications.send
 Content-Type: application/json
 
 { "title": "...", "body": "...", "terminalId": 1, "shellId": 2 }
 ```
+
+This is a tRPC mutation. Send the input as a plain JSON body (no `json` wrapper).
 
 - `title` (required): Short notification title
 - `body` (required): Notification body text
@@ -30,7 +32,7 @@ When `terminalId` or `shellId` are provided, the server resolves their names and
 Use `curl -k` (self-signed cert) from Bash, command on a single line like this:
 
 ```bash
-curl -sk -X POST "https://localhost:5176/api/notifications/send" -H "Content-Type: application/json" -d "{\"title\":\"...\",\"body\":\"...\"}"
+curl -sk -X POST "https://localhost:5176/api/trpc/notifications.send" -H "Content-Type: application/json" -d "{\"title\":\"...\",\"body\":\"...\"}"
 ```
 
 ### Environment variables
@@ -43,7 +45,7 @@ Your shell may have these env vars set by Workio — use them when available:
 Example with context:
 
 ```bash
-curl -sk -X POST "https://localhost:5176/api/notifications/send" -H "Content-Type: application/json" -d "{\"title\":\"Build done\",\"body\":\"Frontend compiled successfully\",\"terminalId\":${WORKIO_TERMINAL_ID:-null},\"shellId\":${WORKIO_SHELL_ID:-null}}"
+curl -sk -X POST "https://localhost:5176/api/trpc/notifications.send" -H "Content-Type: application/json" -d "{\"title\":\"Build done\",\"body\":\"Frontend compiled successfully\",\"terminalId\":${WORKIO_TERMINAL_ID:-null},\"shellId\":${WORKIO_SHELL_ID:-null}}"
 ```
 
 ### When to use

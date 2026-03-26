@@ -11,7 +11,7 @@ import {
   checkAndEmitSingleGitDirty,
   detectGitBranch,
 } from '@domains/git/services/status'
-import { gitExec, gitExecLogged } from '@server/lib/git'
+import { gitExecLogged } from '@server/lib/git'
 import { log } from '@server/logger'
 import { publicProcedure } from '@server/trpc'
 
@@ -32,7 +32,9 @@ export const checkoutMutation = publicProcedure
     const terminal = await resolveGitTerminal(input.terminalId)
 
     // Prune stale worktrees before checkout
-    await gitExec(terminal, ['worktree', 'prune'], {
+    await gitExecLogged(terminal, ['worktree', 'prune'], {
+      terminalId: input.terminalId,
+      errorOnly: true,
       timeout: 5000,
     }).catch((err) =>
       log.error(
@@ -90,10 +92,10 @@ export const pushMutation = publicProcedure
     })
 
     // Update the local remote-tracking ref for single-branch clones
-    gitExec(
+    gitExecLogged(
       terminal,
       ['update-ref', `refs/remotes/origin/${input.branch}`, 'HEAD'],
-      { timeout: 5000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 5000 },
     ).catch(() => {})
 
     detectGitBranch(input.terminalId)
@@ -119,7 +121,8 @@ export const rebaseMutation = publicProcedure
         timeout: 60000,
       })
     } catch (err) {
-      await gitExec(terminal, ['rebase', '--abort'], {
+      await gitExecLogged(terminal, ['rebase', '--abort'], {
+        terminalId: input.terminalId,
         timeout: 10000,
       }).catch(() => {})
       throw err
@@ -161,10 +164,10 @@ export const renameBranchMutation = publicProcedure
     const terminal = await resolveGitTerminal(input.terminalId)
 
     // Pre-check: ensure target name doesn't already exist
-    const listResult = await gitExec(
+    const listResult = await gitExecLogged(
       terminal,
       ['branch', '--list', input.newName],
-      { timeout: 5000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 5000 },
     ).catch(() => ({ stdout: '', stderr: '' }))
     if (listResult.stdout.trim()) {
       throw new Error(`Branch '${input.newName}' already exists`)

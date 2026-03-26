@@ -11,7 +11,7 @@ import {
 } from '@domains/git/services/git-utils'
 import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { getTerminalById } from '@domains/workspace/db/terminals'
-import { gitExec } from '@server/lib/git'
+import { gitExecLogged } from '@server/lib/git'
 import { expandPath } from '@server/lib/strings'
 import { publicProcedure } from '@server/trpc'
 
@@ -20,7 +20,9 @@ export const headMessage = publicProcedure
   .query(async ({ input }) => {
     const terminal = await resolveGitTerminal(input.terminalId)
 
-    const result = await gitExec(terminal, ['log', '-1', '--format=%B'], {
+    const result = await gitExecLogged(terminal, ['log', '-1', '--format=%B'], {
+      terminalId: input.terminalId,
+      errorOnly: true,
       timeout: 10000,
     })
 
@@ -45,7 +47,9 @@ export const changedFiles = publicProcedure
           const refspecs = refs
             .map((r) => `+refs/heads/${r}:refs/remotes/origin/${r}`)
             .join(' ')
-          await gitExec(terminal, [], {
+          await gitExecLogged(terminal, [], {
+            terminalId: input.terminalId,
+            errorOnly: true,
             timeout: 15000,
             sshCmd: `git fetch origin ${refspecs} 2>/dev/null || true`,
           }).catch(() => {})
@@ -58,13 +62,17 @@ export const changedFiles = publicProcedure
       }
 
       const [numstat, nameStatus] = await Promise.all([
-        gitExec(terminal, ['diff', '--numstat', base], {
+        gitExecLogged(terminal, ['diff', '--numstat', base], {
+          terminalId: input.terminalId,
+          errorOnly: true,
           timeout: 10000,
         }).then(
           (r) => r.stdout,
           () => '',
         ),
-        gitExec(terminal, ['diff', '--name-status', base], {
+        gitExecLogged(terminal, ['diff', '--name-status', base], {
+          terminalId: input.terminalId,
+          errorOnly: true,
           timeout: 10000,
         }).then(
           (r) => r.stdout,
@@ -76,7 +84,12 @@ export const changedFiles = publicProcedure
 
     // No base: diff working tree against HEAD
     const gitExecSafe = (args: string[], sshCmd?: string) =>
-      gitExec(terminal, args, { timeout: 10000, sshCmd }).then(
+      gitExecLogged(terminal, args, {
+        terminalId: input.terminalId,
+        errorOnly: true,
+        timeout: 10000,
+        sshCmd,
+      }).then(
         (r) => r.stdout,
         () => '',
       )
@@ -117,7 +130,12 @@ export const fileDiff = publicProcedure
       args: string[],
       extraOpts?: { maxBuffer?: number; sshCmd?: string },
     ) =>
-      gitExec(terminal, args, { timeout: 10000, ...extraOpts }).then(
+      gitExecLogged(terminal, args, {
+        terminalId: input.terminalId,
+        errorOnly: true,
+        timeout: 10000,
+        ...extraOpts,
+      }).then(
         (r) => r.stdout,
         (err) => {
           // git diff --no-index exits with code 1 when differences exist,
@@ -192,10 +210,10 @@ export const commits = publicProcedure
       await fetchOriginIfNeeded(cwd, refspecs)
     }
 
-    const headExists = await gitExec(
+    const headExists = await gitExecLogged(
       terminal,
       ['rev-parse', '--verify', `origin/${input.head}`],
-      { timeout: 5000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 5000 },
     )
       .then(() => true)
       .catch(() => false)
@@ -212,14 +230,14 @@ export const commits = publicProcedure
       }
     }
 
-    const result = await gitExec(
+    const result = await gitExecLogged(
       terminal,
       [
         'log',
         '--format=%H|%s|%an|%aI',
         `origin/${input.base}..origin/${input.head}`,
       ],
-      { timeout: 15000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 15000 },
     )
 
     const commitList = result.stdout
@@ -240,7 +258,7 @@ export const branchCommits = publicProcedure
     const terminal = await getTerminalById(input.terminalId)
     if (!terminal) throw new Error('Terminal not found')
 
-    const result = await gitExec(
+    const result = await gitExecLogged(
       terminal,
       [
         'log',
@@ -249,7 +267,7 @@ export const branchCommits = publicProcedure
         `--skip=${input.offset}`,
         input.branch,
       ],
-      { timeout: 15000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 15000 },
     )
 
     const lines = result.stdout.trim().split('\n').filter(Boolean)
@@ -265,10 +283,10 @@ export const branchCommits = publicProcedure
     if (input.offset === 0) {
       for (const defaultBranch of ['main', 'master']) {
         try {
-          const mb = await gitExec(
+          const mb = await gitExecLogged(
             terminal,
             ['merge-base', defaultBranch, input.branch],
-            { timeout: 5000 },
+            { terminalId: input.terminalId, errorOnly: true, timeout: 5000 },
           )
           mergeBase = mb.stdout.trim()
           mergeBaseBranch = defaultBranch
@@ -297,7 +315,7 @@ export const branchConflicts = publicProcedure
       await fetchOriginIfNeeded(cwd, refspecs)
     }
 
-    const hasConflicts = await gitExec(
+    const hasConflicts = await gitExecLogged(
       terminal,
       [
         'merge-tree',
@@ -306,7 +324,7 @@ export const branchConflicts = publicProcedure
         `origin/${input.base}`,
         `origin/${input.head}`,
       ],
-      { timeout: 15000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 15000 },
     )
       .then(() => false)
       .catch(() => true)

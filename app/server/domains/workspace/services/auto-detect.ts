@@ -8,7 +8,7 @@ import {
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 
 /**
  * Auto-detect git repo, conductor.json, and branch for a terminal.
@@ -49,10 +49,10 @@ export async function autoDetectTerminal(
         let hasConductor = false
         if (terminal.ssh_host) {
           const conductorPath = `${terminal.cwd.replace(/\/+$/, '')}/conductor.json`
-          const result = await execSSHCommand(
+          const result = await execSSHCommandLogged(
             terminal.ssh_host,
             `test -f "${conductorPath}" && echo "yes"`,
-            terminal.cwd,
+            { cwd: terminal.cwd, category: 'workspace', errorOnly: true },
           )
           hasConductor = result.stdout.trim() === 'yes'
         } else {

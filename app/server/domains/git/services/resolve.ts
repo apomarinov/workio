@@ -1,7 +1,7 @@
 import { getTerminalById } from '@domains/workspace/db/terminals'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 
 // ── Repo detection ───────────────────────────────────────────────────
 
@@ -35,17 +35,17 @@ export async function detectGitHubRepo(
     let stdout: string
 
     if (sshHost) {
-      const result = await execSSHCommand(
+      const result = await execSSHCommandLogged(
         sshHost,
         'git remote get-url origin',
-        cwd,
+        { cwd, category: 'git', errorOnly: true },
       )
       stdout = result.stdout
     } else {
-      const result = await execFileAsync(
+      const result = await execFileAsyncLogged(
         'git',
         ['remote', 'get-url', 'origin'],
-        { cwd, timeout: 5000 },
+        { cwd, timeout: 5000, category: 'git', errorOnly: true },
       )
       stdout = result.stdout
     }

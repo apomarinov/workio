@@ -11,7 +11,7 @@ import {
 import { expandPath, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
 import { validateSSHHost } from '@server/ssh/config'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 import { publicProcedure } from '@server/trpc'
 
 export const browseFolder = publicProcedure.mutation(() => {
@@ -172,7 +172,9 @@ export const createDirectory = publicProcedure
       const remotePath = fullPath.startsWith('~/')
         ? `"$HOME/${fullPath.slice(2)}"`
         : shellEscape(fullPath)
-      await execSSHCommand(ssh_host, `mkdir ${remotePath}`)
+      await execSSHCommandLogged(ssh_host, `mkdir ${remotePath}`, {
+        category: 'workspace',
+      })
       return { path: fullPath }
     }
 
@@ -197,7 +199,11 @@ export const sshFixMaxSessions = publicProcedure
         'sudo sshd -t',
         'sudo systemctl restart sshd 2>/dev/null || sudo systemctl restart ssh 2>/dev/null || sudo service sshd restart 2>/dev/null || sudo service ssh restart',
       ].join(' && ')
-      await execSSHCommand(input.host, cmd, { timeout: 10000 })
+      await execSSHCommandLogged(input.host, cmd, {
+        category: 'workspace',
+        logCmd: `ssh ${input.host} -- fix MaxSessions (sshd_config)`,
+        timeout: 10000,
+      })
       return { success: true as const }
     } catch (err) {
       const message =

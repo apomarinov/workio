@@ -12,6 +12,8 @@ interface LogCommandOptions {
   stdout?: string
   stderr?: string
   failed?: boolean
+  /** When set, uses upsert: one row per key, only updates on state change (ok↔error). */
+  dedupeKey?: string
 }
 
 /** Fire-and-forget command logging - callers do not await */
@@ -36,23 +38,45 @@ export async function logCommand(opts: LogCommandOptions) {
       stdout = stdout ? `${stdout}\n${opts.stderr}` : opts.stderr
     }
 
-    await pool.query(
-      `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        opts.terminalId ?? null,
-        opts.prId ?? null,
-        exitCode,
-        opts.category,
-        JSON.stringify({
-          command: opts.command,
-          stdout: stdout.substring(0, 10000) || undefined,
-          stderr: stderr?.substring(0, 5000),
-          sshHost,
-          terminalName,
-        }),
-      ],
-    )
+    const data = JSON.stringify({
+      command: opts.command,
+      stdout: stdout.substring(0, 10000) || undefined,
+      stderr: stderr?.substring(0, 5000),
+      sshHost,
+      terminalName,
+    })
+
+    if (opts.dedupeKey) {
+      // Upsert: insert first time, then only update when exit_code changes
+      await pool.query(
+        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data, dedupe_key)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL
+         DO UPDATE SET exit_code = EXCLUDED.exit_code, data = EXCLUDED.data,
+                       terminal_id = EXCLUDED.terminal_id, created_at = NOW()
+         WHERE command_logs.exit_code != EXCLUDED.exit_code`,
+        [
+          opts.terminalId ?? null,
+          opts.prId ?? null,
+          exitCode,
+          opts.category,
+          data,
+          opts.dedupeKey,
+        ],
+      )
+    } else {
+      await pool.query(
+        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          opts.terminalId ?? null,
+          opts.prId ?? null,
+          exitCode,
+          opts.category,
+          data,
+        ],
+      )
+    }
   } catch (err) {
     log.error(
       { err, terminalId: opts.terminalId, prId: opts.prId },

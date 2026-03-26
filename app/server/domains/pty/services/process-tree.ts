@@ -5,7 +5,7 @@ import type {
   RemoteProcessInfo,
   ZellijPaneProcess,
 } from '@domains/pty/schema'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { log } from '@server/logger'
 import { poolExecSSHCommand } from '@server/ssh/pool'
 
@@ -23,7 +23,9 @@ export async function getChildPids(pid: number) {
 
   // Fallback to pgrep (macOS + Linux)
   try {
-    const { stdout } = await execFileAsync('pgrep', ['-P', String(pid)], {
+    const { stdout } = await execFileAsyncLogged('pgrep', ['-P', String(pid)], {
+      category: 'workspace',
+      errorOnly: true,
       encoding: 'utf8',
       timeout: 500,
     })
@@ -47,10 +49,12 @@ export async function getProcessComm(pid: number) {
 
   // Fallback to ps
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'ps',
       ['-o', 'comm=', '-p', String(pid)],
       {
+        category: 'workspace',
+        errorOnly: true,
         encoding: 'utf8',
         timeout: 500,
       },
@@ -64,10 +68,12 @@ export async function getProcessComm(pid: number) {
 // Get full command line with arguments
 async function getProcessArgs(pid: number) {
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'ps',
       ['-o', 'args=', '-p', String(pid)],
       {
+        category: 'workspace',
+        errorOnly: true,
         encoding: 'utf8',
         timeout: 500,
       },
@@ -124,10 +130,12 @@ function shouldIgnoreProcess(name: string): boolean {
 // Get the TTY of a process
 async function getProcessTty(pid: number) {
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'ps',
       ['-o', 'tty=', '-p', String(pid)],
       {
+        category: 'workspace',
+        errorOnly: true,
         encoding: 'utf8',
         timeout: 500,
       },
@@ -144,10 +152,12 @@ async function getProcessesOnTty(tty: string) {
   const pidToName = new Map<number, string>()
   try {
     // ps -t <tty> -o pid=,comm= gives all processes on that TTY
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'ps',
       ['-t', tty, '-o', 'pid=,comm='],
       {
+        category: 'workspace',
+        errorOnly: true,
         encoding: 'utf8',
         timeout: 1000,
       },
@@ -177,13 +187,18 @@ async function getProcessesOnTty(tty: string) {
 async function findZellijServerForSession(sessionName: string) {
   try {
     // Get all Zellij server PIDs (PPID=1)
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'sh',
       [
         '-c',
         "ps -axo pid,ppid,comm | awk '$3 ~ /zellij/ && $2 == 1 {print $1}'",
       ],
-      { encoding: 'utf8', timeout: 1000 },
+      {
+        category: 'workspace',
+        errorOnly: true,
+        encoding: 'utf8',
+        timeout: 1000,
+      },
     )
     const output = stdout.trim()
 
@@ -194,10 +209,15 @@ async function findZellijServerForSession(sessionName: string) {
     const results = await Promise.all(
       serverPids.map(async (serverPid) => {
         try {
-          const { stdout: lsofOutput } = await execFileAsync(
+          const { stdout: lsofOutput } = await execFileAsyncLogged(
             'lsof',
             ['-p', String(serverPid)],
-            { encoding: 'utf8', timeout: 2000 },
+            {
+              category: 'workspace',
+              errorOnly: true,
+              encoding: 'utf8',
+              timeout: 2000,
+            },
           )
           const match = lsofOutput.match(/unix.*zellij-\d+[^\s]*\/([^\s]+)/)
           if (match && match[1] === sessionName) {
@@ -307,10 +327,15 @@ export async function getDescendantPids(pid: number) {
 export async function getSystemResourceUsage() {
   const result = new Map<number, { rss: number; cpu: number }>()
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'ps',
       ['-o', 'pid,rss,%cpu', '-ax'],
-      { encoding: 'utf8', timeout: 3000 },
+      {
+        category: 'workspace',
+        errorOnly: true,
+        encoding: 'utf8',
+        timeout: 3000,
+      },
     )
     // Skip the header line
     for (const line of stdout.split('\n').slice(1)) {
@@ -342,7 +367,9 @@ export async function getSystemResourceUsage() {
 export async function getSystemMemoryUsage() {
   try {
     if (process.platform === 'darwin') {
-      const { stdout } = await execFileAsync('memory_pressure', [], {
+      const { stdout } = await execFileAsyncLogged('memory_pressure', [], {
+        category: 'workspace',
+        errorOnly: true,
         encoding: 'utf8',
         timeout: 2000,
       })
@@ -383,10 +410,15 @@ export async function getSystemMemoryUsage() {
 export async function getSystemListeningPorts() {
   const pidPorts = new Map<number, number[]>()
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'lsof',
       ['-iTCP', '-sTCP:LISTEN', '-P', '-n', '-Fpn'],
-      { encoding: 'utf8', timeout: 3000 },
+      {
+        category: 'workspace',
+        errorOnly: true,
+        encoding: 'utf8',
+        timeout: 3000,
+      },
     )
 
     let currentPid: number | null = null
@@ -462,10 +494,16 @@ export async function getListeningPortsForTerminal(
 // Get all active zellij session names via `zellij list-sessions`
 export async function getActiveZellijSessionNames() {
   try {
-    const { stdout } = await execFileAsync('zellij', ['list-sessions', '-ns'], {
-      encoding: 'utf8',
-      timeout: 2000,
-    })
+    const { stdout } = await execFileAsyncLogged(
+      'zellij',
+      ['list-sessions', '-ns'],
+      {
+        category: 'workspace',
+        errorOnly: true,
+        encoding: 'utf8',
+        timeout: 2000,
+      },
+    )
     const names = new Set<string>()
     for (const line of stdout.trim().split('\n')) {
       const name = line.trim()

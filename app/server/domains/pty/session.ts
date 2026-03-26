@@ -34,7 +34,7 @@ import serverEvents from '@server/lib/events'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
 import { validateSSHHost } from '@server/ssh/config'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WORKER_PATH = path.join(__dirname, 'services', 'worker.ts')
@@ -1020,10 +1020,10 @@ export function renameZellijSession(
   sshHost?: string | null,
 ) {
   if (sshHost) {
-    return execSSHCommand(
+    return execSSHCommandLogged(
       sshHost,
       `zellij --session ${shellEscape(oldName)} action rename-session ${shellEscape(newName)}`,
-      { timeout: 5000 },
+      { category: 'workspace', errorOnly: true, timeout: 5000 },
     ).then(
       () =>
         log.info(

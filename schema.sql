@@ -177,12 +177,14 @@ CREATE TABLE IF NOT EXISTS command_logs (
     exit_code INTEGER,
     category VARCHAR(32),  -- 'git', 'workspace', 'github'
     data JSONB,            -- { command: string, stdout?: string, stderr?: string }
+    dedupe_key VARCHAR(200), -- Non-null for deduped logs; upsert skips if state unchanged
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_command_logs_terminal_id ON command_logs(terminal_id);
 CREATE INDEX IF NOT EXISTS idx_command_logs_pr_id ON command_logs(pr_id);
 CREATE INDEX IF NOT EXISTS idx_command_logs_created_at ON command_logs(created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_command_logs_dedupe_key ON command_logs(dedupe_key) WHERE dedupe_key IS NOT NULL;
 
 -- Insert default settings row if not present
 INSERT INTO settings (id, config) VALUES (1, '{}')

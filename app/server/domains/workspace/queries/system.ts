@@ -8,7 +8,7 @@ import {
 import { getParentAppNameCached } from '@domains/workspace/services/system'
 import { expandPath, shellEscape } from '@server/lib/strings'
 import { listSSHHosts, validateSSHHost } from '@server/ssh/config'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 import { publicProcedure } from '@server/trpc'
 
 export const sshHosts = publicProcedure.query(() => {
@@ -23,10 +23,10 @@ export const sshAudit = publicProcedure
       throw new Error(validation.error)
     }
     try {
-      const { stdout } = await execSSHCommand(
+      const { stdout } = await execSSHCommandLogged(
         input.host,
         "sshd -T 2>/dev/null | grep -i '^maxsessions'",
-        { timeout: 5000 },
+        { category: 'workspace', errorOnly: true, timeout: 5000 },
       )
       const match = stdout.trim().match(/^maxsessions\s+(\d+)$/i)
       return { maxSessions: match ? Number(match[1]) : null }
@@ -64,9 +64,10 @@ export const listDirectories = publicProcedure
                 : rawPath.startsWith('~/')
                   ? `$HOME/${rawPath.slice(2)}`
                   : shellEscape(rawPath)
-            const { stdout } = await execSSHCommand(
+            const { stdout } = await execSSHCommandLogged(
               ssh_host,
               `ls ${flags} ${remotePath}`,
+              { category: 'workspace', errorOnly: true },
             )
             const lines = stdout
               .split('\n')

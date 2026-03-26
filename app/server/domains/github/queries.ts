@@ -1,4 +1,4 @@
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { log } from '@server/logger'
 import { publicProcedure } from '@server/trpc'
 import {
@@ -20,7 +20,7 @@ export const repos = publicProcedure
   .query(async ({ input }) => {
     const query = input.q?.trim().toLowerCase() || ''
     try {
-      const { stdout } = await execFileAsync(
+      const { stdout } = await execFileAsyncLogged(
         'gh',
         [
           'api',
@@ -38,7 +38,7 @@ export const repos = publicProcedure
           '--jq',
           '.[].full_name',
         ],
-        { timeout: 15000 },
+        { timeout: 15000, category: 'github', errorOnly: true },
       )
 
       let repos = stdout.trim().split('\n').filter(Boolean)
@@ -60,10 +60,10 @@ export const conductor = publicProcedure
       return { hasConductor: false }
     }
     try {
-      await execFileAsync(
+      await execFileAsyncLogged(
         'gh',
         ['api', `repos/${repo}/contents/conductor.json`, '--jq', '.name'],
-        { timeout: 10000 },
+        { timeout: 10000, category: 'github', errorOnly: true },
       )
       return { hasConductor: true }
     } catch (err) {

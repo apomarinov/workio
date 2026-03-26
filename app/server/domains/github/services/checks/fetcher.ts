@@ -9,12 +9,13 @@ import type {
   PRReview,
   PRReviewThread,
 } from '@domains/github/schema'
+import { logCommand } from '@domains/logs/db'
 import { getSettings } from '@domains/settings/db'
 import {
   DEFAULT_GH_QUERY_LIMITS,
   type GHQueryLimits,
 } from '@domains/settings/schema'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { log } from '@server/logger'
 import {
   CACHE_TTL,
@@ -135,14 +136,22 @@ export function ghExec(
   args: string[],
   options: { timeout: number; maxBuffer: number },
 ) {
-  return execFileAsync(cmd, args, options)
+  return execFileAsyncLogged(cmd, args, {
+    ...options,
+    category: 'github',
+    errorOnly: true,
+  })
     .then(({ stdout }) => stdout)
     .catch(() => '')
 }
 
 export async function checkGhAvailable() {
   try {
-    await execFileAsync('gh', ['--version'], { timeout: 5000 })
+    await execFileAsyncLogged('gh', ['--version'], {
+      timeout: 5000,
+      category: 'github',
+      errorOnly: true,
+    })
     return true
   } catch {
     return false
@@ -151,10 +160,10 @@ export async function checkGhAvailable() {
 
 export async function fetchGhUsername() {
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'gh',
       ['api', 'user', '--jq', '.login'],
-      { timeout: 5000 },
+      { timeout: 5000, category: 'github', errorOnly: true },
     )
     return stdout.trim() || null
   } catch {
@@ -616,9 +625,22 @@ export async function fetchAllPRsViaGraphQL(
   }
 
   try {
-    return await fetchPRsViaRESTAndGraphQL(repos, trackedBranches)
+    const result = await fetchPRsViaRESTAndGraphQL(repos, trackedBranches)
+    logCommand({
+      category: 'github',
+      command: `gh api (fetch PRs for ${repos.length} repo(s))`,
+      dedupeKey: 'github:fetch-prs',
+    })
+    return result
   } catch (err) {
     log.error({ err }, '[github] Failed to fetch PRs')
+    logCommand({
+      category: 'github',
+      command: `gh api (fetch PRs for ${repos.length} repo(s))`,
+      stderr: err instanceof Error ? err.message : String(err),
+      failed: true,
+      dedupeKey: 'github:fetch-prs',
+    })
     return {
       openPRs: getLastFetchedPRs().filter((pr) => pr.state === 'OPEN'),
       closedPRs: getLastFetchedPRs().filter((pr) => pr.state !== 'OPEN'),

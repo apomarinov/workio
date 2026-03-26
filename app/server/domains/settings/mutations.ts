@@ -1,6 +1,6 @@
 import { env } from '@server/env'
 import serverEvents from '@server/lib/events'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { publicProcedure } from '@server/trpc'
 import { getSettings, updateSettings } from './db'
 import { updateSettingsInput } from './schema'
@@ -10,10 +10,11 @@ export const update = publicProcedure
   .mutation(async ({ input }) => {
     // Verify shell exists if provided (filesystem check, can't be in Zod)
     if (input.default_shell) {
-      const shellExists = await execFileAsync('sh', [
-        '-c',
-        `command -v ${input.default_shell}`,
-      ]).then(
+      const shellExists = await execFileAsyncLogged(
+        'sh',
+        ['-c', `command -v ${input.default_shell}`],
+        { category: 'workspace', errorOnly: true },
+      ).then(
         () => true,
         () => false,
       )

@@ -10,7 +10,7 @@ import {
 } from '@domains/workspace/db/terminals'
 import { withTransaction } from '@server/lib/db'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 
 export async function getMoveTargets(sessionId: string) {
   const session = await getSessionById(sessionId)
@@ -65,9 +65,10 @@ export async function getMoveTargets(sessionId: string) {
         let claudeDirExists = false
         try {
           if (sshHost) {
-            const { stdout } = await execSSHCommand(
+            const { stdout } = await execSSHCommandLogged(
               sshHost,
               `test -d ~/.claude/projects/${shellEscape(encodedPath)} && echo yes || echo no`,
+              { category: 'workspace', errorOnly: true },
             )
             claudeDirExists = stdout.trim() === 'yes'
           } else {
@@ -163,20 +164,23 @@ export async function moveSession(
   const snapshotDir = `/tmp/move-session-${sourceEncoded}-${sessionId}-to-${targetEncoded}`
   try {
     if (sessionSshHost) {
-      await execSSHCommand(
+      await execSSHCommandLogged(
         sessionSshHost,
         `mkdir -p ${shellEscape(snapshotDir)}`,
+        { category: 'workspace', errorOnly: true },
       )
       if (sourceIndexSnapshot !== null) {
-        await execSSHCommand(
+        await execSSHCommandLogged(
           sessionSshHost,
           `cat > ${shellEscape(`${snapshotDir}/source-sessions-index.json`)} << 'WORKIO_EOF'\n${sourceIndexSnapshot}\nWORKIO_EOF`,
+          { category: 'workspace', errorOnly: true },
         )
       }
       if (targetIndexSnapshot !== null) {
-        await execSSHCommand(
+        await execSSHCommandLogged(
           sessionSshHost,
           `cat > ${shellEscape(`${snapshotDir}/target-sessions-index.json`)} << 'WORKIO_EOF'\n${targetIndexSnapshot}\nWORKIO_EOF`,
+          { category: 'workspace', errorOnly: true },
         )
       }
     } else {
@@ -202,10 +206,11 @@ export async function moveSession(
     try {
       if (sessionSshHost) {
         try {
-          await execSSHCommand(
+          await execSSHCommandLogged(
             sessionSshHost,
             `mv ${shellEscape(targetTranscript)} ${shellEscape(sourceTranscript)} 2>/dev/null; ` +
               `mv ${shellEscape(targetSessionDir)} ${shellEscape(sourceSessionDir)} 2>/dev/null; true`,
+            { category: 'workspace', errorOnly: true },
           )
         } catch {
           /* best effort */
@@ -225,9 +230,10 @@ export async function moveSession(
           )
         } else {
           try {
-            await execSSHCommand(
+            await execSSHCommandLogged(
               sessionSshHost,
               `rm -f ${shellEscape(targetIndexPath)}`,
+              { category: 'workspace', errorOnly: true },
             )
           } catch {
             /* best effort */
@@ -277,13 +283,14 @@ export async function moveSession(
   try {
     // Step 1: Move files
     if (sessionSshHost) {
-      await execSSHCommand(
+      await execSSHCommandLogged(
         sessionSshHost,
         [
           `mkdir -p ${shellEscape(targetClaudeDir)}`,
           `mv ${shellEscape(sourceTranscript)} ${shellEscape(targetTranscript)}`,
           `if [ -d ${shellEscape(sourceSessionDir)} ]; then mv ${shellEscape(sourceSessionDir)} ${shellEscape(targetSessionDir)}; fi`,
         ].join(' && '),
+        { category: 'workspace', errorOnly: true },
       )
     } else {
       await fs.promises.mkdir(resolvePath(targetClaudeDir), {
@@ -378,9 +385,10 @@ async function readLocalFile(filePath: string) {
 
 async function readRemoteFile(sshHost: string, filePath: string) {
   try {
-    const { stdout } = await execSSHCommand(
+    const { stdout } = await execSSHCommandLogged(
       sshHost,
       `cat ${shellEscape(filePath)}`,
+      { category: 'workspace', errorOnly: true },
     )
     return stdout
   } catch {
@@ -390,9 +398,10 @@ async function readRemoteFile(sshHost: string, filePath: string) {
 
 async function readRemoteJson(sshHost: string, filePath: string) {
   try {
-    const { stdout } = await execSSHCommand(
+    const { stdout } = await execSSHCommandLogged(
       sshHost,
       `cat ${shellEscape(filePath)}`,
+      { category: 'workspace', errorOnly: true },
     )
     return JSON.parse(stdout) as Record<string, unknown>
   } catch {
@@ -406,9 +415,10 @@ async function writeRemoteJson(
   data: Record<string, unknown>,
 ) {
   const json = JSON.stringify(data, null, 2)
-  await execSSHCommand(
+  await execSSHCommandLogged(
     sshHost,
     `cat > ${shellEscape(filePath)} << 'WORKIO_EOF'\n${json}\nWORKIO_EOF`,
+    { category: 'workspace', errorOnly: true },
   )
 }
 
@@ -493,7 +503,10 @@ async function updateSessionsIndexRemote(
   }
 
   try {
-    const { stdout } = await execSSHCommand(sshHost, 'echo ~')
+    const { stdout } = await execSSHCommandLogged(sshHost, 'echo ~', {
+      category: 'workspace',
+      errorOnly: true,
+    })
     const homeDir = stdout.trim()
     entry.fullPath = (newFullPath as string).replace('~', homeDir)
   } catch {
@@ -513,9 +526,10 @@ async function appendMoveMetaMessage(
 ) {
   let content: string
   if (sshHost) {
-    const result = await execSSHCommand(
+    const result = await execSSHCommandLogged(
       sshHost,
       `cat ${shellEscape(transcriptPath)}`,
+      { category: 'workspace', errorOnly: true },
     )
     content = result.stdout
   } else {
@@ -565,9 +579,10 @@ async function appendMoveMetaMessage(
 
   const line = `\n${JSON.stringify(metaMessage)}`
   if (sshHost) {
-    await execSSHCommand(
+    await execSSHCommandLogged(
       sshHost,
       `printf '%s' ${shellEscape(line)} >> ${shellEscape(transcriptPath)}`,
+      { category: 'workspace', errorOnly: true },
     )
   } else {
     await fs.promises.appendFile(transcriptPath, line)

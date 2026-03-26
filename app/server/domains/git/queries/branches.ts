@@ -1,6 +1,6 @@
 import { type BranchInfo, terminalIdInput } from '@domains/git/schema'
 import { resolveGitTerminal } from '@domains/git/services/resolve'
-import { gitExec } from '@server/lib/git'
+import { gitExecLogged } from '@server/lib/git'
 import { publicProcedure } from '@server/trpc'
 
 export const list = publicProcedure
@@ -8,7 +8,7 @@ export const list = publicProcedure
   .query(async ({ input }) => {
     const terminal = await resolveGitTerminal(input.terminalId)
 
-    const result = await gitExec(
+    const result = await gitExecLogged(
       terminal,
       [
         'for-each-ref',
@@ -17,7 +17,7 @@ export const list = publicProcedure
         'refs/heads',
         'refs/remotes/origin',
       ],
-      { timeout: 10000 },
+      { terminalId: input.terminalId, errorOnly: true, timeout: 10000 },
     )
 
     let currentBranch: BranchInfo | null = null

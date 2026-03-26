@@ -1,4 +1,4 @@
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 
 // Walk up the process tree to find the parent macOS .app (e.g. Terminal, iTerm2, VS Code)
 async function getParentAppName() {
@@ -6,17 +6,17 @@ async function getParentAppName() {
   try {
     let pid = process.ppid
     while (pid > 1) {
-      const { stdout: comm } = await execFileAsync(
+      const { stdout: comm } = await execFileAsyncLogged(
         'ps',
         ['-o', 'comm=', '-p', String(pid)],
-        { encoding: 'utf-8' },
+        { category: 'workspace', errorOnly: true, encoding: 'utf-8' },
       )
       const match = comm.trim().match(/\/([^/]+)\.app\//)
       if (match) return match[1]
-      const { stdout: ppidStr } = await execFileAsync(
+      const { stdout: ppidStr } = await execFileAsyncLogged(
         'ps',
         ['-o', 'ppid=', '-p', String(pid)],
-        { encoding: 'utf-8' },
+        { category: 'workspace', errorOnly: true, encoding: 'utf-8' },
       )
       pid = Number.parseInt(ppidStr.trim(), 10)
       if (Number.isNaN(pid)) break

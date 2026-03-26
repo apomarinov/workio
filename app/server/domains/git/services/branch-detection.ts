@@ -1,23 +1,23 @@
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import type { Terminal } from '@domains/workspace/schema/terminals'
-import { execFileAsync } from '@server/lib/exec'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 
 async function detectLocalBranch(cwd: string): Promise<string> {
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout } = await execFileAsyncLogged(
       'git',
       ['rev-parse', '--abbrev-ref', 'HEAD'],
-      { cwd, timeout: 5000 },
+      { cwd, timeout: 5000, category: 'git', errorOnly: true },
     )
     if (stdout.trim()) return stdout.trim()
   } catch {
     // Fall through to symbolic-ref
   }
-  const { stdout } = await execFileAsync(
+  const { stdout } = await execFileAsyncLogged(
     'git',
     ['symbolic-ref', '--short', 'HEAD'],
-    { cwd, timeout: 5000 },
+    { cwd, timeout: 5000, category: 'git', errorOnly: true },
   )
   return stdout.trim()
 }
@@ -41,8 +41,10 @@ export async function detectBranch(
     if (resolved.ssh_host) {
       const cmd =
         'git rev-parse --abbrev-ref HEAD 2>/dev/null || git symbolic-ref --short HEAD 2>/dev/null'
-      const { stdout } = await execSSHCommand(resolved.ssh_host, cmd, {
+      const { stdout } = await execSSHCommandLogged(resolved.ssh_host, cmd, {
         cwd: resolved.cwd,
+        category: 'git',
+        errorOnly: true,
       })
       branch = stdout.trim()
     } else {

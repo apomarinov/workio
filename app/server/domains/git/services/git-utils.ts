@@ -1,5 +1,5 @@
 import type { ChangedFile, FileStatus } from '@domains/git/schema'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 
 // --- Fetch cache ---
 
@@ -16,9 +16,11 @@ export async function fetchOriginIfNeeded(
     return
   }
   try {
-    await execFileAsync('git', ['fetch', 'origin', ...refspecs], {
+    await execFileAsyncLogged('git', ['fetch', 'origin', ...refspecs], {
       cwd,
       timeout: 30000,
+      category: 'git',
+      errorOnly: true,
     })
   } catch {
     // fetch failure is non-fatal

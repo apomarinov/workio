@@ -18,10 +18,10 @@ import {
   getTerminalById,
   updateTerminal,
 } from '@domains/workspace/db/terminals'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsync, execFileAsyncLogged } from '@server/lib/exec'
 import { shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommand, execSSHCommandLogged } from '@server/ssh/exec'
 import { emitWorkspace } from './emit'
 
 const LONG_TIMEOUT = 300_000 // 5 min for clone/setup operations
@@ -261,14 +261,20 @@ function resolvePath(sshHost: string | null, base: string, rel: string) {
 
 async function getHomeDir(sshHost: string | null) {
   if (!sshHost) return os.homedir()
-  const { stdout } = await execSSHCommand(sshHost, 'echo $HOME')
+  const { stdout } = await execSSHCommandLogged(sshHost, 'echo $HOME', {
+    category: 'workspace',
+    errorOnly: true,
+  })
   return stdout.trim()
 }
 
 async function dirExists(dirPath: string, sshHost: string | null) {
   if (!sshHost) return fs.existsSync(dirPath)
   try {
-    await execSSHCommand(sshHost, `test -d ${shellEscape(dirPath)}`)
+    await execSSHCommandLogged(sshHost, `test -d ${shellEscape(dirPath)}`, {
+      category: 'workspace',
+      errorOnly: true,
+    })
     return true
   } catch (err) {
     log.error({ err, dirPath }, '[workspace] Failed to check directory via SSH')
@@ -281,7 +287,10 @@ async function mkdirp(dirPath: string, sshHost: string | null) {
     fs.mkdirSync(dirPath, { recursive: true })
     return
   }
-  await execSSHCommand(sshHost, `mkdir -p ${shellEscape(dirPath)}`)
+  await execSSHCommandLogged(sshHost, `mkdir -p ${shellEscape(dirPath)}`, {
+    category: 'workspace',
+    errorOnly: true,
+  })
 }
 
 export async function rmrf(dirPath: string, sshHost: string | null) {
@@ -289,7 +298,10 @@ export async function rmrf(dirPath: string, sshHost: string | null) {
     fs.rmSync(dirPath, { recursive: true, force: true })
     return
   }
-  await execSSHCommand(sshHost, `rm -rf ${shellEscape(dirPath)}`)
+  await execSSHCommandLogged(sshHost, `rm -rf ${shellEscape(dirPath)}`, {
+    category: 'workspace',
+    errorOnly: true,
+  })
 }
 
 async function readFileContent(filePath: string, sshHost: string | null) {
@@ -298,9 +310,10 @@ async function readFileContent(filePath: string, sshHost: string | null) {
     return fs.readFileSync(filePath, 'utf-8')
   }
   try {
-    const { stdout } = await execSSHCommand(
+    const { stdout } = await execSSHCommandLogged(
       sshHost,
       `cat ${shellEscape(filePath)}`,
+      { category: 'workspace', errorOnly: true },
     )
     return stdout
   } catch (err) {
@@ -323,6 +336,41 @@ async function runCmd(
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
   const quoted = [cmd, ...args].map(shellEscape).join(' ')
   return execSSHCommand(sshHost, quoted, { cwd, timeout })
+}
+
+/** Run a command and log it via logCommand(). On error, logs as failed before propagating. */
+async function runCmdLogged(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  sshHost: string | null,
+  logOpts: { terminalId: number; logCmd?: string; errorOnly?: boolean },
+  timeout?: number,
+  signal?: AbortSignal,
+) {
+  const command = logOpts.logCmd ?? [cmd, ...args].join(' ')
+  try {
+    const result = await runCmd(cmd, args, cwd, sshHost, timeout, signal)
+    if (!logOpts.errorOnly) {
+      logCommand({
+        terminalId: logOpts.terminalId,
+        category: 'workspace',
+        command,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      })
+    }
+    return result
+  } catch (err) {
+    logCommand({
+      terminalId: logOpts.terminalId,
+      category: 'workspace',
+      command,
+      stderr: err instanceof Error ? err.message : String(err),
+      failed: true,
+    })
+    throw err
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -464,22 +512,15 @@ export async function setupTerminalWorkspace(options: SetupOptions) {
     if (worktreeSource) {
       // --- Worktree mode ---
       // First prune any orphaned worktrees from previous deletions
-      const pruneCmd = 'git worktree prune'
       try {
-        const pruneResult = await runCmd(
+        await runCmdLogged(
           'git',
           ['worktree', 'prune'],
           worktreeSource,
           sshHost,
+          { terminalId },
           10000,
         )
-        logCommand({
-          terminalId,
-          category: 'workspace',
-          command: pruneCmd,
-          stdout: pruneResult.stdout,
-          stderr: pruneResult.stderr,
-        })
       } catch (err) {
         log.error({ err }, '[workspace] Failed to prune worktrees')
       }
@@ -487,28 +528,20 @@ export async function setupTerminalWorkspace(options: SetupOptions) {
       if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
 
       targetPath = joinPath(sshHost, parentDir, slug)
-      const worktreeCmd = `git worktree add ${targetPath} -b feature/${slug}`
-      const worktreeResult = await runCmd(
+      await runCmdLogged(
         'git',
         ['worktree', 'add', targetPath, '-b', `feature/${slug}`],
         worktreeSource,
         sshHost,
+        { terminalId },
         LONG_TIMEOUT,
         signal,
       )
-      logCommand({
-        terminalId,
-        category: 'workspace',
-        command: worktreeCmd,
-        stdout: worktreeResult.stdout,
-        stderr: worktreeResult.stderr,
-      })
     } else {
       // --- Clone mode (shallow) ---
       targetPath = joinPath(sshHost, parentDir, slug)
       await mkdirp(targetPath, sshHost)
-      const cloneCmd = `git clone --depth 1 --single-branch ${cloneUrl(repo)} ${targetPath}`
-      const cloneResult = await runCmd(
+      await runCmdLogged(
         'git',
         [
           'clone',
@@ -520,16 +553,10 @@ export async function setupTerminalWorkspace(options: SetupOptions) {
         ],
         sshHost ? '/' : process.cwd(),
         sshHost,
+        { terminalId },
         LONG_TIMEOUT,
         signal,
       )
-      logCommand({
-        terminalId,
-        category: 'workspace',
-        command: cloneCmd,
-        stdout: cloneResult.stdout,
-        stderr: cloneResult.stderr,
-      })
     }
 
     if (signal.aborted) throw new DOMException('Cancelled', 'AbortError')
@@ -545,28 +572,29 @@ export async function setupTerminalWorkspace(options: SetupOptions) {
     // Get GitHub username and rename branch
     // gh api runs locally (GitHub API call, gh CLI unlikely on remote)
     try {
-      const { stdout } = await execFileAsync('gh', [
-        'api',
-        'user',
-        '-q',
-        '.login',
-      ])
+      const { stdout } = await execFileAsyncLogged(
+        'gh',
+        ['api', 'user', '-q', '.login'],
+        { category: 'workspace', errorOnly: true },
+      )
       const ghUser = stdout.trim()
       if (ghUser) {
         if (worktreeSource) {
           // Rename the feature/slug branch to ghUser/slug
-          await runCmd(
+          await runCmdLogged(
             'git',
             ['branch', '-m', `feature/${slug}`, `${ghUser}/${slug}`],
             targetPath,
             sshHost,
+            { terminalId },
           )
         } else {
-          await runCmd(
+          await runCmdLogged(
             'git',
             ['checkout', '-b', `${ghUser}/${slug}`],
             targetPath,
             sshHost,
+            { terminalId },
           )
         }
       }

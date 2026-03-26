@@ -7,10 +7,10 @@ import {
   detectGitBranch,
 } from '@domains/git/services/status'
 import { logCommand } from '@domains/logs/db'
-import { gitExec, gitExecLogged } from '@server/lib/git'
+import { gitExecLogged } from '@server/lib/git'
 import { expandPath, shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
-import { execSSHCommand } from '@server/ssh/exec'
+import { execSSHCommandLogged } from '@server/ssh/exec'
 import { publicProcedure } from '@server/trpc'
 
 export const commitMutation = publicProcedure
@@ -21,12 +21,15 @@ export const commitMutation = publicProcedure
 
     // Stage files
     if (input.files && input.files.length > 0) {
-      await gitExec(terminal, ['reset', 'HEAD'], { timeout: 30000 }).catch(
-        (err) =>
-          log.error(
-            { err, terminalId: id },
-            '[git] Failed to reset HEAD (may be fresh repo)',
-          ),
+      await gitExecLogged(terminal, ['reset', 'HEAD'], {
+        terminalId: id,
+        errorOnly: true,
+        timeout: 30000,
+      }).catch((err) =>
+        log.error(
+          { err, terminalId: id },
+          '[git] Failed to reset HEAD (may be fresh repo)',
+        ),
       )
       await gitExecLogged(terminal, ['add', '--', ...input.files], {
         terminalId: id,
@@ -71,7 +74,11 @@ export const discardMutation = publicProcedure
     const id = terminal.id
 
     const safe = (args: string[]) =>
-      gitExec(terminal, args, { timeout: 10000 }).then(
+      gitExecLogged(terminal, args, {
+        terminalId: id,
+        errorOnly: true,
+        timeout: 10000,
+      }).then(
         (r) => r.stdout,
         () => '',
       )
@@ -125,15 +132,10 @@ export const discardMutation = publicProcedure
     if (untracked.length > 0) {
       if (terminal.ssh_host) {
         const rmCmd = `rm -f -- ${untracked.map((f) => shellEscape(f)).join(' ')}`
-        await execSSHCommand(terminal.ssh_host, rmCmd, {
+        await execSSHCommandLogged(terminal.ssh_host, rmCmd, {
           cwd: terminal.cwd,
-        })
-        logCommand({
           terminalId: id,
           category: 'git',
-          command: rmCmd,
-          stdout: '',
-          stderr: '',
         })
       } else {
         const cwdPath = expandPath(terminal.cwd)
@@ -168,7 +170,9 @@ export const undoCommitMutation = publicProcedure
     const terminal = await resolveGitTerminal(input.terminalId)
     const id = terminal.id
 
-    const headResult = await gitExec(terminal, ['rev-parse', 'HEAD'], {
+    const headResult = await gitExecLogged(terminal, ['rev-parse', 'HEAD'], {
+      terminalId: id,
+      errorOnly: true,
       timeout: 5000,
     })
     const headHash = headResult.stdout.trim()
@@ -196,10 +200,10 @@ export const dropCommitMutation = publicProcedure
     const id = terminal.id
 
     try {
-      const parentResult = await gitExec(
+      const parentResult = await gitExecLogged(
         terminal,
         ['rev-parse', `${input.commitHash}~1`],
-        { timeout: 5000 },
+        { terminalId: id, errorOnly: true, timeout: 5000 },
       )
       const parentHash = parentResult.stdout.trim()
 
@@ -216,7 +220,9 @@ export const dropCommitMutation = publicProcedure
         },
       )
     } catch (err) {
-      await gitExec(terminal, ['rebase', '--abort'], {
+      await gitExecLogged(terminal, ['rebase', '--abort'], {
+        terminalId: id,
+        errorOnly: true,
         timeout: 10000,
       }).catch(() => {})
       throw err

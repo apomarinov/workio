@@ -1,8 +1,9 @@
 import crypto from 'node:crypto'
 import { WEBHOOK_EVENTS } from '@domains/github/schema'
+import { logCommand } from '@domains/logs/db'
 import { getSettings, updateSettings } from '@domains/settings/db'
 import serverEvents from '@server/lib/events'
-import { execFileAsync } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { log } from '@server/logger'
 
 export async function getOrCreateWebhookSecret() {
@@ -44,27 +45,32 @@ async function updateWebhookUrl(
   const webhookUrl = `${ngrokUrl}/api/webhooks/github`
   const secret = await getOrCreateWebhookSecret()
 
-  await execFileAsync('gh', [
-    'api',
-    `repos/${owner}/${repoName}/hooks/${hookId}`,
-    '-X',
-    'PATCH',
-    '-f',
-    `config[url]=${webhookUrl}`,
-    '-f',
-    'config[content_type]=json',
-    '-f',
-    `config[secret]=${secret}`,
-  ])
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      `repos/${owner}/${repoName}/hooks/${hookId}`,
+      '-X',
+      'PATCH',
+      '-f',
+      `config[url]=${webhookUrl}`,
+      '-f',
+      'config[content_type]=json',
+      '-f',
+      `config[secret]=${secret}`,
+    ],
+    { category: 'github', errorOnly: true },
+  )
 }
 
 async function checkWebhookExists(repo: string, hookId: number) {
   try {
     const [owner, repoName] = repo.split('/')
-    await execFileAsync('gh', [
-      'api',
-      `repos/${owner}/${repoName}/hooks/${hookId}`,
-    ])
+    await execFileAsyncLogged(
+      'gh',
+      ['api', `repos/${owner}/${repoName}/hooks/${hookId}`],
+      { category: 'github', errorOnly: true },
+    )
     return 'exists' as const
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -93,10 +99,11 @@ async function adoptExistingWebhook(
 ) {
   const [owner, repoName] = repo.split('/')
   try {
-    const { stdout } = await execFileAsync('gh', [
-      'api',
-      `repos/${owner}/${repoName}/hooks`,
-    ])
+    const { stdout } = await execFileAsyncLogged(
+      'gh',
+      ['api', `repos/${owner}/${repoName}/hooks`],
+      { category: 'github', errorOnly: true },
+    )
     const hooks = JSON.parse(stdout) as {
       id: number
       config?: { url?: string }
@@ -105,19 +112,23 @@ async function adoptExistingWebhook(
     if (!match) return null
 
     const eventsArgs = WEBHOOK_EVENTS.flatMap((e) => ['-f', `events[]=${e}`])
-    await execFileAsync('gh', [
-      'api',
-      `repos/${owner}/${repoName}/hooks/${match.id}`,
-      '-X',
-      'PATCH',
-      '-f',
-      `config[url]=${webhookUrl}`,
-      '-f',
-      'config[content_type]=json',
-      '-f',
-      `config[secret]=${secret}`,
-      ...eventsArgs,
-    ])
+    await execFileAsyncLogged(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repoName}/hooks/${match.id}`,
+        '-X',
+        'PATCH',
+        '-f',
+        `config[url]=${webhookUrl}`,
+        '-f',
+        'config[content_type]=json',
+        '-f',
+        `config[secret]=${secret}`,
+        ...eventsArgs,
+      ],
+      { category: 'github', errorOnly: true },
+    )
 
     const settings = await getSettings()
     await updateSettings({
@@ -154,21 +165,25 @@ export async function createRepoWebhook(repo: string) {
   const eventsArgs = WEBHOOK_EVENTS.flatMap((e) => ['-f', `events[]=${e}`])
 
   try {
-    const { stdout } = await execFileAsync('gh', [
-      'api',
-      `repos/${owner}/${repoName}/hooks`,
-      '-X',
-      'POST',
-      '-f',
-      'name=web',
-      '-f',
-      `config[url]=${webhookUrl}`,
-      '-f',
-      'config[content_type]=json',
-      '-f',
-      `config[secret]=${secret}`,
-      ...eventsArgs,
-    ])
+    const { stdout } = await execFileAsyncLogged(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repoName}/hooks`,
+        '-X',
+        'POST',
+        '-f',
+        'name=web',
+        '-f',
+        `config[url]=${webhookUrl}`,
+        '-f',
+        'config[content_type]=json',
+        '-f',
+        `config[secret]=${secret}`,
+        ...eventsArgs,
+      ],
+      { category: 'github' },
+    )
 
     const hook = JSON.parse(stdout) as { id: number }
 
@@ -210,12 +225,11 @@ export async function deleteRepoWebhook(repo: string) {
   }
 
   try {
-    await execFileAsync('gh', [
-      'api',
-      `repos/${owner}/${repoName}/hooks/${webhook.id}`,
-      '-X',
-      'DELETE',
-    ])
+    await execFileAsyncLogged(
+      'gh',
+      ['api', `repos/${owner}/${repoName}/hooks/${webhook.id}`, '-X', 'DELETE'],
+      { category: 'github' },
+    )
   } catch {
     log.warn(
       `[webhooks] Could not delete webhook from GitHub for ${repo}, removing from DB anyway`,
@@ -246,19 +260,21 @@ export async function testWebhook(repo: string) {
     throw new Error('Invalid repo format')
   }
 
-  try {
-    await execFileAsync('gh', [
+  await execFileAsyncLogged(
+    'gh',
+    [
       'api',
       `repos/${owner}/${repoName}/hooks/${webhook.id}/pings`,
       '-X',
       'POST',
-    ])
-    log.info(`[webhooks] Pinged webhook for ${repo}`)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    log.error(err, `[webhooks] Failed to ping webhook for ${repo}`)
-    throw new Error(message)
-  }
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh api repos/${repo}/hooks/${webhook.id}/pings -X POST (test webhook)`,
+    },
+  )
+  log.info(`[webhooks] Pinged webhook for ${repo}`)
 }
 
 // Background polling
@@ -299,6 +315,7 @@ async function validateStoredWebhooks() {
 
   for (const [repo, webhook] of Object.entries(repoWebhooks)) {
     const result = await checkWebhookExists(repo, webhook.id)
+    const validateCmd = `gh api repos/${repo}/hooks/${webhook.id} (validate)`
 
     if (result === 'no_access') {
       if (webhook.missing) {
@@ -308,10 +325,22 @@ async function validateStoredWebhooks() {
           `[webhooks] No admin access for ${repo}, cleared incorrect missing flag`,
         )
       }
+      logCommand({
+        category: 'github',
+        command: validateCmd,
+        dedupeKey: `webhook:validate:${repo}`,
+      })
       continue
     }
 
     if (result === 'error') {
+      logCommand({
+        category: 'github',
+        command: validateCmd,
+        stderr: 'Transient error checking webhook',
+        failed: true,
+        dedupeKey: `webhook:validate:${repo}`,
+      })
       continue
     }
 
@@ -328,6 +357,16 @@ async function validateStoredWebhooks() {
         `[webhooks] Webhook for ${repo} found again, cleared missing flag`,
       )
     }
+
+    logCommand({
+      category: 'github',
+      command: validateCmd,
+      dedupeKey: `webhook:validate:${repo}`,
+      ...(result === 'missing' && {
+        stderr: 'Webhook not found in GitHub',
+        failed: true,
+      }),
+    })
   }
 
   if (hasChanges) {

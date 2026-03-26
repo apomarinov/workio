@@ -1,20 +1,5 @@
-import { logCommand } from '@domains/logs/db'
-import { execFileAsync, getExecStderr } from '@server/lib/exec'
+import { execFileAsyncLogged } from '@server/lib/exec'
 import { invalidateChecksCache } from './checks/state'
-
-function logAndThrow(err: unknown, cmd: string, prId?: string): never {
-  const message = err instanceof Error ? err.message : String(err)
-  const stderr = getExecStderr(err)
-  logCommand({
-    prId,
-    category: 'github',
-    command: cmd,
-    stdout: '',
-    stderr: stderr || message,
-    failed: true,
-  })
-  throw new Error(stderr || message)
-}
 
 export async function addPRComment(
   owner: string,
@@ -22,27 +7,25 @@ export async function addPRComment(
   prNumber: number,
   body: string,
 ) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh pr comment ${prNumber} --repo ${owner}/${repo} -b "..."`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'pr',
-        'comment',
-        String(prNumber),
-        '--repo',
-        `${owner}/${repo}`,
-        '-b',
-        body,
-      ],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'pr',
+      'comment',
+      String(prNumber),
+      '--repo',
+      `${owner}/${repo}`,
+      '-b',
+      body,
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh pr comment ${prNumber} --repo ${owner}/${repo} -b "..."`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function replyToReviewComment(
@@ -52,24 +35,22 @@ export async function replyToReviewComment(
   commentId: number,
   body: string,
 ) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies -f body="..."`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        `repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies`,
-        '-f',
-        `body=${body}`,
-      ],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      `repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies`,
+      '-f',
+      `body=${body}`,
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh api repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies -f body="..."`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function editIssueComment(
@@ -78,26 +59,24 @@ export async function editIssueComment(
   commentId: number,
   body: string,
 ) {
-  const prId = `${owner}/${repo}`
-  const cmd = `gh api repos/${owner}/${repo}/issues/comments/${commentId} -X PATCH -f body="..."`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        `repos/${owner}/${repo}/issues/comments/${commentId}`,
-        '-X',
-        'PATCH',
-        '-f',
-        `body=${body}`,
-      ],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      `repos/${owner}/${repo}/issues/comments/${commentId}`,
+      '-X',
+      'PATCH',
+      '-f',
+      `body=${body}`,
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh api repos/${owner}/${repo}/issues/comments/${commentId} -X PATCH -f body="..."`,
+      prId: `${owner}/${repo}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function editReviewComment(
@@ -106,26 +85,24 @@ export async function editReviewComment(
   commentId: number,
   body: string,
 ) {
-  const prId = `${owner}/${repo}`
-  const cmd = `gh api repos/${owner}/${repo}/pulls/comments/${commentId} -X PATCH -f body="..."`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        `repos/${owner}/${repo}/pulls/comments/${commentId}`,
-        '-X',
-        'PATCH',
-        '-f',
-        `body=${body}`,
-      ],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      `repos/${owner}/${repo}/pulls/comments/${commentId}`,
+      '-X',
+      'PATCH',
+      '-f',
+      `body=${body}`,
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh api repos/${owner}/${repo}/pulls/comments/${commentId} -X PATCH -f body="..."`,
+      prId: `${owner}/${repo}`,
+    },
+  )
+  invalidateChecksCache()
 }
 
 export async function editReview(
@@ -135,24 +112,22 @@ export async function editReview(
   reviewId: number,
   body: string,
 ) {
-  const prId = `${owner}/${repo}#${prNumber}`
-  const cmd = `gh api repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId} -X PUT -f body="..."`
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      'gh',
-      [
-        'api',
-        `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId}`,
-        '-X',
-        'PUT',
-        '-f',
-        `body=${body}`,
-      ],
-      { timeout: 15000 },
-    )
-    logCommand({ prId, category: 'github', command: cmd, stdout, stderr })
-    invalidateChecksCache()
-  } catch (err) {
-    logAndThrow(err, cmd, prId)
-  }
+  await execFileAsyncLogged(
+    'gh',
+    [
+      'api',
+      `repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId}`,
+      '-X',
+      'PUT',
+      '-f',
+      `body=${body}`,
+    ],
+    {
+      timeout: 15000,
+      category: 'github',
+      logCmd: `gh api repos/${owner}/${repo}/pulls/${prNumber}/reviews/${reviewId} -X PUT -f body="..."`,
+      prId: `${owner}/${repo}#${prNumber}`,
+    },
+  )
+  invalidateChecksCache()
 }

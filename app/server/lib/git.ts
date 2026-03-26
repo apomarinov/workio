@@ -53,6 +53,8 @@ interface GitExecLoggedOpts extends GitExecOpts {
   terminalId: number
   /** Override the command string used for logging. Defaults to `git ${args.join(' ')}`. */
   logCmd?: string
+  /** When true, only log if the command fails (skip success logging). */
+  errorOnly?: boolean
 }
 
 /**
@@ -67,13 +69,15 @@ export async function gitExecLogged(
   const command = opts.logCmd ?? `git ${args.join(' ')}`
   try {
     const result = await gitExec(terminal, args, opts)
-    logCommand({
-      terminalId: opts.terminalId,
-      category: 'git',
-      command,
-      stdout: result.stdout,
-      stderr: result.stderr,
-    })
+    if (!opts.errorOnly) {
+      logCommand({
+        terminalId: opts.terminalId,
+        category: 'git',
+        command,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      })
+    }
     return result
   } catch (err) {
     logCommand({
