@@ -1,4 +1,3 @@
-import { getTerminalById } from '@domains/workspace/db/terminals'
 import pool from '@server/db'
 import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
@@ -16,19 +15,22 @@ interface LogCommandOptions {
   dedupeKey?: string
 }
 
+// In-memory cache for deduped log state — avoids DB round-trip when state unchanged
+const dedupeCache = new Map<string, boolean>()
+
 /** Fire-and-forget command logging - callers do not await */
 export async function logCommand(opts: LogCommandOptions) {
   try {
     const exitCode = opts.failed ? 1 : 0
-    let sshHost: string | undefined
-    let terminalName: string | undefined
-    if (opts.terminalId) {
-      const terminal = await getTerminalById(opts.terminalId)
-      if (terminal) {
-        sshHost = terminal.ssh_host ?? undefined
-        terminalName = terminal.name ?? undefined
-      }
+
+    // For deduped keys, skip the DB query entirely if state hasn't changed
+    if (opts.dedupeKey) {
+      const failed = !!opts.failed
+      const prev = dedupeCache.get(opts.dedupeKey)
+      if (failed === (prev ?? false)) return
+      dedupeCache.set(opts.dedupeKey, failed)
     }
+
     // If not failed, combine stderr into stdout (git often outputs progress to stderr)
     let stdout = opts.stdout ?? ''
     let stderr: string | undefined
@@ -42,8 +44,6 @@ export async function logCommand(opts: LogCommandOptions) {
       command: opts.command,
       stdout: stdout.substring(0, 10000) || undefined,
       stderr: stderr?.substring(0, 5000),
-      sshHost,
-      terminalName,
     })
 
     if (opts.dedupeKey) {
@@ -158,7 +158,7 @@ export async function getLogTerminals() {
   const { rows } = await pool.query<LogTerminal>(`
     SELECT DISTINCT ON (cl.terminal_id)
       cl.terminal_id as id,
-      cl.data->>'terminalName' as name,
+      COALESCE(t.name, cl.data->>'terminalName') as name,
       (t.id IS NULL) as deleted
     FROM command_logs cl
     LEFT JOIN terminals t ON t.id = cl.terminal_id

@@ -53,6 +53,7 @@ def get_conn():
         cur = _db_conn.cursor()
         cur.execute("SELECT 1")
         cur.close()
+        _db_conn.rollback()
         return _db_conn
     except Exception:
         try:
@@ -237,6 +238,7 @@ def process_event(event: dict, env: dict, host: str = 'local', session_index: di
 
             if terminal_id is None and shell_id is None:
                 if get_ignore_external_sessions(conn):
+                    conn.rollback()
                     return {"continue": True}
 
             log(conn, "Received hook event", hook_type=hook_type, session_id=session_id, payload=event, terminal_id=terminal_id_str, host=host)
