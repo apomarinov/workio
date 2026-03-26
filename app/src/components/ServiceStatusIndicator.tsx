@@ -275,28 +275,37 @@ function TunnelRow({
   tunnel: ClaudeTunnelStatus
 }) {
   const hostLabel = tunnel.alias || stableId
+  const allHealthy =
+    tunnel.bootstrap.status === 'healthy' && tunnel.tunnel.status === 'healthy'
   return (
     <div className="py-0.5">
       <span className="text-xs font-medium truncate flex items-center gap-1">
-        <Globe className="w-3 h-3 flex-shrink-0" />
+        <Globe
+          className={cn(
+            'w-3 h-3 flex-shrink-0',
+            allHealthy && 'text-green-500',
+          )}
+        />
         {hostLabel}
       </span>
-      <div className="pl-3 mt-0.5 space-y-0.5">
-        <SubStatusRow label="Bootstrap" sub={tunnel.bootstrap} />
-        {tunnel.bootstrap.error && (
-          <ErrorText
-            error={tunnel.bootstrap.error}
-            label={`${hostLabel} Bootstrap`}
-          />
-        )}
-        <SubStatusRow label="Tunnel" sub={tunnel.tunnel} />
-        {tunnel.tunnel.error && (
-          <ErrorText
-            error={tunnel.tunnel.error}
-            label={`${hostLabel} Tunnel`}
-          />
-        )}
-      </div>
+      {!allHealthy && (
+        <div className="pl-3 mt-0.5 space-y-0.5">
+          <SubStatusRow label="Bootstrap" sub={tunnel.bootstrap} />
+          {tunnel.bootstrap.error && (
+            <ErrorText
+              error={tunnel.bootstrap.error}
+              label={`${hostLabel} Bootstrap`}
+            />
+          )}
+          <SubStatusRow label="Tunnel" sub={tunnel.tunnel} />
+          {tunnel.tunnel.error && (
+            <ErrorText
+              error={tunnel.tunnel.error}
+              label={`${hostLabel} Tunnel`}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 }

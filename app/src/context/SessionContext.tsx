@@ -122,10 +122,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         next[idx] = {
           ...next[idx],
           ...(status !== undefined
-            ? { status: status as SessionWithProject['status'] }
+            ? {
+                status: status as SessionWithProject['status'],
+                updated_at: new Date().toISOString(),
+              }
             : {}),
           data: { ...next[idx].data, ...rest },
         }
+        next.sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        )
         return next
       })
     })
