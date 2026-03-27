@@ -43,3 +43,18 @@ export const listInput = z.object({
 })
 
 export type ListInput = z.infer<typeof listInput>
+
+export const infiniteListInput = z
+  .object({
+    terminalId: z.number().optional(),
+    deleted: z.boolean().optional(),
+    prName: z.string().optional(),
+    category: z.string().optional(),
+    failed: z.boolean().optional(),
+    search: z.string().optional(),
+    cursor: z.number().optional(),
+    limit: z.number().min(1).max(500).default(50),
+  })
+  .passthrough()
+
+export type InfiniteListInput = z.infer<typeof infiniteListInput>

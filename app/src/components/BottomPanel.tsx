@@ -1,15 +1,11 @@
 import { ChevronDown, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import {
-  Group,
-  Panel,
-  Separator,
-  useDefaultLayout,
-  usePanelRef,
-} from 'react-resizable-panels'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
+import { usePersistedPanel } from '@/hooks/usePersistedPanel'
 import { cn } from '@/lib/utils'
+import { LogsView } from './LogsView'
 
 interface BottomPanelProps {
   visible: boolean
@@ -69,8 +65,10 @@ export function BottomPanel({
           onTabChange={setActiveTab}
           onClose={onClose}
         />
-        <div className="flex-1 min-h-0 overflow-auto">
-          <PanelContent tab={activeTab} />
+        <div className="flex-1 min-h-0 relative">
+          <div className="absolute inset-0">
+            <PanelContent tab={activeTab} />
+          </div>
         </div>
       </div>
     )
@@ -100,49 +98,38 @@ function DesktopPanel({
   maximized: boolean
   onToggleMaximize: () => void
 }) {
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'bottom-panel-layout',
-    storage: localStorage,
+  const panel = usePersistedPanel({
+    id: 'bottom-panel',
+    defaultSize: 30,
+    maximized,
   })
-  const spacerRef = usePanelRef()
-  const contentRef = usePanelRef()
-
-  // Resize panels when maximized changes
-  useEffect(() => {
-    if (maximized) {
-      spacerRef.current?.resize('0%')
-      contentRef.current?.resize('100%')
-    } else {
-      spacerRef.current?.resize('70%')
-      contentRef.current?.resize('30%')
-    }
-  }, [maximized, spacerRef, contentRef])
 
   return (
     <div
       className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 15 }}
     >
-      <Group
-        orientation="vertical"
-        className="h-full"
-        defaultLayout={defaultLayout}
-        onLayoutChanged={onLayoutChanged}
-      >
+      <Group orientation="vertical" className="h-full">
         <Panel
           id="bottom-panel-spacer"
-          panelRef={spacerRef}
-          defaultSize="70%"
+          panelRef={panel.spacerRef}
+          defaultSize={panel.spacerDefaultSize}
           minSize="0px"
           className="pointer-events-none"
         />
-        <Separator className={cn('panel-resize-handle-horizontal pointer-events-auto', maximized && 'hidden')} />
+        <Separator
+          className={cn(
+            'panel-resize-handle-horizontal pointer-events-auto',
+            maximized && 'hidden',
+          )}
+        />
         <Panel
           id="bottom-panel-content"
-          panelRef={contentRef}
-          defaultSize="30%"
+          panelRef={panel.contentRef}
+          defaultSize={panel.contentDefaultSize}
           minSize="10%"
           className="pointer-events-auto"
+          onResize={panel.onContentResize}
         >
           <div className="h-full flex flex-col bg-sidebar border-t border-zinc-700/50">
             <PanelHeader
@@ -152,8 +139,10 @@ function DesktopPanel({
               maximized={maximized}
               onToggleMaximize={onToggleMaximize}
             />
-            <div className="flex-1 min-h-0 overflow-auto">
-              <PanelContent tab={activeTab} />
+            <div className="flex-1 min-h-0 relative">
+              <div className="absolute inset-0">
+                <PanelContent tab={activeTab} />
+              </div>
             </div>
           </div>
         </Panel>
@@ -226,9 +215,5 @@ function PanelHeader({
 }
 
 function PanelContent({ tab }: { tab: BottomPanelTab }) {
-  return (
-    <div className="p-3 text-xs text-zinc-500">
-      {tab === 'logs' && <p>Logs will appear here.</p>}
-    </div>
-  )
+  return <div className="h-full">{tab === 'logs' && <LogsView />}</div>
 }
