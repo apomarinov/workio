@@ -1,4 +1,5 @@
 import pool from '@server/db'
+import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
 import type {
@@ -51,15 +52,18 @@ export async function logCommand(opts: LogCommandOptions) {
       stderr: stderr?.substring(0, 5000),
     })
 
+    let row: CommandLog | undefined
+
     if (opts.dedupeKey) {
       // Upsert: insert first time, then only update when exit_code changes
-      await pool.query(
+      const result = await pool.query<CommandLog>(
         `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data, dedupe_key)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL
          DO UPDATE SET exit_code = EXCLUDED.exit_code, data = EXCLUDED.data,
                        terminal_id = EXCLUDED.terminal_id, created_at = NOW()
-         WHERE command_logs.exit_code != EXCLUDED.exit_code`,
+         WHERE command_logs.exit_code != EXCLUDED.exit_code
+         RETURNING id, terminal_id, pr_id, exit_code, category, data, created_at`,
         [
           opts.terminalId ?? null,
           opts.prId ?? null,
@@ -69,10 +73,12 @@ export async function logCommand(opts: LogCommandOptions) {
           opts.dedupeKey,
         ],
       )
+      row = result.rows[0]
     } else {
-      await pool.query(
+      const result = await pool.query<CommandLog>(
         `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
-         VALUES ($1, $2, $3, $4, $5)`,
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, terminal_id, pr_id, exit_code, category, data, created_at`,
         [
           opts.terminalId ?? null,
           opts.prId ?? null,
@@ -81,6 +87,11 @@ export async function logCommand(opts: LogCommandOptions) {
           data,
         ],
       )
+      row = result.rows[0]
+    }
+
+    if (row) {
+      getIO()?.emit('log:created', row)
     }
   } catch (err) {
     log.error(

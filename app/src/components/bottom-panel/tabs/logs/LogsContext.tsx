@@ -1,5 +1,6 @@
 import type { CommandLog } from '@server/domains/logs/schema'
-import { createContext, use } from 'react'
+import { createContext, use, useEffect, useState } from 'react'
+import { useSocket } from '@/hooks/useSocket'
 import { trpc } from '@/lib/trpc'
 
 const PAGE_SIZE = 300
@@ -21,6 +22,9 @@ export function useLogsContext() {
 }
 
 export function LogsProvider({ children }: { children: React.ReactNode }) {
+  const { subscribe } = useSocket()
+  const [realtimeLogs, setRealtimeLogs] = useState<CommandLog[]>([])
+
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     trpc.logs.infiniteList.useInfiniteQuery(
       { limit: PAGE_SIZE },
@@ -30,7 +34,14 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
       },
     )
 
-  const logs = data?.pages.flatMap((p) => p.logs) ?? []
+  useEffect(() => {
+    return subscribe<CommandLog>('log:created', (log) => {
+      setRealtimeLogs((prev) => [log, ...prev])
+    })
+  }, [subscribe])
+
+  const queryLogs = data?.pages.flatMap((p) => p.logs) ?? []
+  const logs = [...realtimeLogs, ...queryLogs]
 
   return (
     <LogsContext
