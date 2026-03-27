@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Group,
   Panel,
@@ -13,14 +13,35 @@ interface BottomPanelProps {
   visible: boolean
   onClose: () => void
   mobile?: boolean
+  initialTab?: BottomPanelTab
 }
 
-const TABS = ['Logs'] as const
-type Tab = (typeof TABS)[number]
+export const BOTTOM_PANEL_TABS = ['logs'] as const
+export type BottomPanelTab = (typeof BOTTOM_PANEL_TABS)[number]
+const TAB_CONFIG: Record<BottomPanelTab, { title: string }> = {
+  logs: {
+    title: 'Logs',
+  },
+}
 
-export function BottomPanel({ visible, onClose, mobile }: BottomPanelProps) {
+export function BottomPanel({
+  visible,
+  onClose,
+  mobile,
+  initialTab,
+}: BottomPanelProps) {
   const isMobileQuery = useIsMobile()
   const isMobile = mobile ?? isMobileQuery
+  const [activeTab, setActiveTab] = useState<BottomPanelTab>('logs')
+  const prevInitialTab = useRef(initialTab)
+
+  // Sync tab when initialTab changes from the loader
+  useEffect(() => {
+    if (initialTab && initialTab !== prevInitialTab.current) {
+      setActiveTab(initialTab)
+    }
+    prevInitialTab.current = initialTab
+  }, [initialTab])
 
   // Close on Escape
   useEffect(() => {
@@ -36,19 +57,37 @@ export function BottomPanel({ visible, onClose, mobile }: BottomPanelProps) {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-40 flex flex-col bg-[#1e1e1e]">
-        <PanelHeader onClose={onClose} />
+      <div className="fixed inset-0 z-40 flex flex-col bg-sidebar">
+        <PanelHeader
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onClose={onClose}
+        />
         <div className="flex-1 min-h-0 overflow-auto">
-          <PanelContent tab="Logs" />
+          <PanelContent tab={activeTab} />
         </div>
       </div>
     )
   }
 
-  return <DesktopPanel onClose={onClose} />
+  return (
+    <DesktopPanel
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onClose={onClose}
+    />
+  )
 }
 
-function DesktopPanel({ onClose }: { onClose: () => void }) {
+function DesktopPanel({
+  activeTab,
+  onTabChange,
+  onClose,
+}: {
+  activeTab: BottomPanelTab
+  onTabChange: (tab: BottomPanelTab) => void
+  onClose: () => void
+}) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: 'bottom-panel-layout',
     storage: localStorage,
@@ -78,10 +117,14 @@ function DesktopPanel({ onClose }: { onClose: () => void }) {
           minSize="10%"
           className="pointer-events-auto"
         >
-          <div className="h-full flex flex-col bg-[#1e1e1e] border-t border-zinc-700/50">
-            <PanelHeader onClose={onClose} />
+          <div className="h-full flex flex-col bg-sidebar border-t border-zinc-700/50">
+            <PanelHeader
+              activeTab={activeTab}
+              onTabChange={onTabChange}
+              onClose={onClose}
+            />
             <div className="flex-1 min-h-0 overflow-auto">
-              <PanelContent tab="Logs" />
+              <PanelContent tab={activeTab} />
             </div>
           </div>
         </Panel>
@@ -90,21 +133,32 @@ function DesktopPanel({ onClose }: { onClose: () => void }) {
   )
 }
 
-function PanelHeader({ onClose }: { onClose: () => void }) {
+function PanelHeader({
+  activeTab,
+  onTabChange,
+  onClose,
+}: {
+  activeTab: BottomPanelTab
+  onTabChange: (tab: BottomPanelTab) => void
+  onClose: () => void
+}) {
   return (
-    <div className="flex items-center justify-between px-1 h-[28px] shrink-0 border-b border-zinc-700/50 bg-[#1e1e1e]">
+    <div className="flex items-center justify-between px-1 h-[28px] shrink-0 border-b border-zinc-700/50 bg-sidebar">
       {/* Left: tabs */}
       <div className="flex items-center min-w-0">
-        {TABS.map((tab) => (
+        {BOTTOM_PANEL_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
+            onClick={() => onTabChange(tab)}
             className={cn(
-              'px-1.5 py-1 text-[11px] font-medium transition-colors cursor-pointer',
-              'text-white border-b border-blue-500',
+              'px-1.5 py-1 text-[11px] font-medium transition-colors cursor-pointer border-b',
+              activeTab === tab
+                ? 'text-white border-blue-500'
+                : 'text-zinc-500 border-transparent hover:text-zinc-300',
             )}
           >
-            {tab}
+            {TAB_CONFIG[tab].title}
           </button>
         ))}
       </div>
@@ -123,10 +177,10 @@ function PanelHeader({ onClose }: { onClose: () => void }) {
   )
 }
 
-function PanelContent({ tab }: { tab: Tab }) {
+function PanelContent({ tab }: { tab: BottomPanelTab }) {
   return (
     <div className="p-3 text-xs text-zinc-500">
-      {tab === 'Logs' && <p>Logs will appear here.</p>}
+      {tab === 'logs' && <p>Logs will appear here.</p>}
     </div>
   )
 }

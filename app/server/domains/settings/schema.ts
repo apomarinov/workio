@@ -102,6 +102,7 @@ const statusBarSectionNameSchema = z.enum([
   'lastCommit',
   'branch',
   'spacer',
+  'logs',
 ])
 
 const statusBarSectionSchema = z.object({
@@ -167,7 +168,8 @@ export const DEFAULT_STATUS_BAR: z.input<typeof statusBarConfigSchema> = {
     { name: 'resources', visible: true, order: 4 },
     { name: 'processes', visible: true, order: 5 },
     { name: 'ports', visible: true, order: 6 },
-    { name: 'pr', visible: true, order: 7 },
+    { name: 'logs', visible: true, order: 7 },
+    { name: 'pr', visible: true, order: 8 },
   ],
 }
 

@@ -28,6 +28,7 @@ import {
   GitCommitHorizontal,
   Globe,
   MoreVertical,
+  ScrollText,
   Settings2,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -60,6 +61,7 @@ const STATUS_BAR_SECTION_LABELS: Record<StatusBarSectionName, string> = {
   lastCommit: 'Last Commit',
   branch: 'Branch',
   spacer: 'Spacer',
+  logs: 'Logs',
 }
 
 interface StatusBarProps {
@@ -371,6 +373,23 @@ function LastCommitSection({
   )
 }
 
+function LogsSection({ section }: { section: StatusBarSection }) {
+  return (
+    <SortableStatusSection
+      section={section}
+      onClick={() =>
+        window.dispatchEvent(
+          new CustomEvent('toggle-bottom-panel', {
+            detail: { tab: 'logs' },
+          }),
+        )
+      }
+    >
+      <ScrollText className="w-3 h-3" />
+    </SortableStatusSection>
+  )
+}
+
 function SpacerSection({ section }: { section: StatusBarSection }) {
   const isMobile = useIsMobile()
   if (isMobile) return null
@@ -510,10 +529,20 @@ export function StatusBar({ position }: StatusBarProps) {
       ))
     : undefined
 
+  // Inject logs section if not present (for users who don't have it in settings)
+  const sections = statusBar.sections.some((s) => s.name === 'logs')
+    ? statusBar.sections
+    : [
+        ...statusBar.sections,
+        {
+          name: 'logs' as const,
+          visible: true,
+          order: statusBar.sections.length,
+        },
+      ]
+
   // Get sorted visible sections
-  const sortedSections = [...statusBar.sections].sort(
-    (a, b) => a.order - b.order,
-  )
+  const sortedSections = [...sections].sort((a, b) => a.order - b.order)
 
   // Check which sections have content
   const hasContent = (name: StatusBarSectionName): boolean => {
@@ -537,6 +566,8 @@ export function StatusBar({ position }: StatusBarProps) {
       case 'branch':
         return !!terminal.git_branch
       case 'spacer':
+        return true
+      case 'logs':
         return true
     }
   }
@@ -634,6 +665,8 @@ export function StatusBar({ position }: StatusBarProps) {
         ) : null
       case 'spacer':
         return <SpacerSection key={section.name} section={section} />
+      case 'logs':
+        return <LogsSection key={section.name} section={section} />
     }
   }
 
