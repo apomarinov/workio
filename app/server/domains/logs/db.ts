@@ -163,7 +163,6 @@ export async function getCommandLogsInfinite(input: InfiniteListInput) {
   const conditions: string[] = []
   const values: (string | number)[] = []
   let paramIdx = 1
-  await new Promise((sleep) => setTimeout(() => sleep(true), 2000))
 
   if (input.cursor) {
     conditions.push(`id < $${paramIdx++}`)

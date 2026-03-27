@@ -1,10 +1,13 @@
 import { ChevronDown, X } from 'lucide-react'
+import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { usePersistedPanel } from '@/hooks/usePersistedPanel'
 import { cn } from '@/lib/utils'
-import { LogsView } from './LogsView'
+import { LogsProvider } from './tabs/logs/LogsContext'
+import { LogsHeaderActions } from './tabs/logs/LogsHeaderActions'
+import { LogsView } from './tabs/logs/LogsView'
 
 interface BottomPanelProps {
   visible: boolean
@@ -15,9 +18,20 @@ interface BottomPanelProps {
 
 export const BOTTOM_PANEL_TABS = ['logs'] as const
 export type BottomPanelTab = (typeof BOTTOM_PANEL_TABS)[number]
-const TAB_CONFIG: Record<BottomPanelTab, { title: string }> = {
+
+interface TabConfig {
+  title: string
+  Provider: React.FC<{ children: React.ReactNode }>
+  View: React.FC
+  HeaderActions: React.FC
+}
+
+const TAB_CONFIG: Record<BottomPanelTab, TabConfig> = {
   logs: {
     title: 'Logs',
+    Provider: LogsProvider,
+    View: LogsView,
+    HeaderActions: LogsHeaderActions,
   },
 }
 
@@ -52,29 +66,38 @@ export function BottomPanel({
 
   if (!visible) return null
 
+  const config = TAB_CONFIG[activeTab]
+
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-40 flex flex-col bg-sidebar">
-        <PanelHeader
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onClose={onClose}
-        />
-        <div className="flex-1 min-h-0 relative">
-          <div className="absolute inset-0">
-            <PanelContent tab={activeTab} />
+      <config.Provider>
+        <div className="fixed inset-0 z-40 flex flex-col bg-sidebar">
+          <PanelHeader
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onClose={onClose}
+            headerActions={<config.HeaderActions />}
+          />
+          <div className="flex-1 min-h-0 relative">
+            <div className="absolute inset-0">
+              <config.View />
+            </div>
           </div>
         </div>
-      </div>
+      </config.Provider>
     )
   }
 
   return (
-    <DesktopPanel
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      onClose={onClose}
-    />
+    <config.Provider>
+      <DesktopPanel
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onClose={onClose}
+        headerActions={<config.HeaderActions />}
+        view={<config.View />}
+      />
+    </config.Provider>
   )
 }
 
@@ -82,10 +105,14 @@ function DesktopPanel({
   activeTab,
   onTabChange,
   onClose,
+  headerActions,
+  view,
 }: {
   activeTab: BottomPanelTab
   onTabChange: (tab: BottomPanelTab) => void
   onClose: () => void
+  headerActions: React.ReactNode
+  view: React.ReactNode
 }) {
   const panel = usePersistedPanel({
     id: 'bottom-panel',
@@ -132,11 +159,10 @@ function DesktopPanel({
               onClose={onClose}
               maximized={maximized}
               onToggleMaximize={toggleMaximize}
+              headerActions={headerActions}
             />
             <div className="flex-1 min-h-0 relative">
-              <div className="absolute inset-0">
-                <PanelContent tab={activeTab} />
-              </div>
+              <div className="absolute inset-0">{view}</div>
             </div>
           </div>
         </Panel>
@@ -151,12 +177,14 @@ function PanelHeader({
   onClose,
   maximized,
   onToggleMaximize,
+  headerActions,
 }: {
   activeTab: BottomPanelTab
   onTabChange: (tab: BottomPanelTab) => void
   onClose: () => void
   maximized?: boolean
   onToggleMaximize?: () => void
+  headerActions?: React.ReactNode
 }) {
   return (
     <div className="flex items-center justify-between px-1 h-[28px] shrink-0 border-b border-zinc-700/50 bg-sidebar">
@@ -178,8 +206,9 @@ function PanelHeader({
           </button>
         ))}
       </div>
-      {/* Right: actions */}
+      {/* Right: tab actions + panel controls */}
       <div className="flex items-center">
+        {headerActions}
         {onToggleMaximize && (
           <button
             type="button"
@@ -206,8 +235,4 @@ function PanelHeader({
       </div>
     </div>
   )
-}
-
-function PanelContent({ tab }: { tab: BottomPanelTab }) {
-  return <div className="h-full">{tab === 'logs' && <LogsView />}</div>
 }

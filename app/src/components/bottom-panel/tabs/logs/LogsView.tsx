@@ -9,23 +9,13 @@ import {
   Terminal as TerminalIcon,
 } from 'lucide-react'
 import { useState } from 'react'
-import { trpc } from '@/lib/trpc'
+import { InfiniteScrollView } from '@/components/InfiniteScrollView'
 import { cn } from '@/lib/utils'
-import { InfiniteScrollView } from './InfiniteScrollView'
-
-const PAGE_SIZE = 300
+import { useLogsContext } from './LogsContext'
 
 export function LogsView() {
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
-    trpc.logs.infiniteList.useInfiniteQuery(
-      { limit: PAGE_SIZE },
-      {
-        initialCursor: undefined,
-        getNextPageParam: (lastPage) => lastPage.nextCursor,
-      },
-    )
-
-  const logs = data?.pages.flatMap((p) => p.logs) ?? []
+  const { logs, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useLogsContext()
 
   if (isLoading) {
     return (

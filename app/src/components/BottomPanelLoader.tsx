@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import type { BottomPanelTab } from './BottomPanel'
+import type { BottomPanelTab } from './bottom-panel/BottomPanel'
 
 const BottomPanel = lazy(() =>
-  import('./BottomPanel').then((m) => ({ default: m.BottomPanel })),
+  import('./bottom-panel/BottomPanel').then((m) => ({
+    default: m.BottomPanel,
+  })),
 )
 
 interface BottomPanelLoaderProps {
