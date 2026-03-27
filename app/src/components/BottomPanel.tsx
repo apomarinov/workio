@@ -1,11 +1,13 @@
-import { X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Group,
   Panel,
   Separator,
   useDefaultLayout,
+  usePanelRef,
 } from 'react-resizable-panels'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
 
@@ -33,6 +35,10 @@ export function BottomPanel({
   const isMobileQuery = useIsMobile()
   const isMobile = mobile ?? isMobileQuery
   const [activeTab, setActiveTab] = useState<BottomPanelTab>('logs')
+  const [maximized, setMaximized] = useLocalStorage(
+    'bottom-panel-maximized',
+    false,
+  )
   const prevInitialTab = useRef(initialTab)
 
   // Sync tab when initialTab changes from the loader
@@ -75,6 +81,8 @@ export function BottomPanel({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onClose={onClose}
+      maximized={maximized}
+      onToggleMaximize={() => setMaximized((m) => !m)}
     />
   )
 }
@@ -83,15 +91,32 @@ function DesktopPanel({
   activeTab,
   onTabChange,
   onClose,
+  maximized,
+  onToggleMaximize,
 }: {
   activeTab: BottomPanelTab
   onTabChange: (tab: BottomPanelTab) => void
   onClose: () => void
+  maximized: boolean
+  onToggleMaximize: () => void
 }) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: 'bottom-panel-layout',
     storage: localStorage,
   })
+  const spacerRef = usePanelRef()
+  const contentRef = usePanelRef()
+
+  // Resize panels when maximized changes
+  useEffect(() => {
+    if (maximized) {
+      spacerRef.current?.resize('0%')
+      contentRef.current?.resize('100%')
+    } else {
+      spacerRef.current?.resize('70%')
+      contentRef.current?.resize('30%')
+    }
+  }, [maximized, spacerRef, contentRef])
 
   return (
     <div
@@ -106,13 +131,15 @@ function DesktopPanel({
       >
         <Panel
           id="bottom-panel-spacer"
+          panelRef={spacerRef}
           defaultSize="70%"
           minSize="0px"
           className="pointer-events-none"
         />
-        <Separator className="panel-resize-handle-horizontal pointer-events-auto" />
+        <Separator className={cn('panel-resize-handle-horizontal pointer-events-auto', maximized && 'hidden')} />
         <Panel
           id="bottom-panel-content"
+          panelRef={contentRef}
           defaultSize="30%"
           minSize="10%"
           className="pointer-events-auto"
@@ -122,6 +149,8 @@ function DesktopPanel({
               activeTab={activeTab}
               onTabChange={onTabChange}
               onClose={onClose}
+              maximized={maximized}
+              onToggleMaximize={onToggleMaximize}
             />
             <div className="flex-1 min-h-0 overflow-auto">
               <PanelContent tab={activeTab} />
@@ -137,10 +166,14 @@ function PanelHeader({
   activeTab,
   onTabChange,
   onClose,
+  maximized,
+  onToggleMaximize,
 }: {
   activeTab: BottomPanelTab
   onTabChange: (tab: BottomPanelTab) => void
   onClose: () => void
+  maximized?: boolean
+  onToggleMaximize?: () => void
 }) {
   return (
     <div className="flex items-center justify-between px-1 h-[28px] shrink-0 border-b border-zinc-700/50 bg-sidebar">
@@ -164,6 +197,21 @@ function PanelHeader({
       </div>
       {/* Right: actions */}
       <div className="flex items-center">
+        {onToggleMaximize && (
+          <button
+            type="button"
+            onClick={onToggleMaximize}
+            className="flex items-center justify-center w-5 h-5 text-zinc-400 hover:text-white transition-colors cursor-pointer rounded hover:bg-zinc-700/50"
+            title={maximized ? 'Restore panel' : 'Maximize panel'}
+          >
+            <ChevronDown
+              className={cn(
+                'w-3 h-3 transition-transform',
+                !maximized && '-rotate-180',
+              )}
+            />
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
