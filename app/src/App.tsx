@@ -132,14 +132,15 @@ function AppContent() {
               !isTermVisible && 'invisible',
             )}
           >
-            {showStatusBar &&
+            {isTermVisible &&
+              showStatusBar &&
               statusBarOnTop === effectiveTabsTop &&
               activeShellId != null && (
                 <Suspense fallback={<div className="w-full h-[29px]" />}>
                   <StatusBar position={statusBarOnTop ? 'top' : 'bottom'} />
                 </Suspense>
               )}
-            {tabBar && activeShellId != null && !isMobile && (
+            {isTermVisible && tabBar && activeShellId != null && !isMobile && (
               <ShellTabs
                 terminal={t}
                 activeShellId={activeShellId}
@@ -165,9 +166,10 @@ function AppContent() {
                   />
                 )
               })}
-              <BottomPanelLoader />
+              {isTermVisible && <BottomPanelLoader />}
             </div>
-            {showStatusBar &&
+            {isTermVisible &&
+              showStatusBar &&
               statusBarOnTop !== effectiveTabsTop &&
               activeShellId != null && (
                 <Suspense fallback={<div className="w-full h-[29px]" />}>

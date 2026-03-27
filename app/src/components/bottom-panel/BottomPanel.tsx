@@ -3,6 +3,7 @@ import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useIsMobile } from '@/hooks/useMediaQuery'
+import { usePanelFocus } from '@/hooks/usePanelFocus'
 import { usePersistedPanel } from '@/hooks/usePersistedPanel'
 import { cn } from '@/lib/utils'
 import { LogsProvider } from './tabs/logs/LogsContext'
@@ -112,6 +113,10 @@ function DesktopPanel({
   const toggleMaximize = () =>
     panel.setMode((m) => (m === 'maximized' ? 'normal' : 'maximized'))
 
+  const contentRef = usePanelFocus((focused) => {
+    console.log('focused 1', focused)
+  })
+
   return (
     <div
       className="absolute inset-0 pointer-events-none"
@@ -142,7 +147,10 @@ function DesktopPanel({
           minSize="10%"
           className="pointer-events-auto"
         >
-          <div className="h-full flex flex-col bg-sidebar border-t border-zinc-700/50">
+          <div
+            ref={contentRef}
+            className="h-full flex flex-col bg-sidebar border-t border-zinc-700/50"
+          >
             <PanelHeader
               activeTab={activeTab}
               onTabChange={onTabChange}
