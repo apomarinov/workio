@@ -49,8 +49,10 @@ export function LogsView() {
 }
 
 function LogRow({ log }: { log: CommandLog }) {
+  const { filters } = useLogsContext()
   const [expanded, setExpanded] = useState(false)
   const isFailed = log.exit_code !== 0
+  const showEntity = filters.scope !== 'project'
 
   return (
     <div>
@@ -76,10 +78,12 @@ function LogRow({ log }: { log: CommandLog }) {
           <span className="w-16 flex-shrink-0 flex items-center">
             {categoryBadge(log.category)}
           </span>
-          <span className="flex items-center gap-1 w-28 flex-shrink-0 min-w-0">
-            {entityIcon(log)}
-            <span className="text-[11px] truncate">{entityName(log)}</span>
-          </span>
+          {showEntity && (
+            <span className="flex items-center gap-1 w-28 flex-shrink-0 min-w-0">
+              {entityIcon(log)}
+              <span className="text-[11px] truncate">{entityName(log)}</span>
+            </span>
+          )}
         </div>
         <span
           className={cn(
@@ -141,6 +145,7 @@ function categoryBadge(category: string) {
 }
 
 function entityName(log: CommandLog): string {
+  if (log.terminal_name) return log.terminal_name
   if (log.data.terminalName) return log.data.terminalName
   if (log.pr_id && /^.+?\/.+?#\d+$/.test(log.pr_id)) return log.pr_id
   return 'System'
@@ -150,7 +155,7 @@ function entityIcon(log: CommandLog) {
   if (log.pr_id && /^.+?\/.+?#\d+$/.test(log.pr_id)) {
     return <Github className="w-3 h-3 text-zinc-400 flex-shrink-0" />
   }
-  if (log.data.terminalName) {
+  if (log.terminal_name || log.data.terminalName) {
     return <TerminalIcon className="w-3 h-3 text-zinc-400 flex-shrink-0" />
   }
   return <GitBranch className="w-3 h-3 text-zinc-400 flex-shrink-0" />

@@ -14,6 +14,7 @@ export interface CommandLogData {
 export interface CommandLog {
   id: number
   terminal_id: number | null
+  terminal_name: string | null
   pr_id: string | null
   exit_code: number
   category: string
@@ -48,6 +49,7 @@ export const infiniteListInput = z
   .object({
     terminalId: z.number().optional(),
     deleted: z.boolean().optional(),
+    system: z.boolean().optional(),
     prName: z.string().optional(),
     category: z.string().optional(),
     failed: z.boolean().optional(),

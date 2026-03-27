@@ -63,7 +63,7 @@ export async function logCommand(opts: LogCommandOptions) {
          DO UPDATE SET exit_code = EXCLUDED.exit_code, data = EXCLUDED.data,
                        terminal_id = EXCLUDED.terminal_id, created_at = NOW()
          WHERE command_logs.exit_code != EXCLUDED.exit_code
-         RETURNING id, terminal_id, pr_id, exit_code, category, data, created_at`,
+         RETURNING id, terminal_id, (SELECT name FROM terminals WHERE id = terminal_id) as terminal_name, pr_id, exit_code, category, data, created_at`,
         [
           opts.terminalId ?? null,
           opts.prId ?? null,
@@ -78,7 +78,7 @@ export async function logCommand(opts: LogCommandOptions) {
       const result = await pool.query<CommandLog>(
         `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, terminal_id, pr_id, exit_code, category, data, created_at`,
+         RETURNING id, terminal_id, (SELECT name FROM terminals WHERE id = terminal_id) as terminal_name, pr_id, exit_code, category, data, created_at`,
         [
           opts.terminalId ?? null,
           opts.prId ?? null,
@@ -170,56 +170,71 @@ export async function getCommandLogs(input: ListInput) {
   }
 }
 
-export async function getCommandLogsInfinite(input: InfiniteListInput) {
+function buildLogFilters(input: InfiniteListInput, alias = '') {
+  const p = alias ? `${alias}.` : ''
   const conditions: string[] = []
   const values: (string | number)[] = []
   let paramIdx = 1
 
   if (input.cursor) {
-    conditions.push(`id < $${paramIdx++}`)
+    conditions.push(`${p}id < $${paramIdx++}`)
     values.push(input.cursor)
   }
 
-  if (input.terminalId) {
-    conditions.push(`terminal_id = $${paramIdx++}`)
+  if (input.system) {
+    conditions.push(`${p}terminal_id IS NULL`)
+  } else if (input.terminalId) {
+    conditions.push(`${p}terminal_id = $${paramIdx++}`)
     values.push(input.terminalId)
   }
 
   if (input.deleted) {
     conditions.push(
-      `terminal_id IS NOT NULL AND terminal_id NOT IN (SELECT id FROM terminals)`,
+      `${p}terminal_id IS NOT NULL AND ${p}terminal_id NOT IN (SELECT id FROM terminals)`,
     )
   }
 
   if (input.prName) {
-    conditions.push(`pr_id = $${paramIdx++}`)
+    conditions.push(`${p}pr_id = $${paramIdx++}`)
     values.push(input.prName)
   }
 
   if (input.category) {
-    conditions.push(`category = $${paramIdx++}`)
+    conditions.push(`${p}category = $${paramIdx++}`)
     values.push(input.category)
   }
 
   if (input.failed) {
-    conditions.push('exit_code = 1')
+    conditions.push(`${p}exit_code = 1`)
   }
 
   if (input.search) {
-    conditions.push(`data::text ILIKE '%' || $${paramIdx++} || '%'`)
+    conditions.push(`${p}data::text ILIKE '%' || $${paramIdx++} || '%'`)
     values.push(input.search)
   }
 
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
+  return { conditions, values, paramIdx, whereClause }
+}
+
+export async function getCommandLogsInfinite(input: InfiniteListInput) {
+  const {
+    values,
+    paramIdx: nextIdx,
+    whereClause,
+  } = buildLogFilters(input, 'cl')
+  let paramIdx = nextIdx
+
   // Fetch limit+1 to determine if there are more items
   const fetchLimit = input.limit + 1
   const { rows } = await pool.query<CommandLog>(
-    `SELECT id, terminal_id, pr_id, exit_code, category, data, created_at
-     FROM command_logs
+    `SELECT cl.id, cl.terminal_id, t.name as terminal_name, cl.pr_id, cl.exit_code, cl.category, cl.data, cl.created_at
+     FROM command_logs cl
+     LEFT JOIN terminals t ON t.id = cl.terminal_id
      ${whereClause}
-     ORDER BY id DESC
+     ORDER BY cl.id DESC
      LIMIT $${paramIdx++}`,
     [...values, fetchLimit],
   )
@@ -244,6 +259,16 @@ export async function getLogTerminals() {
   `)
 
   return { terminals: rows }
+}
+
+export async function deleteLogs(input: InfiniteListInput) {
+  const { values, whereClause } = buildLogFilters(input)
+
+  const { rows } = await pool.query<{ id: number }>(
+    `DELETE FROM command_logs ${whereClause} RETURNING id`,
+    values,
+  )
+  return { deletedIds: rows.map((r) => r.id) }
 }
 
 async function cleanupOrphanedCommandLogs() {
