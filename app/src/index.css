@@ -223,32 +223,42 @@ body {
   }
 }
 
-/* Panel resize handle */
+/* Panel resize handle — 1px line, expands on hover without shifting layout */
 .panel-resize-handle {
   width: 1px;
   background: var(--sidebar-border);
-  transition: background 0.15s, width 0.15s;
-  outline: #3b82f6;
+  position: relative;
 }
 
-.panel-resize-handle:hover,
-.panel-resize-handle[data-resize-handle-state="drag"] {
-  width: 3px;
-  background: #3b82f6; /* blue-500 */
+.panel-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -0.2rem;
+  transition: background 0.15s;
 }
 
-/* Horizontal panel resize handle (bottom panel) */
+.panel-resize-handle:hover::after,
+.panel-resize-handle[data-resize-handle-state="drag"]::after {
+  background: #3b82f6;
+}
+
+/* Horizontal panel resize handle */
 .panel-resize-handle-horizontal {
   height: 1px;
   background: var(--sidebar-border);
-  transition: background 0.15s, height 0.15s;
-  outline: #3b82f6;
+  position: relative;
 }
 
-.panel-resize-handle-horizontal:hover,
-.panel-resize-handle-horizontal[data-resize-handle-state="drag"] {
-  height: 3px;
-  background: #3b82f6; /* blue-500 */
+.panel-resize-handle-horizontal::after {
+  content: '';
+  position: absolute;
+  inset: -0.12rem 0;
+  transition: background 0.15s;
+}
+
+.panel-resize-handle-horizontal:hover::after,
+.panel-resize-handle-horizontal[data-resize-handle-state="drag"]::after {
+  background: #3b82f6;
 }
 
 /* Flash animation for session items */

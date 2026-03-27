@@ -82,7 +82,7 @@ function LogRow({ log }: { log: CommandLog }) {
         <span className="text-[11px] text-muted-foreground w-28 flex-shrink-0">
           {formatDate(log.created_at)}
         </span>
-        <span className="w-16 flex-shrink-0">
+        <span className="w-16 flex-shrink-0 flex items-center">
           {categoryBadge(log.category)}
         </span>
         <span className="flex items-center gap-1 w-28 flex-shrink-0 min-w-0">
@@ -97,11 +97,6 @@ function LogRow({ log }: { log: CommandLog }) {
         >
           {log.data.command}
         </span>
-        {isFailed && (
-          <span className="text-[10px] text-red-400 flex-shrink-0">
-            exit {log.exit_code}
-          </span>
-        )}
       </button>
 
       {expanded && (
