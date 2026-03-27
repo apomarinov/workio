@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { PanelSize } from 'react-resizable-panels'
 import { usePanelRef } from 'react-resizable-panels'
 
 export type PanelMode = 'minimized' | 'normal' | 'maximized'
@@ -85,13 +84,14 @@ export function usePersistedPanel({
     [id],
   )
 
-  const handleContentResize = (size: PanelSize) => {
-    // Only persist size during normal dragging
-    if (mode !== 'normal') return
-    if (size.asPercentage < 1) return
+  // Persist size when layout changes (fires after drag ends)
+  const onLayoutChanged = useCallback(() => {
+    if (!contentRef.current) return
+    const size = contentRef.current.getSize()
+    if (size.asPercentage < 1 || size.asPercentage > 99) return
     persisted.current = { ...persisted.current, size: size.asPercentage }
     writeState(id, persisted.current)
-  }
+  }, [id, contentRef])
 
   // Resize panels when mode changes (skip initial mount — defaultSize handles that)
   const mounted = useRef(false)
@@ -108,9 +108,9 @@ export function usePersistedPanel({
   return {
     spacerRef,
     contentRef,
+    onLayoutChanged,
     spacerDefaultSize: initialSizes.spacer,
     contentDefaultSize: initialSizes.content,
-    onContentResize: handleContentResize,
     mode,
     setMode,
   }

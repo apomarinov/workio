@@ -19,14 +19,17 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
   }, [panel.setMode])
 
   return (
-    <Group orientation="horizontal" className="h-full bg-zinc-950">
+    <Group
+      orientation="horizontal"
+      className="h-full bg-zinc-950"
+      onLayoutChanged={panel.onLayoutChanged}
+    >
       <Panel
         id="sidebar"
         panelRef={panel.contentRef}
         defaultSize={panel.contentDefaultSize}
         minSize="0%"
         maxSize="50%"
-        onResize={panel.onContentResize}
       >
         <Sidebar />
       </Panel>

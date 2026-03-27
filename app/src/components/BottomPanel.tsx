@@ -100,7 +100,11 @@ function DesktopPanel({
       className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 15 }}
     >
-      <Group orientation="vertical" className="h-full">
+      <Group
+        orientation="vertical"
+        className="h-full"
+        onLayoutChanged={panel.onLayoutChanged}
+      >
         <Panel
           id="bottom-panel-spacer"
           panelRef={panel.spacerRef}
@@ -120,7 +124,6 @@ function DesktopPanel({
           defaultSize={panel.contentDefaultSize}
           minSize="10%"
           className="pointer-events-auto"
-          onResize={panel.onContentResize}
         >
           <div className="h-full flex flex-col bg-sidebar border-t border-zinc-700/50">
             <PanelHeader
