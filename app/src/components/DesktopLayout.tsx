@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import type { PanelSize } from 'react-resizable-panels'
+import { useEffect } from 'react'
 import {
   Group,
   Panel,
@@ -14,16 +13,11 @@ interface DesktopLayoutProps {
 }
 
 export function DesktopLayout({ children }: DesktopLayoutProps) {
-  const [sidebarWidth, setSidebarWidth] = useState<number | undefined>()
   const sidebarPanelRef = usePanelRef()
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: 'main-layout',
     storage: localStorage,
   })
-
-  const handleSidebarResize = (size: PanelSize) => {
-    setSidebarWidth(size.inPixels)
-  }
 
   // Listen for toggle-sidebar event from AppKeyboardShortcuts
   useEffect(() => {
@@ -53,9 +47,8 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
         minSize="150px"
         maxSize="50%"
         panelRef={sidebarPanelRef}
-        onResize={handleSidebarResize}
       >
-        <Sidebar width={sidebarWidth} />
+        <Sidebar />
       </Panel>
       <Separator className="panel-resize-handle" />
       <Panel id="main">{children}</Panel>

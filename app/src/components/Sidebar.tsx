@@ -71,12 +71,7 @@ import { SettingsModal } from './SettingsModal'
 import { MultiClientIndicator } from './ShellTabs'
 import { SortableTerminalItem } from './SortableTerminalItem'
 
-interface SidebarProps {
-  width?: number
-  onDismiss?: () => void
-}
-
-export function Sidebar({ width }: SidebarProps) {
+export function Sidebar() {
   const pip = useDocumentPip()
   const {
     terminals,
@@ -571,10 +566,7 @@ export function Sidebar({ width }: SidebarProps) {
     collapsedGitHubRepos.length < githubPRsByRepo.size
 
   return (
-    <div
-      className="h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden"
-      style={width ? { width: `${width}px` } : undefined}
-    >
+    <div className="h-full bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden @container/header">
       <div className="px-1 py-0.5 border-b border-sidebar-border flex items-center justify-between">
         <div className="text-sm flex items-center gap-2">
           <Button
@@ -589,146 +581,123 @@ export function Sidebar({ width }: SidebarProps) {
             <Plus className="w-4 h-4" />
           </Button>
         </div>
-        {width !== undefined && width < 250 ? (
-          <div className="flex items-center gap-1">
-            <MultiClientIndicator />
-            {(hasAnyUnseenPRs || hasNotifications) && (
-              <Popover open={bellOpen} onOpenChange={setBellOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 relative"
-                    title="Notifications"
-                  >
-                    <Bell className="w-4 h-4" />
-                    {hasUnreadNotifications && (
-                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-green-500" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="center">
-                  <NotificationList />
-                </PopoverContent>
-              </Popover>
-            )}
-            <Popover>
+        <div className="flex items-center gap-1">
+          <MultiClientIndicator />
+          {/* Full buttons — visible at >= 250px */}
+          {hasAnythingExpanded && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 hidden @[250px]/header:inline-flex"
+              onClick={collapseAll}
+              title="Collapse all"
+            >
+              <ChevronsDownUp className="w-4 h-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 hidden @[250px]/header:inline-flex"
+            onClick={() => window.dispatchEvent(new Event('open-palette'))}
+            title="Search"
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+          {hasAnySessions && pip.isSupported && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-6 w-6 hidden @[250px]/header:inline-flex',
+                pip.isOpen && 'text-[#D97757]',
+              )}
+              onClick={handlePipToggle}
+              title={pip.isOpen ? 'Close PiP' : 'Open PiP'}
+            >
+              <PictureInPicture2 className="w-4 h-4" />
+            </Button>
+          )}
+          {(hasAnyUnseenPRs || hasNotifications) && (
+            <Popover open={bellOpen} onOpenChange={setBellOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6"
-                  title="More options"
+                  className="h-6 w-6 relative"
+                  title="Notifications"
                 >
-                  <Ellipsis className="w-4 h-4" />
+                  <Bell className="w-4 h-4" />
+                  {hasUnreadNotifications && (
+                    <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-green-500" />
+                  )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-40 p-1 space-y-1" align="end">
-                {hasAnythingExpanded && (
-                  <button
-                    onClick={collapseAll}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                  >
-                    <ChevronsDownUp className="w-4 h-4" />
-                    Collapse all
-                  </button>
-                )}
-                <button
-                  onClick={() =>
-                    window.dispatchEvent(new Event('open-palette'))
-                  }
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                >
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-                {hasAnySessions && pip.isSupported && (
-                  <button
-                    onClick={handlePipToggle}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                  >
-                    <PictureInPicture2 className="w-4 h-4" />
-                    {pip.isOpen ? 'Close PiP' : 'Open PiP'}
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowSettingsModal(true)}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </button>
+              <PopoverContent className="w-auto p-0" align="center">
+                <NotificationList />
               </PopoverContent>
             </Popover>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1">
-            <MultiClientIndicator />
-            {hasAnythingExpanded && (
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 relative hidden @[250px]/header:inline-flex"
+            onClick={() => setShowSettingsModal(true)}
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+            {(hasWebhookWarning || hasBackfill) && (
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500" />
+            )}
+          </Button>
+          {/* Compact overflow menu — visible below 250px */}
+          <Popover>
+            <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
-                onClick={collapseAll}
-                title="Collapse all"
+                className="h-6 w-6 @[250px]/header:hidden"
+                title="More options"
               >
-                <ChevronsDownUp className="w-4 h-4" />
+                <Ellipsis className="w-4 h-4" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => window.dispatchEvent(new Event('open-palette'))}
-              title="Search"
-            >
-              <Search className="w-4 h-4" />
-            </Button>
-            {hasAnySessions && pip.isSupported && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn('h-6 w-6', pip.isOpen && 'text-[#D97757]')}
-                onClick={handlePipToggle}
-                title={pip.isOpen ? 'Close PiP' : 'Open PiP'}
-              >
-                <PictureInPicture2 className="w-4 h-4" />
-              </Button>
-            )}
-            {(hasAnyUnseenPRs || hasNotifications) && (
-              <Popover open={bellOpen} onOpenChange={setBellOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 relative"
-                    title="Notifications"
-                  >
-                    <Bell className="w-4 h-4" />
-                    {hasUnreadNotifications && (
-                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-green-500" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="center">
-                  <NotificationList />
-                </PopoverContent>
-              </Popover>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 relative"
-              onClick={() => setShowSettingsModal(true)}
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-              {(hasWebhookWarning || hasBackfill) && (
-                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500" />
+            </PopoverTrigger>
+            <PopoverContent className="w-40 p-1 space-y-1" align="end">
+              {hasAnythingExpanded && (
+                <button
+                  onClick={collapseAll}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                >
+                  <ChevronsDownUp className="w-4 h-4" />
+                  Collapse all
+                </button>
               )}
-            </Button>
-          </div>
-        )}
+              <button
+                onClick={() => window.dispatchEvent(new Event('open-palette'))}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+                Search
+              </button>
+              {hasAnySessions && pip.isSupported && (
+                <button
+                  onClick={handlePipToggle}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+                >
+                  <PictureInPicture2 className="w-4 h-4" />
+                  {pip.isOpen ? 'Close PiP' : 'Open PiP'}
+                </button>
+              )}
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-0 space-y-1 pb-2 @container/sidebar">

@@ -224,7 +224,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
             mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
-          <Sidebar onDismiss={() => setMobileSidebarOpen(false)} />
+          <Sidebar />
         </div>
       </div>
     </div>
