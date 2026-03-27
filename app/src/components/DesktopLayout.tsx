@@ -1,11 +1,6 @@
 import { useEffect } from 'react'
-import {
-  Group,
-  Panel,
-  Separator,
-  useDefaultLayout,
-  usePanelRef,
-} from 'react-resizable-panels'
+import { Group, Panel, Separator } from 'react-resizable-panels'
+import { usePersistedPanel } from '@/hooks/usePersistedPanel'
 import { Sidebar } from './Sidebar'
 
 interface DesktopLayoutProps {
@@ -13,45 +8,36 @@ interface DesktopLayoutProps {
 }
 
 export function DesktopLayout({ children }: DesktopLayoutProps) {
-  const sidebarPanelRef = usePanelRef()
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: 'main-layout',
-    storage: localStorage,
-  })
+  const panel = usePersistedPanel({ id: 'sidebar', defaultSize: 18 })
 
-  // Listen for toggle-sidebar event from AppKeyboardShortcuts
   useEffect(() => {
     const handler = () => {
-      if (sidebarPanelRef.current?.isCollapsed()) {
-        sidebarPanelRef.current.expand()
-      } else {
-        sidebarPanelRef.current?.collapse()
-      }
+      panel.setMode((m) => (m === 'minimized' ? 'normal' : 'minimized'))
     }
     window.addEventListener('toggle-sidebar', handler)
     return () => window.removeEventListener('toggle-sidebar', handler)
-  }, [sidebarPanelRef])
+  }, [panel.setMode])
 
   return (
-    <Group
-      orientation="horizontal"
-      className="h-full bg-zinc-950"
-      defaultLayout={defaultLayout}
-      onLayoutChanged={onLayoutChanged}
-    >
+    <Group orientation="horizontal" className="h-full bg-zinc-950">
       <Panel
         id="sidebar"
-        collapsible
-        collapsedSize="0px"
-        defaultSize="250px"
-        minSize="150px"
+        panelRef={panel.contentRef}
+        defaultSize={panel.contentDefaultSize}
+        minSize="0%"
         maxSize="50%"
-        panelRef={sidebarPanelRef}
+        onResize={panel.onContentResize}
       >
         <Sidebar />
       </Panel>
       <Separator className="panel-resize-handle" />
-      <Panel id="main">{children}</Panel>
+      <Panel
+        id="main"
+        panelRef={panel.spacerRef}
+        defaultSize={panel.spacerDefaultSize}
+      >
+        {children}
+      </Panel>
     </Group>
   )
 }

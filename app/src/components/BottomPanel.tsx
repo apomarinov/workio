@@ -1,7 +1,6 @@
 import { ChevronDown, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { usePersistedPanel } from '@/hooks/usePersistedPanel'
 import { cn } from '@/lib/utils'
@@ -31,10 +30,6 @@ export function BottomPanel({
   const isMobileQuery = useIsMobile()
   const isMobile = mobile ?? isMobileQuery
   const [activeTab, setActiveTab] = useState<BottomPanelTab>('logs')
-  const [maximized, setMaximized] = useLocalStorage(
-    'bottom-panel-maximized',
-    false,
-  )
   const prevInitialTab = useRef(initialTab)
 
   // Sync tab when initialTab changes from the loader
@@ -79,8 +74,6 @@ export function BottomPanel({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onClose={onClose}
-      maximized={maximized}
-      onToggleMaximize={() => setMaximized((m) => !m)}
     />
   )
 }
@@ -89,20 +82,18 @@ function DesktopPanel({
   activeTab,
   onTabChange,
   onClose,
-  maximized,
-  onToggleMaximize,
 }: {
   activeTab: BottomPanelTab
   onTabChange: (tab: BottomPanelTab) => void
   onClose: () => void
-  maximized: boolean
-  onToggleMaximize: () => void
 }) {
   const panel = usePersistedPanel({
     id: 'bottom-panel',
     defaultSize: 30,
-    maximized,
   })
+  const maximized = panel.mode === 'maximized'
+  const toggleMaximize = () =>
+    panel.setMode((m) => (m === 'maximized' ? 'normal' : 'maximized'))
 
   return (
     <div
@@ -137,7 +128,7 @@ function DesktopPanel({
               onTabChange={onTabChange}
               onClose={onClose}
               maximized={maximized}
-              onToggleMaximize={onToggleMaximize}
+              onToggleMaximize={toggleMaximize}
             />
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
