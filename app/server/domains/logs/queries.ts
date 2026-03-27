@@ -8,6 +8,10 @@ export const list = publicProcedure
 
 export const infiniteList = publicProcedure
   .input(infiniteListInput)
-  .query(({ input }) => getCommandLogsInfinite(input))
+  .query(async ({ input }) => {
+    const result = await getCommandLogsInfinite(input)
+    result.logs.reverse()
+    return result
+  })
 
 export const terminals = publicProcedure.query(() => getLogTerminals())

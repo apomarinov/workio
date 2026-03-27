@@ -4,4 +4,4 @@ import { infiniteListInput } from './schema'
 
 export const deleteFiltered = publicProcedure
   .input(infiniteListInput)
-  .mutation(({ input }) => deleteLogs(input))
+  .mutation(({ input }) => deleteLogs({ ...input, cursor: undefined }))
