@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import type { BottomPanelTab } from './bottom-panel/BottomPanel'
+import { lazy, Suspense } from 'react'
+import { useBottomPanelContext } from '@/context/BottomPanelContext'
 
 const BottomPanel = lazy(() =>
   import('./bottom-panel/BottomPanel').then((m) => ({
@@ -12,27 +12,7 @@ interface BottomPanelLoaderProps {
 }
 
 export function BottomPanelLoader({ mobile }: BottomPanelLoaderProps) {
-  const [loaded, setLoaded] = useState(false)
-  const [visible, setVisible] = useState(false)
-  const [tab, setTab] = useState<BottomPanelTab | undefined>()
-  const tabRef = useRef(tab)
-  tabRef.current = tab
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as
-        | { tab?: BottomPanelTab }
-        | undefined
-      setLoaded(true)
-      setVisible((v) => {
-        if (v && detail?.tab && detail.tab !== tabRef.current) return true
-        return !v
-      })
-      if (detail?.tab) setTab(detail.tab)
-    }
-    window.addEventListener('toggle-bottom-panel', handler)
-    return () => window.removeEventListener('toggle-bottom-panel', handler)
-  }, [])
+  const { loaded, visible, tab, close } = useBottomPanelContext()
 
   if (!loaded) return null
 
@@ -40,7 +20,7 @@ export function BottomPanelLoader({ mobile }: BottomPanelLoaderProps) {
     <Suspense fallback={null}>
       <BottomPanel
         visible={visible}
-        onClose={() => setVisible(false)}
+        onClose={close}
         mobile={mobile}
         initialTab={tab}
       />

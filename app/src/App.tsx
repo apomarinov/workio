@@ -19,6 +19,7 @@ const SessionChat = lazy(() =>
   import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
 )
 
+import { BottomPanelProvider } from './context/BottomPanelContext'
 import { DocumentPipProvider } from './context/DocumentPipContext'
 import { GitHubProvider } from './context/GitHubContext'
 import { NotificationDataProvider } from './context/NotificationDataContext'
@@ -202,15 +203,17 @@ function App() {
   return (
     <DocumentPipProvider>
       <WorkspaceProvider>
-        <ProcessProvider>
-          <GitHubProvider>
-            <NotificationDataProvider>
-              <SessionProvider>
-                <AppContent />
-              </SessionProvider>
-            </NotificationDataProvider>
-          </GitHubProvider>
-        </ProcessProvider>
+        <BottomPanelProvider>
+          <ProcessProvider>
+            <GitHubProvider>
+              <NotificationDataProvider>
+                <SessionProvider>
+                  <AppContent />
+                </SessionProvider>
+              </NotificationDataProvider>
+            </GitHubProvider>
+          </ProcessProvider>
+        </BottomPanelProvider>
       </WorkspaceProvider>
     </DocumentPipProvider>
   )
