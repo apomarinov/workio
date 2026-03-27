@@ -54,16 +54,6 @@ export function BottomPanel({
     prevInitialTab.current = initialTab
   }, [initialTab])
 
-  // Close on Escape
-  useEffect(() => {
-    if (!visible) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [visible, onClose])
-
   if (!visible) return null
 
   const config = TAB_CONFIG[activeTab]
@@ -71,7 +61,7 @@ export function BottomPanel({
   if (isMobile) {
     return (
       <config.Provider>
-        <div className="fixed inset-0 z-40 flex flex-col bg-sidebar">
+        <div className="fixed inset-0 z-40 flex flex-col bg-sidebar pt-[env(safe-area-inset-top)]">
           <PanelHeader
             activeTab={activeTab}
             onTabChange={setActiveTab}

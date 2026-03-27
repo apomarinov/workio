@@ -58,30 +58,32 @@ function LogRow({ log }: { log: CommandLog }) {
         type="button"
         onClick={() => setExpanded((e) => !e)}
         className={cn(
-          'w-full flex items-center gap-2 px-2 py-1 text-left hover:bg-sidebar-accent/50 cursor-pointer',
+          'w-full flex items-start sm:items-center max-sm:flex-col max-sm:gap-1 gap-2 px-2 py-1 text-left hover:bg-sidebar-accent/50 cursor-pointer',
           isFailed && 'bg-red-500/10',
           expanded && 'bg-sidebar-accent',
         )}
       >
-        <ChevronDown
-          className={cn(
-            'w-3 h-3 flex-shrink-0 text-muted-foreground transition-transform',
-            !expanded && '-rotate-90',
-          )}
-        />
-        <span className="text-[11px] text-muted-foreground w-28 flex-shrink-0">
-          {formatDate(log.created_at)}
-        </span>
-        <span className="w-16 flex-shrink-0 flex items-center">
-          {categoryBadge(log.category)}
-        </span>
-        <span className="flex items-center gap-1 w-28 flex-shrink-0 min-w-0">
-          {entityIcon(log)}
-          <span className="text-[11px] truncate">{entityName(log)}</span>
-        </span>
+        <div className="flex items-center">
+          <ChevronDown
+            className={cn(
+              'w-3 h-3 flex-shrink-0 text-muted-foreground transition-transform mr-1',
+              !expanded && '-rotate-90',
+            )}
+          />
+          <span className="text-[11px] text-muted-foreground w-28 flex-shrink-0">
+            {formatDate(log.created_at)}
+          </span>
+          <span className="w-16 flex-shrink-0 flex items-center">
+            {categoryBadge(log.category)}
+          </span>
+          <span className="flex items-center gap-1 w-28 flex-shrink-0 min-w-0">
+            {entityIcon(log)}
+            <span className="text-[11px] truncate">{entityName(log)}</span>
+          </span>
+        </div>
         <span
           className={cn(
-            'flex-1 text-[11px] font-mono truncate',
+            'flex-1 text-[11px] font-mono truncate max-w-full',
             isFailed && 'text-red-400',
           )}
         >
