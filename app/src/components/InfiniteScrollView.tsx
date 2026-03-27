@@ -67,7 +67,7 @@ export function InfiniteScrollView({
 
   const items = []
   for (let i = 0; i < count; i++) {
-    items.push(<div key={i}>{renderItem(i)}</div>)
+    items.push(renderItem(i))
   }
 
   return (
@@ -77,7 +77,9 @@ export function InfiniteScrollView({
         className="h-full w-full overflow-y-auto flex flex-col-reverse"
       >
         {/* flex-col-reverse displays index 0 at the bottom */}
-        {items}
+        <table className="w-full border-collapse">
+          <tbody>{items}</tbody>
+        </table>
 
         {/* Loading indicator — in reversed flex, this is visually at the top */}
         {isLoading && (
