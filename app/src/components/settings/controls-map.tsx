@@ -7,6 +7,7 @@
 import { DEFAULT_CONFIG } from '@domains/settings/schema'
 import { BackfillSection } from '../BackfillModal'
 import { createAuthorFilterSetting } from './controls/AuthorFilterSetting'
+import { CustomCommandsSetting } from './controls/CustomCommandsSetting'
 import { HiddenPRsSetting } from './controls/HiddenPRsSetting'
 import { KeymapSetting } from './controls/KeymapSetting'
 import { MobileKeyboardSetting } from './controls/MobileKeyboardSetting'
@@ -95,6 +96,9 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
   ),
   // Terminal > Mobile Keyboard
   mobile_keyboard_rows: MobileKeyboardSetting,
+
+  // Terminal > Custom Commands
+  custom_terminal_actions: CustomCommandsSetting,
 
   // GitHub > PR Data
   'server_config.gh_poll_interval': createNumberSetting(

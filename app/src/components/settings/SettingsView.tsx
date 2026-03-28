@@ -50,6 +50,7 @@ function SettingsViewInner() {
         {dirty && (
           <div className="absolute bottom-4 right-4 z-20">
             <Button
+              variant="warning"
               onClick={saveSettings}
               disabled={saving}
               className="gap-2 shadow-lg"

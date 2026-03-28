@@ -188,7 +188,9 @@ function SettingRow({
   sectionPath?: string[]
 }) {
   const Control = getSettingControl(setting.key)
-  const { addSectionWarning, removeSectionWarning } = useSettingsView()
+  const { addSectionWarning, removeSectionWarning, flashKey } =
+    useSettingsView()
+  const isFlashing = flashKey === setting.key
   const [expanded, setExpanded] = useState(!setting.collapsed)
   const [warning, setWarning] = useState(false)
 
@@ -206,8 +208,12 @@ function SettingRow({
   return (
     <div
       className={cn(
-        'rounded-md border group/settings-row bg-muted',
-        warning ? 'border-amber-500/50' : 'border-zinc-700/50',
+        'rounded-md border group/settings-row bg-muted transition-colors duration-700',
+        warning
+          ? 'border-amber-500/50'
+          : isFlashing
+            ? 'border-blue-500'
+            : 'border-zinc-700/50',
         !setting.collapsed && 'px-4 py-3',
       )}
     >

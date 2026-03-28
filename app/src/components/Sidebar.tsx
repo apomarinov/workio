@@ -20,29 +20,17 @@ import {
   ChevronDown,
   ChevronsDownUp,
   Ellipsis,
-  EyeOff,
   GitBranch,
   Github,
   GitPullRequest,
   Globe,
-  Loader2,
   PictureInPicture2,
   Plus,
   Search,
   Settings,
-  SlidersHorizontal,
-  Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   Popover,
   PopoverContent,
@@ -69,7 +57,6 @@ import { PRStatusGroup } from './PRStatusGroup'
 import { ResourceInfo } from './ResourceInfo'
 import { ServiceStatusIndicator } from './ServiceStatusIndicator'
 import { SessionGroup } from './SessionGroup'
-import { SettingsModal } from './SettingsModal'
 import { MultiClientIndicator } from './ShellTabs'
 import { SortableTerminalItem } from './SortableTerminalItem'
 
@@ -105,19 +92,7 @@ export function Sidebar() {
   const { hasWarning: hasWebhookWarning } = useWebhookWarning()
   const { hasBackfill } = useBackfillCheck()
   const isMobile = useIsMobile()
-  const { settings, updateSettings } = useSettings()
-  const [hiddenPRsModalRepo, setHiddenPRsModalRepo] = useState<string | null>(
-    null,
-  )
-  const [removingPR, setRemovingPR] = useState<number | null>(null)
-  const [removingAuthor, setRemovingAuthor] = useState<string | null>(null)
-  const [removingSilencedAuthor, setRemovingSilencedAuthor] = useState<
-    string | null
-  >(null)
-  const [removingCollapsedAuthor, setRemovingCollapsedAuthor] = useState<
-    string | null
-  >(null)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const { settings } = useSettings()
   const [expandedSessionGroups, setExpandedSessionGroups] = useLocalStorage<
     string[]
   >('sidebar-expanded-session-groups', [])
@@ -412,6 +387,14 @@ export function Sidebar() {
     return () => window.removeEventListener('open-settings', handler)
   }, [openSettings])
 
+  // Redirect open-create-custom-action to settings > Custom Commands
+  useEffect(() => {
+    const handler = () => openSettings(['Terminal', 'Custom Commands'])
+    window.addEventListener('open-create-custom-action', handler)
+    return () =>
+      window.removeEventListener('open-create-custom-action', handler)
+  }, [openSettings])
+
   // Listen for open-logs events from command palette
   useEffect(() => {
     const handler = (e: Event) => {
@@ -653,15 +636,6 @@ export function Sidebar() {
               <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500" />
             )}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 hidden @[250px]/header:inline-flex"
-            onClick={() => setShowSettingsModal(true)}
-            title="Settings Modal"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-          </Button>
           {/* Compact overflow menu — visible below 250px */}
           <Popover>
             <PopoverTrigger asChild>
@@ -880,7 +854,9 @@ export function Sidebar() {
                       {hasHiddenItems && (
                         <button
                           type="button"
-                          onClick={() => setHiddenPRsModalRepo(repo)}
+                          onClick={() =>
+                            openSettings(['GitHub', 'Author Filters'])
+                          }
                           className={cn(
                             'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',
                             isMobile
@@ -989,235 +965,6 @@ export function Sidebar() {
         <ResourceInfo className="hover:opacity-80 py-[0.35rem]" />
         <ServiceStatusIndicator className="hover:opacity-100 py-[0.35rem] px-1" />
       </div>
-
-      <SettingsModal
-        open={showSettingsModal}
-        onOpenChange={setShowSettingsModal}
-      />
-
-      <Dialog
-        open={hiddenPRsModalRepo !== null}
-        onOpenChange={(open) => !open && setHiddenPRsModalRepo(null)}
-      >
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Repo Config</DialogTitle>
-            <DialogDescription>
-              Manage author filters and hidden PRs for{' '}
-              {hiddenPRsModalRepo?.split('/')[1] || hiddenPRsModalRepo}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[80vh] overflow-y-auto">
-            {(settings?.silence_gh_authors ?? []).filter(
-              (h) => h.repo === hiddenPRsModalRepo,
-            ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <BellOff className="w-3 h-3" />
-                  Silenced Authors
-                </p>
-                {(settings?.silence_gh_authors ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.author}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <span className="text-sm">{entry.author}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingSilencedAuthor(entry.author)
-                          try {
-                            const current = settings?.silence_gh_authors ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.author === entry.author
-                                ),
-                            )
-                            await updateSettings({
-                              silence_gh_authors: updated,
-                            })
-                          } finally {
-                            setRemovingSilencedAuthor(null)
-                          }
-                        }}
-                        disabled={removingSilencedAuthor === entry.author}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                      >
-                        {removingSilencedAuthor === entry.author ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-            {(settings?.collapse_gh_authors ?? []).filter(
-              (h) => h.repo === hiddenPRsModalRepo,
-            ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <ChevronsDownUp className="w-3 h-3" />
-                  Collapsed Authors
-                </p>
-                {(settings?.collapse_gh_authors ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.author}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <span className="text-sm">{entry.author}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingCollapsedAuthor(entry.author)
-                          try {
-                            const current = settings?.collapse_gh_authors ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.author === entry.author
-                                ),
-                            )
-                            await updateSettings({
-                              collapse_gh_authors: updated,
-                            })
-                          } finally {
-                            setRemovingCollapsedAuthor(null)
-                          }
-                        }}
-                        disabled={removingCollapsedAuthor === entry.author}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                      >
-                        {removingCollapsedAuthor === entry.author ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-            {(settings?.hide_gh_authors ?? []).filter(
-              (h) => h.repo === hiddenPRsModalRepo,
-            ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <EyeOff className="w-3 h-3" />
-                  Hidden Comment Authors
-                </p>
-                {(settings?.hide_gh_authors ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.author}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <span className="text-sm">{entry.author}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingAuthor(entry.author)
-                          try {
-                            const current = settings?.hide_gh_authors ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.author === entry.author
-                                ),
-                            )
-                            await updateSettings({ hide_gh_authors: updated })
-                          } finally {
-                            setRemovingAuthor(null)
-                          }
-                        }}
-                        disabled={removingAuthor === entry.author}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                      >
-                        {removingAuthor === entry.author ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-            {(settings?.hidden_prs ?? []).filter(
-              (h) => h.repo === hiddenPRsModalRepo,
-            ).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <EyeOff className="w-3 h-3" />
-                  Hidden Pull Requests
-                </p>
-                {(settings?.hidden_prs ?? [])
-                  .filter((h) => h.repo === hiddenPRsModalRepo)
-                  .map((entry) => (
-                    <div
-                      key={entry.prNumber}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-sidebar-accent/30"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm truncate block">
-                          {entry.title}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          #{entry.prNumber}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setRemovingPR(entry.prNumber)
-                          try {
-                            const current = settings?.hidden_prs ?? []
-                            const updated = current.filter(
-                              (e) =>
-                                !(
-                                  e.repo === hiddenPRsModalRepo &&
-                                  e.prNumber === entry.prNumber
-                                ),
-                            )
-                            await updateSettings({ hidden_prs: updated })
-                          } finally {
-                            setRemovingPR(null)
-                          }
-                        }}
-                        disabled={removingPR === entry.prNumber}
-                        className="text-muted-foreground/50 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50 ml-2"
-                      >
-                        {removingPR === entry.prNumber ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setHiddenPRsModalRepo(null)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <LogsModal
         open={logsModal.open}

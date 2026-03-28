@@ -152,6 +152,18 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           },
         ],
       },
+      {
+        name: 'Custom Commands',
+        settings: [
+          {
+            key: 'custom_terminal_actions',
+            label: 'Custom Commands',
+            description: 'Set up your frequently used CLI commands',
+            column: true,
+            collapsed: true,
+          },
+        ],
+      },
     ],
   },
 

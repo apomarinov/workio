@@ -10,6 +10,7 @@ import { getByPath, setByPath } from '@/lib/object'
 import { toastError } from '@/lib/toastError'
 import {
   type FlatSetting,
+  flattenSettings,
   SETTINGS_REGISTRY,
   type SettingsSection,
   searchSettings,
@@ -32,6 +33,7 @@ interface SettingsViewContextValue {
   isMobile: boolean
   categories: SettingsSection[]
   scrollToSection: (path: string[]) => void
+  flashKey: string | null
 
   // Warnings
   sectionWarnings: Set<string>
@@ -76,6 +78,7 @@ export function SettingsViewProvider({
     getFirstSettingsPath(SETTINGS_REGISTRY),
   )
   const [sectionWarnings, setSectionWarnings] = useState<Set<string>>(new Set())
+  const [flashKey, setFlashKey] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Partial<SettingsUpdate>>({})
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
@@ -116,6 +119,16 @@ export function SettingsViewProvider({
 
     setKeymapOpen(false)
     setActivePath(settingsTarget)
+
+    // Find first setting key in the target section for flashing
+    const flat = flattenSettings()
+    const targetPath = settingsTarget.join(' > ')
+    const firstSetting = flat.find((s) => s.path.startsWith(targetPath))
+    if (firstSetting) {
+      setFlashKey(firstSetting.key)
+      setTimeout(() => setFlashKey(null), 2000)
+    }
+
     requestAnimationFrame(() => {
       const id = `settings-section-${settingsTarget.join('-')}`
       const el = document.getElementById(id)
@@ -247,6 +260,7 @@ export function SettingsViewProvider({
         isMobile,
         categories: SETTINGS_REGISTRY,
         scrollToSection,
+        flashKey,
         sectionWarnings,
         addSectionWarning,
         removeSectionWarning,
