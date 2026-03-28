@@ -132,6 +132,9 @@ export function CreateTerminalModal({
   const [sshMaxSessions, setSSHMaxSessions] = useState<number | null>(null)
   const [auditingSSH, setAuditingSSH] = useState(false)
   const [fixingSSH, setFixingSSH] = useState(false)
+  const [sshShells, setSSHShells] = useState<string[]>([])
+  const [sshLoginShell, setSSHLoginShell] = useState<string | null>(null)
+  const [loadingShells, setLoadingShells] = useState(false)
 
   // Repo picker state
   const [repoPickerOpen, setRepoPickerOpen] = useState(false)
@@ -219,6 +222,9 @@ export function CreateTerminalModal({
       setSSHMaxSessions(null)
       setAuditingSSH(false)
       setFixingSSH(false)
+      setSSHShells([])
+      setSSHLoginShell(null)
+      setLoadingShells(false)
       setRepos([])
       setRepoSearch('')
       fetchedQueriesRef.current.clear()
@@ -234,7 +240,7 @@ export function CreateTerminalModal({
       const terminal = await createTerminal({
         cwd: hasGitRepo ? '~' : cwd.trim() || '~',
         name: name.trim() || undefined,
-        shell: !isSSH && shell.trim() ? shell.trim() : undefined,
+        shell: shell.trim() && shell !== 'default' ? shell.trim() : undefined,
         ssh_host: isSSH ? sshHost : undefined,
         git_repo: hasGitRepo ? gitRepo.trim() : undefined,
         workspaces_root:
@@ -298,17 +304,40 @@ export function CreateTerminalModal({
               <label htmlFor="shell" className="text-sm font-medium">
                 Shell
               </label>
-              <div className="relative">
-                <TerminalIcon2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fill-muted-foreground" />
-                <Input
-                  id="shell"
-                  type="text"
-                  value={shell}
-                  onChange={(e) => setShell(e.target.value)}
-                  placeholder={defaultShell}
-                  className="pl-10"
-                />
-              </div>
+              {isSSH ? (
+                <Select value={shell} onValueChange={setShell}>
+                  <SelectTrigger id="shell" className="w-full">
+                    <div className="flex items-center gap-2">
+                      <TerminalIcon2 className="w-4 h-4 fill-muted-foreground flex-shrink-0" />
+                      <SelectValue
+                        placeholder={loadingShells ? 'Loading...' : 'Default'}
+                      />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Default{sshLoginShell ? ` (${sshLoginShell})` : ''}
+                    </SelectItem>
+                    {sshShells.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="relative">
+                  <TerminalIcon2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fill-muted-foreground" />
+                  <Input
+                    id="shell"
+                    type="text"
+                    value={shell}
+                    onChange={(e) => setShell(e.target.value)}
+                    placeholder={defaultShell}
+                    className="pl-10"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -323,17 +352,35 @@ export function CreateTerminalModal({
                   setSSHHost('')
                   setSSHMaxSessions(null)
                   setAuditingSSH(false)
+                  setSSHShells([])
+                  setSSHLoginShell(null)
+                  setShell('')
                   return
                 }
                 setCwd('')
                 setSSHHost(v)
                 setSSHMaxSessions(null)
                 setAuditingSSH(true)
+                setShell('')
+                setLoadingShells(true)
                 utils.workspace.system.sshAudit
                   .fetch({ host: v })
                   .then((r) => setSSHMaxSessions(r.maxSessions))
                   .catch(() => setSSHMaxSessions(null))
                   .finally(() => setAuditingSSH(false))
+                utils.workspace.system.sshShells
+                  .fetch({ host: v })
+                  .then((r) => {
+                    setSSHShells(r.shells)
+                    setSSHLoginShell(r.loginShell)
+                    setShell('default')
+                  })
+                  .catch((err) => {
+                    toastError(err, 'Failed to load shells')
+                    setSSHShells([])
+                    setSSHLoginShell(null)
+                  })
+                  .finally(() => setLoadingShells(false))
               }}
             >
               <SelectTrigger
@@ -639,7 +686,7 @@ export function CreateTerminalModal({
             </div>
           )}
 
-          <Button type="submit" disabled={creating} className="w-full mt-2">
+          <Button type="submit" disabled={creating || auditingSSH || loadingShells} className="w-full mt-2">
             <Plus className="w-4 h-4 mr-2" />
             {creating ? 'Creating...' : 'Create'}
           </Button>

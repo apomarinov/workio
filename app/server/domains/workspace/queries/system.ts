@@ -35,6 +35,47 @@ export const sshAudit = publicProcedure
     }
   })
 
+export const sshShells = publicProcedure
+  .input(sshHostInput)
+  .query(async ({ input }) => {
+    const validation = validateSSHHost(input.host)
+    if (!validation.valid) {
+      throw new Error(validation.error)
+    }
+    const { stdout } = await execSSHCommandLogged(
+      input.host,
+      'echo "LOGIN:$SHELL" && cat /etc/shells 2>/dev/null',
+      { category: 'workspace', errorOnly: true, timeout: 5000 },
+    )
+    const lines = stdout.split('\n')
+    const loginLine = lines.find((l) => l.startsWith('LOGIN:'))
+    const loginShell = loginLine?.slice(6).trim() || null
+
+    const KNOWN_SHELLS = new Set([
+      'sh',
+      'bash',
+      'zsh',
+      'fish',
+      'dash',
+      'ksh',
+      'csh',
+      'tcsh',
+      'nu',
+    ])
+    const seen = new Set<string>()
+    const shells: string[] = []
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (!line || line.startsWith('#') || line.startsWith('LOGIN:')) continue
+      const name = line.split('/').pop()!
+      if (!KNOWN_SHELLS.has(name)) continue
+      if (seen.has(name)) continue
+      seen.add(name)
+      shells.push(line)
+    }
+    return { shells, loginShell }
+  })
+
 export const listDirectories = publicProcedure
   .input(listDirectoriesInput)
   .mutation(async ({ input }) => {
