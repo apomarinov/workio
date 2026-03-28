@@ -30,6 +30,7 @@ import {
   Plus,
   Search,
   Settings,
+  SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -51,6 +52,7 @@ import { useDocumentPip } from '@/context/DocumentPipContext'
 import { useGitHubContext } from '@/context/GitHubContext'
 import { useNotificationDataContext } from '@/context/NotificationDataContext'
 import { useSessionContext } from '@/context/SessionContext'
+import { useUIState } from '@/context/UIStateContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useIsMobile } from '@/hooks/useMediaQuery'
@@ -72,6 +74,7 @@ import { MultiClientIndicator } from './ShellTabs'
 import { SortableTerminalItem } from './SortableTerminalItem'
 
 export function Sidebar() {
+  const { openSettings } = useUIState()
   const pip = useDocumentPip()
   const {
     terminals,
@@ -404,10 +407,9 @@ export function Sidebar() {
 
   // Listen for open-settings events from keyboard shortcut
   useEffect(() => {
-    const handler = () => setShowSettingsModal(true)
-    window.addEventListener('open-settings', handler)
-    return () => window.removeEventListener('open-settings', handler)
-  }, [])
+    window.addEventListener('open-settings', openSettings)
+    return () => window.removeEventListener('open-settings', openSettings)
+  }, [openSettings])
 
   // Listen for open-logs events from command palette
   useEffect(() => {
@@ -642,13 +644,22 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             className="h-6 w-6 relative hidden @[250px]/header:inline-flex"
-            onClick={() => setShowSettingsModal(true)}
+            onClick={() => openSettings()}
             title="Settings"
           >
             <Settings className="w-4 h-4" />
             {(hasWebhookWarning || hasBackfill) && (
               <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500" />
             )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 hidden @[250px]/header:inline-flex"
+            onClick={() => setShowSettingsModal(true)}
+            title="Settings Modal"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
           </Button>
           {/* Compact overflow menu — visible below 250px */}
           <Popover>
@@ -689,7 +700,7 @@ export function Sidebar() {
                 </button>
               )}
               <button
-                onClick={() => setShowSettingsModal(true)}
+                onClick={() => openSettings()}
                 className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
               >
                 <Settings className="w-4 h-4" />

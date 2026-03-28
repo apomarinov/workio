@@ -63,6 +63,13 @@ export function MobileLayout({ children }: MobileLayoutProps) {
     },
   })
 
+  // Close mobile sidebar on collapse-sidebar event (e.g. opening settings)
+  useEffect(() => {
+    const handler = () => setMobileSidebarOpen(false)
+    window.addEventListener('collapse-sidebar', handler)
+    return () => window.removeEventListener('collapse-sidebar', handler)
+  }, [])
+
   // Auto-close mobile sidebar when navigating to a terminal or session
   const prevActiveTerminalId = useRef(activeTerminal?.id)
   const prevActiveSessionId = useRef(activeSessionId)

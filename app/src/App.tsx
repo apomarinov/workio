@@ -18,6 +18,11 @@ const StatusBar = lazy(() =>
 const SessionChat = lazy(() =>
   import('./components/SessionChat').then((m) => ({ default: m.SessionChat })),
 )
+const SettingsView = lazy(() =>
+  import('./components/settings/SettingsView').then((m) => ({
+    default: m.SettingsView,
+  })),
+)
 
 import { BottomPanelProvider } from './context/BottomPanelContext'
 import { DocumentPipProvider } from './context/DocumentPipContext'
@@ -25,6 +30,7 @@ import { GitHubProvider } from './context/GitHubContext'
 import { NotificationDataProvider } from './context/NotificationDataContext'
 import { ProcessProvider } from './context/ProcessContext'
 import { SessionProvider, useSessionContext } from './context/SessionContext'
+import { UIStateProvider, useUIState } from './context/UIStateContext'
 import {
   useWorkspaceContext,
   WorkspaceProvider,
@@ -54,6 +60,7 @@ function AppContent() {
   const isMobile = useIsMobile()
   const mountedShells = useMountedShells()
   const { handleCreateShell, handleRenameShell } = useShellActions()
+  const { settingsFocused } = useUIState()
   useNotificationSubscriptions()
   useSleepWakeRevalidation()
 
@@ -89,15 +96,21 @@ function AppContent() {
     <div className="h-full relative">
       {activeSessionId ? (
         <div className="absolute inset-0 z-20">
-          <Suspense
-            fallback={
-              <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
-                Loading...
-              </div>
-            }
-          >
-            <SessionChat hideAvatars={isMobile} />
-          </Suspense>
+          {settingsFocused ? (
+            <Suspense fallback={null}>
+              <SettingsView />
+            </Suspense>
+          ) : (
+            <Suspense
+              fallback={
+                <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
+                  Loading...
+                </div>
+              }
+            >
+              <SessionChat hideAvatars={isMobile} />
+            </Suspense>
+          )}
         </div>
       ) : terminals.length === 0 ? (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#1a1a1a]">
@@ -163,11 +176,22 @@ function AppContent() {
                     key={shell.id}
                     terminalId={t.id}
                     shellId={shell.id}
-                    isVisible={isTermVisible && shell.id === activeShellId}
+                    isVisible={
+                      isTermVisible &&
+                      !settingsFocused &&
+                      shell.id === activeShellId
+                    }
                   />
                 )
               })}
-              {isTermVisible && <BottomPanelLoader />}
+              {isTermVisible && !settingsFocused && <BottomPanelLoader />}
+              {isTermVisible && settingsFocused && (
+                <div className="absolute inset-0 z-10">
+                  <Suspense fallback={null}>
+                    <SettingsView />
+                  </Suspense>
+                </div>
+              )}
             </div>
             {isTermVisible &&
               showStatusBar &&
@@ -208,7 +232,9 @@ function App() {
             <GitHubProvider>
               <NotificationDataProvider>
                 <SessionProvider>
-                  <AppContent />
+                  <UIStateProvider>
+                    <AppContent />
+                  </UIStateProvider>
                 </SessionProvider>
               </NotificationDataProvider>
             </GitHubProvider>
