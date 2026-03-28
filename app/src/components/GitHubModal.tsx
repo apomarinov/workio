@@ -480,52 +480,52 @@ export function GitHubModal({ open, onOpenChange }: GitHubModalProps) {
 
                                 {(status === 'active' ||
                                   status === 'orphaned') && (
-                                  <>
-                                    {status === 'active' && (
+                                    <>
+                                      {status === 'active' && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-7 w-7"
+                                              disabled={loading[`${repo}-test`]}
+                                              onClick={() => handleTest(repo)}
+                                            >
+                                              {loading[`${repo}-test`] ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                              ) : (
+                                                <TestTube className="w-4 h-4" />
+                                              )}
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Test webhook
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
+
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <Button
                                             variant="ghost"
                                             size="icon"
                                             className="h-7 w-7"
-                                            disabled={loading[`${repo}-test`]}
-                                            onClick={() => handleTest(repo)}
+                                            disabled={loading[repo]}
+                                            onClick={() => handleDelete(repo)}
                                           >
-                                            {loading[`${repo}-test`] ? (
+                                            {loading[repo] ? (
                                               <Loader2 className="w-4 h-4 animate-spin" />
                                             ) : (
-                                              <TestTube className="w-4 h-4" />
+                                              <Trash2 className="w-4 h-4" />
                                             )}
                                           </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          Test webhook
+                                          Delete webhook
                                         </TooltipContent>
                                       </Tooltip>
-                                    )}
-
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7"
-                                          disabled={loading[repo]}
-                                          onClick={() => handleDelete(repo)}
-                                        >
-                                          {loading[repo] ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                          ) : (
-                                            <Trash2 className="w-4 h-4" />
-                                          )}
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Delete webhook
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </>
-                                )}
+                                    </>
+                                  )}
                               </TooltipProvider>
                             </div>
                           </div>

@@ -118,7 +118,11 @@ function SectionRenderer({
           {section.settings && (
             <div className="space-y-3 mb-6">
               {section.settings.map((setting) => (
-                <SettingRow key={setting.key} setting={setting} />
+                <SettingRow
+                  key={setting.key}
+                  setting={setting}
+                  sectionPath={path}
+                />
               ))}
             </div>
           )}
@@ -149,7 +153,11 @@ function SectionRenderer({
       {section.settings && (
         <div className="space-y-3 mb-4">
           {section.settings.map((setting) => (
-            <SettingRow key={setting.key} setting={setting} />
+            <SettingRow
+              key={setting.key}
+              setting={setting}
+              sectionPath={path}
+            />
           ))}
         </div>
       )}
@@ -167,6 +175,7 @@ function SectionRenderer({
 
 function SettingRow({
   setting,
+  sectionPath,
 }: {
   setting: {
     key: string
@@ -176,10 +185,23 @@ function SettingRow({
     column?: boolean
     collapsed?: boolean
   }
+  sectionPath?: string[]
 }) {
   const Control = getSettingControl(setting.key)
+  const { addSectionWarning, removeSectionWarning } = useSettingsView()
   const [expanded, setExpanded] = useState(!setting.collapsed)
   const [warning, setWarning] = useState(false)
+
+  const handleWarning = (hasWarning: boolean) => {
+    setWarning(hasWarning)
+    if (!sectionPath) return
+    // Register warnings for all ancestor paths
+    for (let i = 1; i <= sectionPath.length; i++) {
+      const key = sectionPath.slice(0, i).join('/')
+      if (hasWarning) addSectionWarning(key)
+      else removeSectionWarning(key)
+    }
+  }
 
   return (
     <div
@@ -230,11 +252,11 @@ function SettingRow({
             </button>
           )}
         </div>
-        {setting.collapsed == null && <Control onWarning={setWarning} />}
+        {setting.collapsed == null && <Control onWarning={handleWarning} />}
       </div>
       {setting.collapsed != null && (
         <div className={cn(expanded ? '' : 'hidden', 'px-4 py-3')}>
-          <Control onWarning={setWarning} />
+          <Control onWarning={handleWarning} />
         </div>
       )}
     </div>

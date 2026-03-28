@@ -22,7 +22,6 @@ export interface SettingDef {
   key: string
   label: string
   description: string
-  keywords: string[]
   /** Render label and control stacked vertically instead of side-by-side */
   column?: boolean
   /** Start collapsed — shows a chevron to expand/collapse the control */
@@ -52,7 +51,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'preferred_ide',
             label: 'Preferred IDE',
             description: 'Which IDE to launch when opening files',
-            keywords: ['editor', 'cursor', 'vscode', 'open', 'launch'],
           },
         ],
       },
@@ -64,7 +62,11 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Desktop Active Timeout',
             description:
               'How long after last activity to suppress push notifications',
-            keywords: ['push', 'notification', 'timeout', 'active', 'desktop'],
+          },
+          {
+            key: 'push_notifications',
+            label: 'Mobile Notifications',
+            description: 'Get notified even when the app is closed',
           },
         ],
       },
@@ -77,13 +79,11 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.auth_max_failures',
             label: 'Max Login Failures',
             description: 'Failed login attempts before lockout',
-            keywords: ['auth', 'login', 'password', 'lockout', 'security'],
           },
           {
             key: 'server_config.auth_lockout_ms',
             label: 'Lockout Duration',
             description: 'How long an IP stays locked out',
-            keywords: ['auth', 'lockout', 'ban', 'duration', 'security'],
           },
         ],
       },
@@ -94,15 +94,17 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
   {
     name: 'Terminal',
     icon: Monitor,
-    settings: [
-      {
-        key: 'default_shell',
-        label: 'Default Shell',
-        description: 'Shell used when creating new terminals',
-        keywords: ['bash', 'zsh', 'fish', 'shell', 'path'],
-      },
-    ],
     children: [
+      {
+        name: 'General',
+        settings: [
+          {
+            key: 'default_shell',
+            label: 'Default Shell',
+            description: 'Shell used when creating new terminals',
+          },
+        ],
+      },
       {
         name: 'Display',
         settings: [
@@ -110,13 +112,11 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'font_size',
             label: 'Font Size',
             description: 'Terminal font size (desktop)',
-            keywords: ['font', 'text', 'size', 'zoom', 'terminal'],
           },
           {
             key: 'mobile_font_size',
             label: 'Mobile Font Size',
             description: 'Terminal font size (mobile)',
-            keywords: ['font', 'text', 'size', 'zoom', 'mobile'],
           },
         ],
       },
@@ -127,7 +127,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.max_buffer_lines',
             label: 'Scrollback Lines (Server)',
             description: 'Lines retained in the server-side output buffer',
-            keywords: ['buffer', 'scroll', 'history', 'lines', 'server'],
           },
         ],
       },
@@ -138,7 +137,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.session_timeout_ms',
             label: 'Idle Timeout',
             description: 'Destroy terminal pty after this idle period',
-            keywords: ['idle', 'timeout', 'pty', 'destroy', 'inactive'],
           },
         ],
       },
@@ -149,14 +147,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'mobile_keyboard_rows',
             label: 'Terminal Actions',
             description: 'Customize mobile keyboard action rows',
-            keywords: [
-              'mobile',
-              'keyboard',
-              'keys',
-              'rows',
-              'actions',
-              'touch',
-            ],
             column: true,
             collapsed: true,
           },
@@ -177,26 +167,22 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'show_thinking',
             label: 'Show Thinking',
             description: "Display Claude's extended thinking output",
-            keywords: ['thinking', 'reasoning', 'claude', 'ai'],
           },
           {
             key: 'show_tools',
             label: 'Show Tool Calls',
             description: 'Display tool call blocks in conversations',
-            keywords: ['tools', 'function', 'calls', 'claude', 'ai'],
           },
           {
             key: 'show_tool_output',
             label: 'Show Tool Output',
             description:
               'Display tool call results (only when Show Tool Calls is on)',
-            keywords: ['tools', 'output', 'results', 'claude', 'ai'],
           },
           {
             key: 'message_line_clamp',
             label: 'Message Line Clamp',
             description: 'Max preview lines shown for messages in session list',
-            keywords: ['message', 'preview', 'lines', 'clamp', 'truncate'],
           },
         ],
       },
@@ -207,13 +193,11 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'ignore_external_sessions',
             label: 'Ignore External Sessions',
             description: 'Skip sessions launched outside WorkIO',
-            keywords: ['external', 'sessions', 'ignore', 'filter', 'claude'],
           },
           {
             key: 'import_sessions',
             label: 'Import Sessions',
             description: 'Import untracked Claude Code sessions',
-            keywords: ['import', 'backfill', 'sessions', 'untracked', 'jsonl'],
           },
         ],
       },
@@ -229,17 +213,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
         key: 'keymap',
         label: 'Keyboard Shortcuts',
         description: 'Customize keyboard shortcuts for all actions',
-        keywords: [
-          'keyboard',
-          'shortcut',
-          'keybinding',
-          'hotkey',
-          'palette',
-          'tab',
-          'shell',
-          'sidebar',
-          'commit',
-        ],
       },
     ],
   },
@@ -256,7 +229,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.gh_poll_interval',
             label: 'Check Poll Interval',
             description: 'How often to poll GitHub for PR check status',
-            keywords: ['poll', 'interval', 'github', 'pr', 'refresh', 'checks'],
           },
         ],
       },
@@ -267,7 +239,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'repo_webhooks',
             label: 'Repo Webhooks',
             description: 'Manage GitHub webhook registrations per repo',
-            keywords: ['webhook', 'github', 'repo', 'hooks', 'notifications'],
             column: true,
             collapsed: true,
           },
@@ -280,7 +251,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'gh_query_limits',
             label: 'GraphQL Query Limits',
             description: 'Control how much data to fetch per PR from GitHub',
-            keywords: ['query', 'limits', 'github', 'graphql', 'rate'],
             column: true,
             collapsed: true,
           },
@@ -293,7 +263,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'hide_gh_authors',
             label: 'Hidden Authors',
             description: 'Hide all PRs from these authors',
-            keywords: ['hide', 'author', 'filter', 'github', 'pr'],
             column: true,
             collapsed: true,
           },
@@ -301,14 +270,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'silence_gh_authors',
             label: 'Silenced Authors',
             description: 'Suppress notifications but show PRs',
-            keywords: [
-              'silence',
-              'mute',
-              'author',
-              'filter',
-              'github',
-              'notification',
-            ],
             column: true,
             collapsed: true,
           },
@@ -316,7 +277,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'collapse_gh_authors',
             label: 'Collapsed Authors',
             description: 'Collapse PRs from these authors by default',
-            keywords: ['collapse', 'author', 'filter', 'github', 'fold'],
             column: true,
             collapsed: true,
           },
@@ -324,7 +284,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'hidden_prs',
             label: 'Hidden PRs',
             description: 'Individually hidden pull requests',
-            keywords: ['hide', 'pr', 'pull request', 'github', 'filter'],
             column: true,
             collapsed: true,
           },
@@ -345,13 +304,11 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'ngrok.domain',
             label: 'Domain',
             description: 'ngrok domain for remote access',
-            keywords: ['ngrok', 'domain', 'tunnel', 'remote', 'url'],
           },
           {
             key: 'ngrok.token',
             label: 'Auth Token',
             description: 'ngrok authentication token',
-            keywords: ['ngrok', 'token', 'auth', 'key', 'remote'],
           },
         ],
       },
@@ -362,19 +319,16 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.ssh_idle_timeout',
             label: 'SSH Idle Timeout',
             description: 'Close idle SSH connection after this period',
-            keywords: ['ssh', 'idle', 'timeout', 'remote', 'disconnect'],
           },
           {
             key: 'server_config.ssh_default_timeout',
             label: 'SSH Command Timeout',
             description: 'Default timeout for SSH commands',
-            keywords: ['ssh', 'command', 'timeout', 'remote'],
           },
           {
             key: 'server_config.ssh_keepalive_interval',
             label: 'SSH Keepalive Interval',
             description: 'SSH keepalive ping interval',
-            keywords: ['ssh', 'keepalive', 'ping', 'heartbeat', 'remote'],
           },
         ],
       },
@@ -415,12 +369,12 @@ export function flattenSettings(
   return result
 }
 
-/** Search settings by query string, matching against label, description, ancestors, and keywords */
+/** Search settings by query string, matching against label, description, and ancestors */
 export function searchSettings(query: string): FlatSetting[] {
   if (!query.trim()) return flattenSettings()
   const terms = query.toLowerCase().split(/\s+/)
   return flattenSettings().filter((s) => {
-    const haystack = [s.label, s.description, ...s.ancestors, ...s.keywords]
+    const haystack = [s.label, s.description, ...s.ancestors]
       .join(' ')
       .toLowerCase()
     return terms.every((term) => haystack.includes(term))

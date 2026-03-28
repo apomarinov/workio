@@ -11,8 +11,13 @@ function pathMatches(activePath: string[] | null, path: string[]) {
 }
 
 export function SettingsSidebar() {
-  const { categories, matchedCategories, activePath, scrollToSection } =
-    useSettingsView()
+  const {
+    categories,
+    matchedCategories,
+    activePath,
+    scrollToSection,
+    sectionWarnings,
+  } = useSettingsView()
 
   return (
     <div className="w-full h-full sm:w-48 flex-shrink-0 border-r border-zinc-700/50 bg-[#1a1a1a] overflow-y-auto max-sm:pt-[env(safe-area-inset-top)]">
@@ -34,8 +39,22 @@ export function SettingsSidebar() {
                     : 'text-muted-foreground hover:text-foreground hover:bg-zinc-700/20',
                 )}
               >
-                {section.icon && <section.icon className="w-4 h-4" />}
-                <span className="font-medium">{section.name}</span>
+                {section.icon && (
+                  <section.icon
+                    className={cn(
+                      'w-4 h-4',
+                      sectionWarnings.has(path.join('/')) && 'text-amber-500',
+                    )}
+                  />
+                )}
+                <span
+                  className={cn(
+                    'font-medium',
+                    sectionWarnings.has(path.join('/')) && 'text-amber-500',
+                  )}
+                >
+                  {section.name}
+                </span>
               </button>
               {section.children && (
                 <SidebarChildren
@@ -61,7 +80,7 @@ function SidebarChildren({
   parentPath: string[]
   depth: number
 }) {
-  const { activePath, scrollToSection } = useSettingsView()
+  const { activePath, scrollToSection, sectionWarnings } = useSettingsView()
 
   return (
     <div>
@@ -81,8 +100,21 @@ function SidebarChildren({
                   : 'text-muted-foreground hover:text-foreground hover:bg-zinc-700/20',
               )}
             >
-              {section.icon && <section.icon className="w-3.5 h-3.5" />}
-              {section.name}
+              {section.icon && (
+                <section.icon
+                  className={cn(
+                    'w-3.5 h-3.5',
+                    sectionWarnings.has(path.join('/')) && 'text-amber-500',
+                  )}
+                />
+              )}
+              <span
+                className={cn(
+                  sectionWarnings.has(path.join('/')) && 'text-amber-500',
+                )}
+              >
+                {section.name}
+              </span>
             </button>
             {section.children && (
               <SidebarChildren

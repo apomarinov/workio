@@ -13,6 +13,7 @@ import { MobileKeyboardSetting } from './controls/MobileKeyboardSetting'
 import { createNumberSetting } from './controls/NumberSetting'
 import { Placeholder } from './controls/Placeholder'
 import { PreferredIDESetting } from './controls/PreferredIDESetting'
+import { PushNotificationSetting } from './controls/PushNotificationSetting'
 import { QueryLimitsSetting } from './controls/QueryLimitsSetting'
 import { createSwitchSetting } from './controls/SwitchSetting'
 import { createTextSetting } from './controls/TextSetting'
@@ -51,6 +52,9 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
       unit: 'ms',
     },
   ),
+
+  // General > Notifications
+  push_notifications: PushNotificationSetting,
 
   // Terminal
   default_shell: createTextSetting('default_shell', {

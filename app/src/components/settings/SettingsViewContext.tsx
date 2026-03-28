@@ -33,6 +33,11 @@ interface SettingsViewContextValue {
   categories: SettingsSection[]
   scrollToSection: (path: string[]) => void
 
+  // Warnings
+  sectionWarnings: Set<string>
+  addSectionWarning: (path: string) => void
+  removeSectionWarning: (path: string) => void
+
   // Form
   formValues: Partial<SettingsUpdate>
   validationErrors: Record<string, string>
@@ -70,6 +75,7 @@ export function SettingsViewProvider({
   const [activePath, setActivePath] = useState<string[] | null>(() =>
     getFirstSettingsPath(SETTINGS_REGISTRY),
   )
+  const [sectionWarnings, setSectionWarnings] = useState<Set<string>>(new Set())
   const [formValues, setFormValues] = useState<Partial<SettingsUpdate>>({})
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
@@ -175,6 +181,24 @@ export function SettingsViewProvider({
     }
   }
 
+  const addSectionWarning = (path: string) => {
+    setSectionWarnings((prev) => {
+      if (prev.has(path)) return prev
+      const next = new Set(prev)
+      next.add(path)
+      return next
+    })
+  }
+
+  const removeSectionWarning = (path: string) => {
+    setSectionWarnings((prev) => {
+      if (!prev.has(path)) return prev
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
+  }
+
   const dirty = baselineRef.current !== JSON.stringify(formValues)
 
   const saveSettings = async () => {
@@ -223,6 +247,9 @@ export function SettingsViewProvider({
         isMobile,
         categories: SETTINGS_REGISTRY,
         scrollToSection,
+        sectionWarnings,
+        addSectionWarning,
+        removeSectionWarning,
         formValues,
         validationErrors,
         getFormValue,
