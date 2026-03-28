@@ -218,7 +218,12 @@ function SettingRow({
       )}
     >
       {setting.path && (
-        <div className="text-[10px] text-muted-foreground/60 mb-1">
+        <div
+          className={cn(
+            'text-[10px] text-muted-foreground/60 mb-1',
+            setting.collapsed ? 'px-4 pt-2' : 'pb-2',
+          )}
+        >
           {setting.path}
         </div>
       )}

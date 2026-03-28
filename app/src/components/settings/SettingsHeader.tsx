@@ -1,10 +1,16 @@
 import { Menu, Search, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useSettingsView } from './SettingsViewContext'
 
 export function SettingsHeader() {
   const { search, setSearch, isMobile, toggleSidebar } = useSettingsView()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   return (
     <div className="flex items-center border-b border-zinc-700/50">
@@ -21,8 +27,9 @@ export function SettingsHeader() {
       <div className="relative flex-1">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Search settings..."
+          placeholder="Search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={cn(
