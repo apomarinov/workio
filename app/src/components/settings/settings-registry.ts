@@ -4,9 +4,13 @@
  * a component that owns its own rendering, validation, and persistence.
  */
 
+import { DEFAULT_CONFIG } from '@domains/settings/schema'
 import { Github, Globe, Keyboard, Monitor, Settings } from 'lucide-react'
 import { ClaudeIcon } from '@/components/icons'
+import { createServerConfigNumberSetting } from './controls/NumberSetting'
 import { Placeholder } from './controls/Placeholder'
+import { PreferredIDESetting } from './controls/PreferredIDESetting'
+import { createTextSetting } from './controls/TextSetting'
 
 // --- Setting definition ---
 
@@ -45,7 +49,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Preferred IDE',
             description: 'Which IDE to launch when opening files',
             keywords: ['editor', 'cursor', 'vscode', 'open', 'launch'],
-            component: Placeholder,
+            component: PreferredIDESetting,
           },
         ],
       },
@@ -58,7 +62,16 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             description:
               'How long after last activity to suppress push notifications',
             keywords: ['push', 'notification', 'timeout', 'active', 'desktop'],
-            component: Placeholder,
+            component: createServerConfigNumberSetting(
+              'notification_active_timeout',
+              {
+                min: 1000,
+                placeholder: String(
+                  DEFAULT_CONFIG.server_config.notification_active_timeout,
+                ),
+                unit: 'ms',
+              },
+            ),
           },
         ],
       },
@@ -70,14 +83,24 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Max Login Failures',
             description: 'Failed login attempts before lockout',
             keywords: ['auth', 'login', 'password', 'lockout', 'security'],
-            component: Placeholder,
+            component: createServerConfigNumberSetting('auth_max_failures', {
+              min: 1,
+              placeholder: String(
+                DEFAULT_CONFIG.server_config.auth_max_failures,
+              ),
+              unit: 'ms',
+            }),
           },
           {
             key: 'server_config.auth_lockout_ms',
             label: 'Lockout Duration',
             description: 'How long an IP stays locked out',
             keywords: ['auth', 'lockout', 'ban', 'duration', 'security'],
-            component: Placeholder,
+            component: createServerConfigNumberSetting('auth_lockout_ms', {
+              min: 60000,
+              placeholder: String(DEFAULT_CONFIG.server_config.auth_lockout_ms),
+              unit: 'ms',
+            }),
           },
         ],
       },
@@ -97,7 +120,9 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Default Shell',
             description: 'Shell used when creating new terminals',
             keywords: ['bash', 'zsh', 'fish', 'shell', 'path'],
-            component: Placeholder,
+            component: createTextSetting('default_shell', {
+              placeholder: String(DEFAULT_CONFIG.default_shell),
+            }),
           },
           {
             key: 'shell_templates',
