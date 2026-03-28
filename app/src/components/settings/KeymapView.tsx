@@ -366,107 +366,115 @@ export function KeymapView() {
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="w-full space-y-1.5">
           <SectionHeader>General</SectionHeader>
-          {shortcutRow('palette', 'Command Palette')}
-          {shortcutRow('settings', 'Settings')}
-          {shortcutRow('collapseAll', 'Collapse All')}
-          {shortcutRow('customCommands', 'Custom Commands')}
-          {shortcutRow('toggleSidebar', 'Toggle Sidebar')}
-          {shortcutRow('togglePip', 'Toggle PiP Window')}
+          <SectionRows>
+            {shortcutRow('palette', 'Command Palette')}
+            {shortcutRow('settings', 'Settings')}
+            {shortcutRow('collapseAll', 'Collapse All')}
+            {shortcutRow('customCommands', 'Custom Commands')}
+            {shortcutRow('toggleSidebar', 'Toggle Sidebar')}
+            {shortcutRow('togglePip', 'Toggle PiP Window')}
+          </SectionRows>
 
           <SectionHeader>Projects</SectionHeader>
-          {shortcutRow('goToTab', 'Go to project', {
-            suffix: bindings.goToTab ? '1 - 9' : undefined,
-          })}
-          {shortcutRow('itemActions', 'Actions')}
+          <SectionRows>
+            {shortcutRow('goToTab', 'Go to project', {
+              suffix: bindings.goToTab ? '1 - 9' : undefined,
+            })}
+            {shortcutRow('itemActions', 'Actions')}
+          </SectionRows>
 
           <SectionHeader>Shells</SectionHeader>
-          {shortcutRow('newShell', 'New Shell')}
-          {shortcutRow('closeShell', 'Close Shell')}
-          {shortcutRow('goToShell', 'Go to shell', {
-            suffix: bindings.goToShell ? '1 - 9' : undefined,
-          })}
-          {shortcutRow('prevShell', 'Previous shell')}
-          {shortcutRow('nextShell', 'Next shell')}
-          {shortcutRow('shellTemplates', 'Shell Templates')}
-          <InfoShortcutRow
-            label="Focus active shell"
-            display={
-              <ArrowRightToLine className={cn(ICON_CLASS, 'stroke-3')} />
-            }
-          />
-          <InfoShortcutRow
-            label="Open file in IDE"
-            display={<MouseLeft className={ICON_CLASS} />}
-          />
-          <InfoShortcutRow
-            label="Open file in Finder"
-            display={
-              <span className="inline-flex items-center gap-1">
-                <Command className={cn(ICON_CLASS, 'stroke-3')} />
-                <MouseLeft className={ICON_CLASS} />
-              </span>
-            }
-          />
-          <InfoShortcutRow
-            label="Copy filepath/URL"
-            display={
-              <span className="inline-flex items-center gap-1">
-                <Option className={cn(ICON_CLASS, 'stroke-3')} />
-                <MouseLeft className={ICON_CLASS} />
-              </span>
-            }
-          />
-          <InfoShortcutRow
-            label="Jump line"
-            display={
-              <span className="inline-flex items-center gap-1">
-                <Command className={cn(ICON_CLASS, 'stroke-3')} />
-                <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
-                <span>/</span>
-                <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
-              </span>
-            }
-          />
-          <InfoShortcutRow
-            label="Jump word"
-            display={
-              <span className="inline-flex items-center gap-1">
-                <Option className={cn(ICON_CLASS, 'stroke-3')} />
-                <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
-                <span>/</span>
-                <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
-              </span>
-            }
-          />
-          <InfoShortcutRow
-            label="Delete word"
-            display={
-              <span className="inline-flex items-center gap-1">
-                <Option className={cn(ICON_CLASS, 'stroke-3')} />
-                <Delete className={cn(ICON_CLASS, 'stroke-3')} />
-              </span>
-            }
-          />
-          <InfoShortcutRow
-            label="Delete line"
-            display={
-              <span className="inline-flex items-center gap-1">
-                <Command className={cn(ICON_CLASS, 'stroke-3')} />
-                <Delete className={cn(ICON_CLASS, 'stroke-3')} />
-              </span>
-            }
-          />
+          <SectionRows>
+            {shortcutRow('newShell', 'New Shell')}
+            {shortcutRow('closeShell', 'Close Shell')}
+            {shortcutRow('goToShell', 'Go to shell', {
+              suffix: bindings.goToShell ? '1 - 9' : undefined,
+            })}
+            {shortcutRow('prevShell', 'Previous shell')}
+            {shortcutRow('nextShell', 'Next shell')}
+            {shortcutRow('shellTemplates', 'Shell Templates')}
+            <InfoShortcutRow
+              label="Focus active shell"
+              display={
+                <ArrowRightToLine className={cn(ICON_CLASS, 'stroke-3')} />
+              }
+            />
+            <InfoShortcutRow
+              label="Open file in IDE"
+              display={<MouseLeft className={ICON_CLASS} />}
+            />
+            <InfoShortcutRow
+              label="Open file in Finder"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <MouseLeft className={ICON_CLASS} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Copy filepath/URL"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Option className={cn(ICON_CLASS, 'stroke-3')} />
+                  <MouseLeft className={ICON_CLASS} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Jump line"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
+                  <span>/</span>
+                  <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Jump word"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Option className={cn(ICON_CLASS, 'stroke-3')} />
+                  <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
+                  <span>/</span>
+                  <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Delete word"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Option className={cn(ICON_CLASS, 'stroke-3')} />
+                  <Delete className={cn(ICON_CLASS, 'stroke-3')} />
+                </span>
+              }
+            />
+            <InfoShortcutRow
+              label="Delete line"
+              display={
+                <span className="inline-flex items-center gap-1">
+                  <Command className={cn(ICON_CLASS, 'stroke-3')} />
+                  <Delete className={cn(ICON_CLASS, 'stroke-3')} />
+                </span>
+              }
+            />
+          </SectionRows>
 
           <SectionHeader>Git</SectionHeader>
-          {shortcutRow('branches', 'Branches')}
-          {shortcutRow('pullBranch', 'Pull Current Branch', {
-            description: '(rebase)',
-          })}
-          {shortcutRow('commit', 'Commit', {
-            description: '(dirty → commit, clean → log)',
-          })}
-          {shortcutRow('commitAmend', 'Toggle Amend')}
-          {shortcutRow('commitNoVerify', 'Toggle No Verify')}
+          <SectionRows>
+            {shortcutRow('branches', 'Branches')}
+            {shortcutRow('pullBranch', 'Pull Current Branch', {
+              description: '(rebase)',
+            })}
+            {shortcutRow('commit', 'Commit', {
+              description: '(dirty → commit, clean → log)',
+            })}
+            {shortcutRow('commitAmend', 'Toggle Amend')}
+            {shortcutRow('commitNoVerify', 'Toggle No Verify')}
+          </SectionRows>
         </div>
       </div>
     </div>
@@ -483,6 +491,14 @@ function SectionHeader({ children }: { children: ReactNode }) {
   )
 }
 
+function SectionRows({ children }: { children: ReactNode }) {
+  return (
+    <div className="[&>div:nth-child(odd)]:bg-zinc-800/30 [&>div]:hover:!bg-zinc-700/50 [&>div]:transition-colors [&>div:first-child]:rounded-t-md [&>div:last-child]:rounded-b-md">
+      {children}
+    </div>
+  )
+}
+
 function InfoShortcutRow({
   label,
   display,
@@ -491,7 +507,7 @@ function InfoShortcutRow({
   display: ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between px-2 py-1.5">
       <span className="text-sm font-medium text-muted-foreground">{label}</span>
       <span className="h-7 px-2.5 text-xs font-mono rounded-md border border-border bg-zinc-800/50 text-muted-foreground inline-flex items-center">
         {display}
@@ -528,7 +544,7 @@ function ShortcutRow({
   const isDisabled = !binding
   const isDefault = bindingsEqual(binding, defaultBinding)
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between px-2 py-1.5">
       <div className="flex gap-1 items-center">
         <span className="text-sm font-medium flex flex-col gap-0">{label}</span>
         {binding && !binding.key && (

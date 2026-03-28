@@ -686,7 +686,11 @@ export function CreateTerminalModal({
             </div>
           )}
 
-          <Button type="submit" disabled={creating || auditingSSH || loadingShells} className="w-full mt-2">
+          <Button
+            type="submit"
+            disabled={creating || auditingSSH || loadingShells}
+            className="w-full mt-2"
+          >
             <Plus className="w-4 h-4 mr-2" />
             {creating ? 'Creating...' : 'Create'}
           </Button>
