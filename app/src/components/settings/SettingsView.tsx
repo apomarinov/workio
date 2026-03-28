@@ -1,10 +1,50 @@
-import { Settings } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { KeymapView } from './KeymapView'
+import { SettingsContent } from './SettingsContent'
+import { SettingsHeader } from './SettingsHeader'
+import { SettingsSidebar } from './SettingsSidebar'
+import { SettingsViewProvider, useSettingsView } from './SettingsViewContext'
+
+function SettingsViewInner() {
+  const { isMobile, sidebarOpen, setSidebarOpen, keymapOpen } =
+    useSettingsView()
+
+  return (
+    <div className="h-full flex flex-col bg-[#1a1a1a]">
+      <SettingsHeader />
+      <div className="flex flex-1 min-h-0 relative">
+        {!isMobile && <SettingsSidebar />}
+
+        {isMobile && (
+          <>
+            <div
+              className={cn(
+                'fixed inset-0 z-40 bg-black/50 transition-opacity',
+                sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              )}
+              onClick={() => setSidebarOpen(false)}
+            />
+            <div
+              className={cn(
+                'fixed inset-y-0 left-0 z-50 w-full transition-transform duration-200',
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+              )}
+            >
+              <SettingsSidebar />
+            </div>
+          </>
+        )}
+
+        {keymapOpen ? <KeymapView /> : <SettingsContent />}
+      </div>
+    </div>
+  )
+}
 
 export function SettingsView() {
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-[#1a1a1a] text-zinc-400 gap-3">
-      <Settings className="w-8 h-8 text-zinc-500" />
-      <p className="text-sm">Settings</p>
-    </div>
+    <SettingsViewProvider>
+      <SettingsViewInner />
+    </SettingsViewProvider>
   )
 }

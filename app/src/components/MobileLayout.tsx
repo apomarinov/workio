@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useSessionContext } from '@/context/SessionContext'
+import { useUIState } from '@/context/UIStateContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useEdgeSwipe } from '@/hooks/useEdgeSwipe'
 import { useSettings } from '@/hooks/useSettings'
@@ -32,6 +33,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   const { activeTerminal, activeShells, selectTerminal, setShell } =
     useWorkspaceContext()
   const { activeSessionId } = useSessionContext()
+  const { settingsFocused } = useUIState()
   const { settings } = useSettings()
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [mobileKeyboardMode, setMobileKeyboardMode] = useState<
@@ -136,57 +138,59 @@ export function MobileLayout({ children }: MobileLayoutProps) {
                   position="bottom"
                   className="pr-2 bg-[#1a1a1a]"
                   rightExtra={
-                    <div className="flex items-center gap-0.5 max-sm:border-l-[1px] pl-1">
-                      {mobileKeyboardMode === 'input' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.dispatchEvent(
-                                new CustomEvent('open-custom-commands', {
-                                  detail: { terminalId: t.id },
-                                }),
-                              )
-                            }
-                            className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                          >
-                            <TerminalNoBorder className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setMobileKeyboardMode('actions')}
-                            className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                          >
-                            <LayoutGrid className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {mobileKeyboardMode === 'actions' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              mobileInputRef.current?.focus()
-                              setMobileKeyboardMode('input')
-                            }}
-                            className="flex items-center justify-center h-7 px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                          >
-                            ABC
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.dispatchEvent(
-                                new Event('mobile-keyboard-customize'),
-                              )
-                            }
-                            className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                          >
-                            <Settings className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    settingsFocused ? undefined : (
+                      <div className="flex items-center gap-0.5 max-sm:border-l-[1px] pl-1">
+                        {mobileKeyboardMode === 'input' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                window.dispatchEvent(
+                                  new CustomEvent('open-custom-commands', {
+                                    detail: { terminalId: t.id },
+                                  }),
+                                )
+                              }
+                              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                              <TerminalNoBorder className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMobileKeyboardMode('actions')}
+                              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                              <LayoutGrid className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {mobileKeyboardMode === 'actions' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                mobileInputRef.current?.focus()
+                                setMobileKeyboardMode('input')
+                              }}
+                              className="flex items-center justify-center h-7 px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                              ABC
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                window.dispatchEvent(
+                                  new Event('mobile-keyboard-customize'),
+                                )
+                              }
+                              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )
                   }
                 />
               )}
@@ -195,14 +199,16 @@ export function MobileLayout({ children }: MobileLayoutProps) {
                   <StatusBar position="bottom" />
                 </Suspense>
               )}
-              <Suspense fallback={null}>
-                <MobileKeyboard
-                  terminalId={t.id}
-                  currentRepo={t.git_repo?.repo}
-                  mode={mobileKeyboardMode}
-                  inputRef={mobileInputRef}
-                />
-              </Suspense>
+              {!settingsFocused && (
+                <Suspense fallback={null}>
+                  <MobileKeyboard
+                    terminalId={t.id}
+                    currentRepo={t.git_repo?.repo}
+                    mode={mobileKeyboardMode}
+                    inputRef={mobileInputRef}
+                  />
+                </Suspense>
+              )}
             </div>
           )
         })()}

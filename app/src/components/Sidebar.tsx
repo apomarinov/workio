@@ -407,8 +407,9 @@ export function Sidebar() {
 
   // Listen for open-settings events from keyboard shortcut
   useEffect(() => {
-    window.addEventListener('open-settings', openSettings)
-    return () => window.removeEventListener('open-settings', openSettings)
+    const handler = () => openSettings()
+    window.addEventListener('open-settings', handler)
+    return () => window.removeEventListener('open-settings', handler)
   }, [openSettings])
 
   // Listen for open-logs events from command palette
