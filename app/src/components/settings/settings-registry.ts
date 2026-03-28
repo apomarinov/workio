@@ -67,6 +67,8 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'push_notifications',
             label: 'Mobile Notifications',
             description: 'Get notified even when the app is closed',
+            column: true,
+            collapsed: true,
           },
         ],
       },

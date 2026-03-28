@@ -12,6 +12,7 @@ import {
   Globe,
   HeartPulse,
   ServerOff,
+  Settings,
 } from 'lucide-react'
 import { useState } from 'react'
 import {
@@ -25,6 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useUIState } from '@/context/UIStateContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { cn } from '@/lib/utils'
 import { useWebhookWarning } from './GitHubModal'
@@ -98,12 +100,21 @@ const SERVICE_INFO: Record<string, string> = {
     'Claude tunnels connect remote SSH hosts back to your local WorkIO server via SSH reverse tunnels. Bootstrap sets up the forwarder script and hooks on the remote host. The tunnel keeps the connection alive so Claude hooks on remote machines can forward events back to WorkIO.',
 }
 
+const SETTINGS_PATH: Record<string, string[]> = {
+  'GitHub REST': ['GitHub', 'PR Data'],
+  'GitHub GraphQL': ['GitHub', 'Query Limits'],
+  'GitHub Webhooks': ['GitHub', 'Webhooks'],
+  ngrok: ['Remote Access', 'ngrok'],
+}
+
 function InfoButton({ label }: { label: string }) {
   const [open, setOpen] = useState(false)
+  const { openSettings } = useUIState()
   const info = SERVICE_INFO[label]
+  const settingsPath = SETTINGS_PATH[label]
   if (!info) return null
   return (
-    <>
+    <div className="flex items-center gap-1">
       <button
         type="button"
         className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
@@ -111,6 +122,15 @@ function InfoButton({ label }: { label: string }) {
       >
         <CircleHelp className="w-3 h-3" />
       </button>
+      {settingsPath && (
+        <button
+          type="button"
+          className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
+          onClick={() => openSettings(settingsPath)}
+        >
+          <Settings className="w-3 h-3" />
+        </button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -121,7 +141,7 @@ function InfoButton({ label }: { label: string }) {
           </p>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }
 

@@ -215,6 +215,9 @@ function SettingRow({
             ? 'border-blue-500'
             : 'border-zinc-700/50',
         !setting.collapsed && 'px-4 py-3',
+        setting.collapsed &&
+          !expanded &&
+          'hover:bg-muted-foreground/20 duration-200',
       )}
     >
       {setting.path && (
