@@ -12,7 +12,7 @@ export function SettingsHeader() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 flex-shrink-0"
+          className="ml-1.5 h-7 w-7 flex-shrink-0"
           onClick={toggleSidebar}
         >
           <Menu className="w-4 h-4" />

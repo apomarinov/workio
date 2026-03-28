@@ -44,7 +44,8 @@ function SettingsViewInner() {
           </>
         )}
 
-        {keymapOpen ? <KeymapView /> : <SettingsContent />}
+        <SettingsContent />
+        {keymapOpen && <KeymapView />}
 
         {dirty && (
           <div className="absolute bottom-4 right-4 z-20">

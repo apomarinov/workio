@@ -6,8 +6,8 @@ export function KeymapView() {
   const { closeKeymap } = useSettingsView()
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-700/50">
+    <div className="absolute inset-0 flex flex-col bg-[#1a1a1a] z-10">
+      <div className="flex items-center gap-2 p-2 border-b border-zinc-700/50">
         <Button
           variant="ghost"
           size="icon"

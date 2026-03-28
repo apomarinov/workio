@@ -37,7 +37,7 @@ export function createNumberSetting(
           )}
         />
         {!error && opts?.unit && (
-          <span className="text-xs text-muted-foreground absolute -bottom-3.5">
+          <span className="text-xs text-muted-foreground absolute bottom-[-12px]">
             {opts.unit}
           </span>
         )}

@@ -19,10 +19,13 @@ export interface SettingDef {
   label: string
   description: string
   keywords: string[]
+  /** Render label and control stacked vertically instead of side-by-side */
+  column?: boolean
 }
 
 export interface SettingsSection {
   name: string
+  description?: string
   icon?: IconComponent
   settings?: SettingDef[]
   children?: SettingsSection[]
@@ -61,6 +64,8 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
       },
       {
         name: 'Security',
+        description:
+          'Set BASIC_AUTH environment variable with your credentials to enable authentication.',
         settings: [
           {
             key: 'server_config.auth_max_failures',
@@ -146,6 +151,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
               'actions',
               'touch',
             ],
+            column: true,
           },
         ],
       },
@@ -195,6 +201,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Ignore External Sessions',
             description: 'Skip sessions launched outside WorkIO',
             keywords: ['external', 'sessions', 'ignore', 'filter', 'claude'],
+          },
+          {
+            key: 'import_sessions',
+            label: 'Import Sessions',
+            description: 'Import untracked Claude Code sessions',
+            keywords: ['import', 'backfill', 'sessions', 'untracked', 'jsonl'],
           },
         ],
       },

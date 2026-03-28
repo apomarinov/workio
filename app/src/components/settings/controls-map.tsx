@@ -5,9 +5,13 @@
  */
 
 import { DEFAULT_CONFIG } from '@domains/settings/schema'
+import { BackfillSection } from '../BackfillModal'
+import { KeymapSetting } from './controls/KeymapSetting'
+import { MobileKeyboardSetting } from './controls/MobileKeyboardSetting'
 import { createNumberSetting } from './controls/NumberSetting'
 import { Placeholder } from './controls/Placeholder'
 import { PreferredIDESetting } from './controls/PreferredIDESetting'
+import { createSwitchSetting } from './controls/SwitchSetting'
 import { createTextSetting } from './controls/TextSetting'
 
 const CONTROLS_MAP: Record<string, React.ComponentType> = {
@@ -80,6 +84,26 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
       unit: 'ms',
     },
   ),
+  // Terminal > Mobile Keyboard
+  mobile_keyboard_rows: MobileKeyboardSetting,
+
+  // Claude > Display
+  show_thinking: createSwitchSetting('show_thinking'),
+  show_tools: createSwitchSetting('show_tools'),
+  show_tool_output: createSwitchSetting('show_tool_output'),
+
+  message_line_clamp: createNumberSetting('message_line_clamp', {
+    min: 1,
+    max: 20,
+    placeholder: String(DEFAULT_CONFIG.message_line_clamp),
+  }),
+
+  // Claude > Sessions
+  ignore_external_sessions: createSwitchSetting('ignore_external_sessions'),
+  import_sessions: BackfillSection,
+
+  // Keymap
+  keymap: KeymapSetting,
 }
 
 export function getSettingControl(key: string): React.ComponentType {

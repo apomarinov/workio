@@ -5,7 +5,7 @@ import { useSettingsView } from './SettingsViewContext'
 import { SETTINGS_REGISTRY, type SettingsSection } from './settings-registry'
 
 export function SettingsContent() {
-  const { filtered, search, setActivePath } = useSettingsView()
+  const { filtered, search, setActivePath, keymapOpen } = useSettingsView()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const handleScroll = () => {
@@ -47,7 +47,10 @@ export function SettingsContent() {
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto"
+      className={cn(
+        'flex-1 overflow-y-auto',
+        keymapOpen && 'invisible pointer-events-none',
+      )}
       data-settings-scroll
       onScroll={handleScroll}
     >
@@ -134,9 +137,14 @@ function SectionRenderer({
   // Nested sections get a subheading
   return (
     <div id={id} data-section-path={sectionPath} className="mb-6">
-      <h3 className="text-xs font-medium text-muted-foreground mb-3">
+      <h3 className="text-xs font-medium text-muted-foreground mb-1">
         {section.name}
       </h3>
+      {section.description && (
+        <p className="text-[11px] text-muted-foreground/60 mb-3">
+          {section.description}
+        </p>
+      )}
       {section.settings && (
         <div className="space-y-3 mb-4">
           {section.settings.map((setting) => (
@@ -164,6 +172,7 @@ function SettingRow({
     label: string
     description: string
     path?: string
+    column?: boolean
   }
 }) {
   const Control = getSettingControl(setting.key)
@@ -175,7 +184,13 @@ function SettingRow({
           {setting.path}
         </div>
       )}
-      <div className="flex items-start justify-between gap-4">
+      <div
+        className={
+          setting.column
+            ? 'space-y-3'
+            : 'flex items-start justify-between gap-4'
+        }
+      >
         <div className="min-w-0">
           <div className="text-sm font-medium text-foreground">
             {setting.label}

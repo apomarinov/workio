@@ -1,4 +1,4 @@
-import { AlertTriangle, Download, Loader2 } from 'lucide-react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +14,6 @@ import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
-import { cn } from '@/lib/utils'
 
 /**
  * Hook to check for unbackfilled sessions.
@@ -89,15 +88,11 @@ export function BackfillSection() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Download className={cn('w-4 h-4', 'text-amber-500')} />
-          <span className="text-sm font-medium">Import Sessions</span>
-          <span className="inline-flex items-center gap-1 text-xs text-amber-500">
-            <AlertTriangle className="w-3 h-3" />
-            {totalCount} untracked
-          </span>
-        </div>
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+          <AlertTriangle className="w-3 h-3" />
+          <span className="whitespace-nowrap">{totalCount} untracked</span>
+        </span>
         <Button
           type="button"
           variant="outline"
@@ -116,8 +111,7 @@ export function BackfillSection() {
           <DialogHeader>
             <DialogTitle>Import Sessions</DialogTitle>
             <DialogDescription>
-              Import Claude Code sessions from JSONL files that aren't tracked
-              in WorkIO.
+              Import Claude Code sessions that aren't tracked in WorkIO.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2 text-sm">
