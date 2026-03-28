@@ -7,7 +7,7 @@ export function SettingsHeader() {
   const { search, setSearch, isMobile, toggleSidebar } = useSettingsView()
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-700/50">
+    <div className="flex items-center border-b border-zinc-700/50">
       {isMobile && (
         <Button
           variant="ghost"
@@ -19,15 +19,15 @@ export function SettingsHeader() {
         </Button>
       )}
       <div className="relative flex-1">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <input
           type="text"
           placeholder="Search settings..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={cn(
-            'w-full h-8 pl-8 pr-8 rounded-md bg-zinc-800/50 border border-zinc-700/50 text-base text-foreground placeholder:text-muted-foreground',
-            'outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600/50 transition-colors',
+            'w-full h-8 pl-8 pr-8 text-sm max-sm:text-base text-foreground placeholder:text-muted-foreground',
+            'outline-none',
           )}
         />
         {search && (
