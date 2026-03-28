@@ -1,5 +1,38 @@
 # Changelog
 
+## [v0.8.0](../../compare/v0.7.0...v0.8.0) — 2026-03-28
+
+### Features
+- Add bottom panel with VS Code-style resize, minimize/maximize, and lazy-loaded tab views
+- Add real-time log streaming with cursor-based infinite scroll, filters, and delete
+- Add comprehensive command logging with deduped upsert support
+- Add settings view with registry, sidebar, search, and inline keymap editor
+- Add server settings map for runtime-configurable server constants
+- Add inline push notification configuration in settings
+- Add custom commands section in settings
+- Add SSH shell picker — fetches available shells from remote host with login shell detection
+- Add author filters and hidden PRs in GitHub settings
+- Add alternating row backgrounds with hover in keymap settings
+
+### Improvements
+- Refactor settings to dot-path form helpers with validation, dirty tracking, and auto-save
+- Lift bottom panel state to context for persistence across terminal switches
+- Replace sidebar width prop with container queries for compact mode
+- Implement per-tab panel context architecture
+- Use `onLayoutChanged` for panel size persistence instead of `onResize`
+- Remove old settings modals — all settings now live in the unified settings view
+- Centralize shared `execFileAsync` helpers and eliminate duplication
+- Auto-focus search on settings open
+- Flash on navigate to settings section
+- Disable create button while SSH audit or shell loading is in progress
+
+### Bug Fixes
+- Fix DB connection leak — rollback idle transactions in monitor daemon
+- Fix panel resize handle hover shifting layout
+- Fix session sort order on resume and collapse healthy tunnel sub-rows
+- Fix breadcrumb padding in settings
+- Revert process-tree to plain `execFileAsync` — exit code 1 means empty results, not errors
+
 ## [v0.7.0](../../compare/v0.6.0...v0.7.0) — 2026-03-26
 
 ### Features

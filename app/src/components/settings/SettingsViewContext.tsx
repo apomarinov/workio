@@ -144,7 +144,7 @@ export function SettingsViewProvider({
 
   const filtered = searchSettings(search)
   const matchedCategories = new Set(filtered.map((s) => s.ancestors[0]))
-  console.log(formValues)
+
   const scrollToSection = (path: string[]) => {
     const id = `settings-section-${path.join('-')}`
     const el = document.getElementById(id)
@@ -172,7 +172,7 @@ export function SettingsViewProvider({
     const rootKey = path.split('.')[0]
     const fieldSchema =
       updateSettingsFormInput.shape[
-        rootKey as keyof typeof updateSettingsFormInput.shape
+      rootKey as keyof typeof updateSettingsFormInput.shape
       ]
     if (!fieldSchema) return
     const updated = setByPath({ ...formValues }, path, value)
