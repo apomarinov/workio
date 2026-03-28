@@ -189,7 +189,10 @@ export const DEFAULT_STATUS_BAR: z.input<typeof statusBarConfigSchema> = {
 // --- Config schema (stored fields with defaults) ---
 
 const settingsBaseSchema = z.object({
-  default_shell: z.string().default('/bin/bash'),
+  default_shell: z
+    .string()
+    .min(1, { error: 'Shell is required' })
+    .default('/bin/bash'),
   font_size: z.number().min(8).max(32).default(13),
   mobile_font_size: z.number().min(8).max(32).default(10),
   show_thinking: z.boolean().default(false),
@@ -244,6 +247,9 @@ const SERVER_ONLY_FIELDS = {
   vapid_public_key: true,
   vapid_private_key: true,
 } as const
+
+export const updateSettingsFormInput =
+  stripDefaults(settingsBaseSchema).omit(SERVER_ONLY_FIELDS)
 
 export const updateSettingsInput = stripDefaults(settingsBaseSchema)
   .omit(SERVER_ONLY_FIELDS)

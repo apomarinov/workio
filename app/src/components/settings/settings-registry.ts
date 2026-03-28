@@ -1,29 +1,24 @@
 /**
  * Settings registry — defines the structure, metadata, and search keywords
- * for every setting rendered in the settings view. Each setting points to
- * a component that owns its own rendering, validation, and persistence.
+ * for every setting rendered in the settings view. No component imports here
+ * to keep this module HMR-safe (changes don't cause full page reloads).
+ *
+ * Component resolution happens in controls-map.tsx, imported only by SettingsContent.
  */
 
-import { DEFAULT_CONFIG } from '@domains/settings/schema'
 import { Github, Globe, Keyboard, Monitor, Settings } from 'lucide-react'
 import { ClaudeIcon } from '@/components/icons'
-import { createServerConfigNumberSetting } from './controls/NumberSetting'
-import { Placeholder } from './controls/Placeholder'
-import { PreferredIDESetting } from './controls/PreferredIDESetting'
-import { createTextSetting } from './controls/TextSetting'
 
 // --- Setting definition ---
 
 type IconComponent = React.ComponentType<{ className?: string }>
 
 export interface SettingDef {
-  /** Unique key for this setting, used for search result identity */
+  /** Unique key for this setting, used for component lookup and search identity */
   key: string
   label: string
   description: string
   keywords: string[]
-  /** Component that renders the control for this setting */
-  component: React.ComponentType
 }
 
 export interface SettingsSection {
@@ -49,7 +44,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Preferred IDE',
             description: 'Which IDE to launch when opening files',
             keywords: ['editor', 'cursor', 'vscode', 'open', 'launch'],
-            component: PreferredIDESetting,
           },
         ],
       },
@@ -62,16 +56,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             description:
               'How long after last activity to suppress push notifications',
             keywords: ['push', 'notification', 'timeout', 'active', 'desktop'],
-            component: createServerConfigNumberSetting(
-              'notification_active_timeout',
-              {
-                min: 1000,
-                placeholder: String(
-                  DEFAULT_CONFIG.server_config.notification_active_timeout,
-                ),
-                unit: 'ms',
-              },
-            ),
           },
         ],
       },
@@ -83,24 +67,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Max Login Failures',
             description: 'Failed login attempts before lockout',
             keywords: ['auth', 'login', 'password', 'lockout', 'security'],
-            component: createServerConfigNumberSetting('auth_max_failures', {
-              min: 1,
-              placeholder: String(
-                DEFAULT_CONFIG.server_config.auth_max_failures,
-              ),
-              unit: 'ms',
-            }),
           },
           {
             key: 'server_config.auth_lockout_ms',
             label: 'Lockout Duration',
             description: 'How long an IP stays locked out',
             keywords: ['auth', 'lockout', 'ban', 'duration', 'security'],
-            component: createServerConfigNumberSetting('auth_lockout_ms', {
-              min: 60000,
-              placeholder: String(DEFAULT_CONFIG.server_config.auth_lockout_ms),
-              unit: 'ms',
-            }),
           },
         ],
       },
@@ -111,28 +83,15 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
   {
     name: 'Terminal',
     icon: Monitor,
-    children: [
+    settings: [
       {
-        name: 'Shell',
-        settings: [
-          {
-            key: 'default_shell',
-            label: 'Default Shell',
-            description: 'Shell used when creating new terminals',
-            keywords: ['bash', 'zsh', 'fish', 'shell', 'path'],
-            component: createTextSetting('default_shell', {
-              placeholder: String(DEFAULT_CONFIG.default_shell),
-            }),
-          },
-          {
-            key: 'shell_templates',
-            label: 'Shell Templates',
-            description: 'Reusable shell command templates',
-            keywords: ['template', 'command', 'preset', 'layout'],
-            component: Placeholder,
-          },
-        ],
+        key: 'default_shell',
+        label: 'Default Shell',
+        description: 'Shell used when creating new terminals',
+        keywords: ['bash', 'zsh', 'fish', 'shell', 'path'],
       },
+    ],
+    children: [
       {
         name: 'Display',
         settings: [
@@ -141,14 +100,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Font Size',
             description: 'Terminal font size (desktop)',
             keywords: ['font', 'text', 'size', 'zoom', 'terminal'],
-            component: Placeholder,
           },
           {
             key: 'mobile_font_size',
             label: 'Mobile Font Size',
             description: 'Terminal font size (mobile)',
             keywords: ['font', 'text', 'size', 'zoom', 'mobile'],
-            component: Placeholder,
           },
         ],
       },
@@ -160,7 +117,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Scrollback Lines (Server)',
             description: 'Lines retained in the server-side output buffer',
             keywords: ['buffer', 'scroll', 'history', 'lines', 'server'],
-            component: Placeholder,
           },
         ],
       },
@@ -172,7 +128,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Idle Timeout',
             description: 'Destroy terminal pty after this idle period',
             keywords: ['idle', 'timeout', 'pty', 'destroy', 'inactive'],
-            component: Placeholder,
           },
         ],
       },
@@ -191,14 +146,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
               'actions',
               'touch',
             ],
-            component: Placeholder,
-          },
-          {
-            key: 'custom_terminal_actions',
-            label: 'Custom Actions',
-            description: 'Custom terminal context menu actions',
-            keywords: ['action', 'command', 'custom', 'menu'],
-            component: Placeholder,
           },
         ],
       },
@@ -218,14 +165,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Show Thinking',
             description: "Display Claude's extended thinking output",
             keywords: ['thinking', 'reasoning', 'claude', 'ai'],
-            component: Placeholder,
           },
           {
             key: 'show_tools',
             label: 'Show Tool Calls',
             description: 'Display tool call blocks in conversations',
             keywords: ['tools', 'function', 'calls', 'claude', 'ai'],
-            component: Placeholder,
           },
           {
             key: 'show_tool_output',
@@ -233,14 +178,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             description:
               'Display tool call results (only when Show Tool Calls is on)',
             keywords: ['tools', 'output', 'results', 'claude', 'ai'],
-            component: Placeholder,
           },
           {
             key: 'message_line_clamp',
             label: 'Message Line Clamp',
             description: 'Max preview lines shown for messages in session list',
             keywords: ['message', 'preview', 'lines', 'clamp', 'truncate'],
-            component: Placeholder,
           },
         ],
       },
@@ -252,7 +195,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Ignore External Sessions',
             description: 'Skip sessions launched outside WorkIO',
             keywords: ['external', 'sessions', 'ignore', 'filter', 'claude'],
-            component: Placeholder,
           },
         ],
       },
@@ -279,7 +221,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           'sidebar',
           'commit',
         ],
-        component: Placeholder,
       },
     ],
   },
@@ -297,7 +238,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Check Poll Interval',
             description: 'How often to poll GitHub for PR check status',
             keywords: ['poll', 'interval', 'github', 'pr', 'refresh', 'checks'],
-            component: Placeholder,
           },
         ],
       },
@@ -317,7 +257,6 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Hidden Authors',
             description: 'Hide all PRs from these authors',
             keywords: ['hide', 'author', 'filter', 'github', 'pr'],
-            component: Placeholder,
           },
           {
             key: 'silence_gh_authors',
@@ -331,21 +270,18 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
               'github',
               'notification',
             ],
-            component: Placeholder,
           },
           {
             key: 'collapse_gh_authors',
             label: 'Collapsed Authors',
             description: 'Collapse PRs from these authors by default',
             keywords: ['collapse', 'author', 'filter', 'github', 'fold'],
-            component: Placeholder,
           },
           {
             key: 'hidden_prs',
             label: 'Hidden PRs',
             description: 'Individually hidden pull requests',
             keywords: ['hide', 'pr', 'pull request', 'github', 'filter'],
-            component: Placeholder,
           },
         ],
       },
@@ -365,14 +301,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Domain',
             description: 'ngrok domain for remote access',
             keywords: ['ngrok', 'domain', 'tunnel', 'remote', 'url'],
-            component: Placeholder,
           },
           {
             key: 'ngrok.token',
             label: 'Auth Token',
             description: 'ngrok authentication token',
             keywords: ['ngrok', 'token', 'auth', 'key', 'remote'],
-            component: Placeholder,
           },
         ],
       },
@@ -384,21 +318,18 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'SSH Idle Timeout',
             description: 'Close idle SSH connection after this period',
             keywords: ['ssh', 'idle', 'timeout', 'remote', 'disconnect'],
-            component: Placeholder,
           },
           {
             key: 'server_config.ssh_default_timeout',
             label: 'SSH Command Timeout',
             description: 'Default timeout for SSH commands',
             keywords: ['ssh', 'command', 'timeout', 'remote'],
-            component: Placeholder,
           },
           {
             key: 'server_config.ssh_keepalive_interval',
             label: 'SSH Keepalive Interval',
             description: 'SSH keepalive ping interval',
             keywords: ['ssh', 'keepalive', 'ping', 'heartbeat', 'remote'],
-            component: Placeholder,
           },
         ],
       },

@@ -1,11 +1,12 @@
 import {
   type SettingsUpdate,
-  updateSettingsInput,
+  updateSettingsFormInput,
 } from '@domains/settings/schema'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useUIState } from '@/context/UIStateContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
+import { getByPath, setByPath } from '@/lib/object'
 import { toastError } from '@/lib/toastError'
 import {
   type FlatSetting,
@@ -35,10 +36,8 @@ interface SettingsViewContextValue {
   // Form
   formValues: Partial<SettingsUpdate>
   validationErrors: Record<string, string>
-  setSettingsValue: <K extends keyof SettingsUpdate>(
-    key: K,
-    value: SettingsUpdate[K],
-  ) => void
+  getFormValue: (path: string) => unknown
+  setFormValue: (path: string, value: unknown) => void
   saveSettings: () => Promise<void>
   saving: boolean
   dirty: boolean
@@ -126,7 +125,7 @@ export function SettingsViewProvider({
 
   const filtered = searchSettings(search)
   const matchedCategories = new Set(filtered.map((s) => s.ancestors[0]))
-
+  console.log(formValues)
   const scrollToSection = (path: string[]) => {
     const id = `settings-section-${path.join('-')}`
     const el = document.getElementById(id)
@@ -143,27 +142,34 @@ export function SettingsViewProvider({
     if (isMobile) setSidebarOpen(false)
   }
 
-  const setSettingsValue = <K extends keyof SettingsUpdate>(
-    key: K,
-    value: SettingsUpdate[K],
-  ) => {
-    setFormValues((prev) => ({ ...prev, [key]: value }))
+  const getFormValue = (path: string): unknown => {
+    return getByPath(formValues, path)
+  }
 
-    // Validate the single field against the schema
-    const result = updateSettingsInput.safeParse({ [key]: value })
+  const setFormValue = (path: string, value: unknown) => {
+    setFormValues((prev) => setByPath(prev, path, value))
+
+    // Validate the top-level field
+    const rootKey = path.split('.')[0]
+    const fieldSchema =
+      updateSettingsFormInput.shape[
+        rootKey as keyof typeof updateSettingsFormInput.shape
+      ]
+    if (!fieldSchema) return
+    const updated = setByPath({ ...formValues }, path, value)
+    const rootValue = (updated as Record<string, unknown>)[rootKey]
+    const result = fieldSchema.safeParse(rootValue)
     if (!result.success) {
-      const fieldError = result.error.issues.find((i) =>
-        i.path.includes(key as string),
-      )
+      const fieldError = result.error.issues[0]
       if (fieldError) {
         setValidationErrors((prev) => ({
           ...prev,
-          [key]: fieldError.message,
+          [path]: fieldError.message,
         }))
       }
     } else {
       setValidationErrors((prev) => {
-        const { [key as string]: _, ...rest } = prev
+        const { [path]: _, ...rest } = prev
         return rest
       })
     }
@@ -187,21 +193,9 @@ export function SettingsViewProvider({
 
     if (Object.keys(updates).length === 0) return
 
-    // Validate changed fields before saving
-    const result = updateSettingsInput.safeParse(updates)
-    if (!result.success) {
-      const errors: Record<string, string> = {}
-      for (const issue of result.error.issues) {
-        const key = issue.path.join('.')
-        errors[key] = issue.message
-      }
-      setValidationErrors(errors)
-      return
-    }
-
     setSaving(true)
     try {
-      await updateSettings(result.data as SettingsUpdate)
+      await updateSettings(updates as SettingsUpdate)
       baselineRef.current = JSON.stringify(formValues)
       setValidationErrors({})
     } catch (err) {
@@ -231,7 +225,8 @@ export function SettingsViewProvider({
         scrollToSection,
         formValues,
         validationErrors,
-        setSettingsValue,
+        getFormValue,
+        setFormValue,
         saveSettings,
         saving,
         dirty,

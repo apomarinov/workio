@@ -1,3 +1,5 @@
+import { Save } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { KeymapView } from './KeymapView'
 import { SettingsContent } from './SettingsContent'
@@ -6,8 +8,15 @@ import { SettingsSidebar } from './SettingsSidebar'
 import { SettingsViewProvider, useSettingsView } from './SettingsViewContext'
 
 function SettingsViewInner() {
-  const { isMobile, sidebarOpen, setSidebarOpen, keymapOpen } =
-    useSettingsView()
+  const {
+    isMobile,
+    sidebarOpen,
+    setSidebarOpen,
+    keymapOpen,
+    dirty,
+    saving,
+    saveSettings,
+  } = useSettingsView()
 
   return (
     <div className="h-full flex flex-col bg-[#1a1a1a]">
@@ -36,6 +45,19 @@ function SettingsViewInner() {
         )}
 
         {keymapOpen ? <KeymapView /> : <SettingsContent />}
+
+        {dirty && (
+          <div className="absolute bottom-4 right-4 z-20">
+            <Button
+              onClick={saveSettings}
+              disabled={saving}
+              className="gap-2 shadow-lg"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

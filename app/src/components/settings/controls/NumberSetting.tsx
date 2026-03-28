@@ -1,49 +1,46 @@
-import type { SettingsUpdate } from '@domains/settings/schema'
+import { useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useSettingsView } from '../SettingsViewContext'
 
-/**
- * Factory for number settings that live at a nested path like 'server_config.xxx'.
- * Returns a component that reads/writes the nested value via the form context.
- */
-export function createServerConfigNumberSetting(
-  configKey: keyof NonNullable<SettingsUpdate['server_config']>,
+export function createNumberSetting(
+  path: string,
   opts?: { min?: number; max?: number; placeholder?: string; unit?: string },
 ) {
-  return function ServerConfigNumberSetting() {
-    const { formValues, setSettingsValue, validationErrors } = useSettingsView()
-    const serverConfig = formValues.server_config
-    const value = serverConfig?.[configKey] ?? ''
-    const error = validationErrors[`server_config.${configKey}`]
+  return function NumberSetting() {
+    const { getFormValue, setFormValue, validationErrors } = useSettingsView()
+    const [local, setLocal] = useState('')
+    const error = validationErrors[path]
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const num = e.target.value === '' ? undefined : Number(e.target.value)
-      setSettingsValue('server_config', {
-        ...serverConfig,
-        [configKey]: num,
-      } as SettingsUpdate['server_config'])
-    }
+    useEffect(() => {
+      const v = getFormValue(path)
+      if (v != null) setLocal(String(v))
+    }, [getFormValue])
 
     return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex gap-1 items-end">
-          <Input
-            type="number"
-            min={opts?.min}
-            max={opts?.max}
-            placeholder={opts?.placeholder}
-            value={value}
-            onChange={handleChange}
-            className={cn(
-              'w-[120px] text-right',
-              error && 'border-destructive',
-            )}
-          />
-          {opts?.unit && (
-            <span className="text-xs text-muted-foreground">{opts.unit}</span>
+      <div className="flex flex-col items-end gap-1 relative">
+        <Input
+          type="number"
+          min={opts?.min}
+          max={opts?.max}
+          placeholder={opts?.placeholder}
+          value={local}
+          onChange={(e) => {
+            setLocal(e.target.value)
+            const num =
+              e.target.value === '' ? undefined : Number(e.target.value)
+            setFormValue(path, num)
+          }}
+          className={cn(
+            'w-[120px] text-right !bg-[#1a1a1a] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]',
+            error && 'border-destructive',
           )}
-        </div>
+        />
+        {!error && opts?.unit && (
+          <span className="text-xs text-muted-foreground absolute -bottom-3.5">
+            {opts.unit}
+          </span>
+        )}
         {error && <span className="text-[10px] text-destructive">{error}</span>}
       </div>
     )

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { getSettingControl } from './controls-map'
 import { useSettingsView } from './SettingsViewContext'
 import { SETTINGS_REGISTRY, type SettingsSection } from './settings-registry'
 
@@ -163,11 +164,12 @@ function SettingRow({
     label: string
     description: string
     path?: string
-    component: React.ComponentType
   }
 }) {
+  const Control = getSettingControl(setting.key)
+
   return (
-    <div className="rounded-md border border-zinc-700/50 px-4 py-3">
+    <div className="rounded-md border border-zinc-700/50 px-4 py-3 bg-muted">
       {setting.path && (
         <div className="text-[10px] text-muted-foreground/60 mb-1">
           {setting.path}
@@ -182,7 +184,7 @@ function SettingRow({
             {setting.description}
           </div>
         </div>
-        <setting.component />
+        <Control />
       </div>
     </div>
   )

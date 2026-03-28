@@ -1,4 +1,3 @@
-import type { PreferredIDE } from '@domains/settings/schema'
 import { CursorIcon, VSCodeIcon } from '@/components/icons'
 import {
   Select,
@@ -10,17 +9,15 @@ import {
 import { useSettingsView } from '../SettingsViewContext'
 
 export function PreferredIDESetting() {
-  const { formValues, setSettingsValue } = useSettingsView()
-  const value = (formValues.preferred_ide ?? 'cursor') as PreferredIDE
+  const { getFormValue, setFormValue } = useSettingsView()
+  const value = (getFormValue('preferred_ide') as string) ?? 'cursor'
 
   return (
     <Select
       value={value}
-      onValueChange={(v) =>
-        setSettingsValue('preferred_ide', v as PreferredIDE)
-      }
+      onValueChange={(v) => setFormValue('preferred_ide', v)}
     >
-      <SelectTrigger className="w-[140px]">
+      <SelectTrigger className="w-[140px] !bg-[#1a1a1a]">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
