@@ -6,6 +6,8 @@
 
 import { DEFAULT_CONFIG } from '@domains/settings/schema'
 import { BackfillSection } from '../BackfillModal'
+import { createAuthorFilterSetting } from './controls/AuthorFilterSetting'
+import { HiddenPRsSetting } from './controls/HiddenPRsSetting'
 import { KeymapSetting } from './controls/KeymapSetting'
 import { MobileKeyboardSetting } from './controls/MobileKeyboardSetting'
 import { createNumberSetting } from './controls/NumberSetting'
@@ -123,6 +125,47 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
 
   // GitHub > Query Limits
   gh_query_limits: QueryLimitsSetting,
+
+  // GitHub > Author Filters
+  hide_gh_authors: createAuthorFilterSetting('hide_gh_authors'),
+  silence_gh_authors: createAuthorFilterSetting('silence_gh_authors'),
+  collapse_gh_authors: createAuthorFilterSetting('collapse_gh_authors'),
+  hidden_prs: HiddenPRsSetting,
+
+  // Remote Access > ngrok
+  'ngrok.domain': createTextSetting('ngrok.domain', {
+    placeholder: 'your-domain.ngrok-free.app',
+  }),
+  'ngrok.token': createTextSetting('ngrok.token', {
+    placeholder: 'ngrok auth token',
+    secretPresent: 'ngrok.tokenPresent',
+  }),
+
+  // Remote Access > SSH
+  'server_config.ssh_idle_timeout': createNumberSetting(
+    'server_config.ssh_idle_timeout',
+    {
+      min: 60000,
+      placeholder: String(DEFAULT_CONFIG.server_config.ssh_idle_timeout),
+      unit: 'ms',
+    },
+  ),
+  'server_config.ssh_default_timeout': createNumberSetting(
+    'server_config.ssh_default_timeout',
+    {
+      min: 1000,
+      placeholder: String(DEFAULT_CONFIG.server_config.ssh_default_timeout),
+      unit: 'ms',
+    },
+  ),
+  'server_config.ssh_keepalive_interval': createNumberSetting(
+    'server_config.ssh_keepalive_interval',
+    {
+      min: 1000,
+      placeholder: String(DEFAULT_CONFIG.server_config.ssh_keepalive_interval),
+      unit: 'ms',
+    },
+  ),
 }
 
 export function getSettingControl(

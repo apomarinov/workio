@@ -233,7 +233,7 @@ function SettingRow({
         {setting.collapsed == null && <Control onWarning={setWarning} />}
       </div>
       {setting.collapsed != null && (
-        <div className={cn(expanded ? 'mt-3' : 'hidden', 'px-4 py-3')}>
+        <div className={cn(expanded ? '' : 'hidden', 'px-4 py-3')}>
           <Control onWarning={setWarning} />
         </div>
       )}
