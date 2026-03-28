@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { ChevronDown } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { getSettingControl } from './controls-map'
 import { useSettingsView } from './SettingsViewContext'
@@ -173,9 +174,11 @@ function SettingRow({
     description: string
     path?: string
     column?: boolean
+    collapsed?: boolean
   }
 }) {
   const Control = getSettingControl(setting.key)
+  const [expanded, setExpanded] = useState(!setting.collapsed)
 
   return (
     <div className="rounded-md border border-zinc-700/50 px-4 py-3 bg-muted">
@@ -188,19 +191,40 @@ function SettingRow({
         className={
           setting.column
             ? 'space-y-3'
-            : 'flex items-start justify-between gap-4'
+            : 'flex items-center justify-between gap-4'
         }
       >
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground">
-            {setting.label}
+        <div className="w-full flex justify-between">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground">
+              {setting.label}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {setting.description}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {setting.description}
-          </div>
+          {setting.collapsed != null && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="flex-shrink-0 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <ChevronDown
+                className={cn(
+                  'w-4 h-4 transition-transform',
+                  !expanded && '-rotate-90',
+                )}
+              />
+            </button>
+          )}
         </div>
-        <Control />
+        {setting.collapsed == null && <Control />}
       </div>
+      {setting.collapsed != null && expanded && (
+        <div className="mt-3">
+          <Control />
+        </div>
+      )}
     </div>
   )
 }

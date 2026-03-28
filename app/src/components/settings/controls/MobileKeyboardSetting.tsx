@@ -176,7 +176,7 @@ export function MobileKeyboardSetting() {
         <button
           type="button"
           onClick={() => setNewGroupOpen(true)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center cursor-pointer gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Group

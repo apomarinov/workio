@@ -21,6 +21,8 @@ export interface SettingDef {
   keywords: string[]
   /** Render label and control stacked vertically instead of side-by-side */
   column?: boolean
+  /** Start collapsed — shows a chevron to expand/collapse the control */
+  collapsed?: boolean
 }
 
 export interface SettingsSection {
@@ -141,7 +143,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
         settings: [
           {
             key: 'mobile_keyboard_rows',
-            label: 'Keyboard Rows',
+            label: 'Terminal Actions',
             description: 'Customize mobile keyboard action rows',
             keywords: [
               'mobile',
@@ -152,6 +154,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
               'touch',
             ],
             column: true,
+            collapsed: true,
           },
         ],
       },
