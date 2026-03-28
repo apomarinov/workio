@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { getServerConfig } from '@domains/settings/server-config'
 import { Client, type ClientChannel } from 'ssh2'
 import type { ResolvedSSHConfig } from './config'
 
@@ -129,7 +130,7 @@ export function createSSHSession(
       username: config.user,
       privateKey,
       readyTimeout: 10000,
-      keepaliveInterval: 15000,
+      keepaliveInterval: getServerConfig('ssh_keepalive_interval'),
       keepaliveCountMax: 3,
       // Fallback to SSH agent if key doesn't work
       agent: process.env.SSH_AUTH_SOCK,

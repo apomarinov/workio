@@ -1,4 +1,5 @@
 import type { CommandEvent } from '@domains/pty/schema'
+import type { ServerConfig } from '@domains/settings/schema'
 import type { ServicesStatus } from '@server/types/status'
 
 /**
@@ -32,4 +33,5 @@ export interface ServerEventMap {
       event: CommandEvent
     },
   ]
+  'settings:server-config-changed': [changed: Partial<ServerConfig>]
 }

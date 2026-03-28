@@ -1,4 +1,5 @@
 import { emitNotification } from '@domains/notifications/service'
+import { getServerConfig } from '@domains/settings/server-config'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { env } from './env'
 import { log } from './logger'
@@ -16,8 +17,6 @@ export function createAuthHook():
   const [authUser, authPass] = env.BASIC_AUTH.split(':')
   const expected = `Basic ${Buffer.from(`${authUser}:${authPass}`).toString('base64')}`
 
-  const AUTH_MAX_FAILURES = 5
-  const AUTH_LOCKOUT_MS = 10 * 60 * 1000
   const ipFailures = new Map<
     string,
     { attempts: number; lockedUntil: number }
@@ -65,8 +64,8 @@ export function createAuthHook():
     // (no header = browser's initial challenge, not a failed login)
     if (request.headers.authorization) {
       entry.attempts++
-      if (entry.attempts >= AUTH_MAX_FAILURES) {
-        entry.lockedUntil = Date.now() + AUTH_LOCKOUT_MS
+      if (entry.attempts >= getServerConfig('auth_max_failures')) {
+        entry.lockedUntil = Date.now() + getServerConfig('auth_lockout_ms')
         log.warn(
           `[auth] IP ${ip} locked out after ${entry.attempts} failed attempts`,
         )

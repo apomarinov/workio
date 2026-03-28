@@ -13,6 +13,7 @@ import {
 } from '@domains/pty/session'
 import { handleUpgrade } from '@domains/pty/websocket'
 import { initSessionListener } from '@domains/sessions/services/realtime-listener'
+import { loadServerConfig } from '@domains/settings/server-config'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
@@ -111,6 +112,9 @@ if (authHook) fastify.addHook('onRequest', authHook)
 
 // Initialize database
 await initDb()
+
+// Load server config into memory
+await loadServerConfig()
 
 // Write shell integration scripts to ~/.workio/shell-integration/
 await writeShellIntegrationScripts()

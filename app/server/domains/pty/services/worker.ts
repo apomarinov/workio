@@ -11,13 +11,14 @@ import {
   type WorkerInitConfig,
   type WorkerToMasterMessage,
 } from '@domains/pty/schema'
+import { DEFAULT_CONFIG } from '@domains/settings/schema'
 import type { TerminalBackend } from '@server/ssh/ssh-pty-adapter'
 import { createSSHSession } from '@server/ssh/ssh-pty-adapter'
 import * as pty from 'node-pty'
 import { createOscParser } from './osc-parser'
 import { getChildPids } from './process-tree'
 
-const MAX_BUFFER_LINES = 5000
+let maxBufferLines = DEFAULT_CONFIG.server_config.max_buffer_lines
 // Monotonic counter for buffer chunks — used to ID bell events
 let chunkIndex = 0
 
@@ -52,6 +53,7 @@ function workerLog(
 async function init(config: WorkerInitConfig) {
   shellId = config.shellId
   terminalId = config.terminalId
+  if (config.max_buffer_lines) maxBufferLines = config.max_buffer_lines
 
   try {
     if (config.sshHost && config.sshConfig) {
@@ -89,8 +91,8 @@ async function init(config: WorkerInitConfig) {
     (data) => {
       chunkIndex++
       buffer.push(data)
-      if (buffer.length > MAX_BUFFER_LINES) {
-        buffer = buffer.slice(-MAX_BUFFER_LINES)
+      if (buffer.length > maxBufferLines) {
+        buffer = buffer.slice(-maxBufferLines)
       }
       send({ type: 'data', data })
     },
@@ -279,6 +281,10 @@ process.on('message', async (raw: unknown) => {
 
     case 'update-session-name':
       // Acknowledged but not used locally — master tracks session name
+      break
+
+    case 'update-config':
+      if (msg.max_buffer_lines) maxBufferLines = msg.max_buffer_lines
       break
   }
 })

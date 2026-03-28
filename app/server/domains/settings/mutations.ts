@@ -4,6 +4,7 @@ import { execFileAsyncLogged } from '@server/lib/exec'
 import { publicProcedure } from '@server/trpc'
 import { getSettings, updateSettings } from './db'
 import { updateSettingsInput } from './schema'
+import { applyServerConfig } from './server-config'
 
 export const update = publicProcedure
   .input(updateSettingsInput)
@@ -36,6 +37,10 @@ export const update = publicProcedure
     }
 
     const settings = await updateSettings(input)
+
+    if (input.server_config !== undefined) {
+      applyServerConfig(input.server_config)
+    }
 
     if (input.hidden_prs !== undefined) {
       serverEvents.emit('github:refresh-pr-checks')

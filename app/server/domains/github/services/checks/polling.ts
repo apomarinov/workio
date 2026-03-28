@@ -2,6 +2,7 @@ import { detectGitHubRepo } from '@domains/git/services/resolve'
 import { detectGitBranch } from '@domains/git/services/status'
 import type { PRCheckStatus } from '@domains/github/schema'
 import { getSettings } from '@domains/settings/db'
+import { getServerConfig } from '@domains/settings/server-config'
 import {
   getAllTerminals,
   getTerminalById,
@@ -30,7 +31,6 @@ import {
   invalidateChecksCache,
   lastPRData,
   monitoredTerminals,
-  POLL_INTERVAL,
   REFRESH_MIN_INTERVAL,
   setGhAvailable,
   setGhUsername,
@@ -255,13 +255,15 @@ export function untrackTerminal(terminalId: number) {
 export function startChecksPolling() {
   if (getGlobalChecksPollingId()) return
   if (monitoredTerminals.size === 0) return
-  setGlobalChecksPollingId(setInterval(pollAllPRChecks, POLL_INTERVAL))
+  setGlobalChecksPollingId(
+    setInterval(pollAllPRChecks, getServerConfig('gh_poll_interval')),
+  )
   pollAllPRChecks()
 }
 
-export function stopChecksPolling() {
+export function stopChecksPolling(force = false) {
   const id = getGlobalChecksPollingId()
-  if (id && monitoredTerminals.size === 0) {
+  if (id && (force || monitoredTerminals.size === 0)) {
     clearInterval(id)
     setGlobalChecksPollingId(null)
   }
@@ -297,6 +299,12 @@ export async function initGitHubChecks() {
   }
 
   serverEvents.on('github:refresh-pr-checks', () => refreshPRChecks(true))
+  serverEvents.on('settings:server-config-changed', (changed) => {
+    if ('gh_poll_interval' in changed) {
+      stopChecksPolling(true)
+      startChecksPolling()
+    }
+  })
   serverEvents.on('pty:terminal-sessions-destroyed', ({ terminalId }) => {
     untrackTerminal(terminalId)
   })

@@ -1,4 +1,5 @@
 import { getSettings, updateSettings } from '@domains/settings/db'
+import { getServerConfig } from '@domains/settings/server-config'
 import { getIO } from '@server/io'
 import { log } from '@server/logger'
 import webPush from 'web-push'
@@ -9,8 +10,6 @@ import { NOTIFICATION_REGISTRY, resolveNotification } from './registry'
 
 let initialized = false
 let lastActiveAt = 0
-
-const ACTIVE_TIMEOUT_MS = 60_000
 
 // Only desktop (non-push) clients report activity. When the user is active
 // on their main device, push notifications are suppressed for all devices.
@@ -62,9 +61,10 @@ export async function sendPushNotification(
     return 'Not initialized'
   }
 
-  if (!options?.force && Date.now() - lastActiveAt < ACTIVE_TIMEOUT_MS) {
+  const activeTimeout = getServerConfig('notification_active_timeout')
+  if (!options?.force && Date.now() - lastActiveAt < activeTimeout) {
     log.info(
-      `[push] desktop last active ${Date.now() - lastActiveAt}/${ACTIVE_TIMEOUT_MS}`,
+      `[push] desktop last active ${Date.now() - lastActiveAt}/${activeTimeout}`,
     )
     return 'Desktop Active'
   }

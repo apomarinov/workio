@@ -2,7 +2,6 @@ import type { PRCheckStatus } from '@domains/github/schema'
 
 // --- Constants ---
 
-export const POLL_INTERVAL = 60_000 // 60 seconds
 export const CACHE_TTL = 30_000 // 30 seconds
 export const REFRESH_MIN_INTERVAL = 30_000 // 30 seconds
 export const WEBHOOK_THROTTLE_MS = 2000 // 2 seconds

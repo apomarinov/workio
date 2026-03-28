@@ -1,14 +1,9 @@
 import fs from 'node:fs'
+import { getServerConfig } from '@domains/settings/server-config'
 import { shellEscape } from '@server/lib/strings'
 import { log } from '@server/logger'
 import { Client } from 'ssh2'
 import { type ResolvedSSHConfig, validateSSHHost } from './config'
-
-// Max concurrent exec channels per pooled connection.
-// Default OpenSSH MaxSessions is 10, and each PTY terminal also uses
-// one session on the same server, so keep this low to avoid hitting
-// the limit. Bump MaxSessions on the server for higher throughput.
-const MAX_CHANNELS = 10
 
 interface QueuedExec {
   resolve: (conn: Client) => void
@@ -28,7 +23,6 @@ interface PoolEntry {
 const pool = new Map<string, PoolEntry>()
 
 const IDLE_CHECK_INTERVAL = 5 * 60 * 1000 // 5 minutes
-const IDLE_TIMEOUT = 10 * 60 * 1000 // 10 minutes
 
 // Periodic cleanup of idle connections
 const idleCleanupTimer = setInterval(() => {
@@ -37,7 +31,7 @@ const idleCleanupTimer = setInterval(() => {
     if (
       entry.state === 'ready' &&
       entry.activeChannels === 0 &&
-      now - entry.lastUsed > IDLE_TIMEOUT
+      now - entry.lastUsed > getServerConfig('ssh_idle_timeout')
     ) {
       log.info(`[ssh-pool] Closing idle connection to ${host}`)
       entry.state = 'closed'
@@ -50,7 +44,10 @@ idleCleanupTimer.unref()
 
 /** Drain queued waiters while under the channel limit */
 function drainQueue(entry: PoolEntry) {
-  while (entry.queue.length > 0 && entry.activeChannels < MAX_CHANNELS) {
+  while (
+    entry.queue.length > 0 &&
+    entry.activeChannels < getServerConfig('ssh_max_channels')
+  ) {
     const waiter = entry.queue.shift()!
     entry.activeChannels++
     waiter.resolve(entry.conn)
@@ -128,7 +125,7 @@ function createConnection(
       username: config.user,
       privateKey,
       readyTimeout: 10_000,
-      keepaliveInterval: 15_000,
+      keepaliveInterval: getServerConfig('ssh_keepalive_interval'),
       keepaliveCountMax: 3,
       agent: process.env.SSH_AUTH_SOCK,
     })
@@ -173,14 +170,14 @@ function acquireChannel(sshHost: string): Promise<Client> {
     const entry = pool.get(sshHost)
     if (!entry || entry.conn !== conn) return conn
 
-    if (entry.activeChannels < MAX_CHANNELS) {
+    if (entry.activeChannels < getServerConfig('ssh_max_channels')) {
       entry.activeChannels++
       return conn
     }
 
     // Over the limit — queue
     log.info(
-      `[ssh-pool] Channel limit reached for ${sshHost} (${entry.activeChannels}/${MAX_CHANNELS}), queuing (queue size: ${entry.queue.length + 1})`,
+      `[ssh-pool] Channel limit reached for ${sshHost} (${entry.activeChannels}/${getServerConfig('ssh_max_channels')}), queuing (queue size: ${entry.queue.length + 1})`,
     )
     return new Promise<Client>((resolve, reject) => {
       entry.queue.push({ resolve, reject })
@@ -193,8 +190,6 @@ export interface PoolExecSSHOptions {
   timeout?: number
 }
 
-const DEFAULT_TIMEOUT = 15_000
-
 export function poolExecSSHCommand(
   sshHost: string,
   command: string,
@@ -203,7 +198,7 @@ export function poolExecSSHCommand(
   const cwd = typeof options === 'string' ? options : options?.cwd
   const timeout =
     (typeof options === 'object' ? options?.timeout : undefined) ??
-    DEFAULT_TIMEOUT
+    getServerConfig('ssh_default_timeout')
 
   return new Promise((resolve, reject) => {
     acquireChannel(sshHost)

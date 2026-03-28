@@ -43,6 +43,7 @@ const workerInitConfigSchema = z.object({
     .optional(),
   integrationScript: z.string().nullable().optional(),
   sshInlineScript: z.string().nullable().optional(),
+  max_buffer_lines: z.number().optional(),
 })
 
 export type WorkerInitConfig = z.infer<typeof workerInitConfigSchema>
@@ -61,6 +62,10 @@ export const masterToWorkerMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('interrupt') }),
   z.object({ type: z.literal('kill-children'), requestId: z.string() }),
   z.object({ type: z.literal('update-session-name'), name: z.string() }),
+  z.object({
+    type: z.literal('update-config'),
+    max_buffer_lines: z.number().optional(),
+  }),
 ])
 
 export type MasterToWorkerMessage = z.infer<typeof masterToWorkerMessageSchema>

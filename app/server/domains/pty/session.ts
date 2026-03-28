@@ -23,6 +23,7 @@ import {
   workerToMasterMessageSchema,
 } from '@domains/pty/schema'
 import { getSettings } from '@domains/settings/db'
+import { getServerConfig } from '@domains/settings/server-config'
 import { getShellById } from '@domains/workspace/db/shells'
 import {
   getTerminalById,
@@ -41,7 +42,6 @@ import { poolExecSSHCommand } from '@server/ssh/pool'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WORKER_PATH = path.join(__dirname, 'services', 'worker.ts')
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 const LONG_TIMEOUT = 900_000 // 15 min for setup/teardown operations
 
 const WORKIO_DIR = path.join(os.homedir(), '.workio')
@@ -222,7 +222,7 @@ export class PtySession {
     }
     this.timeoutId = setTimeout(() => {
       this.destroy()
-    }, SESSION_TIMEOUT_MS)
+    }, getServerConfig('session_timeout_ms'))
   }
 
   clearTimeout() {
@@ -287,6 +287,18 @@ const sessions = new Map<number, PtySession>()
 
 // Pending commands for shells that don't have a worker yet
 const pendingCommands = new Map<number, string>()
+
+// Forward server config changes to all live workers
+serverEvents.on('settings:server-config-changed', (changed) => {
+  if ('max_buffer_lines' in changed) {
+    for (const session of sessions.values()) {
+      session.process.send({
+        type: 'update-config',
+        max_buffer_lines: changed.max_buffer_lines,
+      })
+    }
+  }
+})
 
 // ── Worker message handler ──────────────────────────────────────────
 
@@ -441,6 +453,7 @@ export async function createSession(
     rows,
     sessionName,
     shellName: shellRecord.name,
+    max_buffer_lines: getServerConfig('max_buffer_lines'),
   }
 
   if (terminal.ssh_host) {

@@ -111,6 +111,19 @@ const statusBarSectionSchema = z.object({
   order: z.number(),
 })
 
+const serverConfigSchema = z.object({
+  session_timeout_ms: z.number().min(60_000).default(1_800_000),
+  max_buffer_lines: z.number().min(500).default(5000),
+  auth_max_failures: z.number().min(1).default(5),
+  auth_lockout_ms: z.number().min(60_000).default(600_000),
+  gh_poll_interval: z.number().min(10_000).default(60_000),
+  ssh_max_channels: z.number().min(1).default(10),
+  ssh_idle_timeout: z.number().min(60_000).default(600_000),
+  ssh_default_timeout: z.number().min(1000).default(15_000),
+  ssh_keepalive_interval: z.number().min(1000).default(15_000),
+  notification_active_timeout: z.number().min(1000).default(60_000),
+})
+
 const ngrokConfigSchema = z.object({
   domain: z.string().optional(),
   token: z.string().optional(),
@@ -190,6 +203,9 @@ const settingsBaseSchema = z.object({
     .default(DEFAULT_GH_QUERY_LIMITS),
   ignore_external_sessions: z.boolean().default(false),
   ngrok: ngrokConfigSchema.optional(),
+  server_config: serverConfigSchema
+    .optional()
+    .default(serverConfigSchema.parse({})),
   // Server-managed fields (not user-editable)
   webhook_secret: z.string().optional(),
   repo_webhooks: z.record(z.string(), repoWebhookStatusSchema).optional(),
@@ -256,5 +272,6 @@ export type PushSubscriptionRecord = z.infer<
 export type StatusBarSectionName = z.infer<typeof statusBarSectionNameSchema>
 export type StatusBarSection = z.infer<typeof statusBarSectionSchema>
 export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
+export type ServerConfig = z.infer<typeof serverConfigSchema>
 export type NgrokConfig = z.infer<typeof ngrokConfigSchema>
 export type PreferredIDE = Settings['preferred_ide']
