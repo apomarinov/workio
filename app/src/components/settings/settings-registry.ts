@@ -13,6 +13,10 @@ import { ClaudeIcon } from '@/components/icons'
 
 type IconComponent = React.ComponentType<{ className?: string }>
 
+export interface SettingControlProps {
+  onWarning?: (warning: boolean) => void
+}
+
 export interface SettingDef {
   /** Unique key for this setting, used for component lookup and search identity */
   key: string
@@ -258,11 +262,29 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
       },
       {
         name: 'Webhooks',
-        settings: [],
+        settings: [
+          {
+            key: 'repo_webhooks',
+            label: 'Repo Webhooks',
+            description: 'Manage GitHub webhook registrations per repo',
+            keywords: ['webhook', 'github', 'repo', 'hooks', 'notifications'],
+            column: true,
+            collapsed: true,
+          },
+        ],
       },
       {
         name: 'Query Limits',
-        settings: [],
+        settings: [
+          {
+            key: 'gh_query_limits',
+            label: 'GraphQL Query Limits',
+            description: 'Control how much data to fetch per PR from GitHub',
+            keywords: ['query', 'limits', 'github', 'graphql', 'rate'],
+            column: true,
+            collapsed: true,
+          },
+        ],
       },
       {
         name: 'Author Filters',

@@ -11,8 +11,11 @@ import { MobileKeyboardSetting } from './controls/MobileKeyboardSetting'
 import { createNumberSetting } from './controls/NumberSetting'
 import { Placeholder } from './controls/Placeholder'
 import { PreferredIDESetting } from './controls/PreferredIDESetting'
+import { QueryLimitsSetting } from './controls/QueryLimitsSetting'
 import { createSwitchSetting } from './controls/SwitchSetting'
 import { createTextSetting } from './controls/TextSetting'
+import { WebhooksSetting } from './controls/WebhooksSetting'
+import type { SettingControlProps } from './settings-registry'
 
 const CONTROLS_MAP: Record<string, React.ComponentType> = {
   // General > Application
@@ -87,6 +90,16 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
   // Terminal > Mobile Keyboard
   mobile_keyboard_rows: MobileKeyboardSetting,
 
+  // GitHub > PR Data
+  'server_config.gh_poll_interval': createNumberSetting(
+    'server_config.gh_poll_interval',
+    {
+      min: 10000,
+      placeholder: String(DEFAULT_CONFIG.server_config.gh_poll_interval),
+      unit: 'ms',
+    },
+  ),
+
   // Claude > Display
   show_thinking: createSwitchSetting('show_thinking'),
   show_tools: createSwitchSetting('show_tools'),
@@ -104,8 +117,17 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
 
   // Keymap
   keymap: KeymapSetting,
+
+  // GitHub > Webhooks
+  repo_webhooks: WebhooksSetting,
+
+  // GitHub > Query Limits
+  gh_query_limits: QueryLimitsSetting,
 }
 
-export function getSettingControl(key: string): React.ComponentType {
-  return CONTROLS_MAP[key] ?? Placeholder
+export function getSettingControl(
+  key: string,
+): React.ComponentType<SettingControlProps> {
+  return (CONTROLS_MAP[key] ??
+    Placeholder) as React.ComponentType<SettingControlProps>
 }

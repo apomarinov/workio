@@ -179,20 +179,33 @@ function SettingRow({
 }) {
   const Control = getSettingControl(setting.key)
   const [expanded, setExpanded] = useState(!setting.collapsed)
+  const [warning, setWarning] = useState(false)
 
   return (
-    <div className="rounded-md border border-zinc-700/50 px-4 py-3 bg-muted">
+    <div
+      className={cn(
+        'rounded-md border group/settings-row bg-muted',
+        warning ? 'border-amber-500/50' : 'border-zinc-700/50',
+        !setting.collapsed && 'px-4 py-3',
+      )}
+    >
       {setting.path && (
         <div className="text-[10px] text-muted-foreground/60 mb-1">
           {setting.path}
         </div>
       )}
       <div
-        className={
+        onClick={() => {
+          if (setting.collapsed) {
+            setExpanded((v) => !v)
+          }
+        }}
+        className={cn(
           setting.column
             ? 'space-y-3'
-            : 'flex items-center justify-between gap-4'
-        }
+            : 'flex items-center justify-between gap-4',
+          setting.collapsed && 'cursor-pointer px-4 py-3',
+        )}
       >
         <div className="w-full flex justify-between">
           <div className="min-w-0">
@@ -206,8 +219,7 @@ function SettingRow({
           {setting.collapsed != null && (
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="flex-shrink-0 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="flex-shrink-0 p-1 text-muted-foreground group-hover/settings-row:text-foreground"
             >
               <ChevronDown
                 className={cn(
@@ -218,11 +230,11 @@ function SettingRow({
             </button>
           )}
         </div>
-        {setting.collapsed == null && <Control />}
+        {setting.collapsed == null && <Control onWarning={setWarning} />}
       </div>
-      {setting.collapsed != null && expanded && (
-        <div className="mt-3">
-          <Control />
+      {setting.collapsed != null && (
+        <div className={cn(expanded ? 'mt-3' : 'hidden', 'px-4 py-3')}>
+          <Control onWarning={setWarning} />
         </div>
       )}
     </div>
