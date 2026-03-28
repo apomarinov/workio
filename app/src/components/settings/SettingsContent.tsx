@@ -1,6 +1,5 @@
-import { Keyboard } from 'lucide-react'
 import { useRef } from 'react'
-import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useSettingsView } from './SettingsViewContext'
 import { SETTINGS_REGISTRY, type SettingsSection } from './settings-registry'
 
@@ -84,7 +83,12 @@ function SectionRenderer({
   if (depth === 0) {
     return (
       <div id={id} data-section-path={sectionPath}>
-        <div className="sticky top-0 z-10 bg-[#1a1a1a] px-4 sm:px-6 py-2 border-b border-zinc-700/40">
+        <div
+          className={cn(
+            'sticky top-0 z-10 bg-[#1a1a1a] px-4 sm:px-6 py-2 border-b border-zinc-700/40',
+            activeSubPath && activeSubPath.length > 0 && 'bg-[#222]',
+          )}
+        >
           <div className="flex flex-wrap items-center gap-1.5 text-sm text-foreground">
             <span className="flex items-center gap-2 whitespace-nowrap">
               {section.icon && (
@@ -159,44 +163,9 @@ function SettingRow({
     label: string
     description: string
     path?: string
-    type: { control: string }
+    component: React.ComponentType
   }
 }) {
-  const { openKeymap } = useSettingsView()
-
-  // Keymap is a special case — show a button to open the full keymap view
-  if (setting.type.control === 'keymap') {
-    return (
-      <div className="rounded-md border border-zinc-700/50 px-4 py-3">
-        {setting.path && (
-          <div className="text-[10px] text-muted-foreground/60 mb-1">
-            {setting.path}
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-foreground">
-              {setting.label}
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              {setting.description}
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 flex-shrink-0 ml-4"
-            onClick={openKeymap}
-          >
-            <Keyboard className="w-3.5 h-3.5" />
-            Open Keymap
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // All other settings — placeholder control area
   return (
     <div className="rounded-md border border-zinc-700/50 px-4 py-3">
       {setting.path && (
@@ -213,9 +182,7 @@ function SettingRow({
             {setting.description}
           </div>
         </div>
-        <div className="flex-shrink-0 text-xs text-muted-foreground/40 italic">
-          {setting.type.control}
-        </div>
+        <setting.component />
       </div>
     </div>
   )
