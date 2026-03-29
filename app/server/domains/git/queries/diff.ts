@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
+  batchFileContentsInput,
   branchCommitsInput,
   changedFilesInput,
   fileContentsInput,
@@ -16,7 +17,7 @@ import { resolveGitTerminal } from '@domains/git/services/resolve'
 import { getTerminalById } from '@domains/workspace/db/terminals'
 import { gitExecLogged } from '@server/lib/git'
 import { expandPath } from '@server/lib/strings'
-import { publicProcedure } from '@server/trpc'
+import { createCallerFactory, publicProcedure, router } from '@server/trpc'
 
 export const headMessage = publicProcedure
   .input(terminalIdInput)
@@ -335,6 +336,38 @@ export const fileContents = publicProcedure
     const language = extToMonacoLanguage(ext)
 
     return { original, modified, language, binary: false }
+  })
+
+const diffCaller = createCallerFactory(router({ changedFiles, fileContents }))(
+  {} as never,
+)
+
+export const batchFileContents = publicProcedure
+  .input(batchFileContentsInput)
+  .query(async ({ input }) => {
+    const { terminalId, base, cursor, pageSize } = input
+
+    const { files } = await diffCaller.changedFiles({
+      terminalId,
+      base: base ?? undefined,
+    })
+
+    const page = files.slice(cursor, cursor + pageSize)
+    const nextCursor =
+      cursor + pageSize < files.length ? cursor + pageSize : null
+
+    const items = await Promise.all(
+      page.map(async (file) => {
+        const contents = await diffCaller.fileContents({
+          terminalId,
+          path: file.path,
+          base: base ?? undefined,
+        })
+        return { path: file.path, status: file.status, ...contents }
+      }),
+    )
+
+    return { items, nextCursor, totalFiles: files.length }
   })
 
 export const commits = publicProcedure

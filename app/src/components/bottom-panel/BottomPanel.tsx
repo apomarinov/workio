@@ -185,7 +185,7 @@ function PanelHeader({
   headerActions?: React.ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between px-1 h-[28px] shrink-0 border-b border-zinc-700/50 bg-sidebar">
+    <div className="flex items-center justify-between px-1 flex-wrap max-sm:pb-1 gap-1 sm:h-[28px] shrink-0 border-b border-zinc-700/50 bg-sidebar">
       {/* Left: tabs */}
       <div className="flex items-center min-w-0">
         {BOTTOM_PANEL_TABS.map((tab) => (
@@ -205,7 +205,7 @@ function PanelHeader({
         ))}
       </div>
       {/* Right: tab actions + panel controls */}
-      <div className="flex items-center">
+      <div className="flex items-center justify-between max-sm:w-full">
         {headerActions}
         {onToggleMaximize && (
           <button

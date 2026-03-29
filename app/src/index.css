@@ -1,7 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "diff2html/node_modules/highlight.js/styles/github-dark.min.css";
-@import "diff2html/bundles/css/diff2html.min.css";
 
 @plugin "@tailwindcss/container-queries";
 
@@ -203,16 +201,6 @@ body {
 
 /* Wider xterm scrollbar on mobile for easier touch scrolling */
 @media (max-width: 639px) {
-  .d2h-wrapper * {
-    font-size: 11px;
-  }
-  .d2h-tag {
-    font-size: 8px;
-  }
-  .d2h-icon {
-    width: 10px;
-    height: 13px;
-  }
   .xterm .xterm-scrollable-element > .scrollbar.vertical {
     width: 30px !important;
   }
@@ -228,12 +216,13 @@ body {
   width: 1px;
   background: var(--sidebar-border);
   position: relative;
+  z-index: 100;
 }
 
 .panel-resize-handle::after {
   content: '';
   position: absolute;
-  inset: 0 -0.2rem;
+  inset: 0 -2px;
   transition: background 0.15s;
 }
 
@@ -252,7 +241,7 @@ body {
 .panel-resize-handle-horizontal::after {
   content: '';
   position: absolute;
-  inset: -0.12rem 0;
+  inset: -1px 0;
   transition: background 0.15s;
 }
 
@@ -271,119 +260,6 @@ body {
   animation: flash 0.7s ease-in-out infinite;
 }
 
-/* ── diff2html dark theme overrides (zinc palette) ── */
-
-.d2h-dark-color-scheme {
-  --d2h-dark-color: #d4d4d8;
-  --d2h-dark-bg-color: transparent;
-  --d2h-dark-border-color: transparent;
-  --d2h-dark-dim-color: #71717a;
-  --d2h-dark-line-border-color: rgba(63, 63, 70, 0.5);
-  --d2h-dark-file-header-bg-color: transparent;
-  --d2h-dark-file-header-border-color: transparent;
-  --d2h-dark-empty-placeholder-bg-color: rgba(63, 63, 70, 0.1);
-  --d2h-dark-empty-placeholder-border-color: rgba(63, 63, 70, 0.3);
-  --d2h-dark-selected-color: rgba(59, 130, 246, 0.1);
-  --d2h-dark-ins-bg-color: rgba(34, 197, 94, 0.12);
-  --d2h-dark-ins-border-color: rgba(34, 197, 94, 0.3);
-  --d2h-dark-ins-highlight-bg-color: rgba(34, 197, 94, 0.3);
-  --d2h-dark-ins-label-color: #4ade80;
-  --d2h-dark-del-bg-color: rgba(239, 68, 68, 0.12);
-  --d2h-dark-del-border-color: rgba(239, 68, 68, 0.3);
-  --d2h-dark-del-highlight-bg-color: rgba(239, 68, 68, 0.3);
-  --d2h-dark-del-label-color: #f87171;
-  --d2h-dark-change-del-color: rgba(234, 179, 8, 0.15);
-  --d2h-dark-change-ins-color: rgba(34, 197, 94, 0.2);
-  --d2h-dark-info-bg-color: rgba(96, 165, 250, 0.08);
-  --d2h-dark-info-border-color: rgba(96, 165, 250, 0.2);
-  --d2h-dark-change-label-color: #facc15;
-  --d2h-dark-moved-label-color: #60a5fa;
-}
-
-/* Hide file header and file list (our toolbar already shows file path) */
-.d2h-dark-color-scheme .d2h-file-header,
-.d2h-dark-color-scheme .d2h-file-list-wrapper {
-  display: none;
-}
-
-/* Remove file-wrapper borders (parent panel has borders) */
-.d2h-dark-color-scheme .d2h-file-wrapper {
-  border: none;
-  margin: 0;
-}
-
-/* Diff table: smaller font, don't stretch rows to fill container */
-.d2h-dark-color-scheme .d2h-diff-table {
-  width: max-content;
-  min-width: 100%;
-  height: min-content;
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-}
-.d2h-dark-color-scheme .d2h-diff-table td {
-  vertical-align: top;
-  padding: 0;
-  line-height: 1.25rem;
-}
-
-/* ── Line number gutter: sticky table-cell that stays visible on horizontal scroll ── */
-.d2h-dark-color-scheme .d2h-code-linenumber {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  display: table-cell;
-  width: auto;
-  white-space: nowrap;
-  padding: 0;
-  direction: ltr;
-  vertical-align: top;
-  background: #18181b;
-}
-.d2h-dark-color-scheme tr.d2h-ins .d2h-code-linenumber {
-  background: #162415;
-}
-.d2h-dark-color-scheme tr.d2h-del .d2h-code-linenumber {
-  background: #241515;
-}
-.d2h-dark-color-scheme tr.d2h-info .d2h-code-linenumber {
-  background: #171b21;
-}
-.d2h-dark-color-scheme .d2h-code-linenumber .line-num1 {
-  display: none;
-}
-.d2h-dark-color-scheme .d2h-code-linenumber .line-num2 {
-  display: block;
-  float: none;
-  direction: ltr;
-  width: auto;
-  padding: 0 0.5em;
-  text-align: right;
-  line-height: 1.25rem;
-  border-right: 1px solid rgba(63, 63, 70, 0.5);
-}
-
-/* ── Hide +/- prefix and @@ hunk info rows ── */
-.d2h-dark-color-scheme .d2h-code-line-prefix {
-  display: none;
-}
-
-
-/* ── Code content: remove absolute-positioning padding hacks ── */
-.d2h-dark-color-scheme .d2h-code-line {
-  padding: 0;
-  width: auto;
-}
-.d2h-dark-color-scheme .d2h-code-linenumber::after {
-  content: none;
-}
-.d2h-dark-color-scheme .d2h-code-line-ctn {
-  padding-left: 0.75em;
-  vertical-align: top;
-  line-height: 1.25rem;
-}
-
-
 /* ── Monaco diff: clickable line numbers ── */
 .monaco-diff-editor .line-numbers,
 .monaco-diff-editor .margin-view-overlays .line-numbers {
@@ -392,82 +268,4 @@ body {
 .diff-line-number-hover {
   color: #d4d4d8 !important;
   text-decoration: underline;
-}
-
-/* ── Row hover ── */
-.d2h-dark-color-scheme tr.d2h-ins:hover td {
-  background-color: rgba(34, 197, 94, 0.18) !important;
-}
-.d2h-dark-color-scheme tr.d2h-ins:hover td.d2h-code-linenumber {
-  background-color: #1a2d18 !important;
-}
-.d2h-dark-color-scheme tr.d2h-del:hover td {
-  background-color: rgba(239, 68, 68, 0.18) !important;
-}
-.d2h-dark-color-scheme tr.d2h-del:hover td.d2h-code-linenumber {
-  background-color: #2d1818 !important;
-}
-.d2h-dark-color-scheme tr.d2h-info:hover td {
-  background-color: rgba(96, 165, 250, 0.12) !important;
-}
-.d2h-dark-color-scheme tr.d2h-info:hover td.d2h-code-linenumber {
-  background-color: #1a1f27 !important;
-}
-.d2h-dark-color-scheme tr:not(.d2h-ins):not(.d2h-del):not(.d2h-info):hover td {
-  background-color: rgba(255, 255, 255, 0.03) !important;
-}
-.d2h-dark-color-scheme tr:not(.d2h-ins):not(.d2h-del):not(.d2h-info):hover td.d2h-code-linenumber {
-  background-color: #1c1c1f !important;
-}
-
-/* ── Unified diff view: show file headers between files ── */
-.unified-diff-view .d2h-file-header {
-  display: flex !important;
-  align-items: center;
-  gap: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--sidebar);
-  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
-  padding: 6px 12px;
-  font-size: 0.75rem;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  color: #d4d4d8;
-}
-
-.unified-diff-view .d2h-file-name-wrapper {
-  display: flex;
-  align-items: center;
-  flex-shrink: 1;
-  min-width: 0;
-}
-
-.unified-diff-view .d2h-file-name {
-  white-space: nowrap;
-  overflow-x: auto;
-  text-overflow: unset;
-}
-
-.unified-diff-view .d2h-collapse-chevron {
-  display: inline-block;
-  transition: transform 0.15s ease;
-  transform: rotate(90deg);
-  font-size: 0.7rem;
-  flex-shrink: 0;
-  color: #a1a1aa;
-}
-
-.unified-diff-view .d2h-collapse-chevron.collapsed {
-  transform: rotate(0deg);
-}
-
-@media (max-width: 639px) {
-  .unified-diff-view .d2h-icon {
-    display: none;
-  }
-}
-
-.unified-diff-view .d2h-file-wrapper + .d2h-file-wrapper {
-  margin-top: 4px;
 }

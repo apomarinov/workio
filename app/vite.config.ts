@@ -91,7 +91,6 @@ export default defineConfig(({ mode }) => {
               'remark-math',
               'katex',
             ],
-            diff2html: ['diff2html'],
             'monaco-react': ['@monaco-editor/react'],
             dndkit: [
               '@dnd-kit/core',

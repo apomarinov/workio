@@ -122,6 +122,12 @@ export const fileContentsInput = terminalIdInput.extend({
   base: z.string().optional(),
 })
 
+export const batchFileContentsInput = terminalIdInput.extend({
+  base: z.string().optional(),
+  cursor: z.number().min(0).default(0),
+  pageSize: z.number().min(1).max(20).default(5),
+})
+
 export const branchCommitsInput = branchInput.extend({
   limit: z.number().min(1).max(100).default(20),
   offset: z.number().min(0).default(0),

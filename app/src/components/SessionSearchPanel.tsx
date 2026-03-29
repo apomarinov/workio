@@ -342,7 +342,7 @@ export function SessionSearchPanel({
                                 className={cn(
                                   'w-2.5 h-2.5 transition-transform',
                                   !expandedBranches.has(match.session_id) &&
-                                  '-rotate-90',
+                                    '-rotate-90',
                                 )}
                               />
                               More Branches
@@ -543,7 +543,10 @@ export function SessionSearchPanel({
                   <ChevronDown className="w-3 h-3 ml-1 shrink-0 opacity-50 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="min-w-72 w-fit max-w-[600px] p-0" align="start">
+              <PopoverContent
+                className="min-w-72 w-fit max-w-[600px] p-0"
+                align="start"
+              >
                 <Command shouldFilter={true}>
                   <CommandInput placeholder="Filter..." />
                   <CommandList>

@@ -437,8 +437,8 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
         {/* Left column: commit list */}
         <Panel
           id="branch-commits"
-          defaultSize="220px"
-          minSize="150px"
+          defaultSize="280px"
+          minSize="280px"
           maxSize="50%"
         >
           <div className="flex flex-col overflow-hidden h-full">
