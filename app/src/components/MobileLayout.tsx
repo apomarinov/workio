@@ -33,7 +33,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   const { activeTerminal, activeShells, selectTerminal, setShell } =
     useWorkspaceContext()
   const { activeSessionId } = useSessionContext()
-  const { settingsFocused } = useUIState()
+  const uiState = useUIState()
   const { settings } = useSettings()
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [mobileKeyboardMode, setMobileKeyboardMode] = useState<
@@ -65,11 +65,11 @@ export function MobileLayout({ children }: MobileLayoutProps) {
     },
   })
 
-  // Close mobile sidebar on collapse-sidebar event (e.g. opening settings)
+  // Close mobile sidebar when settings opens
   useEffect(() => {
     const handler = () => setMobileSidebarOpen(false)
-    window.addEventListener('collapse-sidebar', handler)
-    return () => window.removeEventListener('collapse-sidebar', handler)
+    window.addEventListener('settings-open', handler)
+    return () => window.removeEventListener('settings-open', handler)
   }, [])
 
   // Auto-close mobile sidebar when navigating to a terminal or session
@@ -138,7 +138,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
                   position="bottom"
                   className="pr-2 bg-[#1a1a1a]"
                   rightExtra={
-                    settingsFocused ? undefined : (
+                    uiState.settings.isFocused ? undefined : (
                       <div className="flex items-center gap-0.5 max-sm:border-l-[1px] pl-1">
                         {mobileKeyboardMode === 'input' && (
                           <>
@@ -199,7 +199,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
                   <StatusBar position="bottom" />
                 </Suspense>
               )}
-              {!settingsFocused && (
+              {!uiState.settings.isFocused && (
                 <Suspense fallback={null}>
                   <MobileKeyboard
                     terminalId={t.id}

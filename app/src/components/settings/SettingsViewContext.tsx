@@ -71,9 +71,9 @@ export function SettingsViewProvider({
 }: {
   children: React.ReactNode
 }) {
-  const [search, setSearch] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [keymapOpen, setKeymapOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const [activePath, setActivePath] = useState<string[] | null>(() =>
     getFirstSettingsPath(SETTINGS_REGISTRY),
   )
@@ -86,7 +86,9 @@ export function SettingsViewProvider({
   const [saving, setSaving] = useState(false)
 
   const isMobile = useIsMobile()
-  const { settingsTarget, clearSettingsTarget } = useUIState()
+  const uiState = useUIState()
+  const settingsTarget = uiState.settings.target
+  const clearSettingsTarget = uiState.settings.clearTarget
   const { settings, updateSettings } = useSettings()
 
   // Snapshot of settings when the form was initialized, for dirty comparison

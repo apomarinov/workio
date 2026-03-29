@@ -672,14 +672,14 @@ function SortableShellTab({
 }
 
 function SettingsCloseButton() {
-  const { closeSettings } = useUIState()
+  const uiState = useUIState()
   return (
     <span
       role="button"
       tabIndex={0}
       onClick={(e) => {
         e.stopPropagation()
-        closeSettings()
+        uiState.settings.close()
       }}
       className="items-center justify-center text-muted-foreground hover:text-foreground sm:invisible max-sm:visible group-hover/pill:visible group-hover/tab:visible"
     >
@@ -689,15 +689,15 @@ function SettingsCloseButton() {
 }
 
 function SettingsPill() {
-  const { settingsFocused, focusSettings } = useUIState()
+  const uiState = useUIState()
 
   return (
     <button
       type="button"
-      onClick={focusSettings}
+      onClick={() => uiState.settings.focus()}
       className={cn(
         'group/pill flex relative items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] transition-colors cursor-pointer flex-shrink-0',
-        settingsFocused
+        uiState.settings.isFocused
           ? 'bg-accent text-accent-foreground/80'
           : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground/80',
       )}
@@ -710,15 +710,15 @@ function SettingsPill() {
 }
 
 function SettingsTab() {
-  const { settingsFocused, focusSettings } = useUIState()
+  const uiState = useUIState()
 
   return (
     <button
       type="button"
-      onClick={focusSettings}
+      onClick={() => uiState.settings.focus()}
       className={cn(
         'group/tab flex items-center relative gap-1.5 px-2 py-1.5 text-xs transition-colors flex-shrink-0 border-t-1 border-r-[1px] cursor-pointer',
-        settingsFocused
+        uiState.settings.isFocused
           ? 'border-t-primary text-foreground bg-zinc-500/10 hover:bg-zinc-500/20'
           : 'border-t-transparent text-muted-foreground hover:text-foreground hover:bg-zinc-500/10 hover:border-t-primary',
       )}
@@ -747,7 +747,7 @@ export function ShellTabs({
   const killShellMutation = trpc.workspace.shells.killShell.useMutation()
   const { isBellSubscribed, processes } = useProcessContext()
   const { sessions } = useSessionContext()
-  const { settingsOpen, settingsFocused, unfocusSettings } = useUIState()
+  const uiState = useUIState()
 
   const { isGoToShellModifierHeld, modifierIcons } = useModifiersHeld()
 
@@ -1141,7 +1141,7 @@ export function ShellTabs({
               wrap ? 'flex-wrap' : 'overflow-x-auto flex-nowrap p-0.5',
             )}
           >
-            {settingsOpen && isActiveTerminal && <SettingsPill />}
+            {uiState.settings.isOpen && isActiveTerminal && <SettingsPill />}
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1165,7 +1165,10 @@ export function ShellTabs({
                     <SortableShellPill
                       key={shell.id}
                       shell={shell}
-                      isActive={!settingsFocused && shell.id === activeShellId}
+                      isActive={
+                        !uiState.settings.isFocused &&
+                        shell.id === activeShellId
+                      }
                       hasActivity={shellHasActivity(shell.id)}
                       bellSubscribed={isBellSubscribed(shell.id)}
                       isMain={isMain}
@@ -1174,7 +1177,7 @@ export function ShellTabs({
                         (isMain ? (terminal.name ?? shell.name) : shell.name)
                       }
                       onSelect={() => {
-                        unfocusSettings()
+                        uiState.settings.unfocus()
                         onSelectShell(shell.id)
                       }}
                       onDelete={() => handleDeleteShell(shell.id)}
@@ -1210,7 +1213,7 @@ export function ShellTabs({
               wrap ? 'flex-wrap' : 'overflow-x-auto',
             )}
           >
-            {settingsOpen && isActiveTerminal && <SettingsTab />}
+            {uiState.settings.isOpen && isActiveTerminal && <SettingsTab />}
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1234,7 +1237,10 @@ export function ShellTabs({
                     <SortableShellTab
                       key={shell.id}
                       shell={shell}
-                      isActive={!settingsFocused && shell.id === activeShellId}
+                      isActive={
+                        !uiState.settings.isFocused &&
+                        shell.id === activeShellId
+                      }
                       hasActivity={shellHasActivity(shell.id)}
                       bellSubscribed={isBellSubscribed(shell.id)}
                       isMain={isMain}
@@ -1243,7 +1249,7 @@ export function ShellTabs({
                         (isMain ? (terminal.name ?? shell.name) : shell.name)
                       }
                       onSelect={() => {
-                        unfocusSettings()
+                        uiState.settings.unfocus()
                         onSelectShell(shell.id)
                       }}
                       onDelete={() => handleDeleteShell(shell.id)}

@@ -979,10 +979,16 @@ export function CommandPalette() {
             pushing: { branch: name, force: !!force },
           },
         }))
+        const toastId = toast.loading(
+          force ? `Force pushing ${name}...` : `Pushing ${name}...`,
+        )
         try {
           await pushBranch(terminal.id, name, force)
-          toast.success(force ? `Force pushed ${name}` : `Pushed ${name}`)
+          toast.success(force ? `Force pushed ${name}` : `Pushed ${name}`, {
+            id: toastId,
+          })
         } catch (err) {
+          toast.dismiss(toastId)
           toastError(err, 'Failed to push branch')
         } finally {
           api.updateLevel((l) => ({

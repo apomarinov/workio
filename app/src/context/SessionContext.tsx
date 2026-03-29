@@ -63,6 +63,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setActiveSessionId(null)
   }
 
+  useEffect(() => {
+    const handler = () => clearSession()
+    window.addEventListener('settings-open', handler)
+    return () => window.removeEventListener('settings-open', handler)
+  }, [])
+
   const mergeSession = async (sessionId: string) => {
     try {
       const updated = await utils.sessions.getById.fetch({ id: sessionId })

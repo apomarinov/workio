@@ -2,46 +2,58 @@ import { createContext, useContext, useState } from 'react'
 
 type SettingsMode = 'open' | 'focused'
 
+interface SettingsState {
+  mode: SettingsMode | undefined
+  target: string[] | null
+}
+
+interface SettingsContextValue {
+  mode: SettingsMode | undefined
+  isOpen: boolean
+  isFocused: boolean
+  target: string[] | null
+  open: (target?: string[]) => void
+  focus: () => void
+  unfocus: () => void
+  close: () => void
+  clearTarget: () => void
+}
+
+const DEFAULT_STATE: SettingsState = {
+  mode: undefined,
+  target: null,
+}
+
 interface UIStateContextValue {
-  settingsMode: SettingsMode | undefined
-  settingsOpen: boolean
-  settingsFocused: boolean
-  /** Path to scroll to when settings opens, e.g. ['Terminal', 'Display'] */
-  settingsTarget: string[] | null
-  openSettings: (target?: string[]) => void
-  focusSettings: () => void
-  unfocusSettings: () => void
-  closeSettings: () => void
-  clearSettingsTarget: () => void
+  settings: SettingsContextValue
 }
 
 const UIStateContext = createContext<UIStateContextValue | null>(null)
 
 export function UIStateProvider({ children }: { children: React.ReactNode }) {
-  const [settingsMode, setSettingsMode] = useState<SettingsMode | undefined>()
-  const [settingsTarget, setSettingsTarget] = useState<string[] | null>(null)
+  const [state, setState] = useState<SettingsState>(DEFAULT_STATE)
+
+  const settings: SettingsContextValue = {
+    mode: state.mode,
+    isOpen: state.mode != null,
+    isFocused: state.mode === 'focused',
+    target: state.target,
+    open: (target?: string[]) => {
+      setState({ mode: 'focused', target: target ?? null })
+      window.dispatchEvent(new Event('settings-open'))
+    },
+    focus: () => setState((prev) => ({ ...prev, mode: 'focused' })),
+    unfocus: () =>
+      setState((prev) => ({
+        ...prev,
+        mode: prev.mode ? 'open' : undefined,
+      })),
+    close: () => setState(DEFAULT_STATE),
+    clearTarget: () => setState((prev) => ({ ...prev, target: null })),
+  }
 
   return (
-    <UIStateContext.Provider
-      value={{
-        settingsMode,
-        settingsOpen: settingsMode != null,
-        settingsFocused: settingsMode === 'focused',
-        settingsTarget,
-        openSettings: (target?: string[]) => {
-          setSettingsMode('focused')
-          if (target) setSettingsTarget(target)
-          window.dispatchEvent(new Event('collapse-sidebar'))
-        },
-        focusSettings: () => setSettingsMode('focused'),
-        unfocusSettings: () => setSettingsMode((m) => (m ? 'open' : undefined)),
-        closeSettings: () => {
-          setSettingsMode(undefined)
-          setSettingsTarget(null)
-        },
-        clearSettingsTarget: () => setSettingsTarget(null),
-      }}
-    >
+    <UIStateContext.Provider value={{ settings }}>
       {children}
     </UIStateContext.Provider>
   )

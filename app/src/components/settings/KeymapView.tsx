@@ -170,7 +170,7 @@ function findDuplicates(
 // --- Components ---
 
 export function KeymapView() {
-  const { closeKeymap } = useSettingsView()
+  const { closeKeymap, search } = useSettingsView()
   const { settings, updateSettings } = useSettings()
 
   const [bindings, setBindings] = useState<
@@ -322,27 +322,39 @@ export function KeymapView() {
   }, [recording]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const duplicates = useMemo(() => findDuplicates(bindings), [bindings])
+  const q = search.trim().toLowerCase()
 
-  const shortcutRow = (
+  const shortcutItem = (
     name: ShortcutName,
     label: string,
     opts?: { suffix?: string; description?: string },
-  ) => (
-    <ShortcutRow
-      key={name}
-      label={label}
-      description={opts?.description}
-      binding={bindings[name]}
-      isRecording={recording === name}
-      recordingKeys={recording === name ? recordingKeys : []}
-      onRecord={() => setRecording(recording === name ? null : name)}
-      onReset={() => setBinding(name, DEFAULT_KEYMAP[name])}
-      onUnset={() => setBinding(name, null)}
-      defaultBinding={DEFAULT_KEYMAP[name]}
-      display={formatBinding(bindings[name], opts?.suffix)}
-      hasConflict={duplicates.has(name)}
-    />
-  )
+  ): { label: string; node: ReactNode } => ({
+    label,
+    node: (
+      <ShortcutRow
+        key={name}
+        label={label}
+        description={opts?.description}
+        binding={bindings[name]}
+        isRecording={recording === name}
+        recordingKeys={recording === name ? recordingKeys : []}
+        onRecord={() => setRecording(recording === name ? null : name)}
+        onReset={() => setBinding(name, DEFAULT_KEYMAP[name])}
+        onUnset={() => setBinding(name, null)}
+        defaultBinding={DEFAULT_KEYMAP[name]}
+        display={formatBinding(bindings[name], opts?.suffix)}
+        hasConflict={duplicates.has(name)}
+      />
+    ),
+  })
+
+  const infoItem = (
+    label: string,
+    display: ReactNode,
+  ): { label: string; node: ReactNode } => ({
+    label,
+    node: <InfoShortcutRow label={label} display={display} />,
+  })
 
   return (
     <div className="absolute inset-0 flex flex-col bg-[#1a1a1a] z-10">
@@ -365,119 +377,146 @@ export function KeymapView() {
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="w-full space-y-1.5">
-          <SectionHeader>General</SectionHeader>
-          <SectionRows>
-            {shortcutRow('palette', 'Command Palette')}
-            {shortcutRow('settings', 'Settings')}
-            {shortcutRow('collapseAll', 'Collapse All')}
-            {shortcutRow('customCommands', 'Custom Commands')}
-            {shortcutRow('toggleSidebar', 'Toggle Sidebar')}
-            {shortcutRow('togglePip', 'Toggle PiP Window')}
-          </SectionRows>
+          <FilteredSection
+            heading="General"
+            search={q}
+            items={[
+              shortcutItem('palette', 'Command Palette'),
+              shortcutItem('settings', 'Settings'),
+              shortcutItem('collapseAll', 'Collapse All'),
+              shortcutItem('customCommands', 'Custom Commands'),
+              shortcutItem('toggleSidebar', 'Toggle Sidebar'),
+              shortcutItem('togglePip', 'Toggle PiP Window'),
+            ]}
+          />
 
-          <SectionHeader>Projects</SectionHeader>
-          <SectionRows>
-            {shortcutRow('goToTab', 'Go to project', {
-              suffix: bindings.goToTab ? '1 - 9' : undefined,
-            })}
-            {shortcutRow('itemActions', 'Actions')}
-          </SectionRows>
+          <FilteredSection
+            heading="Projects"
+            search={q}
+            items={[
+              shortcutItem('goToTab', 'Go to project', {
+                suffix: bindings.goToTab ? '1 - 9' : undefined,
+              }),
+              shortcutItem('itemActions', 'Actions'),
+            ]}
+          />
 
-          <SectionHeader>Shells</SectionHeader>
-          <SectionRows>
-            {shortcutRow('newShell', 'New Shell')}
-            {shortcutRow('closeShell', 'Close Shell')}
-            {shortcutRow('goToShell', 'Go to shell', {
-              suffix: bindings.goToShell ? '1 - 9' : undefined,
-            })}
-            {shortcutRow('prevShell', 'Previous shell')}
-            {shortcutRow('nextShell', 'Next shell')}
-            {shortcutRow('shellTemplates', 'Shell Templates')}
-            <InfoShortcutRow
-              label="Focus active shell"
-              display={
-                <ArrowRightToLine className={cn(ICON_CLASS, 'stroke-3')} />
-              }
-            />
-            <InfoShortcutRow
-              label="Open file in IDE"
-              display={<MouseLeft className={ICON_CLASS} />}
-            />
-            <InfoShortcutRow
-              label="Open file in Finder"
-              display={
+          <FilteredSection
+            heading="Shells"
+            search={q}
+            items={[
+              shortcutItem('newShell', 'New Shell'),
+              shortcutItem('closeShell', 'Close Shell'),
+              shortcutItem('goToShell', 'Go to shell', {
+                suffix: bindings.goToShell ? '1 - 9' : undefined,
+              }),
+              shortcutItem('prevShell', 'Previous shell'),
+              shortcutItem('nextShell', 'Next shell'),
+              shortcutItem('shellTemplates', 'Shell Templates'),
+              infoItem(
+                'Focus active shell',
+                <ArrowRightToLine className={cn(ICON_CLASS, 'stroke-3')} />,
+              ),
+              infoItem(
+                'Open file in IDE',
+                <MouseLeft className={ICON_CLASS} />,
+              ),
+              infoItem(
+                'Open file in Finder',
                 <span className="inline-flex items-center gap-1">
                   <Command className={cn(ICON_CLASS, 'stroke-3')} />
                   <MouseLeft className={ICON_CLASS} />
-                </span>
-              }
-            />
-            <InfoShortcutRow
-              label="Copy filepath/URL"
-              display={
+                </span>,
+              ),
+              infoItem(
+                'Copy filepath/URL',
                 <span className="inline-flex items-center gap-1">
                   <Option className={cn(ICON_CLASS, 'stroke-3')} />
                   <MouseLeft className={ICON_CLASS} />
-                </span>
-              }
-            />
-            <InfoShortcutRow
-              label="Jump line"
-              display={
+                </span>,
+              ),
+              infoItem(
+                'Jump line',
                 <span className="inline-flex items-center gap-1">
                   <Command className={cn(ICON_CLASS, 'stroke-3')} />
                   <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
                   <span>/</span>
                   <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
-                </span>
-              }
-            />
-            <InfoShortcutRow
-              label="Jump word"
-              display={
+                </span>,
+              ),
+              infoItem(
+                'Jump word',
                 <span className="inline-flex items-center gap-1">
                   <Option className={cn(ICON_CLASS, 'stroke-3')} />
                   <ArrowLeft className={cn(ICON_CLASS, 'stroke-3')} />
                   <span>/</span>
                   <ArrowRight className={cn(ICON_CLASS, 'stroke-3')} />
-                </span>
-              }
-            />
-            <InfoShortcutRow
-              label="Delete word"
-              display={
+                </span>,
+              ),
+              infoItem(
+                'Delete word',
                 <span className="inline-flex items-center gap-1">
                   <Option className={cn(ICON_CLASS, 'stroke-3')} />
                   <Delete className={cn(ICON_CLASS, 'stroke-3')} />
-                </span>
-              }
-            />
-            <InfoShortcutRow
-              label="Delete line"
-              display={
+                </span>,
+              ),
+              infoItem(
+                'Delete line',
                 <span className="inline-flex items-center gap-1">
                   <Command className={cn(ICON_CLASS, 'stroke-3')} />
                   <Delete className={cn(ICON_CLASS, 'stroke-3')} />
-                </span>
-              }
-            />
-          </SectionRows>
+                </span>,
+              ),
+            ]}
+          />
 
-          <SectionHeader>Git</SectionHeader>
-          <SectionRows>
-            {shortcutRow('branches', 'Branches')}
-            {shortcutRow('pullBranch', 'Pull Current Branch', {
-              description: '(rebase)',
-            })}
-            {shortcutRow('commit', 'Commit', {
-              description: '(dirty → commit, clean → log)',
-            })}
-            {shortcutRow('commitAmend', 'Toggle Amend')}
-            {shortcutRow('commitNoVerify', 'Toggle No Verify')}
-          </SectionRows>
+          <FilteredSection
+            heading="Git"
+            search={q}
+            items={[
+              shortcutItem('branches', 'Branches'),
+              shortcutItem('pullBranch', 'Pull Current Branch', {
+                description: '(rebase)',
+              }),
+              shortcutItem('commit', 'Commit', {
+                description: '(dirty → commit, clean → log)',
+              }),
+              shortcutItem('commitAmend', 'Toggle Amend'),
+              shortcutItem('commitNoVerify', 'Toggle No Verify'),
+            ]}
+          />
         </div>
       </div>
     </div>
+  )
+}
+
+function FilteredSection({
+  heading,
+  search,
+  items,
+}: {
+  heading: string
+  search: string
+  items: { label: string; node: ReactNode }[]
+}) {
+  const filtered = search
+    ? items.filter(
+        (item) =>
+          item.label.toLowerCase().includes(search) ||
+          heading.toLowerCase().includes(search),
+      )
+    : items
+  if (filtered.length === 0) return null
+  return (
+    <>
+      <SectionHeader>{heading}</SectionHeader>
+      <SectionRows>
+        {filtered.map((item) => (
+          <div key={item.label}>{item.node}</div>
+        ))}
+      </SectionRows>
+    </>
   )
 }
 

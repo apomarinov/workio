@@ -229,6 +229,9 @@ export function CommitDialog({
   const discarding = discardMutation.isPending
 
   const handleCommit = async () => {
+    const toastId = toast.loading(
+      amend ? 'Amending commit...' : 'Committing...',
+    )
     try {
       const selected = fileListRef.current?.getSelectedFiles() ?? new Set()
       const filesToSend =
@@ -240,10 +243,13 @@ export function CommitDialog({
         noVerify,
         files: filesToSend,
       })
-      toast.success(amend ? 'Amended commit' : 'Changes committed')
+      toast.success(amend ? 'Amended commit' : 'Changes committed', {
+        id: toastId,
+      })
       onClose()
       onSuccess?.()
     } catch (err) {
+      toast.dismiss(toastId)
       toastError(err, 'Failed to commit')
     }
   }

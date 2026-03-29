@@ -155,7 +155,7 @@ export const DEFAULT_KEYMAP: z.input<typeof keymapSchema> = {
   shellTemplates: { shiftKey: true, altKey: true, key: 'k' },
   customCommands: { altKey: true, key: 'a' },
   branches: { ctrlKey: true, shiftKey: true, key: 'enter' },
-  pullBranch: { metaKey: true, key: 't' },
+  pullBranch: { altKey: true, key: 't' },
   toggleSidebar: { altKey: true, key: 'backquote' },
   commit: { metaKey: true, shiftKey: true, key: 'k' },
 }

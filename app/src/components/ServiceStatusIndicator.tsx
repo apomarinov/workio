@@ -109,7 +109,7 @@ const SETTINGS_PATH: Record<string, string[]> = {
 
 function InfoButton({ label }: { label: string }) {
   const [open, setOpen] = useState(false)
-  const { openSettings } = useUIState()
+  const uiState = useUIState()
   const info = SERVICE_INFO[label]
   const settingsPath = SETTINGS_PATH[label]
   if (!info) return null
@@ -126,7 +126,7 @@ function InfoButton({ label }: { label: string }) {
         <button
           type="button"
           className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
-          onClick={() => openSettings(settingsPath)}
+          onClick={() => uiState.settings.open(settingsPath)}
         >
           <Settings className="w-3 h-3" />
         </button>

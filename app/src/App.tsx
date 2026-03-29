@@ -60,7 +60,7 @@ function AppContent() {
   const isMobile = useIsMobile()
   const mountedShells = useMountedShells()
   const { handleCreateShell, handleRenameShell } = useShellActions()
-  const { settingsFocused } = useUIState()
+  const uiState = useUIState()
   useNotificationSubscriptions()
   useSleepWakeRevalidation()
 
@@ -96,21 +96,15 @@ function AppContent() {
     <div className="h-full relative">
       {activeSessionId ? (
         <div className="absolute inset-0 z-20">
-          {settingsFocused ? (
-            <Suspense fallback={null}>
-              <SettingsView />
-            </Suspense>
-          ) : (
-            <Suspense
-              fallback={
-                <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
-                  Loading...
-                </div>
-              }
-            >
-              <SessionChat hideAvatars={isMobile} />
-            </Suspense>
-          )}
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center bg-zinc-950 text-zinc-400">
+                Loading...
+              </div>
+            }
+          >
+            <SessionChat hideAvatars={isMobile} />
+          </Suspense>
         </div>
       ) : terminals.length === 0 ? (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#1a1a1a]">
@@ -178,15 +172,23 @@ function AppContent() {
                     shellId={shell.id}
                     isVisible={
                       isTermVisible &&
-                      !settingsFocused &&
+                      !uiState.settings.isFocused &&
                       shell.id === activeShellId
                     }
                   />
                 )
               })}
-              {isTermVisible && !settingsFocused && <BottomPanelLoader />}
-              {isTermVisible && settingsFocused && (
-                <div className="absolute inset-0 z-10">
+              {isTermVisible && !uiState.settings.isFocused && (
+                <BottomPanelLoader />
+              )}
+              {isTermVisible && uiState.settings.isOpen && (
+                <div
+                  className={cn(
+                    'absolute inset-0 z-10',
+                    !uiState.settings.isFocused &&
+                      'invisible pointer-events-none',
+                  )}
+                >
                   <Suspense fallback={null}>
                     <SettingsView />
                   </Suspense>

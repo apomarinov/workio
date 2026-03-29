@@ -61,7 +61,7 @@ import { MultiClientIndicator } from './ShellTabs'
 import { SortableTerminalItem } from './SortableTerminalItem'
 
 export function Sidebar() {
-  const { openSettings } = useUIState()
+  const uiState = useUIState()
   const pip = useDocumentPip()
   const {
     terminals,
@@ -382,18 +382,18 @@ export function Sidebar() {
 
   // Listen for open-settings events from keyboard shortcut
   useEffect(() => {
-    const handler = () => openSettings()
+    const handler = () => uiState.settings.open()
     window.addEventListener('open-settings', handler)
     return () => window.removeEventListener('open-settings', handler)
-  }, [openSettings])
+  }, [uiState.settings.open])
 
   // Redirect open-create-custom-action to settings > Custom Commands
   useEffect(() => {
-    const handler = () => openSettings(['Terminal', 'Custom Commands'])
+    const handler = () => uiState.settings.open(['Terminal', 'Custom Commands'])
     window.addEventListener('open-create-custom-action', handler)
     return () =>
       window.removeEventListener('open-create-custom-action', handler)
-  }, [openSettings])
+  }, [uiState.settings.open])
 
   // Listen for open-logs events from command palette
   useEffect(() => {
@@ -628,7 +628,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             className="h-6 w-6 relative hidden @[250px]/header:inline-flex"
-            onClick={() => openSettings()}
+            onClick={() => uiState.settings.open()}
             title="Settings"
           >
             <Settings className="w-4 h-4" />
@@ -675,7 +675,7 @@ export function Sidebar() {
                 </button>
               )}
               <button
-                onClick={() => openSettings()}
+                onClick={() => uiState.settings.open()}
                 className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent cursor-pointer"
               >
                 <Settings className="w-4 h-4" />
@@ -855,7 +855,7 @@ export function Sidebar() {
                         <button
                           type="button"
                           onClick={() =>
-                            openSettings(['GitHub', 'Author Filters'])
+                            uiState.settings.open(['GitHub', 'Author Filters'])
                           }
                           className={cn(
                             'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',

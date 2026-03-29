@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
+import { useUIState } from '@/context/UIStateContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useSettings } from '@/hooks/useSettings'
@@ -37,6 +38,7 @@ export function AppKeyboardShortcuts() {
   const { clearSession } = useSessionContext()
   const { gitDirtyStatus } = useProcessContext()
   const { settings } = useSettings()
+  const uiState = useUIState()
 
   const activeTerminalRef = useRef(activeTerminal)
   activeTerminalRef.current = activeTerminal
@@ -137,6 +139,10 @@ export function AppKeyboardShortcuts() {
       }
     },
     closeShell: () => {
+      if (uiState.settings.isOpen) {
+        uiState.settings.close()
+        return
+      }
       const t = activeTerminalRef.current
       if (!t) return
       const activeShellId = activeShellsRef.current[t.id]
