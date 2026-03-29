@@ -70,6 +70,13 @@ export class ShellClients {
     }
   }
 
+  disconnectClients() {
+    for (const client of this.clients) {
+      client.close()
+    }
+    this.clients.clear()
+  }
+
   getClientsList(): ShellClient[] {
     const clients: ShellClient[] = []
     const seen = new Set<string>()
@@ -128,6 +135,13 @@ export function getOrCreateShellClients(shellId: number): ShellClients {
     shellClients.set(shellId, sc)
   }
   return sc
+}
+
+/** Close all WS clients for given shells, triggering client reconnect. */
+export function disconnectShellClients(shellIds: number[]) {
+  for (const id of shellIds) {
+    shellClients.get(id)?.disconnectClients()
+  }
 }
 
 /** Emit current shell:clients state for all active shells to a specific socket. */

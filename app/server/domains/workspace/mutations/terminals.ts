@@ -6,6 +6,7 @@ import {
   renameZellijSession,
   writeTerminalNameFile,
 } from '@domains/pty/session'
+import { disconnectShellClients } from '@domains/pty/websocket'
 import {
   createTerminal as dbCreateTerminal,
   deleteTerminal as dbDeleteTerminal,
@@ -246,7 +247,7 @@ export const createTerminal = publicProcedure
 export const updateTerminal = publicProcedure
   .input(updateTerminalInput)
   .mutation(async ({ input }) => {
-    const { id, ...updates } = input
+    const { id, restartShells, ...updates } = input
     const terminal = await getTerminalById(id)
     if (!terminal) throw new Error('Terminal not found')
 
@@ -278,6 +279,14 @@ export const updateTerminal = publicProcedure
     }
 
     await dbUpdateTerminal(id, updates)
+
+    // Restart PTY sessions so they pick up the new shell
+    if (restartShells && terminal.shells.length > 0) {
+      const shellIds = terminal.shells.map((s) => s.id)
+      destroySessionsForTerminal(id)
+      // Disconnect WS clients after a short delay so exit message reaches them first
+      setTimeout(() => disconnectShellClients(shellIds), 500)
+    }
 
     // Handle name change: update name files and rename zellij session
     if (updates.name !== undefined) {

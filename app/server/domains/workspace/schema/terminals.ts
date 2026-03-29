@@ -72,6 +72,7 @@ export const createTerminalInput = terminalSchema
 export const updateTerminalInput = terminalSchema.pick({ id: true }).extend({
   name: z.string().optional(),
   shell: z.string().nullable().optional(),
+  restartShells: z.boolean().optional(),
   settings: terminalSettingsSchema.nullable().optional(),
 })
 

@@ -33,9 +33,6 @@ __terminal_integration_precmd() {
   printf '\e]133;A\e\\'
 }
 
-# Set up DEBUG trap for preexec
-trap '__terminal_integration_preexec' DEBUG
-
 # Add to PROMPT_COMMAND for precmd
 if [[ -z "$PROMPT_COMMAND" ]]; then
   PROMPT_COMMAND="__terminal_integration_precmd"
@@ -47,6 +44,9 @@ fi
 __workio_dir="$HOME/.workio"
 wioname() { cat "$__workio_dir/terminals/$WORKIO_TERMINAL_ID" 2>/dev/null || echo "terminal-$WORKIO_TERMINAL_ID"; }
 wiosession() { local sn; sn=$(cat "$__workio_dir/shells/$WORKIO_SHELL_ID" 2>/dev/null || echo "main"); if [ "$sn" = "main" ]; then wioname; else echo "$(wioname)-$sn"; fi; }
+
+# Set up DEBUG trap for preexec (must be last to avoid capturing setup commands)
+trap '__terminal_integration_preexec' DEBUG
 
 # Emit initial prompt marker
 printf '\e]133;A\e\\'
