@@ -30,13 +30,6 @@ import {
   CommandList,
 } from './ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select'
 
 type NavItem =
   | { type: 'session'; sessionId: string }
@@ -84,38 +77,29 @@ export function SessionSearchPanel({
     }
   }, [initialFilter])
 
-  // Extract distinct repos and branches from session data
-  const repos = [
-    ...new Set(
+  // Extract distinct repo/branch combos from session data
+  const repoBranches = [
+    ...new Map(
       sessions
         .flatMap((s) => {
+          const pairs: { repo: string; branch: string }[] = []
           const entries = s.data?.branches ?? []
-          const mainRepo = s.data?.repo
-          const repoSet = new Set(entries.map((e) => e.repo))
-          if (mainRepo) repoSet.add(mainRepo)
-          return [...repoSet]
+          for (const e of entries) {
+            if (e.repo && e.branch)
+              pairs.push({ repo: e.repo, branch: e.branch })
+          }
+          if (s.data?.repo && s.data?.branch) {
+            pairs.push({ repo: s.data.repo, branch: s.data.branch })
+          }
+          return pairs
         })
-        .filter(Boolean),
-    ),
-  ].sort()
-
-  const branches = selectedRepo
-    ? [
-        ...new Set(
-          sessions.flatMap((s) => {
-            const entries = s.data?.branches ?? []
-            const matching = entries
-              .filter((e) => e.repo === selectedRepo)
-              .map((e) => e.branch)
-            // Also include main branch if repo matches
-            if (s.data?.repo === selectedRepo && s.data?.branch) {
-              matching.push(s.data.branch)
-            }
-            return matching
-          }),
-        ),
-      ].sort()
-    : []
+        .map((p) => [`${p.repo}\0${p.branch}`, p] as const),
+    ).values(),
+  ].sort((a, b) =>
+    a.repo === b.repo
+      ? a.branch.localeCompare(b.branch)
+      : a.repo.localeCompare(b.repo),
+  )
 
   const isMobile = useIsMobile()
   const showingChat = isMobile && selectedSessionId != null
@@ -539,84 +523,72 @@ export function SessionSearchPanel({
         </div>
 
         {/* Filter row */}
-        {repos.length > 0 && (
+        {repoBranches.length > 0 && (
           <div className="flex flex-wrap gap-2 pl-2 pr-4 py-2 border-b border-zinc-800">
-            <Select
-              value={selectedRepo ?? '__all__'}
-              onValueChange={(v) => {
-                const repo = v === '__all__' ? null : v
-                setSelectedRepo(repo)
-                setSelectedBranch(null)
-              }}
-            >
-              <SelectTrigger
-                size="sm"
-                className="!h-7 text-xs min-w-0 max-w-48"
-              >
-                <div className="flex items-center gap-2">
-                  <Github className="w-3 h-3 max-w-3" />
-                  <SelectValue placeholder="All repos" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All repos</SelectItem>
-                {repos.map((repo) => (
-                  <SelectItem key={repo} value={repo}>
-                    {repo.split('/').pop()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Popover open={branchPickerOpen} onOpenChange={setBranchPickerOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 group text-xs font-normal min-w-[150px] max-w-[90vw] w-fit flex justify-between"
-                  disabled={!selectedRepo}
+                  className="h-7 group text-xs font-normal max-w-[90vw] w-fit flex justify-between"
                 >
                   <div className="flex items-center gap-2">
                     <GitBranch className="w-3 h-3 max-w-3" />
                     <span className="truncate">
-                      {selectedBranch ?? 'All branches'}
+                      {selectedRepo && selectedBranch
+                        ? selectedBranch
+                        : 'Branch'}
                     </span>
                   </div>
                   <ChevronDown className="w-3 h-3 ml-1 shrink-0 opacity-50 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="start">
+              <PopoverContent className="w-72 p-0" align="start">
                 <Command shouldFilter={true}>
-                  <CommandInput placeholder="Search branches..." />
+                  <CommandInput placeholder="Filter..." />
                   <CommandList>
-                    <CommandEmpty>No branches found</CommandEmpty>
+                    <CommandEmpty>No matches</CommandEmpty>
                     <CommandItem
-                      value="__all_branches__"
+                      className="rounded-none"
+                      value="__all__"
                       onSelect={() => {
+                        setSelectedRepo(null)
                         setSelectedBranch(null)
                         setBranchPickerOpen(false)
                       }}
                     >
-                      All branches
-                      {selectedBranch == null && (
+                      All
+                      {selectedRepo == null && selectedBranch == null && (
                         <Check className="ml-auto h-3 w-3" />
                       )}
                     </CommandItem>
-                    {branches.map((branch) => (
-                      <CommandItem
-                        key={branch}
-                        value={branch}
-                        onSelect={() => {
-                          setSelectedBranch(branch)
-                          setBranchPickerOpen(false)
-                        }}
-                      >
-                        {branch}
-                        {branch === selectedBranch && (
-                          <Check className="ml-auto h-3 w-3" />
-                        )}
-                      </CommandItem>
-                    ))}
+                    {repoBranches.map((rb) => {
+                      const repo = rb.repo.split('/').pop()
+                      const label = `${rb.repo.split('/').pop()}/${rb.branch}`
+                      const isSelected =
+                        selectedRepo === rb.repo && selectedBranch === rb.branch
+                      return (
+                        <CommandItem
+                          className="rounded-none"
+                          key={`${rb.repo}\0${rb.branch}`}
+                          value={label}
+                          onSelect={() => {
+                            setSelectedRepo(rb.repo)
+                            setSelectedBranch(rb.branch)
+                            setBranchPickerOpen(false)
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-[12px]">{rb.branch}</span>
+                            <span className="text-[10px] flex items-center gap-1">
+                              <Github className="w-2.5 h-2.5 max-w-2.5" />
+                              {repo}
+                            </span>
+                          </div>
+                          {isSelected && <Check className="ml-auto h-3 w-3" />}
+                        </CommandItem>
+                      )
+                    })}
                   </CommandList>
                 </Command>
               </PopoverContent>
