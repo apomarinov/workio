@@ -248,8 +248,15 @@ export async function getBranchCommits(
   branch: string,
   limit = 20,
   offset = 0,
+  search?: string,
 ) {
-  return gh.git.diff.branchCommits.query({ terminalId, branch, limit, offset })
+  return gh.git.diff.branchCommits.query({
+    terminalId,
+    branch,
+    limit,
+    offset,
+    search: search || undefined,
+  })
 }
 
 export async function getChangedFiles(terminalId: number, base?: string) {

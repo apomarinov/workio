@@ -2,6 +2,7 @@ import type { ChangedFile } from '@domains/git/schema'
 import type { PRCheckStatus } from '@domains/github/schema'
 import {
   ChevronDown,
+  GitBranch,
   GitCommitHorizontal,
   Loader2,
   PenLine,
@@ -401,7 +402,8 @@ export function CommitDialog({
           {viewOnly && pr ? (
             <>
               <div className="px-2 pb-2 sm:px-0">
-                <div className="flex flex-col gap-0.5">
+                <div className="flex gap-1.5 items-center">
+                  <GitBranch className="w-3 h-3 text-zinc-500" />
                   <span className="text-xs text-zinc-500 font-mono">
                     {pr.baseBranch} ← {pr.branch}
                   </span>

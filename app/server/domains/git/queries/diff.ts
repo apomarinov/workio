@@ -223,6 +223,7 @@ export const commits = publicProcedure
         commits: [] as {
           hash: string
           message: string
+          body: string
           author: string
           date: string
         }[],
@@ -234,7 +235,7 @@ export const commits = publicProcedure
       terminal,
       [
         'log',
-        '--format=%H|%s|%an|%aI',
+        '--format=%H%x00%s%x00%B%x00%an%x00%aI%x01',
         `origin/${input.base}..origin/${input.head}`,
       ],
       { terminalId: input.terminalId, errorOnly: true, timeout: 15000 },
@@ -242,11 +243,11 @@ export const commits = publicProcedure
 
     const commitList = result.stdout
       .trim()
-      .split('\n')
+      .split('\x01')
       .filter(Boolean)
-      .map((line) => {
-        const [hash, message, author, date] = line.split('|')
-        return { hash, message, author, date }
+      .map((record) => {
+        const [hash, message, body, author, date] = record.trim().split('\x00')
+        return { hash, message, body: body.trim(), author, date }
       })
 
     return { commits: commitList, noRemote: false }
@@ -258,29 +259,70 @@ export const branchCommits = publicProcedure
     const terminal = await getTerminalById(input.terminalId)
     if (!terminal) throw new Error('Terminal not found')
 
-    const result = await gitExecLogged(
-      terminal,
-      [
-        'log',
-        '--format=%H|%s|%an|%aI',
-        `--max-count=${input.limit + 1}`,
-        `--skip=${input.offset}`,
-        input.branch,
-      ],
-      { terminalId: input.terminalId, errorOnly: true, timeout: 15000 },
-    )
+    const logArgs = [
+      'log',
+      '--format=%H%x00%s%x00%B%x00%an%x00%aI%x01',
+      `--max-count=${input.limit + 1}`,
+      `--skip=${input.offset}`,
+    ]
 
-    const lines = result.stdout.trim().split('\n').filter(Boolean)
-    const hasMore = lines.length > input.limit
-    const commitList = lines.slice(0, input.limit).map((line) => {
-      const [hash, message, author, date] = line.split('|')
-      return { hash, message, author, date }
+    if (input.search) {
+      logArgs.push(`--grep=${input.search}`, '-i')
+    }
+
+    logArgs.push(input.branch)
+
+    const result = await gitExecLogged(terminal, logArgs, {
+      terminalId: input.terminalId,
+      errorOnly: true,
+      timeout: 15000,
     })
 
-    // Find merge-base with default branch (only on first page)
+    const records = result.stdout.trim().split('\x01').filter(Boolean)
+    const hasMore = records.length > input.limit
+
+    function parseRecord(record: string) {
+      const [hash, message, body, author, date] = record.trim().split('\x00')
+      return { hash, message, body: body.trim(), author, date }
+    }
+
+    const commitList = records.slice(0, input.limit).map(parseRecord)
+
+    // If search looks like a hex hash prefix, try to resolve it and prepend
+    if (
+      input.search &&
+      /^[0-9a-f]{4,}$/i.test(input.search) &&
+      input.offset === 0
+    ) {
+      try {
+        const resolved = await gitExecLogged(
+          terminal,
+          ['log', '-1', '--format=%H%x00%s%x00%B%x00%an%x00%aI', input.search],
+          { terminalId: input.terminalId, errorOnly: true, timeout: 5000 },
+        )
+        const parsed = parseRecord(resolved.stdout.trim())
+        if (parsed.hash && !commitList.some((c) => c.hash === parsed.hash)) {
+          // Verify it's on the branch
+          const onBranch = await gitExecLogged(
+            terminal,
+            ['branch', '--contains', parsed.hash, '--list', input.branch],
+            { terminalId: input.terminalId, errorOnly: true, timeout: 5000 },
+          )
+            .then((r) => r.stdout.trim().length > 0)
+            .catch(() => false)
+          if (onBranch) {
+            commitList.unshift(parsed)
+          }
+        }
+      } catch {
+        // not a valid hash, ignore
+      }
+    }
+
+    // Find merge-base with default branch (only on first page, skip when searching)
     let mergeBase: string | undefined
     let mergeBaseBranch: string | undefined
-    if (input.offset === 0) {
+    if (input.offset === 0 && !input.search) {
       for (const defaultBranch of ['main', 'master']) {
         try {
           const mb = await gitExecLogged(

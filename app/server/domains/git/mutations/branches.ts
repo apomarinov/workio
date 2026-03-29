@@ -49,6 +49,7 @@ export const checkoutMutation = publicProcedure
     })
 
     detectGitBranch(input.terminalId)
+    checkAndEmitSingleGitDirty(input.terminalId)
   })
 
 export const pullMutation = publicProcedure
@@ -216,4 +217,5 @@ export const createBranchMutation = publicProcedure
     })
 
     detectGitBranch(input.terminalId)
+    checkAndEmitSingleGitDirty(input.terminalId)
   })

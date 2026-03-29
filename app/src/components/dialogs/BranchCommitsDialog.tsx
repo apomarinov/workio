@@ -1,3 +1,4 @@
+import { GitBranch } from 'lucide-react'
 import { BranchDiffPanel } from '@/components/BranchDiffPanel'
 import {
   Dialog,
@@ -27,7 +28,10 @@ export function BranchCommitsDialog({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="font-mono text-sm">{branch}</DialogTitle>
+          <DialogTitle className="font-mono text-sm flex items-center gap-2">
+            <GitBranch className="w-3 h-3" />
+            {branch}
+          </DialogTitle>
         </DialogHeader>
 
         <BranchDiffPanel terminalId={terminalId} branch={branch} />

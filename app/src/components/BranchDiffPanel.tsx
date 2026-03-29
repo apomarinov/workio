@@ -1,5 +1,11 @@
 import type { Commit } from '@domains/git/schema'
-import { GitCommitHorizontal, Loader2, Trash2, Undo2 } from 'lucide-react'
+import {
+  GitCommitHorizontal,
+  Loader2,
+  Search,
+  Trash2,
+  Undo2,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   Group,
@@ -17,6 +23,7 @@ import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
 import { DiffViewerPanel } from './DiffViewerPanel'
+import { MarkdownContent } from './MarkdownContent'
 import { MobileSlidePanel } from './MobileSlidePanel'
 
 function simpleHash(str: string): string {
@@ -81,10 +88,23 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // Debounce search input
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+    }, 300)
+    return () => clearTimeout(debounceRef.current)
+  }, [searchInput])
 
   // Refresh branch commits (reusable after mutations)
-  function refreshBranchCommits() {
+  function refreshBranchCommits(search?: string) {
     if (!isBranchMode) return
+    const q = search ?? debouncedSearch
     setBranchCommits([])
     setMergeBase(undefined)
     setMergeBaseBranch(undefined)
@@ -92,7 +112,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
     setSelectedCommit(null)
     offsetRef.current = 0
     setLoadingBranch(true)
-    getBranchCommits(terminalId, props.branch, 20, 0)
+    getBranchCommits(terminalId, props.branch, 20, 0, q)
       .then((data) => {
         setBranchCommits(data.commits)
         setHasMore(data.hasMore)
@@ -107,10 +127,10 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
       .finally(() => setLoadingBranch(false))
   }
 
-  // Initial fetch for branch mode
+  // Initial fetch and re-fetch on search change
   useEffect(() => {
-    refreshBranchCommits()
-  }, [isBranchMode, terminalId, props.branch])
+    refreshBranchCommits(debouncedSearch)
+  }, [isBranchMode, terminalId, props.branch, debouncedSearch])
 
   // Intersection observer for infinite scroll (branch mode)
   useEffect(() => {
@@ -127,7 +147,13 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
           !loadingBranch
         ) {
           setLoadingMore(true)
-          getBranchCommits(terminalId, props.branch, 20, offsetRef.current)
+          getBranchCommits(
+            terminalId,
+            props.branch,
+            20,
+            offsetRef.current,
+            debouncedSearch,
+          )
             .then((data) => {
               setBranchCommits((prev) => [...prev, ...data.commits])
               setHasMore(data.hasMore)
@@ -148,6 +174,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
     loadingBranch,
     terminalId,
     props.branch,
+    debouncedSearch,
   ])
 
   // Notify parent when noRemote is detected (compare mode only)
@@ -415,17 +442,42 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
           maxSize="50%"
         >
           <div className="flex flex-col overflow-hidden h-full">
-            <div className="px-2 py-1.5 border-b border-zinc-700">
-              <span className="text-xs text-zinc-500 uppercase tracking-wider">
-                Commits ({commits.length})
-              </span>
+            <div className="border-b border-zinc-700">
+              <div className="px-2 py-1.5">
+                <span className="text-xs text-zinc-500 uppercase tracking-wider">
+                  Commits{searchInput?.length > 0 ? `(${commits.length})` : ''}
+                </span>
+              </div>
             </div>
+            {isBranchMode && (
+              <div className="relative px-2 py-1.5">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 pl-6 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+            )}
             <div
               className="flex-1 overflow-y-auto"
               ref={isBranchMode ? scrollRef : undefined}
             >
               {renderCommitList()}
             </div>
+            {selectedCommitObj?.body &&
+              selectedCommitObj.body !== selectedCommitObj.message && (
+                <div className="border-t border-zinc-700 h-[150px] overflow-y-auto">
+                  <div className="p-2 font-mono text-[11px] text-zinc-500">
+                    {selectedCommitObj.hash}
+                  </div>
+                  <pre className="whitespace-pre-wrap text-[11px] text-zinc-400 p-2 pt-0">
+                    <MarkdownContent content={selectedCommitObj.body} />
+                  </pre>
+                </div>
+              )}
           </div>
         </Panel>
         <Separator className="panel-resize-handle" />

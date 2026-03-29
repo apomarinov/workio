@@ -33,6 +33,7 @@ export interface ChangedFile {
 export interface Commit {
   hash: string
   message: string
+  body: string
   author: string
   date: string
 }
@@ -119,6 +120,7 @@ export const fileDiffInput = terminalIdInput.extend({
 export const branchCommitsInput = branchInput.extend({
   limit: z.number().min(1).max(100).default(20),
   offset: z.number().min(0).default(0),
+  search: z.string().optional(),
 })
 
 // Commit mutation inputs
