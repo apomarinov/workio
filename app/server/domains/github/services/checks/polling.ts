@@ -3,10 +3,7 @@ import { detectGitBranch } from '@domains/git/services/status'
 import type { PRCheckStatus } from '@domains/github/schema'
 import { getSettings } from '@domains/settings/db'
 import { getServerConfig } from '@domains/settings/server-config'
-import {
-  getAllTerminals,
-  getTerminalById,
-} from '@domains/workspace/db/terminals'
+import { getTerminalById, getTerminals } from '@domains/workspace/db/terminals'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { log } from '@server/logger'
@@ -314,7 +311,7 @@ export async function initGitHubChecks() {
     })
   })
 
-  const terminals = await getAllTerminals()
+  const terminals = await getTerminals()
   for (const terminal of terminals) {
     monitoredTerminals.set(terminal.id, terminal.cwd)
   }

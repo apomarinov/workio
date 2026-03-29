@@ -8,8 +8,8 @@ import {
   updateSessionData,
 } from '@domains/sessions/db'
 import {
-  getAllTerminals,
   getTerminalById,
+  getTerminals,
   upsertProject,
 } from '@domains/workspace/db/terminals'
 import { env } from '@server/env'
@@ -20,7 +20,7 @@ import { log } from '@server/logger'
 export async function backfillCheck(weeksBack: number) {
   const cutoff = Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000
 
-  const allTerminals = await getAllTerminals()
+  const allTerminals = await getTerminals()
   const localTerminals = allTerminals.filter((t) => !t.ssh_host)
 
   const results: {

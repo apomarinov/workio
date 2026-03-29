@@ -4,9 +4,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { getSessionById, updateSessionMove } from '@domains/sessions/db'
 import {
-  getAllTerminals,
   getProjectByPath,
   getTerminalById,
+  getTerminals,
 } from '@domains/workspace/db/terminals'
 import { withTransaction } from '@server/lib/db'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
@@ -23,7 +23,7 @@ export async function getMoveTargets(sessionId: string) {
   const sessionSshHost = sessionTerminal?.ssh_host ?? null
 
   // Get all terminals, filter by same SSH context
-  const allTerminals = await getAllTerminals()
+  const allTerminals = await getTerminals()
   const eligible = allTerminals.filter((t) => {
     if (sessionSshHost) {
       return t.ssh_host === sessionSshHost

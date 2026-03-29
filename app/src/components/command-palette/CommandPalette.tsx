@@ -49,7 +49,6 @@ import { CreateBranchDialog } from '@/components/CreateBranchDialog'
 import { DirectoryBrowser } from '@/components/DirectoryBrowser'
 import { EditPRDialog } from '@/components/dialogs/EditPRDialog'
 import { RenameModal } from '@/components/EditSessionModal'
-import { EditTerminalModal } from '@/components/EditTerminalModal'
 import { MergePRModal } from '@/components/MergePRModal'
 import { RerunChecksModal } from '@/components/RerunChecksModal'
 import { CommandPaletteCore } from './CommandPaletteCore'
@@ -80,7 +79,6 @@ export function CommandPalette() {
   const [stack, setStack] = useState<PaletteLevel[]>([initialLevel])
 
   // Modal state (not navigation-related, stays separate)
-  const [editTerminal, setEditTerminal] = useState<Terminal | null>(null)
   const [deleteTerminalTarget, setDeleteTerminalTarget] =
     useState<Terminal | null>(null)
   const [deleteDirectory, setDeleteDirectory] = useState(false)
@@ -156,14 +154,8 @@ export function CommandPalette() {
     trpc.workspace.system.openInExplorer.useMutation()
 
   // Context data
-  const {
-    terminals,
-    selectTerminal,
-    createTerminal,
-    updateTerminal,
-    deleteTerminal,
-    refetch,
-  } = useWorkspaceContext()
+  const { terminals, selectTerminal, createTerminal, deleteTerminal, refetch } =
+    useWorkspaceContext()
   const { githubPRs, mergedPRs } = useGitHubContext()
   const {
     sessions,
@@ -717,7 +709,15 @@ export function CommandPalette() {
       },
       openEditModal: (terminal) => {
         closePalette()
-        setTimeout(() => setEditTerminal(terminal), 150)
+        setTimeout(
+          () =>
+            window.dispatchEvent(
+              new CustomEvent('open-terminal-modal', {
+                detail: { terminalId: terminal.id },
+              }),
+            ),
+          150,
+        )
       },
       openDeleteModal: (terminal) => {
         closePalette()
@@ -1310,18 +1310,6 @@ export function CommandPalette() {
         onBreadcrumbClick={handleBreadcrumbClick}
         onSearchChange={setSearchText}
       />
-
-      {editTerminal && (
-        <EditTerminalModal
-          open={!!editTerminal}
-          terminal={editTerminal}
-          onSave={async ({ name, settings }) => {
-            await updateTerminal(editTerminal.id, { name, settings })
-            setEditTerminal(null)
-          }}
-          onCancel={() => setEditTerminal(null)}
-        />
-      )}
 
       {deleteTerminalTarget && (
         <ConfirmModal

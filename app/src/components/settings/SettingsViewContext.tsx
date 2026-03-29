@@ -172,7 +172,7 @@ export function SettingsViewProvider({
     const rootKey = path.split('.')[0]
     const fieldSchema =
       updateSettingsFormInput.shape[
-      rootKey as keyof typeof updateSettingsFormInput.shape
+        rootKey as keyof typeof updateSettingsFormInput.shape
       ]
     if (!fieldSchema) return
     const updated = setByPath({ ...formValues }, path, value)

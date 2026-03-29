@@ -119,7 +119,7 @@ function AppContent() {
             size="lg"
             className="gap-2 text-base"
             onClick={() =>
-              window.dispatchEvent(new Event('open-create-terminal'))
+              window.dispatchEvent(new CustomEvent('open-terminal-modal'))
             }
           >
             <Plus className="w-5 h-5" />

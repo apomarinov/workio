@@ -5,11 +5,15 @@ import {
   PAGE_SIZE,
   sshHostInput,
 } from '@domains/workspace/schema/system'
-import { getParentAppNameCached } from '@domains/workspace/services/system'
+import {
+  getParentAppNameCached,
+  parseShells,
+} from '@domains/workspace/services/system'
 import { expandPath, shellEscape } from '@server/lib/strings'
 import { listSSHHosts, validateSSHHost } from '@server/ssh/config'
 import { execSSHCommandLogged } from '@server/ssh/exec'
 import { publicProcedure } from '@server/trpc'
+import { z } from 'zod'
 
 export const sshHosts = publicProcedure.query(() => {
   return listSSHHosts()
@@ -35,45 +39,24 @@ export const sshAudit = publicProcedure
     }
   })
 
-export const sshShells = publicProcedure
-  .input(sshHostInput)
+export const listShells = publicProcedure
+  .input(z.object({ host: z.string().optional() }))
   .query(async ({ input }) => {
-    const validation = validateSSHHost(input.host)
-    if (!validation.valid) {
-      throw new Error(validation.error)
+    if (input.host) {
+      const validation = validateSSHHost(input.host)
+      if (!validation.valid) throw new Error(validation.error)
+      const { stdout } = await execSSHCommandLogged(
+        input.host,
+        'echo "LOGIN:$SHELL" && cat /etc/shells 2>/dev/null',
+        { category: 'workspace', errorOnly: true, timeout: 5000 },
+      )
+      return parseShells(stdout)
     }
-    const { stdout } = await execSSHCommandLogged(
-      input.host,
-      'echo "LOGIN:$SHELL" && cat /etc/shells 2>/dev/null',
-      { category: 'workspace', errorOnly: true, timeout: 5000 },
-    )
-    const lines = stdout.split('\n')
-    const loginLine = lines.find((l) => l.startsWith('LOGIN:'))
-    const loginShell = loginLine?.slice(6).trim() || null
-
-    const KNOWN_SHELLS = new Set([
-      'sh',
-      'bash',
-      'zsh',
-      'fish',
-      'dash',
-      'ksh',
-      'csh',
-      'tcsh',
-      'nu',
-    ])
-    const seen = new Set<string>()
-    const shells: string[] = []
-    for (const raw of lines) {
-      const line = raw.trim()
-      if (!line || line.startsWith('#') || line.startsWith('LOGIN:')) continue
-      const name = line.split('/').pop()!
-      if (!KNOWN_SHELLS.has(name)) continue
-      if (seen.has(name)) continue
-      seen.add(name)
-      shells.push(line)
-    }
-    return { shells, loginShell }
+    const loginShell = process.env.SHELL || null
+    const content = await fs.promises
+      .readFile('/etc/shells', 'utf-8')
+      .catch(() => '')
+    return parseShells(`LOGIN:${loginShell}\n${content}`)
   })
 
 export const listDirectories = publicProcedure

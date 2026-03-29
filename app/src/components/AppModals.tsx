@@ -4,9 +4,9 @@ import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { toastError } from '@/lib/toastError'
-import { CreateTerminalModal } from './CreateTerminalModal'
 import { PortMappingModal } from './PortMappingModal'
 import { PRModal } from './PRModal'
+import { TerminalModal } from './TerminalModal'
 
 const BranchCommitsDialog = lazy(() =>
   import('./dialogs/BranchCommitsDialog').then((m) => ({
@@ -28,12 +28,19 @@ export function AppModals() {
   const { selectTerminal, mapPort } = useWorkspaceContext()
   const { clearSession } = useSessionContext()
 
-  // Create terminal modal
-  const [createModalOpen, setCreateModalOpen] = useState(false)
+  // Terminal modal (create + edit)
+  const [terminalModal, setTerminalModal] = useState<
+    { terminalId?: number } | undefined
+  >()
   useEffect(() => {
-    const handler = () => setCreateModalOpen(true)
-    window.addEventListener('open-create-terminal', handler)
-    return () => window.removeEventListener('open-create-terminal', handler)
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { terminalId?: number }
+        | undefined
+      setTerminalModal(detail ?? {})
+    }
+    window.addEventListener('open-terminal-modal', handler)
+    return () => window.removeEventListener('open-terminal-modal', handler)
   }, [])
 
   // Branch commits dialog
@@ -142,14 +149,16 @@ export function AppModals() {
 
   return (
     <>
-      <CreateTerminalModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-        onCreated={(id) => {
-          selectTerminal(id)
-          clearSession()
-        }}
-      />
+      {terminalModal && (
+        <TerminalModal
+          onClose={() => setTerminalModal(undefined)}
+          terminalId={terminalModal.terminalId}
+          onCreated={(id) => {
+            selectTerminal(id)
+            clearSession()
+          }}
+        />
+      )}
       {branchCommitsTarget && (
         <Suspense>
           <BranchCommitsDialog

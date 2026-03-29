@@ -23,22 +23,21 @@ async function attachShellsToTerminals(terminals: Terminal[]) {
   return terminals
 }
 
-export async function getAllTerminals() {
-  const { rows } = await pool.query<Terminal>(`
-    SELECT * FROM terminals
-    ORDER BY created_at DESC
-  `)
+export async function getTerminals(id?: number) {
+  let sql = 'SELECT * FROM terminals'
+  const params: unknown[] = []
+  if (id) {
+    sql += ' WHERE id = $1'
+    params.push(id)
+  }
+  sql += ' ORDER BY created_at DESC'
+  const { rows } = await pool.query<Terminal>(sql, params)
   return attachShellsToTerminals(rows)
 }
 
 export async function getTerminalById(id: number) {
-  const { rows } = await pool.query<Terminal>(
-    `SELECT * FROM terminals WHERE id = $1`,
-    [id],
-  )
-  if (rows.length === 0) return undefined
-  const [terminal] = await attachShellsToTerminals(rows)
-  return terminal
+  const terminals = await getTerminals(id)
+  return terminals[0]
 }
 
 // Generate unique terminal name by appending -1, -2, etc. if name exists
@@ -120,6 +119,7 @@ export async function updateTerminal(
   id: number,
   updates: {
     name?: string
+    shell?: string | null
     cwd?: string
     pid?: number | null
     status?: string
@@ -131,6 +131,7 @@ export async function updateTerminal(
 ) {
   const set = buildSetClauses({
     name: updates.name,
+    shell: updates.shell,
     cwd: updates.cwd,
     pid: updates.pid,
     status: updates.status,

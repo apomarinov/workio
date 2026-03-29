@@ -49,6 +49,7 @@ interface WorkspaceContextValue {
     id: number,
     updates: {
       name?: string
+      shell?: string | null
       settings?: {
         defaultClaudeCommand?: string
         portMappings?: { port: number; localPort: number }[]
@@ -392,6 +393,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       id: number,
       updates: {
         name?: string
+        shell?: string | null
         settings?: {
           defaultClaudeCommand?: string
           portMappings?: { port: number; localPort: number }[]

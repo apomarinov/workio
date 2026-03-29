@@ -8,8 +8,8 @@ import { detectBranch } from '@domains/git/services/branch-detection'
 import { detectGitHubRepo } from '@domains/git/services/resolve'
 import { logCommand } from '@domains/logs/db'
 import {
-  getAllTerminals,
   getTerminalById,
+  getTerminals,
   updateTerminal,
 } from '@domains/workspace/db/terminals'
 import { emitWorkspace } from '@domains/workspace/services/emit'
@@ -493,7 +493,7 @@ async function scanAndEmitGitDirty() {
   const checks: Promise<void>[] = []
 
   try {
-    const terminals = await getAllTerminals()
+    const terminals = await getTerminals()
     for (const terminal of terminals) {
       if (!terminal.git_branch) continue
       if (terminal.ssh_host && !hasActiveSessionsFn(terminal.id)) continue

@@ -561,7 +561,7 @@ export function Sidebar() {
             className="h-6 w-6"
             title="New Project"
             onClick={() =>
-              window.dispatchEvent(new Event('open-create-terminal'))
+              window.dispatchEvent(new CustomEvent('open-terminal-modal'))
             }
           >
             <Plus className="w-4 h-4" />

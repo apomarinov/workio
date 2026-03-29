@@ -2,24 +2,6 @@ import { api as gh } from './trpc'
 
 // --- GitHub ---
 
-export async function getGitHubRepos(query?: string) {
-  try {
-    const { repos } = await gh.github.repos.query({ q: query })
-    return repos
-  } catch {
-    return [] as string[]
-  }
-}
-
-export async function checkConductor(repo: string) {
-  try {
-    const { hasConductor } = await gh.github.conductor.query({ repo })
-    return hasConductor
-  } catch {
-    return false
-  }
-}
-
 export async function requestPRReview(
   owner: string,
   repo: string,

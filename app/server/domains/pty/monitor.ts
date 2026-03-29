@@ -34,10 +34,7 @@ import {
   type PtySession,
 } from '@domains/pty/session'
 import { updateShell } from '@domains/workspace/db/shells'
-import {
-  getAllTerminals,
-  getTerminalById,
-} from '@domains/workspace/db/terminals'
+import { getTerminalById, getTerminals } from '@domains/workspace/db/terminals'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { sanitizeName } from '@server/lib/strings'
@@ -585,7 +582,7 @@ async function scanAndEmitAllProcesses() {
           })
         }
       }
-      const terminals = await getAllTerminals()
+      const terminals = await getTerminals()
       for (const terminal of terminals) {
         if (sessionTerminalIds.has(terminal.id)) continue
         const terminalName = terminal.name || `terminal-${terminal.id}`

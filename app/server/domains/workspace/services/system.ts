@@ -25,6 +25,29 @@ async function getParentAppName() {
   return null
 }
 
+// ── Shell parsing ───────────────────────────────────────────────────
+
+const KNOWN_SHELLS = new Set(['bash', 'zsh', 'fish', 'nu'])
+
+export function parseShells(stdout: string) {
+  const lines = stdout.split('\n')
+  const loginLine = lines.find((l) => l.startsWith('LOGIN:'))
+  const loginShell = loginLine?.slice(6).trim() || null
+
+  const seen = new Set<string>()
+  const shells: string[] = []
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#') || line.startsWith('LOGIN:')) continue
+    const name = line.split('/').pop()!
+    if (!KNOWN_SHELLS.has(name)) continue
+    if (seen.has(name)) continue
+    seen.add(name)
+    shells.push(line)
+  }
+  return { shells, loginShell }
+}
+
 // Lazily cached parent app name
 let parentAppNamePromise: Promise<string | null> | null = null
 export function getParentAppNameCached() {
