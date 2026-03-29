@@ -383,23 +383,16 @@ body {
   line-height: 1.25rem;
 }
 
-/* ── Line number hover button (injected dynamically on mouseover) ── */
-.d2h-dark-color-scheme .diff-line-open-btn {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #71717a;
-  cursor: pointer;
-  background: inherit;
-  border: none;
-  padding: 0;
-}
-.d2h-dark-color-scheme .diff-line-open-btn:hover {
-  color: #d4d4d8;
-}
 
+/* ── Monaco diff: clickable line numbers ── */
+.monaco-diff-editor .line-numbers,
+.monaco-diff-editor .margin-view-overlays .line-numbers {
+  cursor: pointer !important;
+}
+.diff-line-number-hover {
+  color: #d4d4d8 !important;
+  text-decoration: underline;
+}
 
 /* ── Row hover ── */
 .d2h-dark-color-scheme tr.d2h-ins:hover td {

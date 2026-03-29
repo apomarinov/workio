@@ -1,6 +1,9 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import {
   branchCommitsInput,
   changedFilesInput,
+  fileContentsInput,
   fileDiffInput,
   headBaseInput,
   terminalIdInput,
@@ -193,6 +196,145 @@ export const fileDiff = publicProcedure
     }
 
     return { diff }
+  })
+
+function extToMonacoLanguage(ext: string): string {
+  const map: Record<string, string> = {
+    ts: 'typescript',
+    tsx: 'typescript',
+    js: 'javascript',
+    jsx: 'javascript',
+    mjs: 'javascript',
+    json: 'json',
+    jsonc: 'json',
+    css: 'css',
+    scss: 'scss',
+    less: 'less',
+    html: 'html',
+    htm: 'html',
+    md: 'markdown',
+    mdx: 'markdown',
+    py: 'python',
+    rs: 'rust',
+    go: 'go',
+    java: 'java',
+    rb: 'ruby',
+    php: 'php',
+    sh: 'shell',
+    bash: 'shell',
+    zsh: 'shell',
+    yaml: 'yaml',
+    yml: 'yaml',
+    xml: 'xml',
+    svg: 'xml',
+    sql: 'sql',
+    graphql: 'graphql',
+    gql: 'graphql',
+    dockerfile: 'dockerfile',
+    c: 'c',
+    h: 'c',
+    cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
+    hpp: 'cpp',
+    cs: 'csharp',
+    swift: 'swift',
+    kt: 'kotlin',
+    kts: 'kotlin',
+    toml: 'ini',
+    ini: 'ini',
+    lua: 'lua',
+    r: 'r',
+  }
+  return map[ext] || 'plaintext'
+}
+
+export const fileContents = publicProcedure
+  .input(fileContentsInput)
+  .query(async ({ input }) => {
+    const terminal = await resolveGitTerminal(input.terminalId)
+    const filePath = input.path
+    const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+    const safe = (
+      args: string[],
+      extraOpts?: { maxBuffer?: number; sshCmd?: string },
+    ) =>
+      gitExecLogged(terminal, args, {
+        terminalId: input.terminalId,
+        errorOnly: true,
+        timeout: 10000,
+        ...extraOpts,
+      }).then(
+        (r) => r.stdout,
+        () => '',
+      )
+
+    // Detect binary via numstat
+    if (input.base) {
+      const numstat = await safe([
+        'diff',
+        '--numstat',
+        input.base,
+        '--',
+        filePath,
+      ])
+      if (numstat.startsWith('-\t-\t')) {
+        return {
+          original: '',
+          modified: '',
+          language: 'plaintext',
+          binary: true,
+        }
+      }
+    } else {
+      const numstat = await safe(['diff', '--numstat', 'HEAD', '--', filePath])
+      if (numstat.startsWith('-\t-\t')) {
+        return {
+          original: '',
+          modified: '',
+          language: 'plaintext',
+          binary: true,
+        }
+      }
+    }
+
+    // Get original content
+    let originalRef = 'HEAD'
+    if (input.base) {
+      const parts = input.base.includes('...')
+        ? input.base.split('...')
+        : input.base.split('..')
+      originalRef = parts[0]
+    }
+    const original = await safe(['show', `${originalRef}:${filePath}`], {
+      maxBuffer: 10 * 1024 * 1024,
+    })
+
+    // Get modified content
+    let modified: string
+    if (input.base) {
+      const parts = input.base.includes('...')
+        ? input.base.split('...')
+        : input.base.split('..')
+      const rightRef = parts.length > 1 ? parts[1] : parts[0]
+      modified = await safe(['show', `${rightRef}:${filePath}`], {
+        maxBuffer: 10 * 1024 * 1024,
+      })
+    } else if (terminal.ssh_host) {
+      modified = await safe([], {
+        sshCmd: `cat '${filePath}'`,
+        maxBuffer: 10 * 1024 * 1024,
+      })
+    } else {
+      const fullPath = path.join(cwd, filePath)
+      modified = await fs.promises.readFile(fullPath, 'utf-8').catch(() => '')
+    }
+
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+    const language = extToMonacoLanguage(ext)
+
+    return { original, modified, language, binary: false }
   })
 
 export const commits = publicProcedure

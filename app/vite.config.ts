@@ -92,6 +92,7 @@ export default defineConfig(({ mode }) => {
               'katex',
             ],
             diff2html: ['diff2html'],
+            'monaco-react': ['@monaco-editor/react'],
             dndkit: [
               '@dnd-kit/core',
               '@dnd-kit/sortable',

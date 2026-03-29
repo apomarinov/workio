@@ -342,7 +342,7 @@ export function SessionSearchPanel({
                                 className={cn(
                                   'w-2.5 h-2.5 transition-transform',
                                   !expandedBranches.has(match.session_id) &&
-                                    '-rotate-90',
+                                  '-rotate-90',
                                 )}
                               />
                               More Branches
@@ -543,13 +543,13 @@ export function SessionSearchPanel({
                   <ChevronDown className="w-3 h-3 ml-1 shrink-0 opacity-50 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-72 p-0" align="start">
+              <PopoverContent className="min-w-72 w-fit max-w-[600px] p-0" align="start">
                 <Command shouldFilter={true}>
                   <CommandInput placeholder="Filter..." />
                   <CommandList>
                     <CommandEmpty>No matches</CommandEmpty>
                     <CommandItem
-                      className="rounded-none"
+                      className="rounded-none bg-zinc-800/50"
                       value="__all__"
                       onSelect={() => {
                         setSelectedRepo(null)
@@ -562,14 +562,14 @@ export function SessionSearchPanel({
                         <Check className="ml-auto h-3 w-3" />
                       )}
                     </CommandItem>
-                    {repoBranches.map((rb) => {
+                    {repoBranches.map((rb, i) => {
                       const repo = rb.repo.split('/').pop()
                       const label = `${rb.repo.split('/').pop()}/${rb.branch}`
                       const isSelected =
                         selectedRepo === rb.repo && selectedBranch === rb.branch
                       return (
                         <CommandItem
-                          className="rounded-none"
+                          className={`rounded-none cursor-pointer py-0.5 ${i % 2 === 1 ? 'bg-zinc-800/50' : ''}`}
                           key={`${rb.repo}\0${rb.branch}`}
                           value={label}
                           onSelect={() => {
@@ -580,7 +580,7 @@ export function SessionSearchPanel({
                         >
                           <div className="flex flex-col">
                             <span className="text-[12px]">{rb.branch}</span>
-                            <span className="text-[10px] flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                               <Github className="w-2.5 h-2.5 max-w-2.5" />
                               {repo}
                             </span>

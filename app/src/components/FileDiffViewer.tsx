@@ -1,11 +1,10 @@
-import { ColorSchemeType } from 'diff2html/lib-esm/types'
-import { Diff2HtmlUI } from 'diff2html/lib-esm/ui/js/diff2html-ui-slim'
+import { DiffEditor, type DiffOnMount } from '@monaco-editor/react'
 import {
   ChevronDown,
-  ChevronsDownUp,
-  ChevronsUpDown,
   ChevronUp,
   ExternalLink,
+  ListChevronsDownUp,
+  ListChevronsUpDown,
   Loader2,
   Maximize2,
   X,
@@ -18,117 +17,77 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useIsMobile } from '@/hooks/useMediaQuery'
+import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 
-const D2H_CONFIG = {
-  outputFormat: 'line-by-line' as const,
-  drawFileList: false,
-  matching: 'words' as const,
-  diffStyle: 'word' as const,
-  colorScheme: ColorSchemeType.DARK,
-  highlight: true,
-  stickyFileHeaders: false,
-  fileContentToggle: false,
-  fileListToggle: false,
-  smartSelection: true,
-}
+type DiffEditorInstance = Parameters<DiffOnMount>[0]
 
-/** Inner component that renders diff via Diff2HtmlUI into a DOM ref */
+/** Inner component that renders Monaco DiffEditor in inline (unified) mode */
 function DiffContent({
-  diffString,
-  currentHunkIndex,
+  original,
+  modified,
+  language,
   filePath,
   preferredIde,
   terminalId,
+  editorRef,
+  showFullFile,
+  fontSize,
 }: {
-  diffString: string
-  currentHunkIndex: number
+  original: string
+  modified: string
+  language: string
   filePath: string
   preferredIde: 'cursor' | 'vscode'
   terminalId: number
+  editorRef: React.MutableRefObject<DiffEditorInstance | null>
+  showFullFile: boolean
+  fontSize: number
 }) {
   const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const prevDiffRef = useRef<string>('')
 
-  // Render diff2html when diffString changes
+  // Scroll to top when file changes
   useEffect(() => {
-    const el = containerRef.current
-    if (!el || !diffString) return
-    if (diffString === prevDiffRef.current) return
-    prevDiffRef.current = diffString
+    const editor = editorRef.current
+    if (!editor) return
+    editor.getModifiedEditor().setScrollTop(0)
+  }, [filePath])
 
-    const ui = new Diff2HtmlUI(el, diffString, D2H_CONFIG)
-    ui.draw()
-    ui.highlightCode()
-  }, [diffString])
+  const handleMount: DiffOnMount = (editor, monaco) => {
+    editorRef.current = editor
+    const modifiedEditor = editor.getModifiedEditor()
 
-  // Hunk navigation via DOM query + scrollIntoView
-  const prevHunkRef = useRef(-1)
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el || currentHunkIndex < 0) return
-    if (currentHunkIndex === prevHunkRef.current) return
-    prevHunkRef.current = currentHunkIndex
-
-    const hunkRows = el.querySelectorAll('.d2h-info')
-    if (hunkRows[currentHunkIndex]) {
-      hunkRows[currentHunkIndex].scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    }
-  }, [currentHunkIndex])
-
-  // Line number hover: inject open-in-IDE button on row hover
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-
-    let activeBtn: HTMLButtonElement | null = null
-    let activeRow: HTMLElement | null = null
-    let hiddenNums: HTMLElement[] = []
-
-    const cleanup = () => {
-      if (activeBtn) {
-        activeBtn.remove()
-        activeBtn = null
+    // Highlight line numbers on hover to indicate clickability
+    let decorationIds: string[] = []
+    modifiedEditor.onMouseMove((e) => {
+      const line = e.target.position?.lineNumber
+      if (!line) {
+        decorationIds = modifiedEditor.deltaDecorations(decorationIds, [])
+        return
       }
-      for (const el of hiddenNums) el.style.visibility = ''
-      hiddenNums = []
-      activeRow = null
-    }
+      decorationIds = modifiedEditor.deltaDecorations(decorationIds, [
+        {
+          range: new monaco.Range(line, 1, line, 1),
+          options: {
+            lineNumberClassName: 'diff-line-number-hover',
+            lineNumberHoverMessage: { value: `Open in ${preferredIde}` },
+          },
+        },
+      ])
+    })
+    modifiedEditor.onMouseLeave(() => {
+      decorationIds = modifiedEditor.deltaDecorations(decorationIds, [])
+    })
 
-    const onOver = (e: MouseEvent) => {
-      const row = (e.target as HTMLElement).closest('tr')
-      if (!row || row === activeRow) return
-      cleanup()
-      activeRow = row
-
-      const cell = row.querySelector('.d2h-code-linenumber') as HTMLElement
-      if (!cell) return
-      const num2 = cell.querySelector('.line-num2') as HTMLElement
-      const lineText = num2?.textContent?.trim()
-      if (!lineText) return
-      const lineNum = Number.parseInt(lineText, 10)
-      if (Number.isNaN(lineNum)) return
-
-      // Hide line numbers
-      const nums = cell.querySelectorAll<HTMLElement>('.line-num1, .line-num2')
-      for (const n of nums) {
-        n.style.visibility = 'hidden'
-        hiddenNums.push(n)
-      }
-
-      const btn = document.createElement('button')
-      btn.className = 'diff-line-open-btn'
-      btn.title = `Open at line ${lineNum}`
-      btn.innerHTML =
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>'
-      btn.addEventListener('click', (ev) => {
-        ev.preventDefault()
-        ev.stopPropagation()
+    // Click on line number → open in IDE
+    modifiedEditor.onMouseDown((e) => {
+      if (
+        e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS &&
+        e.target.position
+      ) {
+        const lineNum = e.target.position.lineNumber
         openInIdeMutation
           .mutateAsync({
             path: `${filePath}:${lineNum}`,
@@ -136,23 +95,48 @@ function DiffContent({
             terminal_id: terminalId,
           })
           .catch((err: unknown) => toastError(err, 'Failed to open in IDE'))
-      })
-      cell.appendChild(btn)
-      activeBtn = btn
-    }
+      }
+    })
+  }
 
-    const onLeave = () => cleanup()
-
-    el.addEventListener('mouseover', onOver)
-    el.addEventListener('mouseleave', onLeave)
-    return () => {
-      el.removeEventListener('mouseover', onOver)
-      el.removeEventListener('mouseleave', onLeave)
-      cleanup()
-    }
-  }, [filePath, preferredIde, terminalId])
-
-  return <div ref={containerRef} className="diff-viewer-content" />
+  return (
+    <DiffEditor
+      original={original}
+      modified={modified}
+      language={language}
+      theme="vs-dark"
+      onMount={handleMount}
+      loading={
+        <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading editor...
+        </div>
+      }
+      options={{
+        renderSideBySide: false,
+        readOnly: true,
+        originalEditable: false,
+        fontSize,
+        lineHeight: 20,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        renderOverviewRuler: false,
+        automaticLayout: true,
+        glyphMargin: false,
+        hideUnchangedRegions: {
+          enabled: !showFullFile,
+          contextLineCount: 3,
+          minimumLineCount: 3,
+        },
+        folding: false,
+        lineNumbersMinChars: 4,
+        scrollbar: {
+          verticalScrollbarSize: 8,
+          horizontalScrollbarSize: 8,
+        },
+      }}
+    />
+  )
 }
 
 interface FileDiffViewerProps {
@@ -169,50 +153,28 @@ export function FileDiffViewer({
   base,
 }: FileDiffViewerProps) {
   const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
-  const [showFullFile, setShowFullFile] = useState(false)
+  const { settings } = useSettings()
+  const isMobile = useIsMobile()
+  const fontSize = isMobile ? settings.mobile_font_size : settings.font_size
   const [maximized, setMaximized] = useState(false)
-  const [currentHunkIndex, setCurrentHunkIndex] = useState(0)
-  const hunkCountRef = useRef(0)
+  const [showFullFile, setShowFullFile] = useState(false)
+  const editorRef = useRef<DiffEditorInstance | null>(null)
 
-  const context = showFullFile ? '99999' : '5'
-  const {
-    data: diffData,
-    isLoading,
-    error,
-  } = trpc.git.diff.fileDiff.useQuery(
+  const { data, isLoading, error } = trpc.git.diff.fileContents.useQuery(
     {
       terminalId,
-      path: filePath ?? undefined,
-      context,
+      path: filePath ?? '',
       base: base ?? undefined,
     },
     {
       enabled: filePath != null,
-      placeholderData: (prev) => prev,
     },
   )
-  const diffString = diffData?.diff
-
-  // Count hunks in raw diff for navigation
-  useEffect(() => {
-    if (!diffString) {
-      hunkCountRef.current = 0
-      return
-    }
-    const matches = diffString.match(/^@@ /gm)
-    hunkCountRef.current = matches?.length ?? 0
-    setCurrentHunkIndex(0)
-  }, [diffString])
-
-  const hunkCount = hunkCountRef.current
 
   const navigateHunk = (direction: 'prev' | 'next') => {
-    if (hunkCount === 0) return
-    const nextIndex =
-      direction === 'prev'
-        ? Math.max(0, currentHunkIndex - 1)
-        : Math.min(hunkCount - 1, currentHunkIndex + 1)
-    setCurrentHunkIndex(nextIndex)
+    const editor = editorRef.current
+    if (!editor) return
+    editor.goToDiff(direction === 'next' ? 'next' : 'previous')
   }
 
   if (!filePath) {
@@ -223,7 +185,7 @@ export function FileDiffViewer({
     )
   }
 
-  if (isLoading && !diffString) {
+  if (isLoading && !data) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-zinc-500">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -240,7 +202,7 @@ export function FileDiffViewer({
     )
   }
 
-  if (!diffString || diffString.trim().length === 0) {
+  if (!data) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-zinc-500">
         No changes
@@ -248,9 +210,7 @@ export function FileDiffViewer({
     )
   }
 
-  const isBinary = diffString.includes('Binary files')
-
-  if (isBinary) {
+  if (data.binary) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-zinc-500">
         Binary file — cannot display diff
@@ -258,33 +218,50 @@ export function FileDiffViewer({
     )
   }
 
+  if (data.original === data.modified) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+        No changes
+      </div>
+    )
+  }
+
+  const diffEditor = (
+    <DiffContent
+      key={filePath}
+      original={data.original}
+      modified={data.modified}
+      language={data.language}
+      filePath={filePath}
+      preferredIde={preferredIde}
+      terminalId={terminalId}
+      editorRef={editorRef}
+      showFullFile={showFullFile}
+      fontSize={fontSize}
+    />
+  )
+
   const toolbar = (onClose?: () => void) => (
     <div className="flex items-center gap-1 border-b border-zinc-700 px-2 py-1 flex-shrink-0">
       <span className="truncate text-xs text-zinc-500 mr-auto">{filePath}</span>
-      {!onClose && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => {
-            setShowFullFile(!showFullFile)
-            setCurrentHunkIndex(0)
-          }}
-          title={showFullFile ? 'Compact view' : 'Full file'}
-        >
-          {showFullFile ? (
-            <ChevronsDownUp className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronsUpDown className="h-3.5 w-3.5" />
-          )}
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={`h-7 w-7 ${showFullFile ? 'bg-zinc-700' : ''}`}
+        onClick={() => setShowFullFile(!showFullFile)}
+        title={showFullFile ? 'Compact view' : 'Full file'}
+      >
+        {showFullFile ? (
+          <ListChevronsDownUp className="h-3.5 w-3.5" />
+        ) : (
+          <ListChevronsUpDown className="h-3.5 w-3.5" />
+        )}
+      </Button>
       <Button
         variant="ghost"
         size="icon"
         className="h-7 w-7"
         onClick={() => navigateHunk('prev')}
-        disabled={hunkCount === 0 || currentHunkIndex === 0}
         title="Previous change"
       >
         <ChevronUp className="h-3.5 w-3.5" />
@@ -294,7 +271,6 @@ export function FileDiffViewer({
         size="icon"
         className="h-7 w-7"
         onClick={() => navigateHunk('next')}
-        disabled={hunkCount === 0 || currentHunkIndex >= hunkCount - 1}
         title="Next change"
       >
         <ChevronDown className="h-3.5 w-3.5" />
@@ -345,15 +321,7 @@ export function FileDiffViewer({
       <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
         {toolbar()}
         <div className="relative flex-1 min-h-0">
-          <div className="absolute inset-0 overflow-auto">
-            <DiffContent
-              diffString={diffString}
-              currentHunkIndex={currentHunkIndex}
-              filePath={filePath}
-              preferredIde={preferredIde}
-              terminalId={terminalId}
-            />
-          </div>
+          {!maximized && diffEditor}
         </div>
       </div>
 
@@ -368,15 +336,7 @@ export function FileDiffViewer({
           <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col">
             {toolbar(() => setMaximized(false))}
             <div className="relative flex-1 min-h-0">
-              <div className="absolute inset-0 overflow-auto">
-                <DiffContent
-                  diffString={diffString}
-                  currentHunkIndex={currentHunkIndex}
-                  filePath={filePath}
-                  preferredIde={preferredIde}
-                  terminalId={terminalId}
-                />
-              </div>
+              {maximized && diffEditor}
             </div>
           </div>
         </DialogContent>

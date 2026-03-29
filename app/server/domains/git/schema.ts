@@ -117,6 +117,11 @@ export const fileDiffInput = terminalIdInput.extend({
   base: z.string().optional(),
 })
 
+export const fileContentsInput = terminalIdInput.extend({
+  path: z.string(),
+  base: z.string().optional(),
+})
+
 export const branchCommitsInput = branchInput.extend({
   limit: z.number().min(1).max(100).default(20),
   offset: z.number().min(0).default(0),
