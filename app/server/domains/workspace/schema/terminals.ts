@@ -23,9 +23,21 @@ export const portMappingSchema = z.object({
   localPort: z.number(),
 })
 
+// --- Layout tree (shell multiplexing) ---
+
+export type LayoutLeaf = { type: 'leaf'; shellId: number }
+export type LayoutChild = { node: LayoutNode; size: number }
+export type LayoutSplit = {
+  type: 'split'
+  direction: 'horizontal' | 'vertical'
+  children: [LayoutChild, LayoutChild]
+}
+export type LayoutNode = LayoutLeaf | LayoutSplit
+
 export const terminalSettingsSchema = z.object({
   defaultClaudeCommand: z.string().optional(),
   portMappings: z.array(portMappingSchema).optional(),
+  layouts: z.record(z.string(), z.any()).optional(),
 })
 
 // --- Row schemas ---
@@ -95,7 +107,11 @@ export type WorkspacePayload = {
 export type GitRepoStatus = z.infer<typeof gitRepoStatusSchema>
 export type SetupStatus = z.infer<typeof setupStatusSchema>
 export type PortMapping = z.infer<typeof portMappingSchema>
-export type TerminalSettings = z.infer<typeof terminalSettingsSchema>
+export type TerminalSettings = {
+  defaultClaudeCommand?: string
+  portMappings?: PortMapping[]
+  layouts?: Record<string, LayoutNode>
+}
 export type Terminal = z.infer<typeof terminalSchema>
 export type CreateTerminalInput = z.infer<typeof createTerminalInput>
 export type UpdateTerminalInput = z.infer<typeof updateTerminalInput>

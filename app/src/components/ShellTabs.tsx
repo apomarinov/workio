@@ -27,6 +27,7 @@ import {
   Bell,
   BellRing,
   ChevronDown,
+  Columns2,
   FolderOpen,
   Globe,
   Laptop,
@@ -34,6 +35,7 @@ import {
   PencilIcon,
   Play,
   Plus,
+  Rows2,
   Settings,
   Settings2,
   Smartphone,
@@ -207,6 +209,47 @@ function ShellPopover({
         >
           <FolderOpen className="w-3.5 h-3.5" />
           Select Files
+        </Button>
+        <div className="my-1 h-px bg-border max-sm:hidden" />
+        <Button
+          align="left"
+          variant="ghost"
+          className="max-sm:hidden flex w-full items-center gap-2 rounded-sm !px-1.5 !h-8 font-normal text-sm hover:bg-accent cursor-pointer"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('shell-split', {
+                detail: {
+                  terminalId: terminal.id,
+                  shellId: shell.id,
+                  direction: 'horizontal',
+                },
+              }),
+            )
+            setOpen(false)
+          }}
+        >
+          <Columns2 className="w-3.5 h-3.5" />
+          Split Vertical
+        </Button>
+        <Button
+          align="left"
+          variant="ghost"
+          className="max-sm:hidden flex w-full items-center gap-2 rounded-sm !px-1.5 !h-8 font-normal text-sm hover:bg-accent cursor-pointer"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('shell-split', {
+                detail: {
+                  terminalId: terminal.id,
+                  shellId: shell.id,
+                  direction: 'vertical',
+                },
+              }),
+            )
+            setOpen(false)
+          }}
+        >
+          <Rows2 className="w-3.5 h-3.5" />
+          Split Horizontal
         </Button>
         {!isMain && (
           <>

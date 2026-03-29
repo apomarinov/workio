@@ -40,6 +40,11 @@ export function useActiveShells(
       persist(next)
       return next
     })
+    window.dispatchEvent(
+      new CustomEvent('terminal-focus', {
+        detail: { terminalId, shellId },
+      }),
+    )
   }
 
   // --- Resolve: validate each selection still exists in its terminal ---

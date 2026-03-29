@@ -1,9 +1,14 @@
 import type { ShellTemplate } from '@domains/settings/schema'
 import type { Shell } from '@domains/workspace/schema/shells'
-import type { Terminal } from '@domains/workspace/schema/terminals'
+import type {
+  LayoutNode,
+  Terminal,
+  TerminalSettings,
+} from '@domains/workspace/schema/terminals'
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { getLayoutShellIds, removeLeaf, splitLeaf } from '@/lib/layout'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { useSettings } from './useSettings'
@@ -32,6 +37,7 @@ export function useShellActions() {
     cleanupShellOrder,
     setShell,
     setMountAllShellsTerminalId,
+    updateTerminal,
   } = useWorkspaceContext()
   const { settings } = useSettings()
   const terminalsRef = useRef(terminals)
@@ -61,6 +67,47 @@ export function useShellActions() {
     }
   }
 
+  const handleSplitShell = async (
+    terminalId: number,
+    shellId: number,
+    direction: 'horizontal' | 'vertical',
+  ) => {
+    try {
+      const terminal = terminalsRef.current.find((t) => t.id === terminalId)
+      if (!terminal) return
+
+      const newShell = await createShellMutation.mutateAsync({ terminalId })
+
+      // Find which root shell owns this shellId (could be the shell itself or a parent layout)
+      const layouts = terminal.settings?.layouts ?? {}
+      let rootId = String(shellId)
+      for (const [rid, node] of Object.entries(layouts)) {
+        const ids = getLayoutShellIds(node)
+        if (ids.includes(shellId)) {
+          rootId = rid
+          break
+        }
+      }
+
+      const layout: LayoutNode = layouts[rootId] ?? {
+        type: 'leaf' as const,
+        shellId,
+      }
+      const newLayout = splitLeaf(layout, shellId, newShell.id, direction)
+
+      await updateTerminal(terminalId, {
+        settings: {
+          ...terminal.settings,
+          layouts: { ...layouts, [rootId]: newLayout },
+        } as TerminalSettings,
+      })
+      await refetch()
+      setShell(terminalId, newShell.id)
+    } catch (err) {
+      toastError(err, 'Failed to split shell')
+    }
+  }
+
   const handleDeleteShell = async (terminalId: number, shellId: number) => {
     try {
       const terminalBefore = terminalsRef.current.find(
@@ -68,6 +115,34 @@ export function useShellActions() {
       )
       const shellsBefore = terminalBefore?.shells ?? []
       const deletedIndex = shellsBefore.findIndex((s) => s.id === shellId)
+
+      // Update layout tree if this shell is in one
+      const layouts = terminalBefore?.settings?.layouts
+      if (layouts) {
+        const newLayouts = { ...layouts }
+        let changed = false
+        for (const [rootId, node] of Object.entries(layouts)) {
+          const ids = getLayoutShellIds(node)
+          if (!ids.includes(shellId)) continue
+          changed = true
+          const newLayout = removeLeaf(node, shellId)
+          if (!newLayout || newLayout.type === 'leaf') {
+            delete newLayouts[rootId]
+          } else {
+            newLayouts[rootId] = newLayout
+          }
+          break
+        }
+        if (changed) {
+          await updateTerminal(terminalId, {
+            settings: {
+              ...terminalBefore.settings,
+              layouts:
+                Object.keys(newLayouts).length > 0 ? newLayouts : undefined,
+            } as TerminalSettings,
+          })
+        }
+      }
 
       await deleteShellMutation.mutateAsync({ id: shellId })
       cleanupShellOrder(terminalId, shellId)
@@ -102,6 +177,8 @@ export function useShellActions() {
   // Refs for shell handlers so event listeners get latest versions
   const handleCreateShellRef = useRef(handleCreateShell)
   handleCreateShellRef.current = handleCreateShell
+  const handleSplitShellRef = useRef(handleSplitShell)
+  handleSplitShellRef.current = handleSplitShell
   const handleDeleteShellRef = useRef(handleDeleteShell)
   handleDeleteShellRef.current = handleDeleteShell
   const handleRenameShellRef = useRef(handleRenameShell)
@@ -200,6 +277,19 @@ export function useShellActions() {
     const onCreate = (e: CustomEvent<{ terminalId: number }>) => {
       handleCreateShellRef.current(e.detail.terminalId)
     }
+    const onSplit = (
+      e: CustomEvent<{
+        terminalId: number
+        shellId: number
+        direction: 'horizontal' | 'vertical'
+      }>,
+    ) => {
+      handleSplitShellRef.current(
+        e.detail.terminalId,
+        e.detail.shellId,
+        e.detail.direction,
+      )
+    }
     const onDelete = (
       e: CustomEvent<{ terminalId: number; shellId: number }>,
     ) => {
@@ -216,6 +306,7 @@ export function useShellActions() {
 
     window.addEventListener('shell-select', onSelect as EventListener)
     window.addEventListener('shell-create', onCreate as EventListener)
+    window.addEventListener('shell-split', onSplit as EventListener)
     window.addEventListener('shell-delete', onDelete as EventListener)
     window.addEventListener('shell-rename', onRename as EventListener)
     window.addEventListener(
@@ -225,6 +316,7 @@ export function useShellActions() {
     return () => {
       window.removeEventListener('shell-select', onSelect as EventListener)
       window.removeEventListener('shell-create', onCreate as EventListener)
+      window.removeEventListener('shell-split', onSplit as EventListener)
       window.removeEventListener('shell-delete', onDelete as EventListener)
       window.removeEventListener('shell-rename', onRename as EventListener)
       window.removeEventListener(

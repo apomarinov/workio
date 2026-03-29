@@ -27,6 +27,8 @@ interface TerminalProps {
   isVisible: boolean
 }
 
+let lastFocusedShell: { terminalId: number; shellId: number } | null = null
+
 export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   const { terminals } = useWorkspaceContext()
   const isMobile = useIsMobile()
@@ -301,29 +303,38 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   }, [sendInput, sendResize])
 
   // Listen for terminal-paste events (e.g. from file picker)
-  // Guard with isVisible so only the active shell receives the paste
+  // Guard with isVisible + focus so only the active shell receives the paste
   useEffect(() => {
     const handler = (e: CustomEvent<{ terminalId: number; text: string }>) => {
-      if (e.detail.terminalId === terminalId && isVisibleRef.current) {
-        sendInputRef.current(e.detail.text)
-      }
+      if (e.detail.terminalId !== terminalId || !isVisibleRef.current) return
+      if (
+        lastFocusedShell &&
+        lastFocusedShell.terminalId === terminalId &&
+        lastFocusedShell.shellId !== shellId
+      )
+        return
+      sendInputRef.current(e.detail.text)
     }
     window.addEventListener('terminal-paste', handler as EventListener)
     return () =>
       window.removeEventListener('terminal-paste', handler as EventListener)
   }, [terminalId])
 
-  // Listen for terminal-focus events (e.g. from resume session)
+  // Listen for terminal-focus events (e.g. from resume session or pane click)
   useEffect(() => {
-    const handler = (e: CustomEvent<{ terminalId: number }>) => {
-      if (e.detail.terminalId === terminalId && isVisibleRef.current) {
-        terminalRef.current?.focus()
-      }
+    const handler = (
+      e: CustomEvent<{ terminalId: number; shellId?: number }>,
+    ) => {
+      if (e.detail.terminalId !== terminalId) return
+      if (e.detail.shellId != null && e.detail.shellId !== shellId) return
+      if (!isVisibleRef.current) return
+      lastFocusedShell = { terminalId, shellId }
+      terminalRef.current?.focus()
     }
     window.addEventListener('terminal-focus', handler as EventListener)
     return () =>
       window.removeEventListener('terminal-focus', handler as EventListener)
-  }, [terminalId])
+  }, [terminalId, shellId])
 
   // Track cursor position for clipboard copy button (throttled to once per frame)
   useEffect(() => {
