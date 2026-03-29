@@ -46,7 +46,6 @@ const CreatePRDialog = lazy(() =>
 import { CleanupSessionsModal } from '@/components/CleanupSessionsModal'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { CreateBranchDialog } from '@/components/CreateBranchDialog'
-import { DirectoryBrowser } from '@/components/DirectoryBrowser'
 import { EditPRDialog } from '@/components/dialogs/EditPRDialog'
 import { RenameModal } from '@/components/EditSessionModal'
 import { MergePRModal } from '@/components/MergePRModal'
@@ -110,9 +109,6 @@ export function CommandPalette() {
   const [mergeModal, setMergeModal] = useState<PRCheckStatus | null>(null)
   const [closeModal, setCloseModal] = useState<PRCheckStatus | null>(null)
   const [rerunAllModal, setRerunAllModal] = useState<PRCheckStatus | null>(null)
-  const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
-    null,
-  )
   const [editPRTarget, setEditPRTarget] = useState<PRCheckStatus | null>(null)
   const [renameBranchTarget, setRenameBranchTarget] = useState<{
     terminalId: number
@@ -249,16 +245,6 @@ export function CommandPalette() {
         handler as EventListener,
       )
   }, [terminals])
-
-  // Listen for open-file-picker event (dispatched from shell tab context menu)
-  useEffect(() => {
-    const handler = (e: CustomEvent<{ terminal: Terminal }>) => {
-      setFilePickerTerminal(e.detail.terminal)
-    }
-    window.addEventListener('open-file-picker', handler as EventListener)
-    return () =>
-      window.removeEventListener('open-file-picker', handler as EventListener)
-  }, [])
 
   // Build branchToPR map for event handlers
   const branchToPR = useMemo(() => {
@@ -1683,34 +1669,6 @@ export function CommandPalette() {
             }
           }}
           onCancel={() => setCreateBranchFrom(null)}
-        />
-      )}
-
-      {filePickerTerminal && (
-        <DirectoryBrowser
-          open={!!filePickerTerminal}
-          onOpenChange={(open) => {
-            if (!open) setFilePickerTerminal(null)
-          }}
-          value={filePickerTerminal.cwd}
-          onSelect={() => {}}
-          mode="file"
-          onSelectPaths={(paths) => {
-            const escaped = paths
-              .map((p) => p.replace(/([ \\'"()&|;$`!#{}[\]*?<>])/g, '\\$1'))
-              .join(' ')
-            window.dispatchEvent(
-              new CustomEvent('terminal-paste', {
-                detail: {
-                  terminalId: filePickerTerminal.id,
-                  text: escaped,
-                },
-              }),
-            )
-            setFilePickerTerminal(null)
-            window.dispatchEvent(new Event('dialog-closed'))
-          }}
-          sshHost={filePickerTerminal.ssh_host ?? undefined}
         />
       )}
 

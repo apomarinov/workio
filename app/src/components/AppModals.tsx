@@ -1,9 +1,11 @@
 import type { PRCheckStatus } from '@domains/github/schema'
+import type { Terminal } from '@domains/workspace/schema/terminals'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { toastError } from '@/lib/toastError'
+import { DirectoryBrowser } from './DirectoryBrowser'
 import { PortMappingModal } from './PortMappingModal'
 import { PRModal } from './PRModal'
 import { TerminalModal } from './TerminalModal'
@@ -147,6 +149,19 @@ export function AppModals() {
       window.removeEventListener('open-port-mapping', handler as EventListener)
   }, [])
 
+  // File picker
+  const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
+    null,
+  )
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ terminal: Terminal }>) => {
+      setFilePickerTerminal(e.detail.terminal)
+    }
+    window.addEventListener('open-file-picker', handler as EventListener)
+    return () =>
+      window.removeEventListener('open-file-picker', handler as EventListener)
+  }, [])
+
   return (
     <>
       {terminalModal && (
@@ -228,6 +243,33 @@ export function AppModals() {
             }}
           />
         </Suspense>
+      )}
+      {filePickerTerminal && (
+        <DirectoryBrowser
+          open={!!filePickerTerminal}
+          onOpenChange={(open) => {
+            if (!open) setFilePickerTerminal(null)
+          }}
+          value={filePickerTerminal.cwd}
+          onSelect={() => {}}
+          mode="file"
+          onSelectPaths={(paths) => {
+            const escaped = paths
+              .map((p) => p.replace(/([ \\'"()&|;$`!#{}[\]*?<>])/g, '\\$1'))
+              .join(' ')
+            window.dispatchEvent(
+              new CustomEvent('terminal-paste', {
+                detail: {
+                  terminalId: filePickerTerminal.id,
+                  text: escaped,
+                },
+              }),
+            )
+            setFilePickerTerminal(null)
+            window.dispatchEvent(new Event('dialog-closed'))
+          }}
+          sshHost={filePickerTerminal.ssh_host ?? undefined}
+        />
       )}
     </>
   )

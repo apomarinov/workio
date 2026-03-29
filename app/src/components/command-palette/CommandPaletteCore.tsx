@@ -168,7 +168,7 @@ export function CommandPaletteCore({
             />
             <CommandList
               className={cn(
-                totalItems >= 10 ? 'max-h-[480px]' : 'max-h-[360px]',
+                totalItems >= 10 ? 'max-h-[580px]' : 'max-h-[460px]',
               )}
             >
               {mode.loading ? (
