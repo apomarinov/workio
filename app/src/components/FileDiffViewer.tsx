@@ -7,6 +7,7 @@ import {
   ListChevronsUpDown,
   Loader2,
   Maximize2,
+  Save,
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -17,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/sonner'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
@@ -35,6 +37,9 @@ function DiffContent({
   editorRef,
   showFullFile,
   fontSize,
+  editable,
+  onDirtyChange,
+  onSave,
 }: {
   original: string
   modified: string
@@ -45,8 +50,13 @@ function DiffContent({
   editorRef: React.MutableRefObject<DiffEditorInstance | null>
   showFullFile: boolean
   fontSize: number
+  editable?: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  onSave?: () => void
 }) {
   const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
   // Scroll to top when file changes
   useEffect(() => {
@@ -97,6 +107,19 @@ function DiffContent({
           .catch((err: unknown) => toastError(err, 'Failed to open in IDE'))
       }
     })
+
+    // Track dirty state when editable
+    if (editable && onDirtyChange) {
+      modifiedEditor.onDidChangeModelContent(() => {
+        onDirtyChange(modifiedEditor.getValue() !== modified)
+      })
+
+      // Cmd+S / Ctrl+S — only fires when editor is focused
+      modifiedEditor.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+        () => onSaveRef.current?.(),
+      )
+    }
   }
 
   return (
@@ -114,7 +137,7 @@ function DiffContent({
       }
       options={{
         renderSideBySide: false,
-        readOnly: true,
+        readOnly: !editable,
         originalEditable: false,
         fontSize,
         lineHeight: 20,
@@ -144,6 +167,7 @@ interface FileDiffViewerProps {
   filePath: string | null
   preferredIde: 'cursor' | 'vscode'
   base?: string
+  editable?: boolean
 }
 
 export function FileDiffViewer({
@@ -151,14 +175,21 @@ export function FileDiffViewer({
   filePath,
   preferredIde,
   base,
+  editable,
 }: FileDiffViewerProps) {
   const openInIdeMutation = trpc.workspace.system.openInIde.useMutation()
+  const saveFileMutation = trpc.git.commit.saveFileMutation.useMutation()
+  const utils = trpc.useUtils()
   const { settings } = useSettings()
   const isMobile = useIsMobile()
   const fontSize = isMobile ? settings.mobile_font_size : settings.font_size
   const [maximized, setMaximized] = useState(false)
   const [showFullFile, setShowFullFile] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const editorRef = useRef<DiffEditorInstance | null>(null)
+
+  // Can only edit working tree files (no base ref)
+  const canEdit = editable && !base
 
   const { data, isLoading, error } = trpc.git.diff.fileContents.useQuery(
     {
@@ -170,6 +201,35 @@ export function FileDiffViewer({
       enabled: filePath != null,
     },
   )
+
+  // Reset dirty state when file changes
+  useEffect(() => {
+    setDirty(false)
+  }, [filePath])
+
+  const saveFile = async () => {
+    const editor = editorRef.current
+    if (!editor || !filePath || !dirtyRef.current || saveFileMutation.isPending)
+      return
+    const content = editor.getModifiedEditor().getValue()
+    try {
+      await saveFileMutation.mutateAsync({
+        terminalId,
+        path: filePath,
+        content,
+      })
+      setDirty(false)
+      toast.success('File saved')
+      // Invalidate to refresh the diff
+      utils.git.diff.fileContents.invalidate({ terminalId, path: filePath })
+      utils.git.diff.changedFiles.invalidate({ terminalId })
+    } catch (err) {
+      toastError(err, 'Failed to save file')
+    }
+  }
+
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
 
   const navigateHunk = (direction: 'prev' | 'next') => {
     const editor = editorRef.current
@@ -238,12 +298,34 @@ export function FileDiffViewer({
       editorRef={editorRef}
       showFullFile={showFullFile}
       fontSize={fontSize}
+      editable={canEdit}
+      onDirtyChange={canEdit ? setDirty : undefined}
+      onSave={canEdit ? saveFile : undefined}
     />
   )
 
   const toolbar = (onClose?: () => void) => (
     <div className="flex items-center gap-1 border-b border-zinc-700 px-2 py-1 flex-shrink-0">
-      <span className="truncate text-xs text-zinc-500 mr-auto">{filePath}</span>
+      <span className="truncate text-xs text-zinc-500 mr-auto">
+        {filePath}
+        {dirty && <span className="ml-1 text-amber-400">●</span>}
+      </span>
+      {canEdit && dirty && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={saveFile}
+          disabled={saveFileMutation.isPending}
+          title="Save (⌘S)"
+        >
+          {saveFileMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon"

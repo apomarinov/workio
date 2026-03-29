@@ -2,6 +2,8 @@ import type { Commit } from '@domains/git/schema'
 import {
   GitCommitHorizontal,
   Loader2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Trash2,
   Undo2,
@@ -89,6 +91,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef(0)
   const [searchInput, setSearchInput] = useState('')
+  const [commitsCollapsed, setCommitsCollapsed] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -437,48 +440,70 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
         {/* Left column: commit list */}
         <Panel
           id="branch-commits"
-          defaultSize="280px"
-          minSize="280px"
-          maxSize="50%"
+          defaultSize={commitsCollapsed ? '36px' : '280px'}
+          minSize={commitsCollapsed ? '36px' : '280px'}
+          maxSize={commitsCollapsed ? '36px' : '50%'}
         >
-          <div className="flex flex-col overflow-hidden h-full">
-            <div className="border-b border-zinc-700">
-              <div className="px-2 py-1.5">
-                <span className="text-xs text-zinc-500 uppercase tracking-wider">
-                  Commits{searchInput?.length > 0 ? `(${commits.length})` : ''}
-                </span>
-              </div>
+          {commitsCollapsed ? (
+            <div className="flex items-center justify-center mt-2">
+              <button
+                type="button"
+                className="p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                onClick={() => setCommitsCollapsed(false)}
+                title="Show commits"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
             </div>
-            {isBranchMode && (
-              <div className="relative px-2 py-1.5">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 pl-6 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
-                />
+          ) : (
+            <div className="flex flex-col overflow-hidden h-full">
+              <div className="flex items-center border-b border-zinc-700">
+                <div className="px-2 py-1.5 flex-1">
+                  <span className="text-xs text-zinc-500 uppercase tracking-wider">
+                    Commits
+                    {searchInput?.length > 0 ? `(${commits.length})` : ''}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="p-1 mr-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  onClick={() => setCommitsCollapsed(true)}
+                  title="Hide commits"
+                >
+                  <PanelLeftClose className="w-3.5 h-3.5" />
+                </button>
               </div>
-            )}
-            <div
-              className="flex-1 overflow-y-auto"
-              ref={isBranchMode ? scrollRef : undefined}
-            >
-              {renderCommitList()}
-            </div>
-            {selectedCommitObj?.body &&
-              selectedCommitObj.body !== selectedCommitObj.message && (
-                <div className="border-t border-zinc-700 h-[150px] overflow-y-auto">
-                  <div className="p-2 font-mono text-[11px] text-zinc-500">
-                    {selectedCommitObj.hash}
-                  </div>
-                  <pre className="whitespace-pre-wrap text-[11px] text-zinc-400 p-2 pt-0">
-                    <MarkdownContent content={selectedCommitObj.body} />
-                  </pre>
+              {isBranchMode && (
+                <div className="relative px-2 py-1.5">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 pl-6 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                  />
                 </div>
               )}
-          </div>
+              <div
+                className="flex-1 overflow-y-auto"
+                ref={isBranchMode ? scrollRef : undefined}
+              >
+                {renderCommitList()}
+              </div>
+              {selectedCommitObj?.body &&
+                selectedCommitObj.body !== selectedCommitObj.message && (
+                  <div className="border-t border-zinc-700 h-[150px] overflow-y-auto">
+                    <div className="p-2 font-mono text-[11px] text-zinc-500">
+                      {selectedCommitObj.hash}
+                    </div>
+                    <pre className="whitespace-pre-wrap text-[11px] text-zinc-400 p-2 pt-0">
+                      <MarkdownContent content={selectedCommitObj.body} />
+                    </pre>
+                  </div>
+                )}
+            </div>
+          )}
         </Panel>
         <Separator className="panel-resize-handle" />
         {/* Right: diff viewer panel */}

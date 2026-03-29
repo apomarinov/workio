@@ -143,6 +143,11 @@ export const commitInput = terminalIdInput.extend({
   files: z.array(z.string()).optional(),
 })
 
+export const saveFileInput = terminalIdInput.extend({
+  path: z.string().min(1),
+  content: z.string(),
+})
+
 export const discardInput = terminalIdInput.extend({
   files: z.array(z.string()).min(1),
 })

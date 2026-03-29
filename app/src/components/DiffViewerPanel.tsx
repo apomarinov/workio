@@ -539,6 +539,8 @@ interface DiffViewerPanelProps {
   integrated?: boolean
   /** Extra suffix for the SWR cache key to bust stale data */
   cacheKey?: string
+  /** Allow editing files in the diff viewer (working tree only) */
+  editable?: boolean
 }
 
 export function DiffViewerPanel({
@@ -556,6 +558,7 @@ export function DiffViewerPanel({
   externalFiles,
   externalLoadingFiles,
   cacheKey: _cacheKey,
+  editable,
 }: DiffViewerPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [fileListWidth, setFileListWidth] = useState<number | undefined>()
@@ -729,6 +732,7 @@ export function DiffViewerPanel({
               filePath={selectedFile}
               preferredIde={settings?.preferred_ide ?? 'cursor'}
               base={base}
+              editable={editable}
             />
           </div>
         </div>

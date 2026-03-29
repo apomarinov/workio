@@ -439,6 +439,7 @@ export function CommitDialog({
               }}
               externalFiles={changedFiles}
               externalLoadingFiles={loadingFiles}
+              editable={!viewOnly}
             />
           )}
 

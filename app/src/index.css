@@ -212,17 +212,19 @@ body {
 }
 
 /* Panel resize handle — 1px line, expands on hover without shifting layout */
+.panel-resize-handle:hover {
+  z-index: 100;
+}
 .panel-resize-handle {
   width: 1px;
   background: var(--sidebar-border);
   position: relative;
-  z-index: 100;
 }
 
 .panel-resize-handle::after {
   content: '';
   position: absolute;
-  inset: 0 -2px;
+  inset: 0 -1px;
   transition: background 0.15s;
 }
 

@@ -1,6 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { commitHashInput, commitInput, discardInput } from '@domains/git/schema'
+import {
+  commitHashInput,
+  commitInput,
+  discardInput,
+  saveFileInput,
+} from '@domains/git/schema'
 import { resolveGitTerminal } from '@domains/git/services/resolve'
 import {
   checkAndEmitSingleGitDirty,
@@ -230,4 +235,27 @@ export const dropCommitMutation = publicProcedure
 
     detectGitBranch(id)
     checkAndEmitSingleGitDirty(id)
+  })
+
+export const saveFileMutation = publicProcedure
+  .input(saveFileInput)
+  .mutation(async ({ input }) => {
+    const terminal = await resolveGitTerminal(input.terminalId)
+    const cwd = terminal.ssh_host ? terminal.cwd : expandPath(terminal.cwd)
+
+    if (terminal.ssh_host) {
+      const encoded = Buffer.from(input.content).toString('base64')
+      const cmd = `echo ${shellEscape(encoded)} | base64 -d > ${shellEscape(path.join(cwd, input.path))}`
+      await execSSHCommandLogged(terminal.ssh_host, cmd, {
+        terminalId: terminal.id,
+        category: 'git',
+        logCmd: `save ${input.path}`,
+        errorOnly: true,
+      })
+    } else {
+      const fullPath = path.join(cwd, input.path)
+      await fs.promises.writeFile(fullPath, input.content, 'utf-8')
+    }
+
+    checkAndEmitSingleGitDirty(terminal.id, true)
   })
