@@ -69,6 +69,21 @@ function DiffContent({
     editorRef.current = editor
     const modifiedEditor = editor.getModifiedEditor()
 
+    // Disable all diagnostics (no project context, so TS flags everything)
+    const noValidation = {
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+      noSuggestionDiagnostics: true,
+    }
+    const jsxCompiler = {
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+      target: monaco.languages.typescript.ScriptTarget.ESNext,
+    }
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(noValidation)
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions(jsxCompiler)
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(noValidation)
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions(jsxCompiler)
+
     // Highlight line numbers on hover to indicate clickability
     let decorationIds: string[] = []
     modifiedEditor.onMouseMove((e) => {

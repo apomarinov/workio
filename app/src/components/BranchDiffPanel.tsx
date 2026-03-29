@@ -445,7 +445,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
           maxSize={commitsCollapsed ? '36px' : '50%'}
         >
           {commitsCollapsed ? (
-            <div className="flex items-center justify-center mt-2">
+            <div className="flex items-center justify-center mt-2 flex-col relative">
               <button
                 type="button"
                 className="p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
@@ -454,6 +454,9 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
+              <span className="text-xs text-zinc-500 uppercase tracking-wider rotate-270 left-[-13px] top-[52px] absolute">
+                Commits
+              </span>
             </div>
           ) : (
             <div className="flex flex-col overflow-hidden h-full">
@@ -475,7 +478,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
               </div>
               {isBranchMode && (
                 <div className="relative px-2 py-1.5">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
+                  <Search className="absolute left-3.5 top-[19px] -translate-y-1/2 h-3 w-3 text-zinc-500" />
                   <input
                     type="text"
                     value={searchInput}

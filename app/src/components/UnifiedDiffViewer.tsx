@@ -49,8 +49,23 @@ function DiffItem({
     return () => disposableRef.current?.dispose()
   }, [])
 
-  const handleMount: DiffOnMount = (editor) => {
+  const handleMount: DiffOnMount = (editor, monaco) => {
     const modifiedEditor = editor.getModifiedEditor()
+
+    const noValidation = {
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+      noSuggestionDiagnostics: true,
+    }
+    const jsxCompiler = {
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+      target: monaco.languages.typescript.ScriptTarget.ESNext,
+    }
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(noValidation)
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions(jsxCompiler)
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(noValidation)
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions(jsxCompiler)
+
     const updateHeight = () => {
       try {
         setEditorHeight(modifiedEditor.getContentHeight())
