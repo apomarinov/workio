@@ -6,11 +6,11 @@ const SESSION_SELECT = `
   SELECT
     s.*,
     p.path as project_path,
-    (
+    LEFT((
       SELECT pr.prompt FROM prompts pr
       WHERE pr.session_id = s.session_id AND pr.prompt IS NOT NULL
       ORDER BY pr.created_at DESC LIMIT 1
-    ) as latest_user_message,
+    ), 1000) as latest_user_message,
     (
       SELECT m.body FROM messages m
       JOIN prompts pr ON m.prompt_id = pr.id

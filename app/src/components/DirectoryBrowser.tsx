@@ -4,6 +4,7 @@ import {
   File,
   Folder,
   FolderPlus,
+  Github,
   Loader2,
   ShieldAlert,
 } from 'lucide-react'
@@ -38,7 +39,6 @@ interface DirectoryBrowserProps {
   sshHost?: string
   mode?: 'directory' | 'file'
   onSelectPaths?: (paths: string[]) => void
-  title?: string
 }
 
 export function DirectoryBrowser({
@@ -49,7 +49,6 @@ export function DirectoryBrowser({
   sshHost,
   mode = 'directory',
   onSelectPaths,
-  title,
 }: DirectoryBrowserProps) {
   const listDirsMutation = trpc.workspace.system.listDirectories.useMutation()
   const createDirMutation = trpc.workspace.system.createDirectory.useMutation()
@@ -78,6 +77,13 @@ export function DirectoryBrowser({
 
   useEffect(() => {
     setHiddenVersion((v) => v + 1)
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        initialEntries: undefined,
+        initialHasMore: undefined,
+      })),
+    )
   }, [showHidden])
 
   const navigateToPath = useCallback(
@@ -265,34 +271,33 @@ export function DirectoryBrowser({
         className="bg-sidebar sm:max-w-[95vw] max-h-[calc(85vh-env(safe-area-inset-top))] p-0 gap-0 flex flex-col"
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader className="px-6 pt-6 pb-3">
-          <DialogTitle>
-            {title ?? (mode === 'file' ? 'Select Files' : 'Select Folder')}
+        <DialogHeader className="px-4 pt-4 pb-3">
+          <DialogTitle className="flex items-center gap-3 justify-between">
+            <div className="flex-1 flex gap-2 items-center w-full">
+              <Folder className="w-4 h-4 shrink-0 text-muted-foreground" />
+              <Input
+                value={inputPath}
+                onChange={(e) => setInputPath(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                placeholder={defaultRoot}
+                className="flex-1 font-mono text-sm max-w-1/2 h-7 px-2 !bg-transparent !border-none"
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Checkbox
+                id="show-hidden"
+                checked={showHidden}
+                onCheckedChange={(checked) => setShowHidden(checked === true)}
+              />
+              <label
+                htmlFor="show-hidden"
+                className="text-sm text-muted-foreground cursor-pointer select-none whitespace-nowrap font-normal"
+              >
+                Show hidden
+              </label>
+            </div>
           </DialogTitle>
         </DialogHeader>
-
-        <div className="px-6 pb-3 flex items-center gap-3 flex-wrap">
-          <Input
-            value={inputPath}
-            onChange={(e) => setInputPath(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder={defaultRoot}
-            className="flex-1 font-mono text-sm min-w-[300px]"
-          />
-          <div className="flex items-center gap-2 shrink-0">
-            <Checkbox
-              id="show-hidden"
-              checked={showHidden}
-              onCheckedChange={(checked) => setShowHidden(checked === true)}
-            />
-            <label
-              htmlFor="show-hidden"
-              className="text-sm text-muted-foreground cursor-pointer select-none whitespace-nowrap"
-            >
-              Show hidden
-            </label>
-          </div>
-        </div>
 
         <ColumnView
           columns={columns}
@@ -304,6 +309,19 @@ export function DirectoryBrowser({
           fileMode={mode === 'file'}
           selectedPaths={selectedPaths}
           onSelectEntry={mode === 'file' ? handleSelectEntry : undefined}
+          onConfirmEntry={
+            mode === 'file'
+              ? (fullPath: string) => {
+                  if (onSelectPaths) {
+                    const paths = selectedPaths.has(fullPath)
+                      ? Array.from(selectedPaths)
+                      : [fullPath]
+                    onSelectPaths(paths)
+                    onOpenChange(false)
+                  }
+                }
+              : undefined
+          }
         />
 
         <DialogFooter className="px-6 py-4 border-t">
@@ -420,6 +438,7 @@ function ColumnView({
   fileMode,
   selectedPaths,
   onSelectEntry,
+  onConfirmEntry,
 }: {
   columns: Column[]
   showHidden: boolean
@@ -436,6 +455,7 @@ function ColumnView({
     columnEntries: DirEntry[],
     columnPath: string,
   ) => void
+  onConfirmEntry?: (fullPath: string) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [columnWidths, setColumnWidths] = useState<number[]>([])
@@ -488,6 +508,7 @@ function ColumnView({
               fileMode={fileMode}
               selectedPaths={selectedPaths}
               onSelectEntry={onSelectEntry}
+              onConfirmEntry={onConfirmEntry}
             />
           </div>
           <ColumnResizeHandle onDrag={(delta) => handleDrag(i, delta)} />
@@ -509,6 +530,7 @@ function BrowserColumn({
   fileMode,
   selectedPaths,
   onSelectEntry,
+  onConfirmEntry,
 }: {
   path: string
   selectedDir: string | null
@@ -527,6 +549,7 @@ function BrowserColumn({
     columnEntries: DirEntry[],
     columnPath: string,
   ) => void
+  onConfirmEntry?: (fullPath: string) => void
 }) {
   const listDirsMutation = trpc.workspace.system.listDirectories.useMutation()
   const openFdaMutation = trpc.workspace.system.openFullDiskAccess.useMutation()
@@ -719,6 +742,11 @@ function BrowserColumn({
                 )
               }
             }}
+            onDoubleClick={() => {
+              if (fileMode && onConfirmEntry) {
+                onConfirmEntry(fullPath)
+              }
+            }}
           >
             {entry.isDir ? (
               <Folder className="w-4 h-4 shrink-0 text-muted-foreground" />
@@ -726,6 +754,9 @@ function BrowserColumn({
               <File className="w-4 h-4 shrink-0 text-muted-foreground/50" />
             )}
             <span className="truncate flex-1">{entry.name}</span>
+            {entry.isGit && (
+              <Github className="w-3 h-3 shrink-0 text-blue-400" />
+            )}
             {entry.isDir && (
               <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground/50" />
             )}

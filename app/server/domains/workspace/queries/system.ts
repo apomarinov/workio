@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import path from 'node:path'
 import type { DirEntry, DirResult } from '@domains/workspace/schema/system'
 import {
   listDirectoriesInput,
@@ -116,6 +117,36 @@ export const listDirectories = publicProcedure
             const paged = allEntries.slice(start, start + PAGE_SIZE)
             const hasMore = start + PAGE_SIZE < allEntries.length
 
+            // Check which directories are git repos
+            const dirs = paged.filter((e) => e.isDir)
+            if (dirs.length > 0) {
+              const remoteDirPath =
+                rawPath === '~'
+                  ? '$HOME'
+                  : rawPath.startsWith('~/')
+                    ? `$HOME/${rawPath.slice(2)}`
+                    : shellEscape(rawPath)
+              const checks = dirs
+                .map(
+                  (d) =>
+                    `[ -d ${remoteDirPath}/${shellEscape(d.name)}/.git ] && echo ${shellEscape(d.name)}`,
+                )
+                .join('; ')
+              try {
+                const { stdout: gitOut } = await execSSHCommandLogged(
+                  ssh_host,
+                  checks,
+                  { category: 'workspace', errorOnly: true, timeout: 5000 },
+                )
+                const gitDirs = new Set(gitOut.split('\n').filter(Boolean))
+                for (const d of dirs) {
+                  if (gitDirs.has(d.name)) d.isGit = true
+                }
+              } catch {
+                // ignore - git detection is best-effort
+              }
+            }
+
             results[rawPath] = { entries: paged, hasMore, error: null }
           } else {
             const dirPath = expandPath(rawPath)
@@ -139,11 +170,24 @@ export const listDirectories = publicProcedure
             const paged = filtered.slice(start, start + PAGE_SIZE)
             const hasMore = start + PAGE_SIZE < filtered.length
 
+            const dirEntries: DirEntry[] = await Promise.all(
+              paged.map(async (e) => {
+                const isDir = e.isDirectory()
+                const entry: DirEntry = { name: e.name, isDir }
+                if (isDir) {
+                  entry.isGit = await fs.promises
+                    .access(path.join(dirPath, e.name, '.git'))
+                    .then(
+                      () => true,
+                      () => false,
+                    )
+                }
+                return entry
+              }),
+            )
+
             results[rawPath] = {
-              entries: paged.map((e) => ({
-                name: e.name,
-                isDir: e.isDirectory(),
-              })),
+              entries: dirEntries,
               hasMore,
               error: null,
             }

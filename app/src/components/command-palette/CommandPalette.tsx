@@ -1695,7 +1695,6 @@ export function CommandPalette() {
           value={filePickerTerminal.cwd}
           onSelect={() => {}}
           mode="file"
-          title="Select Files"
           onSelectPaths={(paths) => {
             const escaped = paths
               .map((p) => p.replace(/([ \\'"()&|;$`!#{}[\]*?<>])/g, '\\$1'))

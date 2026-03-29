@@ -7,6 +7,7 @@ export const PAGE_SIZE = 100
 export type DirEntry = {
   name: string
   isDir: boolean
+  isGit?: boolean
 }
 
 export type DirResult = {

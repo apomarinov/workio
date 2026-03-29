@@ -12,11 +12,11 @@ export async function getActivePermissions() {
     SELECT DISTINCT ON (s.session_id)
       s.*,
       proj.path as project_path,
-      (
+      LEFT((
         SELECT pr2.prompt FROM prompts pr2
         WHERE pr2.session_id = s.session_id AND pr2.prompt IS NOT NULL
         ORDER BY pr2.created_at DESC LIMIT 1
-      ) as latest_user_message,
+      ), 1000) as latest_user_message,
       (
         SELECT m2.body FROM messages m2
         JOIN prompts pr2 ON m2.prompt_id = pr2.id
