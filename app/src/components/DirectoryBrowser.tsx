@@ -1,3 +1,4 @@
+import type { FavoriteFolder } from '@domains/settings/schema'
 import type { DirEntry } from '@domains/workspace/schema/system'
 import {
   ChevronRight,
@@ -7,6 +8,8 @@ import {
   Github,
   Loader2,
   ShieldAlert,
+  Star,
+  Trash2,
 } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -19,7 +22,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
+import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
@@ -50,11 +59,13 @@ export function DirectoryBrowser({
   mode = 'directory',
   onSelectPaths,
 }: DirectoryBrowserProps) {
+  const { settings, updateSettings } = useSettings()
   const listDirsMutation = trpc.workspace.system.listDirectories.useMutation()
   const createDirMutation = trpc.workspace.system.createDirectory.useMutation()
 
   const [columns, setColumns] = useState<Column[]>([])
   const [inputPath, setInputPath] = useState('')
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   const [hiddenVersion, setHiddenVersion] = useState(0)
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
@@ -245,6 +256,35 @@ export function DirectoryBrowser({
     onOpenChange(false)
   }
 
+  const hostKey = sshHost ?? 'local'
+  const favorites = settings.favorite_folders ?? []
+  const isFavorite = favorites.some(
+    (f) => f.host === hostKey && f.path === inputPath,
+  )
+
+  const handleSaveFavorite = async () => {
+    if (isFavorite || !inputPath.trim()) return
+    const updated = [...favorites, { host: hostKey, path: inputPath.trim() }]
+    try {
+      await updateSettings({ favorite_folders: updated })
+      toast.success('Folder saved to favorites')
+    } catch (err) {
+      toastError(err, 'Failed to save favorite')
+    }
+  }
+
+  const handleRemoveFavorite = async (fav: FavoriteFolder) => {
+    const updated = favorites.filter(
+      (f) => !(f.host === fav.host && f.path === fav.path),
+    )
+    try {
+      await updateSettings({ favorite_folders: updated })
+      toast.success('Folder removed from favorites')
+    } catch (err) {
+      toastError(err, 'Failed to remove favorite')
+    }
+  }
+
   const handleCreateFolder = async () => {
     if (!newFolderName?.trim()) return
     const name = newFolderName.trim()
@@ -273,8 +313,81 @@ export function DirectoryBrowser({
       >
         <DialogHeader className="px-4 pt-4 pb-3">
           <DialogTitle className="flex items-center gap-3 justify-between">
-            <div className="flex-1 flex gap-2 items-center w-full">
-              <Folder className="w-4 h-4 shrink-0 text-muted-foreground" />
+            <div className="flex-1 flex items-center w-full">
+              <Folder className="w-4 h-4 shrink-0 text-muted-foreground mr-2" />
+              <Popover open={favoritesOpen} onOpenChange={setFavoritesOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Star
+                      className={cn(
+                        'w-4 h-4',
+                        isFavorite && 'fill-yellow-400 text-yellow-400',
+                      )}
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="min-w-72 w-fit max-w-[500px] p-0"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      'w-full text-left px-3 py-2 text-sm border-b flex items-center gap-2',
+                      isFavorite
+                        ? 'text-muted-foreground cursor-default'
+                        : 'hover:bg-accent cursor-pointer',
+                    )}
+                    onClick={() => {
+                      handleSaveFavorite()
+                      setFavoritesOpen(false)
+                    }}
+                    disabled={isFavorite}
+                  >
+                    <Star className="w-3.5 h-3.5 shrink-0" />
+                    {isFavorite ? 'Already saved' : 'Save current folder'}
+                  </button>
+                  {favorites.filter((f) => f.host === hostKey).length > 0 ? (
+                    <div className="max-h-48 overflow-y-auto">
+                      {favorites
+                        .filter((f) => f.host === hostKey)
+                        .map((fav) => (
+                          <div
+                            key={fav.path}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent group cursor-pointer"
+                            onClick={() => {
+                              navigateToPath(fav.path)
+                              setFavoritesOpen(false)
+                            }}
+                          >
+                            <Folder className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                            <span className="break-all flex-1 max-w-full text-xs font-mono">
+                              {fav.path}
+                            </span>
+                            <button
+                              type="button"
+                              className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveFavorite(fav)
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="px-3 py-3 text-sm text-muted-foreground text-center">
+                      No favorites yet
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
               <Input
                 value={inputPath}
                 onChange={(e) => setInputPath(e.target.value)}

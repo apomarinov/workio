@@ -90,7 +90,7 @@ export function SettingsViewProvider({
   const settingsTarget = uiState.settings.target
   const clearSettingsTarget = uiState.settings.clearTarget
   const { settings, updateSettings } = useSettings()
-
+  console.log(settings)
   // Snapshot of settings when the form was initialized, for dirty comparison
   const baselineRef = useRef<string>('')
 

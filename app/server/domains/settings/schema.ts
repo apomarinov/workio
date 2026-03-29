@@ -86,6 +86,11 @@ const customTerminalActionSchema = z.object({
   repo: z.string().optional(),
 })
 
+const favoriteFolderSchema = z.object({
+  host: z.string(),
+  path: z.string(),
+})
+
 const pushSubscriptionRecordSchema = z.object({
   endpoint: z.string(),
   keys: z.object({ p256dh: z.string(), auth: z.string() }),
@@ -226,6 +231,7 @@ const settingsBaseSchema = z.object({
   custom_terminal_actions: z.array(customTerminalActionSchema).optional(),
   terminal_order: z.array(z.number()).optional(),
   shell_order: z.record(z.string(), z.array(z.number())).optional(),
+  favorite_folders: z.array(favoriteFolderSchema).optional(),
   starred_branches: z.record(z.string(), z.array(z.string())).optional(),
   statusBar: statusBarConfigSchema.optional().default(DEFAULT_STATUS_BAR),
 })
@@ -279,5 +285,6 @@ export type StatusBarSectionName = z.infer<typeof statusBarSectionNameSchema>
 export type StatusBarSection = z.infer<typeof statusBarSectionSchema>
 export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
 export type ServerConfig = z.infer<typeof serverConfigSchema>
+export type FavoriteFolder = z.infer<typeof favoriteFolderSchema>
 export type NgrokConfig = z.infer<typeof ngrokConfigSchema>
 export type PreferredIDE = Settings['preferred_ide']
