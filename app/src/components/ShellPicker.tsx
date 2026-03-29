@@ -30,7 +30,15 @@ export function ShellPicker({
   const options = value && !shells.includes(value) ? [value, ...shells] : shells
 
   return (
-    <Select value={value} onValueChange={onChange} disabled={isLoading}>
+    <Select
+      value={value}
+      onValueChange={(v) => {
+        if (!isLoading) {
+          onChange(v)
+        }
+      }}
+      disabled={isLoading}
+    >
       <SelectTrigger className={className}>
         <div className="flex items-center gap-2">
           {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}

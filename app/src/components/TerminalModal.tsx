@@ -129,8 +129,12 @@ export function TerminalModal({
     deleteScript: '',
     defaultClaudeCommand: '',
   })
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+  const set = <K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K],
+  ) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [confirmShellChange, setConfirmShellChange] = useState(false)
