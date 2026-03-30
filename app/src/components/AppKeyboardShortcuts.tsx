@@ -148,7 +148,11 @@ export function AppKeyboardShortcuts() {
       const activeShellId = activeShellsRef.current[t.id]
       if (!activeShellId) return
       const shell = t.shells.find((s) => s.id === activeShellId)
-      if (!shell || shell.name === 'main') return
+      if (!shell) return
+      if (shell.name === 'main') {
+        toast.error('Cannot close the main shell')
+        return
+      }
       window.dispatchEvent(
         new CustomEvent('shell-close', {
           detail: { terminalId: t.id, shellId: activeShellId },

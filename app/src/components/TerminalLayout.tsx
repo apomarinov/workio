@@ -11,12 +11,10 @@ import {
 } from '@dnd-kit/core'
 import type {
   LayoutNode,
-  LayoutSplit,
   Terminal as TerminalType,
 } from '@domains/workspace/schema/terminals'
 import { GripVertical, Plus, Unplug } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import {
@@ -27,6 +25,7 @@ import {
 } from '@/lib/layout'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
+import { PaneLayout } from './PaneLayout'
 import { Terminal } from './Terminal'
 
 interface TerminalLayoutProps {
@@ -55,10 +54,12 @@ export function TerminalLayout({
     setLocalLayout(layout)
   }, [layout])
 
-  // --- Drag mode: Ctrl+Alt held ---
+  // --- Drag mode: configurable modifier held ---
   const { isPaneDragModifierHeld } = useModifiersHeld()
   const dragMode = isPaneDragModifierHeld
   const [draggingShellId, setDraggingShellId] = useState<number | null>(null)
+
+  const activeShellId = activeShells[terminal.id]
 
   // --- Persist layout ---
   const persistLayout = (newLayout: LayoutNode) => {
@@ -131,6 +132,57 @@ export function TerminalLayout({
     setDraggingShellId(null)
   }
 
+  const isDragging = draggingShellId != null
+
+  const renderLeaf = (shellId: number) => {
+    const isActive = shellId === activeShellId
+    const isBeingDragged = draggingShellId === shellId
+    return (
+      <div
+        className="relative h-full w-full"
+        onMouseDown={() => {
+          if (!dragMode) {
+            window.dispatchEvent(
+              new CustomEvent('shell-select', {
+                detail: { terminalId: terminal.id, shellId },
+              }),
+            )
+          }
+        }}
+      >
+        {mountedShells.has(shellId) ? (
+          <Terminal
+            terminalId={terminal.id}
+            shellId={shellId}
+            isVisible={isVisible}
+          />
+        ) : (
+          <div className="absolute cursor-pointer hover:bg-gray-500/10 inset-0 flex flex-col items-center justify-center gap-2 bg-[#1a1a1a]">
+            <Unplug className="w-7 h-7 text-muted-foreground/40" />
+            <span className="text-sm text-muted-foreground/40 leading-none mt-2">
+              Inactive shell disconnected
+            </span>
+            <span className="text-sm text-muted-foreground/40 leading-none">
+              Click to re-attach
+            </span>
+          </div>
+        )}
+        {!isActive && !dragMode && (
+          <div className="absolute inset-0 pointer-events-none z-10 bg-black/20" />
+        )}
+        {dragMode && (!isDragging || isBeingDragged) && (
+          <DragHandle shellId={shellId} terminalId={terminal.id} />
+        )}
+        {isDragging && !isBeingDragged && (
+          <DropZones shellId={shellId} draggingShellId={draggingShellId} />
+        )}
+        {isBeingDragged && (
+          <div className="absolute inset-0 z-10 bg-black/40 pointer-events-none" />
+        )}
+      </div>
+    )
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -138,17 +190,11 @@ export function TerminalLayout({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <LayoutRenderer
+      <PaneLayout
         key={getLayoutShellIds(localLayout).join('-')}
         node={localLayout}
-        terminalId={terminal.id}
-        activeShellId={activeShells[terminal.id]}
-        isVisible={isVisible}
-        mountedShells={mountedShells}
-        path={[]}
+        renderLeaf={renderLeaf}
         onResize={handleResize}
-        dragMode={dragMode}
-        draggingShellId={draggingShellId}
       />
       <DragOverlay dropAnimation={null}>
         {draggingShellId != null && (
@@ -316,172 +362,5 @@ function DragHandle({
         </div>
       </div>
     </div>
-  )
-}
-
-// --- Recursive layout renderer ---
-
-function LayoutRenderer({
-  node,
-  terminalId,
-  activeShellId,
-  isVisible,
-  mountedShells,
-  path,
-  onResize,
-  dragMode,
-  draggingShellId,
-}: {
-  node: LayoutNode
-  terminalId: number
-  activeShellId: number | undefined
-  isVisible: boolean
-  mountedShells: Set<number>
-  path: number[]
-  onResize: (path: number[], sizes: [number, number]) => void
-  dragMode: boolean
-  draggingShellId: number | null
-}) {
-  if (node.type === 'leaf') {
-    const isActive = node.shellId === activeShellId
-    const isDragging = draggingShellId != null
-    const isBeingDragged = draggingShellId === node.shellId
-    return (
-      <div
-        className="relative h-full w-full"
-        onMouseDown={() => {
-          if (!dragMode) {
-            window.dispatchEvent(
-              new CustomEvent('shell-select', {
-                detail: { terminalId, shellId: node.shellId },
-              }),
-            )
-          }
-        }}
-      >
-        {mountedShells.has(node.shellId) ? (
-          <Terminal
-            terminalId={terminalId}
-            shellId={node.shellId}
-            isVisible={isVisible}
-          />
-        ) : (
-          <div className="absolute cursor-pointer hover:bg-gray-500/10 inset-0 flex flex-col items-center justify-center gap-2 bg-[#1a1a1a]">
-            <Unplug className="w-7 h-7 text-muted-foreground/40" />
-            <span className="text-sm text-muted-foreground/40 leading-none mt-2">
-              Inactive shell disconnected
-            </span>
-            <span className="text-sm text-muted-foreground/40 leading-none">
-              Click to re-attach
-            </span>
-          </div>
-        )}
-        {!isActive && !dragMode && (
-          <div className="absolute inset-0 pointer-events-none z-10 bg-black/20" />
-        )}
-        {dragMode && (!isDragging || isBeingDragged) && (
-          <DragHandle shellId={node.shellId} terminalId={terminalId} />
-        )}
-        {isDragging && !isBeingDragged && (
-          <DropZones shellId={node.shellId} draggingShellId={draggingShellId} />
-        )}
-        {isBeingDragged && (
-          <div className="absolute inset-0 z-10 bg-black/40 pointer-events-none" />
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <SplitRenderer
-      node={node}
-      terminalId={terminalId}
-      activeShellId={activeShellId}
-      isVisible={isVisible}
-      mountedShells={mountedShells}
-      path={path}
-      onResize={onResize}
-      dragMode={dragMode}
-      draggingShellId={draggingShellId}
-    />
-  )
-}
-
-function SplitRenderer({
-  node,
-  terminalId,
-  activeShellId,
-  isVisible,
-  mountedShells,
-  path,
-  onResize,
-  dragMode,
-  draggingShellId,
-}: {
-  node: LayoutSplit
-  terminalId: number
-  activeShellId: number | undefined
-  isVisible: boolean
-  mountedShells: Set<number>
-  path: number[]
-  onResize: (path: number[], sizes: [number, number]) => void
-  dragMode: boolean
-  draggingShellId: number | null
-}) {
-  const firstRef = usePanelRef()
-  const secondRef = usePanelRef()
-
-  const handleLayoutChanged = () => {
-    const firstSize = firstRef.current?.getSize()?.asPercentage
-    const secondSize = secondRef.current?.getSize()?.asPercentage
-    if (firstSize != null && secondSize != null) {
-      onResize(path, [firstSize, secondSize])
-    }
-  }
-
-  return (
-    <Group orientation={node.direction} onLayoutChanged={handleLayoutChanged}>
-      <Panel
-        panelRef={firstRef}
-        defaultSize={`${node.children[0].size}%`}
-        minSize="5%"
-      >
-        <LayoutRenderer
-          node={node.children[0].node}
-          terminalId={terminalId}
-          activeShellId={activeShellId}
-          isVisible={isVisible}
-          mountedShells={mountedShells}
-          path={[...path, 0]}
-          onResize={onResize}
-          dragMode={dragMode}
-          draggingShellId={draggingShellId}
-        />
-      </Panel>
-      <Separator
-        className={
-          node.direction === 'horizontal'
-            ? 'panel-resize-handle'
-            : 'panel-resize-handle-horizontal'
-        }
-      />
-      <Panel
-        panelRef={secondRef}
-        defaultSize={`${node.children[1].size}%`}
-        minSize="5%"
-      >
-        <LayoutRenderer
-          node={node.children[1].node}
-          terminalId={terminalId}
-          activeShellId={activeShellId}
-          isVisible={isVisible}
-          mountedShells={mountedShells}
-          path={[...path, 1]}
-          onResize={onResize}
-          dragMode={dragMode}
-          draggingShellId={draggingShellId}
-        />
-      </Panel>
-    </Group>
   )
 }
