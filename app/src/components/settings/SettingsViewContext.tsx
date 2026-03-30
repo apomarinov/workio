@@ -94,14 +94,16 @@ export function SettingsViewProvider({
   // Snapshot of settings when the form was initialized, for dirty comparison
   const baselineRef = useRef<string>('')
 
-  // Initialize form from current settings on mount / when settings load
+  // Sync form from current settings on mount and when settings change externally
   useEffect(() => {
     if (!settings) return
     const snapshot = JSON.stringify(settings)
-    // Only reset form if we haven't touched it yet or settings changed externally
+    if (baselineRef.current === snapshot) return
+    // Only reset form if it hasn't been touched (not dirty)
+    const currentFormSnapshot = JSON.stringify(formValues)
     if (
-      baselineRef.current !== snapshot &&
-      Object.keys(formValues).length === 0
+      Object.keys(formValues).length === 0 ||
+      baselineRef.current === currentFormSnapshot
     ) {
       setFormValues({ ...settings })
       baselineRef.current = snapshot

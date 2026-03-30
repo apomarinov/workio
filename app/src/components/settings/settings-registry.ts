@@ -253,7 +253,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
         settings: [
           {
             key: 'server_config.gh_poll_interval',
-            label: 'Check Poll Interval',
+            label: 'Poll Interval',
             description: 'How often to poll GitHub for PR check status',
           },
         ],
@@ -288,21 +288,21 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           {
             key: 'hide_gh_authors',
             label: 'Hidden Authors',
-            description: 'Hide all PRs from these authors',
+            description: 'Hide all from these users',
             column: true,
             collapsed: true,
           },
           {
             key: 'silence_gh_authors',
             label: 'Silenced Authors',
-            description: 'Suppress notifications but show PRs',
+            description: 'Suppress notifications but show interactions',
             column: true,
             collapsed: true,
           },
           {
             key: 'collapse_gh_authors',
             label: 'Collapsed Authors',
-            description: 'Collapse PRs from these authors by default',
+            description: 'Collapse consecutive comments from these users',
             column: true,
             collapsed: true,
           },

@@ -33,7 +33,7 @@ export function SettingsSidebar() {
                 type="button"
                 onClick={() => scrollToSection(path)}
                 className={cn(
-                  'flex items-center gap-2 w-full px-3 py-1.5 text-xs cursor-pointer transition-colors',
+                  'flex items-center gap-2 w-full px-3 py-3 sm:py-1.5 text-sm sm:text-xs cursor-pointer transition-colors',
                   active
                     ? 'text-foreground bg-zinc-700/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-zinc-700/20',
@@ -94,7 +94,7 @@ function SidebarChildren({
               onClick={() => scrollToSection(path)}
               style={{ paddingLeft: `${depth * 8 + 28}px` }}
               className={cn(
-                'flex items-center gap-2 w-full text-left pr-2 py-1 text-xs cursor-pointer transition-colors',
+                'flex items-center gap-2 w-full text-left pr-2 py-2.5 sm:py-1 text-sm sm:text-xs cursor-pointer transition-colors',
                 active
                   ? 'text-foreground bg-zinc-700/20'
                   : 'text-muted-foreground hover:text-foreground hover:bg-zinc-700/20',
