@@ -1,13 +1,16 @@
 import type { PRCheckStatus } from '@domains/github/schema'
+import type { ShellTemplate } from '@domains/settings/schema'
 import type { Terminal } from '@domains/workspace/schema/terminals'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
 import { DirectoryBrowser } from './DirectoryBrowser'
 import { PortMappingModal } from './PortMappingModal'
 import { PRModal } from './PRModal'
+import { ShellTemplateModal } from './ShellTemplateModal'
 import { TerminalModal } from './TerminalModal'
 
 const BranchCommitsDialog = lazy(() =>
@@ -149,6 +152,37 @@ export function AppModals() {
       window.removeEventListener('open-port-mapping', handler as EventListener)
   }, [])
 
+  // Shell template modal
+  const { settings, updateSettings } = useSettings()
+  const [templateModalOpen, setTemplateModalOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<
+    ShellTemplate | undefined
+  >()
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { template?: ShellTemplate }
+        | undefined
+      setEditingTemplate(detail?.template)
+      setTemplateModalOpen(true)
+    }
+    window.addEventListener('open-template-modal', handler)
+    return () => window.removeEventListener('open-template-modal', handler)
+  }, [])
+
+  const handleSaveTemplate = async (template: ShellTemplate) => {
+    const templates = settings?.shell_templates ?? []
+    const existing = templates.filter((t) => t.id !== template.id)
+    try {
+      await updateSettings({ shell_templates: [...existing, template] })
+      toast.success('Template saved')
+    } catch (err) {
+      toastError(err, 'Failed to save template')
+    }
+    setTemplateModalOpen(false)
+    setEditingTemplate(undefined)
+  }
+
   // File picker
   const [filePickerTerminal, setFilePickerTerminal] = useState<Terminal | null>(
     null,
@@ -271,6 +305,15 @@ export function AppModals() {
           sshHost={filePickerTerminal.ssh_host ?? undefined}
         />
       )}
+      <ShellTemplateModal
+        open={templateModalOpen}
+        template={editingTemplate}
+        onSave={handleSaveTemplate}
+        onCancel={() => {
+          setTemplateModalOpen(false)
+          setEditingTemplate(undefined)
+        }}
+      />
     </>
   )
 }

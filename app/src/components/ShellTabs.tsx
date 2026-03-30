@@ -67,7 +67,6 @@ import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
 import { RenameModal } from './EditSessionModal'
-import { ShellTemplateModal } from './ShellTemplateModal'
 
 interface ShellTabsProps {
   terminal: Terminal
@@ -824,10 +823,6 @@ export function ShellTabs({
   const [deleteShellId, setDeleteShellId] = useState<number | null>(null)
   const [renameShellTarget, setRenameShellTarget] = useState<Shell | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [templateModalOpen, setTemplateModalOpen] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<
-    ShellTemplate | undefined
-  >()
   const [deleteTemplateTarget, setDeleteTemplateTarget] =
     useState<ShellTemplate | null>(null)
   const [runTemplateTarget, setRunTemplateTarget] =
@@ -941,13 +936,6 @@ export function ShellTabs({
 
   const templates = settings?.shell_templates ?? []
 
-  const handleSaveTemplate = async (template: ShellTemplate) => {
-    const existing = templates.filter((t) => t.id !== template.id)
-    await updateSettings({ shell_templates: [...existing, template] })
-    setTemplateModalOpen(false)
-    setEditingTemplate(undefined)
-  }
-
   const handleDeleteTemplate = async (template: ShellTemplate) => {
     await updateSettings({
       shell_templates: templates.filter((t) => t.id !== template.id),
@@ -1045,8 +1033,7 @@ export function ShellTabs({
             type="button"
             className="text-muted-foreground hover:text-foreground cursor-pointer"
             onClick={() => {
-              setEditingTemplate(undefined)
-              setTemplateModalOpen(true)
+              window.dispatchEvent(new CustomEvent('open-template-modal'))
               setMenuOpen(false)
             }}
           >
@@ -1075,8 +1062,11 @@ export function ShellTabs({
                 type="button"
                 className="flex-1 min-w-0 flex items-center gap-2 rounded-sm px-1.5 py-1 text-sm hover:bg-accent cursor-pointer text-left"
                 onClick={() => {
-                  setEditingTemplate(tmpl)
-                  setTemplateModalOpen(true)
+                  window.dispatchEvent(
+                    new CustomEvent('open-template-modal', {
+                      detail: { template: tmpl },
+                    }),
+                  )
                   setMenuOpen(false)
                 }}
               >
@@ -1375,15 +1365,6 @@ export function ShellTabs({
           }
         }}
         onCancel={() => setRenameShellTarget(null)}
-      />
-      <ShellTemplateModal
-        open={templateModalOpen}
-        template={editingTemplate}
-        onSave={handleSaveTemplate}
-        onCancel={() => {
-          setTemplateModalOpen(false)
-          setEditingTemplate(undefined)
-        }}
       />
       <ConfirmModal
         open={deleteTemplateTarget !== null}

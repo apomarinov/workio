@@ -17,6 +17,7 @@ import { PreferredIDESetting } from './controls/PreferredIDESetting'
 import { PushNotificationSetting } from './controls/PushNotificationSetting'
 import { QueryLimitsSetting } from './controls/QueryLimitsSetting'
 import { ShellSetting } from './controls/ShellSetting'
+import { ShellTemplateSetting } from './controls/ShellTemplateSetting'
 import { createSwitchSetting } from './controls/SwitchSetting'
 import { createTextSetting } from './controls/TextSetting'
 import { WebhooksSetting } from './controls/WebhooksSetting'
@@ -60,6 +61,8 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
 
   // Terminal
   default_shell: ShellSetting,
+
+  shell_templates: ShellTemplateSetting,
 
   // Terminal > Display
   font_size: createNumberSetting('font_size', {

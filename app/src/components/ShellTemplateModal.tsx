@@ -57,9 +57,9 @@ export function ShellTemplateModal({
         const mapped =
           template.entries.length > 0
             ? template.entries.map((e) => ({
-              ...e,
-              _key: keyCounter.current++,
-            }))
+                ...e,
+                _key: keyCounter.current++,
+              }))
             : [{ name: 'main', command: '', _key: keyCounter.current++ }]
         setEntries(mapped)
         setLayout((template.layout as LayoutNode) ?? null)
@@ -167,14 +167,14 @@ export function ShellTemplateModal({
         style={
           layout?.type === 'split'
             ? (() => {
-              const { columns, rows } = getLayoutDimensions(layout)
-              return {
-                maxWidth: `min(90vw, ${columns * 300}px)`,
-                height: `min(90dvh, ${rows * 200 + 200}px)`,
-                minWidth: '500px',
-                minHeight: '500px'
-              }
-            })()
+                const { columns, rows } = getLayoutDimensions(layout)
+                return {
+                  maxWidth: `min(90vw, ${columns * 300}px)`,
+                  height: `min(90dvh, ${rows * 200 + 200}px)`,
+                  minWidth: '500px',
+                  minHeight: '500px',
+                }
+              })()
             : undefined
         }
         onInteractOutside={(e) => e.preventDefault()}

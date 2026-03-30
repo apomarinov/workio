@@ -105,6 +105,13 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             label: 'Default Shell',
             description: 'Shell used when creating new terminals',
           },
+          {
+            key: 'shell_templates',
+            label: 'Shell Templates',
+            description: 'Reusable shell layouts with commands',
+            column: true,
+            collapsed: true,
+          },
         ],
       },
       {
