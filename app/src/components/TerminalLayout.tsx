@@ -14,7 +14,7 @@ import type {
   LayoutSplit,
   Terminal as TerminalType,
 } from '@domains/workspace/schema/terminals'
-import { GripVertical, Unplug } from 'lucide-react'
+import { GripVertical, Plus, Unplug } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
@@ -152,7 +152,7 @@ export function TerminalLayout({
       />
       <DragOverlay dropAnimation={null}>
         {draggingShellId != null && (
-          <div className="w-24 h-16 rounded-md bg-zinc-800/90 border border-zinc-600 flex items-center justify-center text-xs text-muted-foreground shadow-lg">
+          <div className="w-24 h-16 rounded-md bg-zinc-800/90 border border-zinc-600 flex items-center justify-center text-xs text-muted-foreground shadow-lg cursor-grabbing">
             <GripVertical className="w-4 h-4 mr-1" />
             Shell
           </div>
@@ -231,19 +231,89 @@ function DropZoneRegion({
 
 // --- Drag handle overlay for a leaf pane ---
 
-function DragHandle({ shellId }: { shellId: number }) {
+function SplitButton({
+  position,
+  terminalId,
+  shellId,
+}: {
+  position: 'top' | 'bottom' | 'left' | 'right'
+  terminalId: number
+  shellId: number
+}) {
+  const isVertical = position === 'top' || position === 'bottom'
+  const positionClass = {
+    top: 'bottom-full rounded-b-none left-1/2 -translate-x-1/2 mb-[-4px]',
+    bottom: 'top-full rounded-t-none left-1/2 -translate-x-1/2 mt-[-4px]',
+    left: 'right-full rounded-r-none top-1/2 -translate-y-1/2 mr-[-4px]',
+    right: 'left-full rounded-l-none top-1/2 -translate-y-1/2 ml-[-4px]',
+  }[position]
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'absolute opacity-0 group-hover/handle:opacity-100 transition-opacity',
+        'w-7 h-7 flex items-center justify-center rounded-lg',
+        'bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 text-muted-foreground cursor-pointer',
+        positionClass,
+      )}
+      onMouseDown={(e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        window.dispatchEvent(
+          new CustomEvent('shell-split', {
+            detail: {
+              terminalId,
+              shellId,
+              direction: isVertical ? 'vertical' : 'horizontal',
+            },
+          }),
+        )
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <Plus className="w-3 h-3" />
+    </button>
+  )
+}
+
+function DragHandle({
+  shellId,
+  terminalId,
+}: {
+  shellId: number
+  terminalId: number
+}) {
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: shellId,
   })
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30">
-      <div
-        ref={setNodeRef}
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing p-3 rounded-lg bg-zinc-800/80 border border-zinc-600 hover:bg-zinc-700/80 transition-colors"
-      >
-        <GripVertical className="w-5 h-5 text-muted-foreground" />
+      <div className="group/handle relative">
+        <SplitButton position="top" terminalId={terminalId} shellId={shellId} />
+        <SplitButton
+          position="bottom"
+          terminalId={terminalId}
+          shellId={shellId}
+        />
+        <SplitButton
+          position="left"
+          terminalId={terminalId}
+          shellId={shellId}
+        />
+        <SplitButton
+          position="right"
+          terminalId={terminalId}
+          shellId={shellId}
+        />
+        <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className="relative z-10 cursor-grab active:cursor-grabbing p-3 rounded-lg bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 transition-colors select-none"
+        >
+          <GripVertical className="w-5 h-5 text-muted-foreground" />
+        </div>
       </div>
     </div>
   )
@@ -310,7 +380,7 @@ function LayoutRenderer({
           <div className="absolute inset-0 pointer-events-none z-10 bg-black/20" />
         )}
         {dragMode && (!isDragging || isBeingDragged) && (
-          <DragHandle shellId={node.shellId} />
+          <DragHandle shellId={node.shellId} terminalId={terminalId} />
         )}
         {isDragging && !isBeingDragged && (
           <DropZones shellId={node.shellId} draggingShellId={draggingShellId} />
