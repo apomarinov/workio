@@ -10,6 +10,7 @@ const shortcutBindingSchema = z
     altKey: z.boolean().optional(),
     shiftKey: z.boolean().optional(),
     key: z.string().optional(),
+    side: z.enum(['left', 'right']).optional(),
   })
   .refine((b) => b.metaKey || b.ctrlKey || b.altKey || b.shiftKey || b.key, {
     message: 'Shortcut must have at least one modifier or key',
@@ -164,7 +165,7 @@ export const DEFAULT_KEYMAP: z.input<typeof keymapSchema> = {
   pullBranch: { altKey: true, key: 't' },
   toggleSidebar: { altKey: true, key: 'backquote' },
   commit: { metaKey: true, shiftKey: true, key: 'k' },
-  paneDrag: { ctrlKey: true, altKey: true },
+  paneDrag: { altKey: true, side: 'right' },
 }
 
 export const DEFAULT_GH_QUERY_LIMITS: z.input<typeof ghQueryLimitsSchema> = {

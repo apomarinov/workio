@@ -111,6 +111,11 @@ function formatBinding(
   }
   return (
     <span className="inline-flex items-center gap-1">
+      {binding.side && (
+        <span className="text-xs font-medium text-muted-foreground">
+          {binding.side === 'left' ? 'L' : 'R'}
+        </span>
+      )}
       {binding.ctrlKey && <ChevronUp className={cn(ICON_CLASS, 'stroke-3')} />}
       {binding.altKey && <Option className={cn(ICON_CLASS, 'stroke-3')} />}
       {binding.shiftKey && (
@@ -234,8 +239,20 @@ export function KeymapView() {
       alt: false,
       shift: false,
     }
+    let lastModSide: 'left' | 'right' | null = null
     const keyBuffer: string[] = []
     let active = false
+
+    const CODE_SIDE: Record<string, 'left' | 'right'> = {
+      MetaLeft: 'left',
+      MetaRight: 'right',
+      ControlLeft: 'left',
+      ControlRight: 'right',
+      AltLeft: 'left',
+      AltRight: 'right',
+      ShiftLeft: 'left',
+      ShiftRight: 'right',
+    }
 
     function finalize() {
       if (!recording) return
@@ -246,6 +263,15 @@ export function KeymapView() {
       if (modifierBuffer.shift) binding.shiftKey = true
       if (keyBuffer.length > 0) {
         binding.key = keyBuffer.join('')
+      }
+      // Include side for single-modifier-only bindings
+      const modCount =
+        +modifierBuffer.meta +
+        +modifierBuffer.ctrl +
+        +modifierBuffer.alt +
+        +modifierBuffer.shift
+      if (modCount === 1 && keyBuffer.length === 0 && lastModSide) {
+        binding.side = lastModSide
       }
       const next = { ...bindings, [recording]: binding }
       setBindings(next)
@@ -271,6 +297,7 @@ export function KeymapView() {
         const mod = MOD_MAP[e.key]
         if (mod) {
           modifierBuffer = { ...modifierBuffer, [mod]: true }
+          lastModSide = CODE_SIDE[e.code] ?? null
           active = true
         }
         setRecordingKeys((prev) => [...prev, e.key])

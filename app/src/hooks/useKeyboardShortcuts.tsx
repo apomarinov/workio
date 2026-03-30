@@ -32,33 +32,71 @@ window.addEventListener('palette-state', handlePaletteState)
 
 // --- Module-level modifier tracking ---
 
-let heldState = { meta: false, ctrl: false, alt: false, shift: false }
+type Side = 'left' | 'right' | null
+
+interface HeldState {
+  meta: boolean
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+  metaSide: Side
+  ctrlSide: Side
+  altSide: Side
+  shiftSide: Side
+}
+
+const INITIAL_HELD: HeldState = {
+  meta: false,
+  ctrl: false,
+  alt: false,
+  shift: false,
+  metaSide: null,
+  ctrlSide: null,
+  altSide: null,
+  shiftSide: null,
+}
+
+let heldState: HeldState = { ...INITIAL_HELD }
 let suppressHeld = false
-const EMPTY_HELD = { meta: false, ctrl: false, alt: false, shift: false }
+const EMPTY_HELD: HeldState = { ...INITIAL_HELD }
 const heldListeners = new Set<() => void>()
 
 function emitHeld() {
   for (const l of heldListeners) l()
 }
 
-const KEY_TO_MOD: Record<string, keyof typeof heldState> = {
+type ModName = 'meta' | 'ctrl' | 'alt' | 'shift'
+
+const KEY_TO_MOD: Record<string, ModName> = {
   Meta: 'meta',
   Control: 'ctrl',
   Alt: 'alt',
   Shift: 'shift',
 }
 
+const CODE_TO_SIDE: Record<string, Side> = {
+  MetaLeft: 'left',
+  MetaRight: 'right',
+  ControlLeft: 'left',
+  ControlRight: 'right',
+  AltLeft: 'left',
+  AltRight: 'right',
+  ShiftLeft: 'left',
+  ShiftRight: 'right',
+}
+
 function handleModKeyDown(e: KeyboardEvent) {
   const mod = KEY_TO_MOD[e.key]
   if (!mod || heldState[mod]) return
-  heldState = { ...heldState, [mod]: true }
+  const side = CODE_TO_SIDE[e.code] ?? null
+  heldState = { ...heldState, [mod]: true, [`${mod}Side`]: side }
   if (!suppressHeld) emitHeld()
 }
 
 function handleModKeyUp(e: KeyboardEvent) {
   const mod = KEY_TO_MOD[e.key]
   if (mod && heldState[mod]) {
-    heldState = { ...heldState, [mod]: false }
+    heldState = { ...heldState, [mod]: false, [`${mod}Side`]: null }
     if (!suppressHeld) emitHeld()
   }
   if (
@@ -75,7 +113,7 @@ function handleModKeyUp(e: KeyboardEvent) {
 function handleModBlur() {
   suppressHeld = false
   if (heldState.meta || heldState.ctrl || heldState.alt || heldState.shift) {
-    heldState = { meta: false, ctrl: false, alt: false, shift: false }
+    heldState = { ...INITIAL_HELD }
     emitHeld()
   }
 }
@@ -108,6 +146,35 @@ function renderModifierIcons(
   )
 }
 
+/** Check if a modifier-only binding matches the held state, including optional side. */
+function modifierBindingMatches(
+  held: HeldState,
+  binding: ShortcutBinding,
+): boolean {
+  if (
+    held.meta !== !!binding.metaKey ||
+    held.ctrl !== !!binding.ctrlKey ||
+    held.alt !== !!binding.altKey ||
+    held.shift !== !!binding.shiftKey
+  )
+    return false
+  // Only check side for single-modifier bindings
+  if (binding.side) {
+    const modCount =
+      +!!binding.metaKey +
+      +!!binding.ctrlKey +
+      +!!binding.altKey +
+      +!!binding.shiftKey
+    if (modCount === 1) {
+      if (binding.metaKey && held.metaSide !== binding.side) return false
+      if (binding.ctrlKey && held.ctrlSide !== binding.side) return false
+      if (binding.altKey && held.altSide !== binding.side) return false
+      if (binding.shiftKey && held.shiftSide !== binding.side) return false
+    }
+  }
+  return true
+}
+
 // --- useModifiersHeld: subscribes to held state, only re-renders subscribers ---
 
 export function useModifiersHeld() {
@@ -131,25 +198,13 @@ export function useModifiersHeld() {
       : (settings?.keymap?.paneDrag ?? DEFAULT_KEYMAP.paneDrag)
 
   const isGoToTabModifierHeld =
-    goToTabBinding !== null &&
-    held.meta === !!goToTabBinding.metaKey &&
-    held.ctrl === !!goToTabBinding.ctrlKey &&
-    held.alt === !!goToTabBinding.altKey &&
-    held.shift === !!goToTabBinding.shiftKey
+    goToTabBinding !== null && modifierBindingMatches(held, goToTabBinding)
 
   const isGoToShellModifierHeld =
-    goToShellBinding !== null &&
-    held.meta === !!goToShellBinding.metaKey &&
-    held.ctrl === !!goToShellBinding.ctrlKey &&
-    held.alt === !!goToShellBinding.altKey &&
-    held.shift === !!goToShellBinding.shiftKey
+    goToShellBinding !== null && modifierBindingMatches(held, goToShellBinding)
 
   const isPaneDragModifierHeld =
-    paneDragBinding !== null &&
-    held.meta === !!paneDragBinding.metaKey &&
-    held.ctrl === !!paneDragBinding.ctrlKey &&
-    held.alt === !!paneDragBinding.altKey &&
-    held.shift === !!paneDragBinding.shiftKey
+    paneDragBinding !== null && modifierBindingMatches(held, paneDragBinding)
 
   return {
     held,
