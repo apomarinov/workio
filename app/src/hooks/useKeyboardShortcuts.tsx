@@ -508,7 +508,12 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   useHotkeys(
     splitRightBinding?.key ? bindingToHotkeyString(splitRightBinding) : '',
     (e) => {
-      if (disabledRef.current || dialogOpenCountRef.current > 0 || commitDialogOpenRef.current) return
+      if (
+        disabledRef.current ||
+        dialogOpenCountRef.current > 0 ||
+        commitDialogOpenRef.current
+      )
+        return
       e.stopPropagation()
       handlersRef.current.splitRight?.()
     },
@@ -518,7 +523,12 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   useHotkeys(
     splitDownBinding?.key ? bindingToHotkeyString(splitDownBinding) : '',
     (e) => {
-      if (disabledRef.current || dialogOpenCountRef.current > 0 || commitDialogOpenRef.current) return
+      if (
+        disabledRef.current ||
+        dialogOpenCountRef.current > 0 ||
+        commitDialogOpenRef.current
+      )
+        return
       e.stopPropagation()
       handlersRef.current.splitDown?.()
     },

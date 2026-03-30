@@ -385,7 +385,7 @@ export function KeymapView() {
 
   return (
     <div className="absolute inset-0 flex flex-col bg-[#1a1a1a] z-10">
-      <div className="flex items-center gap-2 p-2 border-b border-zinc-700/50">
+      <div className="flex items-center gap-2 p-2 pr-3 border-b border-zinc-700/50">
         <Button
           variant="ghost"
           size="icon"
@@ -397,13 +397,13 @@ export function KeymapView() {
         <Keyboard className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-medium flex-1">Keyboard Shortcuts</span>
         <Button variant="ghost" size="sm" onClick={handleReset}>
-          <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+          <RotateCcw className="w-3.5 h-3.5 mr-1" />
           Reset All
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="w-full space-y-1.5">
+      <div className="flex-1 overflow-y-auto py-4">
+        <div className="w-full space-y-4">
           <FilteredSection
             heading="General"
             search={q}
@@ -541,20 +541,20 @@ function FilteredSection({
     : items
   if (filtered.length === 0) return null
   return (
-    <>
+    <div>
       <SectionHeader>{heading}</SectionHeader>
       <SectionRows>
         {filtered.map((item) => (
           <div key={item.label}>{item.node}</div>
         ))}
       </SectionRows>
-    </>
+    </div>
   )
 }
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="pb-1 border-b border-zinc-700">
+    <div className="pb-1 border-b border-zinc-700 px-4">
       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         {children}
       </span>
@@ -564,7 +564,7 @@ function SectionHeader({ children }: { children: ReactNode }) {
 
 function SectionRows({ children }: { children: ReactNode }) {
   return (
-    <div className="[&>div:nth-child(odd)]:bg-zinc-800/30 [&>div]:hover:!bg-zinc-700/50 [&>div]:transition-colors [&>div:first-child]:rounded-t-md [&>div:last-child]:rounded-b-md">
+    <div className="[&>div:nth-child(odd)]:bg-zinc-800/30 [&>div]:hover:!bg-zinc-700/50 [&>div]:transition-colors">
       {children}
     </div>
   )
@@ -578,7 +578,7 @@ function InfoShortcutRow({
   display: ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between px-2 py-1.5">
+    <div className="flex items-center justify-between px-4 py-1.5">
       <span className="text-sm font-medium text-muted-foreground">{label}</span>
       <span className="h-7 px-2.5 text-xs font-mono rounded-md border border-border bg-zinc-800/50 text-muted-foreground inline-flex items-center">
         {display}
@@ -615,7 +615,7 @@ function ShortcutRow({
   const isDisabled = !binding
   const isDefault = bindingsEqual(binding, defaultBinding)
   return (
-    <div className="flex items-center justify-between px-2 py-1.5">
+    <div className="flex items-center justify-between px-4 py-1.5">
       <div className="flex gap-1 items-center">
         <span className="text-sm font-medium flex flex-col gap-0">{label}</span>
         {binding && !binding.key && (
