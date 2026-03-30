@@ -172,49 +172,51 @@ function AppContent() {
                   if (!mountedShells.has(shell.id)) return null
                   // Child shells are rendered by their root's TerminalLayout
                   if (childIds?.has(shell.id)) return null
-                  const shellLayout = layouts?.[shell.id]
-                  if (shellLayout?.type === 'split') {
-                    // Layout is visible when active shell is any shell in this tree
-                    const layoutIds = getLayoutShellIds(shellLayout)
-                    const isLayoutActive =
-                      activeShellId != null && layoutIds.includes(activeShellId)
+                  const shellLayout = layouts?.[shell.id] ?? {
+                    type: 'leaf' as const,
+                    shellId: shell.id,
+                  }
+                  const layoutIds = getLayoutShellIds(shellLayout)
+                  const isLayoutActive =
+                    activeShellId != null && layoutIds.includes(activeShellId)
+                  if (isMobile) {
                     return (
-                      <div
+                      <Terminal
                         key={shell.id}
-                        className={cn(
-                          'absolute inset-0',
-                          !(
-                            isTermVisible &&
-                            !uiState.settings.isFocused &&
-                            isLayoutActive
-                          ) && 'invisible',
-                        )}
-                      >
-                        <TerminalLayout
-                          terminal={t}
-                          rootShellId={shell.id}
-                          layout={shellLayout}
-                          isVisible={
-                            isTermVisible &&
-                            !uiState.settings.isFocused &&
-                            isLayoutActive
-                          }
-                          mountedShells={mountedShells}
-                        />
-                      </div>
+                        terminalId={t.id}
+                        shellId={shell.id}
+                        isVisible={
+                          isTermVisible &&
+                          !uiState.settings.isFocused &&
+                          shell.id === activeShellId
+                        }
+                      />
                     )
                   }
                   return (
-                    <Terminal
+                    <div
                       key={shell.id}
-                      terminalId={t.id}
-                      shellId={shell.id}
-                      isVisible={
-                        isTermVisible &&
-                        !uiState.settings.isFocused &&
-                        shell.id === activeShellId
-                      }
-                    />
+                      className={cn(
+                        'absolute inset-0',
+                        !(
+                          isTermVisible &&
+                          !uiState.settings.isFocused &&
+                          isLayoutActive
+                        ) && 'invisible',
+                      )}
+                    >
+                      <TerminalLayout
+                        terminal={t}
+                        rootShellId={shell.id}
+                        layout={shellLayout}
+                        isVisible={
+                          isTermVisible &&
+                          !uiState.settings.isFocused &&
+                          isLayoutActive
+                        }
+                        mountedShells={mountedShells}
+                      />
+                    </div>
                   )
                 })
               })()}
