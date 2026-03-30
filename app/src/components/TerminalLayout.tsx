@@ -18,6 +18,7 @@ import { GripVertical, Unplug } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useModifiersHeld } from '@/hooks/useKeyboardShortcuts'
 import {
   getLayoutShellIds,
   moveLeaf,
@@ -54,24 +55,10 @@ export function TerminalLayout({
     setLocalLayout(layout)
   }, [layout])
 
-  // --- Drag mode: hold Alt ---
-  const [dragMode, setDragMode] = useState(false)
+  // --- Drag mode: Ctrl+Alt held ---
+  const { isPaneDragModifierHeld } = useModifiersHeld()
+  const dragMode = isPaneDragModifierHeld
   const [draggingShellId, setDraggingShellId] = useState<number | null>(null)
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') setDragMode(true)
-    }
-    const up = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') setDragMode(false)
-    }
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-    }
-  }, [])
 
   // --- Persist layout ---
   const persistLayout = (newLayout: LayoutNode) => {

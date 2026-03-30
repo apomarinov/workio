@@ -413,6 +413,9 @@ export function KeymapView() {
               shortcutItem('prevShell', 'Previous shell'),
               shortcutItem('nextShell', 'Next shell'),
               shortcutItem('shellTemplates', 'Shell Templates'),
+              shortcutItem('paneDrag', 'Drag panes', {
+                description: '(hold)',
+              }),
               infoItem(
                 'Focus active shell',
                 <ArrowRightToLine className={cn(ICON_CLASS, 'stroke-3')} />,

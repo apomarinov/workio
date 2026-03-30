@@ -125,6 +125,10 @@ export function useModifiersHeld() {
     settings?.keymap?.goToShell === null
       ? null
       : (settings?.keymap?.goToShell ?? DEFAULT_KEYMAP.goToShell)
+  const paneDragBinding =
+    settings?.keymap?.paneDrag === null
+      ? null
+      : (settings?.keymap?.paneDrag ?? DEFAULT_KEYMAP.paneDrag)
 
   const isGoToTabModifierHeld =
     goToTabBinding !== null &&
@@ -140,10 +144,18 @@ export function useModifiersHeld() {
     held.alt === !!goToShellBinding.altKey &&
     held.shift === !!goToShellBinding.shiftKey
 
+  const isPaneDragModifierHeld =
+    paneDragBinding !== null &&
+    held.meta === !!paneDragBinding.metaKey &&
+    held.ctrl === !!paneDragBinding.ctrlKey &&
+    held.alt === !!paneDragBinding.altKey &&
+    held.shift === !!paneDragBinding.shiftKey
+
   return {
     held,
     isGoToTabModifierHeld,
     isGoToShellModifierHeld,
+    isPaneDragModifierHeld,
     modifierIcons: {
       palette: paletteBinding
         ? renderModifierIcons(paletteBinding)
