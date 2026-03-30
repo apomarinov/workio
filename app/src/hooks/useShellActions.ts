@@ -8,7 +8,12 @@ import type {
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
-import { getLayoutShellIds, removeLeaf, splitLeaf } from '@/lib/layout'
+import {
+  getLayoutShellIds,
+  mapLeafIds,
+  removeLeaf,
+  splitLeaf,
+} from '@/lib/layout'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { useSettings } from './useSettings'
@@ -193,7 +198,15 @@ export function useShellActions() {
       const terminal = terminalsRef.current.find((t) => t.id === terminalId)
       if (!terminal) return
 
-      // 1. Delete all non-main shells
+      // 1. Clear existing layouts and delete all non-main shells
+      if (terminal.settings?.layouts) {
+        await updateTerminal(terminalId, {
+          settings: {
+            ...terminal.settings,
+            layouts: undefined,
+          } as TerminalSettings,
+        })
+      }
       const nonMainShells = terminal.shells.filter((s) => s.name !== 'main')
       await Promise.all(
         nonMainShells.map((shell) =>
@@ -229,7 +242,22 @@ export function useShellActions() {
         createdShellIds.push(newShell.id)
       }
 
-      // 5. Queue commands via pending (runs after shell integration is ready)
+      // 5. Apply template layout if present
+      if (template.layout?.type === 'split' && mainShell) {
+        const mapping: Record<number, number> = { 0: mainShell.id }
+        for (let i = 0; i < createdShellIds.length; i++) {
+          mapping[i + 1] = createdShellIds[i]
+        }
+        const realLayout = mapLeafIds(template.layout, mapping)
+        await updateTerminal(terminalId, {
+          settings: {
+            ...terminal.settings,
+            layouts: { [mainShell.id]: realLayout },
+          } as TerminalSettings,
+        })
+      }
+
+      // 6. Queue commands via pending (runs after shell integration is ready)
       const writes: Promise<void>[] = []
       if (mainShell && template.entries[0]?.command) {
         writes.push(
@@ -252,10 +280,10 @@ export function useShellActions() {
       }
       await Promise.all(writes)
 
-      // 6. Refetch so React renders the new shells (mount-all flag ensures they mount)
+      // 7. Refetch so React renders the new shells (mount-all flag ensures they mount)
       await refetch()
 
-      // 7. Set active shell to main
+      // 8. Set active shell to main
       if (mainShell) {
         setShell(terminalId, mainShell.id)
       }

@@ -96,6 +96,26 @@ export function getLayoutShellIds(node: LayoutNode): number[] {
   ]
 }
 
+/** Count max columns (horizontal splits) and rows (vertical splits) in the tree. */
+export function getLayoutDimensions(node: LayoutNode): {
+  columns: number
+  rows: number
+} {
+  if (node.type === 'leaf') return { columns: 1, rows: 1 }
+  const first = getLayoutDimensions(node.children[0].node)
+  const second = getLayoutDimensions(node.children[1].node)
+  if (node.direction === 'horizontal') {
+    return {
+      columns: first.columns + second.columns,
+      rows: Math.max(first.rows, second.rows),
+    }
+  }
+  return {
+    columns: Math.max(first.columns, second.columns),
+    rows: first.rows + second.rows,
+  }
+}
+
 /** Swap two leaves by shellId. */
 export function swapLeaves(
   node: LayoutNode,
@@ -165,6 +185,24 @@ function insertAtLeaf(
     children: node.children.map((child) => ({
       ...child,
       node: insertAtLeaf(child.node, shellId, replacement),
+    })) as [LayoutChild, LayoutChild],
+  }
+}
+
+/** Replace leaf IDs using a mapping (e.g. template entry index -> real shell ID). */
+export function mapLeafIds(
+  node: LayoutNode,
+  mapping: Record<number, number>,
+): LayoutNode {
+  if (node.type === 'leaf') {
+    const mapped = mapping[node.shellId]
+    return mapped != null ? { ...node, shellId: mapped } : node
+  }
+  return {
+    ...node,
+    children: node.children.map((child) => ({
+      ...child,
+      node: mapLeafIds(child.node, mapping),
     })) as [LayoutChild, LayoutChild],
   }
 }
