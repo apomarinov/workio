@@ -440,6 +440,8 @@ export function KeymapView() {
               shortcutItem('prevShell', 'Previous shell'),
               shortcutItem('nextShell', 'Next shell'),
               shortcutItem('shellTemplates', 'Shell Templates'),
+              shortcutItem('splitRight', 'Split Right'),
+              shortcutItem('splitDown', 'Split Down'),
               shortcutItem('paneDrag', 'Drag panes', {
                 description: '(hold)',
               }),

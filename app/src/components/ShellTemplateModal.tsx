@@ -336,7 +336,7 @@ function TemplateLeaf({
 }) {
   if (!entry) return null
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900">
+    <div className="relative h-full w-full flex flex-col items-center justify-start gap-2 p-3 bg-zinc-900">
       <div className="flex items-center gap-1 w-full">
         <Input
           value={entry.name}

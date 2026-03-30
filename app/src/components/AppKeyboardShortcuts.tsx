@@ -218,6 +218,28 @@ export function AppKeyboardShortcuts() {
         )
       }
     },
+    splitRight: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      const shellId = activeShellsRef.current[t.id]
+      if (!shellId) return
+      window.dispatchEvent(
+        new CustomEvent('shell-split', {
+          detail: { terminalId: t.id, shellId, direction: 'horizontal' },
+        }),
+      )
+    },
+    splitDown: () => {
+      const t = activeTerminalRef.current
+      if (!t) return
+      const shellId = activeShellsRef.current[t.id]
+      if (!shellId) return
+      window.dispatchEvent(
+        new CustomEvent('shell-split', {
+          detail: { terminalId: t.id, shellId, direction: 'vertical' },
+        }),
+      )
+    },
     pullBranch: () => {
       if (pullingRef.current) return
       const t = activeTerminalRef.current

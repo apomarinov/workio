@@ -245,6 +245,8 @@ interface KeymapHandlers {
   customCommands?: () => void
   branches?: () => void
   pullBranch?: () => void
+  splitRight?: () => void
+  splitDown?: () => void
   toggleSidebar?: () => void
   commit?: () => void
 }
@@ -276,6 +278,7 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   handlersRef.current = handlers
   const disabledRef = useRef(false)
   const commitDialogOpenRef = useRef(false)
+  const dialogOpenCountRef = useRef(0)
 
   useEffect(() => {
     const onDisable = (e: Event) => {
@@ -284,11 +287,21 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
     const onCommitDialog = (e: Event) => {
       commitDialogOpenRef.current = (e as CustomEvent).detail
     }
+    const onDialogOpened = () => {
+      dialogOpenCountRef.current++
+    }
+    const onDialogClosed = () => {
+      dialogOpenCountRef.current = Math.max(0, dialogOpenCountRef.current - 1)
+    }
     window.addEventListener('shortcuts-disabled', onDisable)
     window.addEventListener('commit-dialog-open', onCommitDialog)
+    window.addEventListener('dialog-opened', onDialogOpened)
+    window.addEventListener('dialog-closed', onDialogClosed)
     return () => {
       window.removeEventListener('shortcuts-disabled', onDisable)
       window.removeEventListener('commit-dialog-open', onCommitDialog)
+      window.removeEventListener('dialog-opened', onDialogOpened)
+      window.removeEventListener('dialog-closed', onDialogClosed)
     }
   }, [])
 
@@ -310,6 +323,8 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
   const customCommandsBinding = resolveBinding(keymap, 'customCommands')
   const branchesBinding = resolveBinding(keymap, 'branches')
   const pullBranchBinding = resolveBinding(keymap, 'pullBranch')
+  const splitRightBinding = resolveBinding(keymap, 'splitRight')
+  const splitDownBinding = resolveBinding(keymap, 'splitDown')
   const toggleSidebarBinding = resolveBinding(keymap, 'toggleSidebar')
   const commitBinding = resolveBinding(keymap, 'commit')
 
@@ -486,6 +501,26 @@ export function useKeyboardShortcuts(handlers: KeymapHandlers) {
       if (disabledRef.current) return
       e.stopPropagation()
       handlersRef.current.pullBranch?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    splitRightBinding?.key ? bindingToHotkeyString(splitRightBinding) : '',
+    (e) => {
+      if (disabledRef.current || dialogOpenCountRef.current > 0 || commitDialogOpenRef.current) return
+      e.stopPropagation()
+      handlersRef.current.splitRight?.()
+    },
+    HOTKEY_OPTS,
+  )
+
+  useHotkeys(
+    splitDownBinding?.key ? bindingToHotkeyString(splitDownBinding) : '',
+    (e) => {
+      if (disabledRef.current || dialogOpenCountRef.current > 0 || commitDialogOpenRef.current) return
+      e.stopPropagation()
+      handlersRef.current.splitDown?.()
     },
     HOTKEY_OPTS,
   )

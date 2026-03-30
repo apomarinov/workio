@@ -36,6 +36,8 @@ const keymapSchema = z.object({
   pullBranch: shortcutBindingSchema.nullable(),
   toggleSidebar: shortcutBindingSchema.nullable(),
   commit: shortcutBindingSchema.nullable(),
+  splitRight: shortcutBindingSchema.nullable(),
+  splitDown: shortcutBindingSchema.nullable(),
   paneDrag: shortcutBindingSchema.nullable(),
 })
 
@@ -166,6 +168,8 @@ export const DEFAULT_KEYMAP: z.input<typeof keymapSchema> = {
   pullBranch: { altKey: true, key: 't' },
   toggleSidebar: { altKey: true, key: 'backquote' },
   commit: { metaKey: true, shiftKey: true, key: 'k' },
+  splitRight: { altKey: true, key: 'slash' },
+  splitDown: { altKey: true, key: 'period' },
   paneDrag: { altKey: true, side: 'right' },
 }
 
