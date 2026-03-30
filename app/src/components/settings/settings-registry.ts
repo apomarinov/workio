@@ -61,7 +61,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.notification_active_timeout',
             label: 'Desktop Active Timeout',
             description:
-              'How long after last activity to suppress push notifications',
+              'How long after last activity on desktop to send push notifications',
           },
           {
             key: 'push_notifications',
@@ -120,12 +120,12 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           {
             key: 'font_size',
             label: 'Font Size',
-            description: 'Terminal font size (desktop)',
+            description: 'Terminal font size',
           },
           {
             key: 'mobile_font_size',
             label: 'Mobile Font Size',
-            description: 'Terminal font size (mobile)',
+            description: 'Terminal font size',
           },
         ],
       },
@@ -140,7 +140,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           {
             key: 'server_config.max_buffer_lines',
             label: 'Server',
-            description: 'Lines retained in the server-side output buffer',
+            description: 'Lines retained in the output buffer',
           },
         ],
       },
@@ -254,7 +254,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           {
             key: 'server_config.gh_poll_interval',
             label: 'Poll Interval',
-            description: 'How often to poll GitHub for PR check status',
+            description: 'How often to poll GitHub for PRs',
           },
         ],
       },

@@ -67,7 +67,7 @@ export function LogsHeaderActions() {
           value={filters.search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search"
-          className="h-5 min-w-24 max-w-[300px] py-0 pl-5 pr-1.5 text-[10px] text-zinc-300 placeholder:text-zinc-600 bg-transparent border-none rounded outline-none hover:bg-input/30 focus:bg-input/30"
+          className="h-5 w-24 max-w-[300px] py-0 pl-5 pr-1.5 text-[10px] text-zinc-300 placeholder:text-zinc-600 bg-transparent border-none rounded outline-none hover:bg-input/30 focus:bg-input/30"
         />
       </div>
 

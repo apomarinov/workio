@@ -17,6 +17,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useGitHubContext } from '@/context/GitHubContext'
 import { useProcessContext } from '@/context/ProcessContext'
 import { useSessionContext } from '@/context/SessionContext'
@@ -89,8 +96,8 @@ export const TerminalItem = memo(function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-          ) ??
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
@@ -162,6 +169,9 @@ export const TerminalItem = memo(function TerminalItem({
     _setActiveTab((o) => (o === v ? null : v))
   }
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
+  const [sessionBranchFilter, setSessionBranchFilter] = useState<
+    'branch' | 'all'
+  >('branch')
   const [olderSessionsCount, setOlderSessionsCount] = useState(0)
   const isSettingUp =
     terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'
@@ -208,10 +218,9 @@ export const TerminalItem = memo(function TerminalItem({
           }
         }}
         className={cn(
-          `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
           }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
           ((!hasSessions &&
             (statusBarEnabled ||
@@ -223,17 +232,17 @@ export const TerminalItem = memo(function TerminalItem({
             !showSidebarShells) ||
             isSettingUp ||
             isDeleting) &&
-            'pl-2.5',
+          'pl-2.5',
           hideFolder && 'rounded-l-lg',
         )}
       >
         {!isSettingUp &&
-        !isDeleting &&
-        (hasSessions ||
-          hasGitHub ||
-          (!statusBarEnabled &&
-            (hasProcesses || hasPorts || isDirty || showRemoteSync)) ||
-          showSidebarShells) ? (
+          !isDeleting &&
+          (hasSessions ||
+            hasGitHub ||
+            (!statusBarEnabled &&
+              (hasProcesses || hasPorts || isDirty || showRemoteSync)) ||
+            showSidebarShells) ? (
           <Button
             variant="ghost"
             size="icon"
@@ -260,11 +269,11 @@ export const TerminalItem = memo(function TerminalItem({
                 className={cn(
                   'w-4 h-4 flex-shrink-0',
                   !hasProcesses &&
-                    'fill-muted-foreground/60 group-hover:fill-muted-foreground',
+                  'fill-muted-foreground/60 group-hover:fill-muted-foreground',
                   !hasProcesses && isActive && 'fill-muted-foreground',
                   hasProcesses &&
-                    !isActive &&
-                    'fill-green-500/70 group-hover:fill-green-500',
+                  !isActive &&
+                  'fill-green-500/70 group-hover:fill-green-500',
                   hasProcesses && isActive && 'fill-green-500',
                 )}
               />
@@ -534,7 +543,7 @@ export const TerminalItem = memo(function TerminalItem({
                           pr={prForBranch}
                           expanded={true}
                           hasNewActivity={prForBranch.hasUnreadNotifications}
-                          onToggle={() => {}}
+                          onToggle={() => { }}
                         />
                       </div>
                     )}
@@ -543,22 +552,62 @@ export const TerminalItem = memo(function TerminalItem({
               )}
             {sessions.length > 0 && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setSessionsListExpanded(!sessionsListExpanded)}
-                  className="flex cursor-pointer w-full items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors px-2 pt-1"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'w-3 h-3 transition-transform',
-                      !sessionsListExpanded && '-rotate-90',
-                    )}
-                  />
-                  Claude
-                </button>
+                <div className="flex !h-5 items-center justify-between px-2 pt-1 group/claude-btn">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSessionsListExpanded(!sessionsListExpanded)
+                    }
+                    className="flex cursor-pointer flex-1 items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                  >
+                    <ChevronDown
+                      className={cn(
+                        'w-3 h-3 transition-transform',
+                        !sessionsListExpanded && '-rotate-90',
+                      )}
+                    />
+                    Claude
+                  </button>
+                  {sessionsListExpanded && terminal.git_branch && (
+                    <Select
+                      value={sessionBranchFilter}
+                      onValueChange={(v) =>
+                        setSessionBranchFilter(v as 'branch' | 'all')
+                      }
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="!h-5 sm:invisible group-hover/claude-btn:visible !bg-transparent text-muted-foreground/60 hover:text-white/70 hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="branch" className="text-xs">
+                          On Branch
+                        </SelectItem>
+                        <SelectItem value="all" className="text-xs">
+                          All
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
                 {sessionsListExpanded &&
                   (() => {
-                    const activeSessions = sessions.filter(
+                    const filtered =
+                      sessionBranchFilter === 'branch' && terminal.git_branch
+                        ? sessions.filter((s) => {
+                          const d = s.data
+                          if (!d) return false
+                          if (d.branch === terminal.git_branch) return true
+                          return (
+                            d.branches?.some(
+                              (b) => b.branch === terminal.git_branch,
+                            ) ?? false
+                          )
+                        })
+                        : sessions
+                    const activeSessions = filtered.filter(
                       (s) =>
                         s.status === 'active' ||
                         s.status === 'permission_needed',
@@ -566,8 +615,8 @@ export const TerminalItem = memo(function TerminalItem({
                     const visibleSessions =
                       activeSessions.length > 1
                         ? activeSessions
-                        : sessions.slice(0, 1)
-                    const allHidden = sessions.filter(
+                        : filtered.slice(0, 1)
+                    const allHidden = filtered.filter(
                       (s) => !visibleSessions.includes(s),
                     )
                     const shownOlder = allHidden.slice(0, olderSessionsCount)
