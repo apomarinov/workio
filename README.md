@@ -1,8 +1,10 @@
 # WorkIO
 
+<p align="center">
+  <img src="app/public/hero.png" alt="WorkIO Dashboard" />
+</p>
 
-
-A web-based mini IDE that combines terminals, Git, Claude Code sessions, and GitHub PRs into a single interface. Manage projects, run shells locally or over SSH, commit and review code, monitor what Claude is doing, track PRs — all from one place, including your phone.
+A web-based mini IDE that combines terminals, Git, Claude Code, and GitHub into a single interface. Manage projects, run shells locally or over SSH, commit and review code, monitor what Claude is doing, track PRs — all from one place, including your phone.
 
 ## Features
 
@@ -16,55 +18,46 @@ A web-based mini IDE that combines terminals, Git, Claude Code sessions, and Git
 
 - Start terminals locally or over SSH
 - Multiple shell tabs per terminal with drag-and-drop reordering
+- Shell multiplexing with templates and custom commands
 - Shell integration for command tracking and Claude session linking
 - View all processes and listening ports in your terminal
 - Get notified for command completion
-- Shell templates and custom commands
-- Multi-client support with device indicators
-- Open projects in Cursor/VSCode
+- Process & Port Detection
+- SSH terminal port mapping via reverse SSH tunnel
+- Resource usage (CPU/memory)
 
 ### Claude Code
 
-- View all running Claude sessions on your system
-- View sessions started in your projects
-- Tool visualization — see Bash, Edit, Read, Write tool calls with diffs
+- View all running Claude sessions started in projects or on your system
+- Claude sessions running on remote SSH machines are forwarded back to WorkIO via reverse tunnels
 - Permission prompt detection and notifications
 - Search across all session messages
-- Star/favorite sessions
-- Resume sessions in specific shells
+- Resume sessions
 - Move sessions between projects
-- Hook forwarding — Claude hooks on remote SSH machines are forwarded back to WorkIO via reverse tunnels
 - Pin sessions in an always-on-top Picture-in-Picture window
 - `claude-skill` - add to your global Claude skills for additional functionality
 
 ### GitHub PRs
 
 - PR updates via `gh` CLI polling or real-time repo webhooks
-- View PR status of the current branch in your project
-- View PR list of all repos you have projects in
-- View reviews, comments, running/failed checks
-- Create PRs with diff viewer and conflict detection
-- Merge, close, edit title/description
-- Re-request reviews, rerun failed checks
-- Emoji reactions on comments and reviews
-- Involved PRs — PRs where you're mentioned or review-requested
+- PR management — View status, create, edit, merge/close
+- Reviews & checks — View reviews/comments, re-request reviews, view and rerun running/failed checks, emoji reactions
+- Discovery — Browse PRs across all your repos, track involved PRs (mentioned or review-requested)
 - Filter and silence authors
 
 ### Git
 
 - Changes at a glance with dirty status tracking
 - Pull, push, checkout, merge, rebase branches
-- Commit dialog with file picker, diff viewer, staged/unstaged management
+- Commit dialog with file list, diff viewer and editor, staged/unstaged management
 - Remote sync — shows ahead/behind commit counts
 - Branch diff viewer with compare and commit history modes
-- Create and manage worktrees
 
 ### Command Palette
 
 Access everything with `Cmd+K` — multiple modes:
 
 - Search: jump to sessions, terminals, branches
-- Session search: search message content across sessions
 - Actions: git operations, PR actions
 - Custom commands: user-defined terminal shortcuts
 - PR checkout: switch to PR branches
@@ -74,54 +67,19 @@ Access everything with `Cmd+K` — multiple modes:
 
 - Claude permission requests and session completions
 - PR activity (reviews, comments, checks)
-- Project setup status
-- Mobile push notifications (self-hosted with VAPID keys)
-- Click to navigate to the relevant terminal/shell
+- Mobile push notifications
 
 ### Mobile
 
-- Responsive design for phones and tablets
+- Installable as a PWA, acts as a mirror for WorkIO running on your machine
 - Custom mobile terminal keyboard with action buttons
-- Drag-and-drop button reordering
-- Edge swipe gesture to open/close sidebar
-- Installable as a PWA
-
-### Process & Port Detection
-
-**Local terminals:**
-
-- Uses `ps` to walk the process tree from the shell PID downward
-- Active command detected via OSC 133 shell integration sequences
-- Listening ports detected via `lsof` — matches ports to terminals by checking if the listening PID is a descendant of the shell
-- Resource usage (CPU/memory) aggregated from all descendant processes
-
-**SSH terminals:**
-
-- Fetches the full process list from each SSH host once per scan cycle via `ps` over SSH (batched per host — one SSH call regardless of how many shells are on that host)
-- Walks the remote process tree from the reported remote shell PID
-- Resource usage computed from the same fetched data
-- Listening ports detected via `ss` on the remote host, matched to terminal process trees
-- Detected remote ports can be forwarded locally via automatic SSH reverse port forwarding
-
-**Zellij (local):**
-
-- Finds the Zellij server PID by matching unix socket paths via `lsof`
-- Gets direct children of the server (pane shells) and their children (running commands)
-- Matches sessions to terminals via `zellij list-sessions`
-
-**Zellij (SSH):**
-
-- Uses the already-fetched remote process list — zero extra SSH calls
-- Walks down from the remote shell PID to find the Zellij client process, then locates the Zellij server (daemonized, ppid=1) from the full process list
-- Gets pane processes the same way as local (server → pane shells → commands)
-- Session naming uses `wiosession` shell helper which reads from `~/.workio/terminals/` and `~/.workio/shells/` on the remote host (written automatically on session creation)
-- Limited to one Zellij server per SSH host — multiple concurrent Zellij servers on the same host cannot be disambiguated
+- Edge swipe gestures
 
 ### Zellij Integration
 
-- Copy to clipboard for multi-page selections in panes
-- Detect running processes in tabs
 - Map project to session with `--session-name "$(wiosession)"`
+- Detect running processes in tabs
+- Copy to clipboard for multi-page selections in panes
 
 ### Service Status
 
@@ -129,9 +87,6 @@ Access everything with `Cmd+K` — multiple modes:
 - Per-service info modals with explanations
 
 ### Keyboard Shortcuts
-
-- Fully customizable key bindings
-- Configurable via the settings modal
 
 ---
 
