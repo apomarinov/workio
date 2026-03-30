@@ -78,6 +78,11 @@ export async function detectGitHubRepo(
   return null
 }
 
+export function clearRepoCache(cwd: string, sshHost?: string | null) {
+  const cacheKey = sshHost ? `${sshHost}:${cwd}` : cwd
+  repoCache.delete(cacheKey)
+}
+
 // ── Terminal resolution ──────────────────────────────────────────────
 
 export async function resolveGitTerminal(terminalId: number) {

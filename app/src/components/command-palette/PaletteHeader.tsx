@@ -29,7 +29,7 @@ export function PaletteHeader({
       />
       {breadcrumbs.length > 0 && (
         <div className="flex flex-wrap h-[30px] items-center gap-1.5 border-b border-zinc-700 px-3">
-          <ArrowLeft className="w-3 h-3 text-zinc-400" />
+          <ArrowLeft className="w-3 h-3 mt-[1px] text-zinc-400" />
           {breadcrumbs.map((crumb, i) => {
             const isLast = i === breadcrumbs.length - 1
             const handleClick = isLast

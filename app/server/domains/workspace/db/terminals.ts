@@ -151,6 +151,8 @@ export async function updateTerminal(
 }
 
 export async function deleteTerminal(id: number) {
+  // Delete sessions (and their prompts/messages via CASCADE) for this terminal
+  await pool.query('DELETE FROM sessions WHERE terminal_id = $1', [id])
   // shells are deleted via ON DELETE CASCADE
   const result = await pool.query('DELETE FROM terminals WHERE id = $1', [id])
   return (result.rowCount ?? 0) > 0
