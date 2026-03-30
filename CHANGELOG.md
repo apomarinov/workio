@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.9.0](../../compare/v0.8.0...v0.9.0) — 2026-03-30
+
+### Features
+- Add shell multiplexing with split panes — per-shell layout trees stored in terminal settings
+- Add drag-and-drop pane reordering — hold configurable modifier (default: right Alt) to enter drag mode with swap and edge-drop support
+- Add split buttons to drag handle — hover the grip to reveal directional split buttons on each edge
+- Add split layout support to shell templates — visual layout editor in template modal with PaneLayout preview
+- Add left/right modifier side detection for single-modifier keyboard shortcuts
+- Add Monaco-based diff editors replacing diff2html in FileDiffViewer and UnifiedDiffViewer
+- Add editable diff viewer with file save and collapsible commits panel
+- Add shell template management in Settings > Terminal > General
+- Add scrollback and SSH max channels settings to settings UI
+
+### Improvements
+- Extract generic PaneLayout component for reusable recursive panel rendering
+- Wire paneDrag shortcut into keymap system with configurable binding
+- Always render shells through TerminalLayout on desktop for consistent split button access
+- Move ShellTemplateModal to AppModals with event-based open/close
+- Move DirectoryBrowser from CommandPalette to AppModals
+- Add favorite folders to file picker with star button and popover
+- Consolidate UIState settings, loading toasts, keymap search, close shell shortcut
+- Rework palette breadcrumbs layout and unify session search filter
+- Unify terminal create/edit into single modal with shell picker dropdown
+
+### Bug Fixes
+- Disable Monaco diagnostics and enable JSX compiler options for diff editors
+- Fix shell restart on change with confirm modal and bash integration
+
 ## [v0.8.0](../../compare/v0.7.0...v0.8.0) — 2026-03-28
 
 ### Features
