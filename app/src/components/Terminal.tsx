@@ -391,7 +391,7 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
       cursorBlink: true,
       cursorStyle: 'underline',
       fastScrollSensitivity: 5,
-      scrollback: 10000,
+      scrollback: settings.scrollback,
       fontSize: fontSizeRef.current,
       macOptionIsMeta: true,
       fontFamily:

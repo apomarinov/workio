@@ -76,6 +76,11 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
   }),
 
   // Terminal > Scrollback
+  scrollback: createNumberSetting('scrollback', {
+    min: 500,
+    max: 100000,
+    placeholder: String(DEFAULT_CONFIG.scrollback),
+  }),
   'server_config.max_buffer_lines': createNumberSetting(
     'server_config.max_buffer_lines',
     {
@@ -163,6 +168,13 @@ const CONTROLS_MAP: Record<string, React.ComponentType> = {
       min: 1000,
       placeholder: String(DEFAULT_CONFIG.server_config.ssh_default_timeout),
       unit: 'ms',
+    },
+  ),
+  'server_config.ssh_max_channels': createNumberSetting(
+    'server_config.ssh_max_channels',
+    {
+      min: 1,
+      placeholder: String(DEFAULT_CONFIG.server_config.ssh_max_channels),
     },
   ),
   'server_config.ssh_keepalive_interval': createNumberSetting(

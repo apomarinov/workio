@@ -201,6 +201,7 @@ const settingsBaseSchema = z.object({
     .string()
     .min(1, { error: 'Shell is required' })
     .default('/bin/bash'),
+  scrollback: z.number().min(500).max(100000).default(10000),
   font_size: z.number().min(8).max(32).default(13),
   mobile_font_size: z.number().min(8).max(32).default(10),
   show_thinking: z.boolean().default(false),

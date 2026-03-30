@@ -126,8 +126,13 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
         name: 'Scrollback',
         settings: [
           {
+            key: 'scrollback',
+            label: 'Client',
+            description: 'Lines retained in the terminal view',
+          },
+          {
             key: 'server_config.max_buffer_lines',
-            label: 'Scrollback Lines (Server)',
+            label: 'Server',
             description: 'Lines retained in the server-side output buffer',
           },
         ],
@@ -338,6 +343,11 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
             key: 'server_config.ssh_default_timeout',
             label: 'SSH Command Timeout',
             description: 'Default timeout for SSH commands',
+          },
+          {
+            key: 'server_config.ssh_max_channels',
+            label: 'Max SSH Channels',
+            description: 'Max concurrent SSH exec channels per connection',
           },
           {
             key: 'server_config.ssh_keepalive_interval',
