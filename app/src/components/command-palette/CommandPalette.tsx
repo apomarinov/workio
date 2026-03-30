@@ -943,11 +943,12 @@ export function CommandPalette() {
           ...l,
           loadingStates: { ...l.loadingStates, pulling: name },
         }))
+        const toastId = toast.loading(`Pulling ${name}...`)
         try {
           await pullBranch(terminal.id, name)
-          toast.success(`Pulled ${name}`)
+          toast.success(`Pulled ${name}`, { id: toastId })
         } catch (err) {
-          toastError(err, 'Failed to pull branch')
+          toastError(err, 'Failed to pull branch', toastId)
         } finally {
           api.updateLevel((l) => ({
             ...l,

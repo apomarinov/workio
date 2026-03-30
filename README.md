@@ -199,3 +199,7 @@ graph LR
 ## Platform Support
 
 WorkIO has been developed and tested on **macOS** for local terminals and **Ubuntu (Linux)** for SSH remote terminals. Other platforms may work but are untested.
+
+## Disclaimer
+
+WorkIO was built as a personal tool, combining my daily workflows. It is not intended to be a full-fledged Claude, Git, or GitHub client supporting all their features.
