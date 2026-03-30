@@ -1,14 +1,31 @@
+import {
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
 import type {
   LayoutNode,
   LayoutSplit,
   Terminal as TerminalType,
 } from '@domains/workspace/schema/terminals'
-import { Unplug } from 'lucide-react'
-import { useRef } from 'react'
+import { GripVertical, Unplug } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
-import { updateSizesAtPath } from '@/lib/layout'
+import {
+  getLayoutShellIds,
+  moveLeaf,
+  swapLeaves,
+  updateSizesAtPath,
+} from '@/lib/layout'
 import { trpc } from '@/lib/trpc'
+import { cn } from '@/lib/utils'
 import { Terminal } from './Terminal'
 
 interface TerminalLayoutProps {
@@ -28,11 +45,37 @@ export function TerminalLayout({
 }: TerminalLayoutProps) {
   const { activeShells } = useWorkspaceContext()
   const updateMutation = trpc.workspace.terminals.updateTerminal.useMutation()
-  const layoutRef = useRef(layout)
-  layoutRef.current = layout
+  const [localLayout, setLocalLayout] = useState(layout)
+  const layoutRef = useRef(localLayout)
+  layoutRef.current = localLayout
 
-  const handleResize = (path: number[], sizes: [number, number]) => {
-    const newLayout = updateSizesAtPath(layoutRef.current, path, sizes)
+  // Sync from prop when server data changes (e.g. after refetch)
+  useEffect(() => {
+    setLocalLayout(layout)
+  }, [layout])
+
+  // --- Drag mode: hold Alt ---
+  const [dragMode, setDragMode] = useState(false)
+  const [draggingShellId, setDraggingShellId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') setDragMode(true)
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') setDragMode(false)
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
+
+  // --- Persist layout ---
+  const persistLayout = (newLayout: LayoutNode) => {
+    setLocalLayout(newLayout)
     layoutRef.current = newLayout
     updateMutation.mutate({
       id: terminal.id,
@@ -43,18 +86,183 @@ export function TerminalLayout({
     })
   }
 
+  const handleResize = (path: number[], sizes: [number, number]) => {
+    persistLayout(updateSizesAtPath(layoutRef.current, path, sizes))
+  }
+
+  // --- DnD ---
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  )
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setDraggingShellId(event.active.id as number)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setDraggingShellId(null)
+    const { active, over } = event
+    if (!over) return
+
+    const sourceShellId = active.id as number
+    const [targetShellIdStr, zone] = (over.id as string).split(':')
+    const targetShellId = Number(targetShellIdStr)
+
+    if (sourceShellId === targetShellId) return
+
+    let newLayout: LayoutNode | null = null
+    if (zone === 'center') {
+      newLayout = swapLeaves(layoutRef.current, sourceShellId, targetShellId)
+    } else {
+      const directionMap: Record<string, 'horizontal' | 'vertical'> = {
+        left: 'horizontal',
+        right: 'horizontal',
+        top: 'vertical',
+        bottom: 'vertical',
+      }
+      const positionMap: Record<string, 'before' | 'after'> = {
+        left: 'before',
+        right: 'after',
+        top: 'before',
+        bottom: 'after',
+      }
+      newLayout = moveLeaf(
+        layoutRef.current,
+        sourceShellId,
+        targetShellId,
+        directionMap[zone],
+        positionMap[zone],
+      )
+    }
+
+    if (newLayout) {
+      persistLayout(newLayout)
+    }
+  }
+
+  const handleDragCancel = () => {
+    setDraggingShellId(null)
+  }
+
   return (
-    <LayoutRenderer
-      node={layout}
-      terminalId={terminal.id}
-      activeShellId={activeShells[terminal.id]}
-      isVisible={isVisible}
-      mountedShells={mountedShells}
-      path={[]}
-      onResize={handleResize}
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <LayoutRenderer
+        key={getLayoutShellIds(localLayout).join('-')}
+        node={localLayout}
+        terminalId={terminal.id}
+        activeShellId={activeShells[terminal.id]}
+        isVisible={isVisible}
+        mountedShells={mountedShells}
+        path={[]}
+        onResize={handleResize}
+        dragMode={dragMode}
+        draggingShellId={draggingShellId}
+      />
+      <DragOverlay dropAnimation={null}>
+        {draggingShellId != null && (
+          <div className="w-24 h-16 rounded-md bg-zinc-800/90 border border-zinc-600 flex items-center justify-center text-xs text-muted-foreground shadow-lg">
+            <GripVertical className="w-4 h-4 mr-1" />
+            Shell
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  )
+}
+
+// --- Drop zones overlay for a leaf pane ---
+
+function DropZones({
+  shellId,
+  draggingShellId,
+}: {
+  shellId: number
+  draggingShellId: number | null
+}) {
+  const isSelf = shellId === draggingShellId
+
+  return (
+    <div className="absolute inset-0 z-20 pointer-events-auto">
+      <DropZoneRegion
+        id={`${shellId}:center`}
+        className="absolute inset-[30%]"
+        highlightClass="bg-blue-500/20 rounded-md"
+        disabled={isSelf}
+      />
+      <DropZoneRegion
+        id={`${shellId}:top`}
+        className="absolute top-0 left-0 right-0 h-[30%]"
+        highlightClass="border-t-2 border-t-blue-500"
+        disabled={isSelf}
+      />
+      <DropZoneRegion
+        id={`${shellId}:bottom`}
+        className="absolute bottom-0 left-0 right-0 h-[30%]"
+        highlightClass="border-b-2 border-b-blue-500"
+        disabled={isSelf}
+      />
+      <DropZoneRegion
+        id={`${shellId}:left`}
+        className="absolute top-0 left-0 bottom-0 w-[30%]"
+        highlightClass="border-l-2 border-l-blue-500"
+        disabled={isSelf}
+      />
+      <DropZoneRegion
+        id={`${shellId}:right`}
+        className="absolute top-0 right-0 bottom-0 w-[30%]"
+        highlightClass="border-r-2 border-r-blue-500"
+        disabled={isSelf}
+      />
+    </div>
+  )
+}
+
+function DropZoneRegion({
+  id,
+  className,
+  highlightClass,
+  disabled,
+}: {
+  id: string
+  className: string
+  highlightClass: string
+  disabled: boolean
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled })
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(className, isOver && !disabled && highlightClass)}
     />
   )
 }
+
+// --- Drag handle overlay for a leaf pane ---
+
+function DragHandle({ shellId }: { shellId: number }) {
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: shellId,
+  })
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30">
+      <div
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-3 rounded-lg bg-zinc-800/80 border border-zinc-600 hover:bg-zinc-700/80 transition-colors"
+      >
+        <GripVertical className="w-5 h-5 text-muted-foreground" />
+      </div>
+    </div>
+  )
+}
+
+// --- Recursive layout renderer ---
 
 function LayoutRenderer({
   node,
@@ -64,6 +272,8 @@ function LayoutRenderer({
   mountedShells,
   path,
   onResize,
+  dragMode,
+  draggingShellId,
 }: {
   node: LayoutNode
   terminalId: number
@@ -72,18 +282,24 @@ function LayoutRenderer({
   mountedShells: Set<number>
   path: number[]
   onResize: (path: number[], sizes: [number, number]) => void
+  dragMode: boolean
+  draggingShellId: number | null
 }) {
   if (node.type === 'leaf') {
     const isActive = node.shellId === activeShellId
+    const isDragging = draggingShellId != null
+    const isBeingDragged = draggingShellId === node.shellId
     return (
       <div
         className="relative h-full w-full"
         onMouseDown={() => {
-          window.dispatchEvent(
-            new CustomEvent('shell-select', {
-              detail: { terminalId, shellId: node.shellId },
-            }),
-          )
+          if (!dragMode) {
+            window.dispatchEvent(
+              new CustomEvent('shell-select', {
+                detail: { terminalId, shellId: node.shellId },
+              }),
+            )
+          }
         }}
       >
         {mountedShells.has(node.shellId) ? (
@@ -103,8 +319,17 @@ function LayoutRenderer({
             </span>
           </div>
         )}
-        {!isActive && (
+        {!isActive && !dragMode && (
           <div className="absolute inset-0 pointer-events-none z-10 bg-black/20" />
+        )}
+        {dragMode && (!isDragging || isBeingDragged) && (
+          <DragHandle shellId={node.shellId} />
+        )}
+        {isDragging && !isBeingDragged && (
+          <DropZones shellId={node.shellId} draggingShellId={draggingShellId} />
+        )}
+        {isBeingDragged && (
+          <div className="absolute inset-0 z-10 bg-black/40 pointer-events-none" />
         )}
       </div>
     )
@@ -119,6 +344,8 @@ function LayoutRenderer({
       mountedShells={mountedShells}
       path={path}
       onResize={onResize}
+      dragMode={dragMode}
+      draggingShellId={draggingShellId}
     />
   )
 }
@@ -131,6 +358,8 @@ function SplitRenderer({
   mountedShells,
   path,
   onResize,
+  dragMode,
+  draggingShellId,
 }: {
   node: LayoutSplit
   terminalId: number
@@ -139,6 +368,8 @@ function SplitRenderer({
   mountedShells: Set<number>
   path: number[]
   onResize: (path: number[], sizes: [number, number]) => void
+  dragMode: boolean
+  draggingShellId: number | null
 }) {
   const firstRef = usePanelRef()
   const secondRef = usePanelRef()
@@ -166,6 +397,8 @@ function SplitRenderer({
           mountedShells={mountedShells}
           path={[...path, 0]}
           onResize={onResize}
+          dragMode={dragMode}
+          draggingShellId={draggingShellId}
         />
       </Panel>
       <Separator
@@ -188,6 +421,8 @@ function SplitRenderer({
           mountedShells={mountedShells}
           path={[...path, 1]}
           onResize={onResize}
+          dragMode={dragMode}
+          draggingShellId={draggingShellId}
         />
       </Panel>
     </Group>

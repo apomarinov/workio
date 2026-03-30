@@ -96,6 +96,79 @@ export function getLayoutShellIds(node: LayoutNode): number[] {
   ]
 }
 
+/** Swap two leaves by shellId. */
+export function swapLeaves(
+  node: LayoutNode,
+  shellIdA: number,
+  shellIdB: number,
+): LayoutNode {
+  if (node.type === 'leaf') {
+    if (node.shellId === shellIdA) return { ...node, shellId: shellIdB }
+    if (node.shellId === shellIdB) return { ...node, shellId: shellIdA }
+    return node
+  }
+  return {
+    ...node,
+    children: node.children.map((child) => ({
+      ...child,
+      node: swapLeaves(child.node, shellIdA, shellIdB),
+    })) as [LayoutChild, LayoutChild],
+  }
+}
+
+/**
+ * Move a leaf to a new position relative to a target leaf.
+ * Removes the source from its current position and inserts it next to the target.
+ * `position` controls whether it goes before (top/left) or after (bottom/right).
+ */
+export function moveLeaf(
+  node: LayoutNode,
+  sourceShellId: number,
+  targetShellId: number,
+  direction: 'horizontal' | 'vertical',
+  position: 'before' | 'after',
+): LayoutNode | null {
+  // 1. Remove source from tree
+  const withoutSource = removeLeaf(node, sourceShellId)
+  if (!withoutSource) return null
+
+  // 2. Insert source next to target
+  const children: [LayoutChild, LayoutChild] =
+    position === 'before'
+      ? [
+          { node: { type: 'leaf', shellId: sourceShellId }, size: 50 },
+          { node: { type: 'leaf', shellId: targetShellId }, size: 50 },
+        ]
+      : [
+          { node: { type: 'leaf', shellId: targetShellId }, size: 50 },
+          { node: { type: 'leaf', shellId: sourceShellId }, size: 50 },
+        ]
+
+  return insertAtLeaf(withoutSource, targetShellId, {
+    type: 'split',
+    direction,
+    children,
+  })
+}
+
+/** Replace a leaf matching shellId with a replacement node. */
+function insertAtLeaf(
+  node: LayoutNode,
+  shellId: number,
+  replacement: LayoutNode,
+): LayoutNode {
+  if (node.type === 'leaf') {
+    return node.shellId === shellId ? replacement : node
+  }
+  return {
+    ...node,
+    children: node.children.map((child) => ({
+      ...child,
+      node: insertAtLeaf(child.node, shellId, replacement),
+    })) as [LayoutChild, LayoutChild],
+  }
+}
+
 /** Get shell IDs that are inside layout trees but NOT the root tab shell. */
 export function getChildShellIds(
   layouts: Record<string, LayoutNode>,
