@@ -80,7 +80,6 @@ export default defineConfig(({ mode }) => {
               '@xterm/xterm',
               '@xterm/addon-fit',
               '@xterm/addon-search',
-              '@xterm/addon-web-links',
               '@xterm/addon-webgl',
             ],
             markdown: [
@@ -103,7 +102,6 @@ export default defineConfig(({ mode }) => {
               'react-dom',
               'react-resizable-panels',
               'socket.io-client',
-              'swr',
             ],
           },
         },

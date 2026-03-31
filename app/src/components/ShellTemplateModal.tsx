@@ -64,9 +64,9 @@ export function ShellTemplateModal({
         const mapped =
           template.entries.length > 0
             ? template.entries.map((e) => ({
-              ...e,
-              _key: keyCounter.current++,
-            }))
+                ...e,
+                _key: keyCounter.current++,
+              }))
             : [{ name: 'main', command: '', _key: keyCounter.current++ }]
         setEntries(mapped)
         setLayouts((template.layouts as LayoutNode[]) ?? [])
@@ -245,9 +245,9 @@ export function ShellTemplateModal({
   const dialogStyle =
     maxCols > 1
       ? {
-        maxWidth: `min(90vw, ${maxCols * 300}px)`,
-        minWidth: '500px',
-      }
+          maxWidth: `min(90vw, ${maxCols * 300}px)`,
+          minWidth: '500px',
+        }
       : undefined
 
   return (
@@ -305,7 +305,7 @@ export function ShellTemplateModal({
                           e.stopPropagation()
                           removeEntry(tab.id)
                         }}
-                        onKeyDown={() => { }}
+                        onKeyDown={() => {}}
                       >
                         <X className="w-3 h-3" />
                       </span>
@@ -329,7 +329,7 @@ export function ShellTemplateModal({
               style={{ height: `${contentHeight}px` }}
             >
               {currentTab?.type === 'layout' &&
-                currentTab.layoutIndex != null ? (
+              currentTab.layoutIndex != null ? (
                 <PaneLayout
                   key={getLayoutShellIds(layouts[currentTab.layoutIndex]).join(
                     '-',
