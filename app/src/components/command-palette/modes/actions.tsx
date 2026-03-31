@@ -36,7 +36,7 @@ export function createActionsMode(
   api: PaletteAPI,
 ): PaletteMode {
   const { terminal, pr } = level
-  const { pinnedTerminalSessions, pinnedSessions } = data
+  const { pinnedSessions } = data
   // Look up fresh session from data to reflect latest state (e.g. after favorite toggle)
   const session = level.session
     ? (data.sessions.find((s) => s.session_id === level.session!.session_id) ??
@@ -54,7 +54,6 @@ export function createActionsMode(
 
   // Terminal actions
   if (terminal) {
-    const isPinned = pinnedTerminalSessions.includes(terminal.id)
     const { preferredIDE } = data
 
     const items: PaletteItem[] = []
@@ -180,21 +179,6 @@ export function createActionsMode(
         onSelect: () => actions.addWorkspace(terminal),
       })
     }
-
-    // Pin/Unpin
-    items.push({
-      id: 'action:pin',
-      label: isPinned ? 'Unpin Latest Claude' : 'Pin Latest Claude',
-      icon: isPinned ? (
-        <PinOff className="h-4 w-4 shrink-0 text-zinc-400" />
-      ) : (
-        <Pin className="h-4 w-4 shrink-0 text-zinc-400" />
-      ),
-      onSelect: () => {
-        actions.toggleTerminalPin(terminal.id)
-        api.close()
-      },
-    })
 
     // Open in Explorer (non-SSH only)
     if (!terminal.ssh_host) {

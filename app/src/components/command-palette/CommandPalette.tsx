@@ -168,9 +168,6 @@ export function CommandPalette() {
     trpc.sessions.sessionToggleFavorite.useMutation()
 
   // Pin state (shared localStorage keys with sidebar)
-  const [pinnedTerminalSessions, setPinnedTerminalSessions] = useLocalStorage<
-    number[]
-  >('sidebar-pinned-terminal-sessions', [])
   const [pinnedSessions, setPinnedSessions] = useLocalStorage<string[]>(
     'sidebar-pinned-sessions',
     [],
@@ -501,7 +498,6 @@ export function CommandPalette() {
       githubPRs,
       mergedPRs,
       gitDirtyStatus,
-      pinnedTerminalSessions,
       pinnedSessions,
       preferredIDE,
       processes,
@@ -516,7 +512,6 @@ export function CommandPalette() {
       githubPRs,
       mergedPRs,
       gitDirtyStatus,
-      pinnedTerminalSessions,
       pinnedSessions,
       preferredIDE,
       processes,
@@ -787,13 +782,6 @@ export function CommandPalette() {
       },
 
       // Pin actions
-      toggleTerminalPin: (terminalId) => {
-        setPinnedTerminalSessions((prev) =>
-          prev.includes(terminalId)
-            ? prev.filter((id) => id !== terminalId)
-            : [...prev, terminalId],
-        )
-      },
       toggleSessionPin: (sessionId) => {
         setPinnedSessions((prev) =>
           prev.includes(sessionId)
@@ -1171,7 +1159,6 @@ export function CommandPalette() {
       clearSession,
       closePalette,
       createTerminal,
-      setPinnedTerminalSessions,
       setPinnedSessions,
       currentLevel,
       api,

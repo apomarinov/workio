@@ -200,25 +200,15 @@ export function getPipDimensions(layout: 'horizontal' | 'vertical'): {
 
 export function usePinnedSessionsData() {
   const { sessions } = useSessionContext()
-  const { terminals } = useWorkspaceContext()
   const [rawPinnedSessionIds, setRawPinnedSessionIds] = useLocalStorage<
     string[]
   >('sidebar-pinned-sessions', [])
-  const [rawPinnedTerminalIds, setRawPinnedTerminalIds] = useLocalStorage<
-    number[]
-  >('sidebar-pinned-terminal-sessions', [])
 
   // Validate pinned session IDs against actual sessions
   const pinnedSessionIds = useMemo(() => {
     const sessionIdSet = new Set(sessions.map((s) => s.session_id))
     return rawPinnedSessionIds.filter((id) => sessionIdSet.has(id))
   }, [sessions, rawPinnedSessionIds])
-
-  // Validate pinned terminal IDs against actual terminals
-  const pinnedTerminalIds = useMemo(() => {
-    const terminalIdSet = new Set(terminals.map((t) => t.id))
-    return rawPinnedTerminalIds.filter((id) => terminalIdSet.has(id))
-  }, [terminals, rawPinnedTerminalIds])
 
   // Clean up stale IDs from localStorage
   useEffect(() => {
@@ -227,40 +217,16 @@ export function usePinnedSessionsData() {
     }
   }, [pinnedSessionIds, rawPinnedSessionIds, setRawPinnedSessionIds])
 
-  useEffect(() => {
-    if (pinnedTerminalIds.length < rawPinnedTerminalIds.length) {
-      setRawPinnedTerminalIds(pinnedTerminalIds)
-    }
-  }, [pinnedTerminalIds, rawPinnedTerminalIds, setRawPinnedTerminalIds])
-
-  // Get pinned sessions (directly pinned + latest from pinned terminals)
+  // Get pinned sessions
   const { pinnedSessions, pinnedSessionIdSet } = useMemo(() => {
     const result: SessionWithProject[] = []
     const addedIds = new Set<string>()
 
-    // Directly pinned sessions
     for (const id of pinnedSessionIds) {
       const session = sessions.find((s) => s.session_id === id)
       if (session && !addedIds.has(session.session_id)) {
         result.push(session)
         addedIds.add(session.session_id)
-      }
-    }
-
-    // Latest session per pinned terminal
-    for (const terminalId of pinnedTerminalIds) {
-      const terminal = terminals.find((t) => t.id === terminalId)
-      if (!terminal) continue
-      const terminalSessions = sessions
-        .filter((s) => s.terminal_id === terminalId)
-        .sort(
-          (a, b) =>
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-        )
-      const latest = terminalSessions[0]
-      if (latest && !addedIds.has(latest.session_id)) {
-        result.push(latest)
-        addedIds.add(latest.session_id)
       }
     }
 
@@ -271,7 +237,7 @@ export function usePinnedSessionsData() {
     )
 
     return { pinnedSessions: result, pinnedSessionIdSet: addedIds }
-  }, [sessions, terminals, pinnedSessionIds, pinnedTerminalIds])
+  }, [sessions, pinnedSessionIds])
 
   // Get non-pinned sessions sorted by updated_at
   const nonPinnedSessions = useMemo(() => {
@@ -288,8 +254,7 @@ export function usePinnedSessionsData() {
     nonPinnedSessions,
     allSessions: sessions,
     pinnedSessionIds,
-    pinnedTerminalIds,
-    totalCount: pinnedSessionIds.length + pinnedTerminalIds.length,
+    totalCount: pinnedSessionIds.length,
   }
 }
 

@@ -27,7 +27,6 @@ export type AppData = {
   githubPRs: PRCheckStatus[]
   mergedPRs: MergedPRSummary[]
   gitDirtyStatus: Record<number, GitDiffStat>
-  pinnedTerminalSessions: number[]
   pinnedSessions: string[]
   preferredIDE: PreferredIDE
   processes: ActiveProcess[]
@@ -63,7 +62,6 @@ export type AppActions = {
   ) => void
 
   // Pin actions
-  toggleTerminalPin: (terminalId: number) => void
   toggleSessionPin: (sessionId: string) => void
   toggleFavoriteSession: (sessionId: string) => void
 

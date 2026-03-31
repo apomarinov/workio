@@ -6,7 +6,6 @@ import {
   ChevronRight,
   GitBranch,
   MoreVertical,
-  Pin,
   RotateCw,
   X,
 } from 'lucide-react'
@@ -116,11 +115,6 @@ export const TerminalItem = memo(function TerminalItem({
       remoteSyncStat.ahead > 0)
   const hasGitHub = !!prForBranch
   const isActive = terminal.id === activeTerminal?.id
-  const [pinnedTerminalSessions] = useLocalStorage<number[]>(
-    'sidebar-pinned-terminal-sessions',
-    [],
-  )
-  const isTerminalPinned = pinnedTerminalSessions.includes(terminal.id)
   const [tabBar] = useLocalStorage('shell-tabs-bar', true)
   const { settings } = useSettings()
   const statusBarEnabled = !!settings?.statusBar?.enabled
@@ -345,9 +339,6 @@ export const TerminalItem = memo(function TerminalItem({
             </span>
           )}
         </div>
-        {isTerminalPinned && !isGoToTabModifierHeld && (
-          <Pin className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:invisible" />
-        )}
         {isGoToTabModifierHeld && shortcutIndex >= 1 ? (
           <span className="absolute right-1 bg-sidebar/80 rounded-md px-2 py-1 text-sm flex items-center gap-1 text-muted-foreground font-medium tabular-nums font-mono">
             {modifierIcons.goToTab('w-3 h-3')}
