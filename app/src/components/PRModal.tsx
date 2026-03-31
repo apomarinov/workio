@@ -28,24 +28,28 @@ export function PRModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[80vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 min-w-0">
-            <span className="flex-shrink-0">
+          <DialogTitle className="flex items-start gap-2 min-w-0">
+            <span className="flex-shrink-0 mt-0.5">
               {prInfo.icon({ cls: 'w-4 h-4' })}
             </span>
-            <span className="break-all">{pr.prTitle}</span>
-            <span className="text-muted-foreground text-sm font-normal">
-              #{pr.prNumber}
+            <span className="break-words min-w-0">
+              {pr.prTitle}{' '}
+              <span className="text-muted-foreground text-sm font-normal">
+                #{pr.prNumber}
+              </span>
             </span>
           </DialogTitle>
         </DialogHeader>
-        <PRStatusContent
-          pr={pr}
-          expanded={true}
-          hasNewActivity={pr.hasUnreadNotifications}
-          fullDiscussion
-        />
+        <div className="min-w-0">
+          <PRStatusContent
+            pr={pr}
+            expanded={true}
+            hasNewActivity={pr.hasUnreadNotifications}
+            fullDiscussion
+          />
+        </div>
       </DialogContent>
     </Dialog>
   )

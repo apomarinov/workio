@@ -28,8 +28,7 @@ export function PaletteHeader({
         onValueChange={onSearchChange}
       />
       {breadcrumbs.length > 0 && (
-        <div className="flex flex-wrap h-[30px] items-center gap-1.5 border-b border-zinc-700 px-3">
-          <ArrowLeft className="w-3 h-3 mt-[1px] text-zinc-400" />
+        <div className="flex flex-wrap min-h-[30px] items-center gap-x-1.5 gap-y-0.5 border-b border-zinc-700 px-3 py-1.5">
           {breadcrumbs.map((crumb, i) => {
             const isLast = i === breadcrumbs.length - 1
             const handleClick = isLast
@@ -40,19 +39,27 @@ export function PaletteHeader({
             const isClickable = !!handleClick
 
             return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: breadcrumbs may have duplicates
-              <span key={`${crumb}-${i}`} className="flex items-center gap-1.5">
+              <span
+                // biome-ignore lint/suspicious/noArrayIndexKey: breadcrumbs may have duplicates
+                key={`${crumb}-${i}`}
+                className="flex items-center gap-1.5 leading-none"
+              >
                 <button
                   type="button"
                   onClick={handleClick}
                   className={cn(
-                    'truncate text-xs max-w-[300px]',
+                    'flex items-center gap-1 text-xs max-w-[250px]',
                     isClickable
                       ? 'text-zinc-400 hover:text-zinc-200 cursor-pointer'
                       : 'text-zinc-500 cursor-default',
                   )}
                 >
-                  {breadcrumbs.length === 1 ? 'Home' : crumb}
+                  {i === 0 && (
+                    <ArrowLeft className="w-3 h-3 mt-[1px] min-w-3" />
+                  )}
+                  <span className="truncate">
+                    {breadcrumbs.length === 1 ? 'Home' : crumb}
+                  </span>
                 </button>
                 {!isLast && <span className="shrink-0 text-zinc-600">/</span>}
               </span>

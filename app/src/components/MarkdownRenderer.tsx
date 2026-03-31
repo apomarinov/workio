@@ -72,7 +72,10 @@ const mdComponents: Record<string, (props: any) => ReactNode> = {
     }
 
     return (
-      <code className="bg-zinc-900 px-1.5 py-0.5 rounded text-xs" {...props}>
+      <code
+        className="bg-zinc-900 px-1.5 py-0.5 rounded text-xs break-all"
+        {...props}
+      >
         {children}
       </code>
     )
@@ -169,12 +172,14 @@ export default memo(function MarkdownRenderer({
   content,
 }: MarkdownContentProps) {
   return (
-    <ReactMarkdown
-      remarkPlugins={remarkPlugins}
-      rehypePlugins={rehypePlugins}
-      components={mdComponents}
-    >
-      {content}
-    </ReactMarkdown>
+    <div className="min-w-0 [overflow-wrap:anywhere]">
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={mdComponents}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   )
 })

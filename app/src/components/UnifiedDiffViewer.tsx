@@ -52,6 +52,9 @@ function DiffItem({
   const handleMount: DiffOnMount = (editor, monaco) => {
     const modifiedEditor = editor.getModifiedEditor()
 
+    // Single line-number column (like GitHub) — hide original gutter
+    editor.getOriginalEditor().updateOptions({ lineNumbers: 'off' })
+
     const noValidation = {
       noSemanticValidation: true,
       noSyntaxValidation: true,
@@ -171,6 +174,7 @@ function DiffItem({
               }
               options={{
                 renderSideBySide: false,
+                renderIndicators: false,
                 readOnly: true,
                 domReadOnly: true,
                 originalEditable: false,

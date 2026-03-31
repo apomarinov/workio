@@ -69,6 +69,9 @@ function DiffContent({
     editorRef.current = editor
     const modifiedEditor = editor.getModifiedEditor()
 
+    // Single line-number column (like GitHub) — hide original gutter
+    editor.getOriginalEditor().updateOptions({ lineNumbers: 'off' })
+
     // Disable all diagnostics (no project context, so TS flags everything)
     const noValidation = {
       noSemanticValidation: true,
@@ -160,6 +163,7 @@ function DiffContent({
       }
       options={{
         renderSideBySide: false,
+        renderIndicators: false,
         readOnly: !editable,
         originalEditable: false,
         fontSize,
