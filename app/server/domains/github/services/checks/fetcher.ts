@@ -699,9 +699,15 @@ async function fetchPRsViaRESTAndGraphQL(
           const prs = JSON.parse(openStdout) as Array<{
             number: number
             user?: { login?: string }
+            head?: { ref?: string }
           }>
+          const branchSet = trackedBranches.get(repoKey)
           const myPRs = prs
-            .filter((pr) => pr.user?.login === author)
+            .filter(
+              (pr) =>
+                pr.user?.login === author ||
+                (pr.head?.ref && branchSet?.has(pr.head.ref)),
+            )
             .map((pr) => pr.number)
           if (myPRs.length > 0) {
             openPRsByRepo.set(repoKey, myPRs)

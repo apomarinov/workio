@@ -344,8 +344,9 @@ const ReviewRow = memo(function ReviewRow({
                 <button
                   type="button"
                   onClick={handleReply}
-                  className="text-xs text-left px-2 py-1 rounded hover:bg-sidebar-accent cursor-pointer"
+                  className="text-xs text-left flex items-center px-2 py-1 gap-1 rounded hover:bg-sidebar-accent cursor-pointer"
                 >
+                  <Reply className="w-3.5 h-3.5" />
                   Reply
                 </button>
               </PopoverClose>
@@ -649,8 +650,9 @@ const CommentItem = memo(function CommentItem({
                   <button
                     type="button"
                     onClick={handleReply}
-                    className="text-xs text-left px-2 py-1 rounded hover:bg-sidebar-accent cursor-pointer"
+                    className="text-xs text-left px-2 py-1 flex items-center gap-1 rounded hover:bg-sidebar-accent cursor-pointer"
                   >
+                    <Reply className="w-3.5 h-3.5" />
                     Reply
                   </button>
                 </PopoverClose>

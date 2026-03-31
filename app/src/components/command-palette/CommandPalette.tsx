@@ -836,9 +836,10 @@ export function CommandPalette() {
           ...l,
           loadingStates: { ...l.loadingStates, fetching: true },
         }))
+        const toastId = toast.loading('Fetching all remotes...')
         try {
           await fetchAll(terminalId)
-          toast.success('Fetched all remotes')
+          toast.success('Fetched all remotes', { id: toastId })
           // Refetch branches to reflect any new remote branches
           getBranches(terminalId)
             .then((data) => {
@@ -865,7 +866,7 @@ export function CommandPalette() {
             })
             .catch(() => toast.error('Failed to load branches'))
         } catch (err) {
-          toastError(err, 'Failed to fetch')
+          toastError(err, 'Failed to fetch', toastId)
         } finally {
           api.updateLevel((l) => ({
             ...l,

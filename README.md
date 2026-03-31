@@ -137,15 +137,15 @@ You also need to set up environment variables. Create a `.env.local` file in the
 ## Quick Start
 
 ```bash
-./run.sh
+./workio.so
 ```
 
 This script handles everything: checks dependencies, adds Claude hooks, sets up the database, builds the app, and starts the server. The dashboard will be available at `http://localhost:5175`.
 
 **Flags:**
 
-- `./run.sh --rebuild` — Force a fresh `npm install` and rebuild
-- `./run.sh --drop-db` — Drop and recreate the database from scratch
+- `./workio.so --rebuild` — Force a fresh `npm install` and rebuild
+- `./workio.so --drop-db` — Drop and recreate the database from scratch
 
 ---
 

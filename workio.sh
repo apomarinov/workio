@@ -9,7 +9,7 @@ DROP_DB=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         -h|--help)
-            echo "Usage: ./run.sh [OPTIONS]"
+            echo "Usage: ./workio.so [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --rebuild   Force rebuild the webapp (npm install + npm run build)"
@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: ./run.sh [-h] [--rebuild] [--drop-db]"
+            echo "Usage: ./workio.so [-h] [--rebuild] [--drop-db]"
             exit 1
             ;;
     esac
