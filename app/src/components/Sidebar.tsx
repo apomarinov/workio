@@ -49,7 +49,6 @@ import { getPRStatusInfo } from '@/lib/pr-status'
 import { cn } from '@/lib/utils'
 import { useBackfillCheck } from './BackfillModal'
 import { useWebhookWarning } from './GitHubModal'
-import { LogsModal } from './LogsModal'
 import { InvolvedPRsList, OlderMergedPRsList } from './MergedPRsList'
 import { NotificationList } from './NotificationList'
 import { getPipDimensions, usePinnedSessionsData } from './PinnedSessionsPip'
@@ -110,10 +109,6 @@ export function Sidebar() {
     setBellOpenRaw(open)
     if (!open) setTimeout(refetchNotifications, 200)
   }
-  const [logsModal, setLogsModal] = useState<{
-    open: boolean
-    initialFilter?: { terminalId?: number; prName?: string }
-  }>({ open: false })
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -394,18 +389,6 @@ export function Sidebar() {
     return () =>
       window.removeEventListener('open-create-custom-action', handler)
   }, [uiState.settings.open])
-
-  // Listen for open-logs events from command palette
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as
-        | { terminalId?: number; prName?: string }
-        | undefined
-      setLogsModal({ open: true, initialFilter: detail })
-    }
-    window.addEventListener('open-logs', handler)
-    return () => window.removeEventListener('open-logs', handler)
-  }, [])
 
   // Listen for reveal-pr events from the command palette
   useEffect(() => {
@@ -969,14 +952,6 @@ export function Sidebar() {
         <ResourceInfo className="hover:opacity-80 py-[0.35rem]" />
         <ServiceStatusIndicator className="hover:opacity-100 py-[0.35rem] px-1" />
       </div>
-
-      <LogsModal
-        open={logsModal.open}
-        onOpenChange={(open) =>
-          setLogsModal({ open, initialFilter: undefined })
-        }
-        initialFilter={logsModal.initialFilter}
-      />
     </div>
   )
 }

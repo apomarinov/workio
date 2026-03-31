@@ -246,6 +246,18 @@ export async function getCommandLogsInfinite(input: InfiniteListInput) {
   return { logs, nextCursor }
 }
 
+export async function getLogPrs() {
+  const { rows } = await pool.query<{ pr_id: string }>(`
+    SELECT pr_id
+    FROM command_logs
+    WHERE pr_id IS NOT NULL AND pr_id ~ '^.+/.+#\\d+$'
+    GROUP BY pr_id
+    ORDER BY MAX(created_at) DESC
+    LIMIT 50
+  `)
+  return { prs: rows.map((r) => r.pr_id) }
+}
+
 export async function getLogTerminals() {
   const { rows } = await pool.query<LogTerminal>(`
     SELECT DISTINCT ON (cl.terminal_id)

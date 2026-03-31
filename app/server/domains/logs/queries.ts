@@ -1,5 +1,10 @@
 import { publicProcedure } from '@server/trpc'
-import { getCommandLogs, getCommandLogsInfinite, getLogTerminals } from './db'
+import {
+  getCommandLogs,
+  getCommandLogsInfinite,
+  getLogPrs,
+  getLogTerminals,
+} from './db'
 import { infiniteListInput, listInput } from './schema'
 
 export const list = publicProcedure
@@ -15,3 +20,5 @@ export const infiniteList = publicProcedure
   })
 
 export const terminals = publicProcedure.query(() => getLogTerminals())
+
+export const prs = publicProcedure.query(() => getLogPrs())

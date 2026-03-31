@@ -51,7 +51,7 @@ function LogRow({ log }: { log: CommandLog }) {
   const { filters } = useLogsContext()
   const [expanded, setExpanded] = useState(false)
   const isFailed = log.exit_code !== 0
-  const showEntity = filters.scope !== 'project'
+  const showEntity = filters.source !== 'project'
 
   const rowClass = cn(
     'hover:bg-sidebar-accent/50 cursor-pointer',

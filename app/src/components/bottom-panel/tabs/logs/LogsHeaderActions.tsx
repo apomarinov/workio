@@ -1,21 +1,26 @@
-import { Search, Trash2, X } from 'lucide-react'
+import {
+  Github,
+  Search,
+  Terminal as TerminalIcon,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useGitHubContext } from '@/context/GitHubContext'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
-import { type LogsScope, useLogsContext } from './LogsContext'
-
-const SCOPE_OPTIONS: { value: LogsScope; label: string }[] = [
-  { value: 'all', label: 'All Logs' },
-  { value: 'system', label: 'System Logs' },
-  { value: 'project', label: 'Project Logs' },
-]
+import { useLogsContext } from './LogsContext'
 
 const CATEGORY_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: 'git', label: 'Git', color: 'bg-orange-500/20 text-orange-400' },
@@ -35,19 +40,44 @@ const triggerClass =
   '!h-5 !bg-transparent text-muted-foreground hover:text-white hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1'
 
 export function LogsHeaderActions() {
-  const { filters, setSearch, setScope, setCategory, deleteFiltered } =
+  const { filters, setSearch, setSource, setCategory, deleteFiltered } =
     useLogsContext()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const hasFilters =
     filters.search !== '' ||
-    filters.scope !== 'project' ||
+    filters.source !== 'project' ||
     filters.category !== undefined
 
   const resetFilters = () => {
     setSearch('')
-    setScope('project')
+    setSource('project')
     setCategory(undefined)
   }
+
+  const { data: terminalsData } = trpc.logs.terminals.useQuery()
+  const { data: prsData } = trpc.logs.prs.useQuery()
+  const terminals = terminalsData?.terminals ?? []
+  const logPrIds = prsData?.prs ?? []
+
+  // Build PR title map from GitHub context
+  const { githubPRs, mergedPRs, involvedPRs } = useGitHubContext()
+  const prTitleMap = new Map<string, string>()
+  for (const pr of githubPRs) {
+    prTitleMap.set(`${pr.repo}#${pr.prNumber}`, pr.prTitle)
+  }
+  for (const pr of mergedPRs) {
+    prTitleMap.set(`${pr.repo}#${pr.prNumber}`, pr.prTitle)
+  }
+  for (const pr of involvedPRs) {
+    prTitleMap.set(`${pr.repo}#${pr.prNumber}`, pr.prTitle)
+  }
+
+  // Sort: titled PRs first, then bare IDs
+  const prs = [...logPrIds].sort((a, b) => {
+    const aHasTitle = prTitleMap.has(a) ? 0 : 1
+    const bHasTitle = prTitleMap.has(b) ? 0 : 1
+    return aHasTitle - bHasTitle
+  })
 
   return (
     <div className="flex items-center gap-1 mr-1">
@@ -71,22 +101,85 @@ export function LogsHeaderActions() {
         />
       </div>
 
-      <Select
-        value={filters.scope}
-        onValueChange={(v) => setScope(v as LogsScope)}
-      >
-        <SelectTrigger size="sm" className={triggerClass}>
+      {/* Source filter (scope + terminal + PR) */}
+      <Select value={filters.source} onValueChange={setSource}>
+        <SelectTrigger
+          size="sm"
+          className={cn(
+            triggerClass,
+            'max-w-[200px] truncate line-clamp-1 px-2 pt-0.5',
+          )}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {SCOPE_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} className="text-xs">
-              {opt.label}
-            </SelectItem>
-          ))}
+          <SelectItem value="system" className="text-xs">
+            System
+          </SelectItem>
+          <SelectItem value="project" className="text-xs">
+            This Project
+          </SelectItem>
+
+          {terminals.length > 0 && (
+            <>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel>Projects</SelectLabel>
+                {terminals.map((t) => (
+                  <SelectItem
+                    key={t.id}
+                    value={`terminal:${t.id}`}
+                    className="text-xs"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <TerminalIcon className="w-3 h-3 max-w-3 text-zinc-400 shrink-0" />
+                      <span className="truncate">
+                        {t.name || `Terminal ${t.id}`}
+                      </span>
+                      {t.deleted && (
+                        <span className="text-[9px] text-red-400">
+                          (deleted)
+                        </span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </>
+          )}
+
+          {prs.length > 0 && (
+            <>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel>Pull Requests</SelectLabel>
+                {prs.map((pr) => {
+                  const title = prTitleMap.get(pr)
+                  return (
+                    <SelectItem key={pr} value={`pr:${pr}`} className="text-xs">
+                      <span className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Github className="w-3 h-3 max-w-3 text-zinc-400 shrink-0" />
+                          <span className="max-w-[300px]">
+                            {title ? `${title}` : pr}
+                          </span>
+                        </div>
+                        {title && (
+                          <span className="text-[9px] text-muted-foreground shrink-0">
+                            {pr}
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  )
+                })}
+              </SelectGroup>
+            </>
+          )}
         </SelectContent>
       </Select>
 
+      {/* Category filter */}
       <Select
         value={filters.category ?? 'all'}
         onValueChange={(v) => setCategory(v === 'all' ? undefined : v)}
