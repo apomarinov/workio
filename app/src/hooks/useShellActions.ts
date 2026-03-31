@@ -119,7 +119,17 @@ export function useShellActions() {
         (t) => t.id === terminalId,
       )
       const shellsBefore = terminalBefore?.shells ?? []
-      const deletedIndex = shellsBefore.findIndex((s) => s.id === shellId)
+
+      // Compute next shell to select using visual tab order before deletion
+      const sortedBefore = terminalBefore
+        ? getSortedShellsFromOrder(terminalBefore, shellOrderRef.current)
+        : shellsBefore
+      const sortedIndex = sortedBefore.findIndex((s) => s.id === shellId)
+      const nextShellId =
+        sortedBefore[sortedIndex + 1]?.id ??
+        sortedBefore[sortedIndex - 1]?.id ??
+        shellsBefore.find((s) => s.name === 'main')?.id ??
+        shellsBefore[0]?.id
 
       // Update layout tree if this shell is in one
       const layouts = terminalBefore?.settings?.layouts
@@ -158,9 +168,7 @@ export function useShellActions() {
         if (remaining.length === 0) return
 
         const nextShell =
-          remaining[Math.min(deletedIndex, remaining.length - 1)] ??
-          remaining.find((s) => s.name === 'main') ??
-          remaining[0]
+          remaining.find((s) => s.id === nextShellId) ?? remaining[0]
 
         setShell(terminalId, nextShell.id)
         window.dispatchEvent(
@@ -242,17 +250,28 @@ export function useShellActions() {
         createdShellIds.push(newShell.id)
       }
 
-      // 5. Apply template layout if present
-      if (template.layout?.type === 'split' && mainShell) {
+      // 5. Apply template layouts if present
+      const templateLayouts: LayoutNode[] =
+        (template.layouts as LayoutNode[]) ?? []
+
+      if (templateLayouts.length > 0 && mainShell) {
         const mapping: Record<number, number> = { 0: mainShell.id }
         for (let i = 0; i < createdShellIds.length; i++) {
           mapping[i + 1] = createdShellIds[i]
         }
-        const realLayout = mapLeafIds(template.layout, mapping)
+        const realLayouts: Record<string, LayoutNode> = {}
+        for (const tmplLayout of templateLayouts) {
+          const realLayout = mapLeafIds(tmplLayout, mapping)
+          // Use the first leaf's real shell ID as the layout group key
+          const rootId = getLayoutShellIds(realLayout)[0]
+          if (rootId != null) {
+            realLayouts[rootId] = realLayout
+          }
+        }
         await updateTerminal(terminalId, {
           settings: {
             ...terminal.settings,
-            layouts: { [mainShell.id]: realLayout },
+            layouts: realLayouts,
           } as TerminalSettings,
         })
       }

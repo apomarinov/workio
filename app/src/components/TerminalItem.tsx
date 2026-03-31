@@ -95,8 +95,8 @@ export const TerminalItem = memo(function TerminalItem({
     () =>
       terminal.git_branch
         ? (githubPRs.find(
-            (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
-          ) ??
+          (pr) => pr.branch === terminal.git_branch && pr.state === 'OPEN',
+        ) ??
           githubPRs.find(
             (pr) => pr.branch === terminal.git_branch && pr.state === 'MERGED',
           ))
@@ -212,10 +212,9 @@ export const TerminalItem = memo(function TerminalItem({
           }
         }}
         className={cn(
-          `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+          `group flex relative gap-1 items-center pl-1 pr-2 py-1.5 transition-colors  ${`cursor-pointer ${isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
           }`} ${terminal.orphaned || isSettingUp || isDeleting ? 'opacity-60' : ''}`,
           ((!hasSessions &&
             (statusBarEnabled ||
@@ -227,17 +226,17 @@ export const TerminalItem = memo(function TerminalItem({
             !showSidebarShells) ||
             isSettingUp ||
             isDeleting) &&
-            'pl-2.5',
+          'pl-2.5',
           hideFolder && 'rounded-l-lg',
         )}
       >
         {!isSettingUp &&
-        !isDeleting &&
-        (hasSessions ||
-          hasGitHub ||
-          (!statusBarEnabled &&
-            (hasProcesses || hasPorts || isDirty || showRemoteSync)) ||
-          showSidebarShells) ? (
+          !isDeleting &&
+          (hasSessions ||
+            hasGitHub ||
+            (!statusBarEnabled &&
+              (hasProcesses || hasPorts || isDirty || showRemoteSync)) ||
+            showSidebarShells) ? (
           <Button
             variant="ghost"
             size="icon"
@@ -264,11 +263,11 @@ export const TerminalItem = memo(function TerminalItem({
                 className={cn(
                   'w-4 h-4 flex-shrink-0',
                   !hasProcesses &&
-                    'fill-muted-foreground/60 group-hover:fill-muted-foreground',
+                  'fill-muted-foreground/60 group-hover:fill-muted-foreground',
                   !hasProcesses && isActive && 'fill-muted-foreground',
                   hasProcesses &&
-                    !isActive &&
-                    'fill-green-500/70 group-hover:fill-green-500',
+                  !isActive &&
+                  'fill-green-500/70 group-hover:fill-green-500',
                   hasProcesses && isActive && 'fill-green-500',
                 )}
               />
@@ -535,7 +534,7 @@ export const TerminalItem = memo(function TerminalItem({
                           pr={prForBranch}
                           expanded={true}
                           hasNewActivity={prForBranch.hasUnreadNotifications}
-                          onToggle={() => {}}
+                          onToggle={() => { }}
                         />
                       </div>
                     )}
@@ -543,8 +542,8 @@ export const TerminalItem = memo(function TerminalItem({
                 </>
               )}
             {sessions.length > 0 && (
-              <>
-                <div className="flex !h-5 items-center justify-between px-2 pt-1 group/claude-btn">
+              <div className='group/claude'>
+                <div className="flex !h-5 items-center justify-between px-2 pt-1">
                   <button
                     type="button"
                     onClick={() =>
@@ -569,7 +568,7 @@ export const TerminalItem = memo(function TerminalItem({
                     >
                       <SelectTrigger
                         size="sm"
-                        className="!h-5 sm:invisible group-hover/claude-btn:visible !bg-transparent text-muted-foreground/60 hover:text-white/70 hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1"
+                        className="!h-5 sm:invisible group-hover/claude:visible !bg-transparent text-muted-foreground/60 hover:text-white/70 hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1"
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -589,15 +588,15 @@ export const TerminalItem = memo(function TerminalItem({
                     const filtered =
                       sessionBranchFilter === 'branch' && terminal.git_branch
                         ? sessions.filter((s) => {
-                            const d = s.data
-                            if (!d) return false
-                            if (d.branch === terminal.git_branch) return true
-                            return (
-                              d.branches?.some(
-                                (b) => b.branch === terminal.git_branch,
-                              ) ?? false
-                            )
-                          })
+                          const d = s.data
+                          if (!d) return false
+                          if (d.branch === terminal.git_branch) return true
+                          return (
+                            d.branches?.some(
+                              (b) => b.branch === terminal.git_branch,
+                            ) ?? false
+                          )
+                        })
                         : sessions
                     const activeSessions = filtered.filter(
                       (s) =>
@@ -652,7 +651,7 @@ export const TerminalItem = memo(function TerminalItem({
                       </>
                     )
                   })()}
-              </>
+              </div>
             )}
           </div>
         )}

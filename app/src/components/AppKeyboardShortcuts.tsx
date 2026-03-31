@@ -65,6 +65,7 @@ export function AppKeyboardShortcuts() {
       const shells = getSortedShells(t, shellOrderRef.current)
       const shell = shells[index - 1]
       if (shell) {
+        uiState.settings.unfocus()
         setShell(t.id, shell.id)
         window.dispatchEvent(
           new CustomEvent('shell-select', {
@@ -81,6 +82,7 @@ export function AppKeyboardShortcuts() {
       const idx = shells.findIndex((s) => s.id === currentId)
       const prev = idx > 0 ? shells[idx - 1] : shells[shells.length - 1]
       if (prev) {
+        uiState.settings.unfocus()
         setShell(t.id, prev.id)
         window.dispatchEvent(
           new CustomEvent('shell-select', {
@@ -97,6 +99,7 @@ export function AppKeyboardShortcuts() {
       const idx = shells.findIndex((s) => s.id === currentId)
       const next = idx < shells.length - 1 ? shells[idx + 1] : shells[0]
       if (next) {
+        uiState.settings.unfocus()
         setShell(t.id, next.id)
         window.dispatchEvent(
           new CustomEvent('shell-select', {

@@ -3,7 +3,7 @@ import type {
   ShellTemplateEntry,
 } from '@domains/settings/schema'
 import type { LayoutNode } from '@domains/workspace/schema/terminals'
-import { Columns2, Plus, Rows2, Trash2, X } from 'lucide-react'
+import { Columns2, Plus, Rows2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,6 +36,12 @@ interface EntryWithKey extends ShellTemplateEntry {
   _key: number
 }
 
+type Tab = {
+  id: number
+  type: 'standalone' | 'layout'
+  layoutIndex?: number
+}
+
 export function ShellTemplateModal({
   open,
   template,
@@ -47,7 +53,8 @@ export function ShellTemplateModal({
   const [entries, setEntries] = useState<EntryWithKey[]>([
     { name: 'main', command: '', _key: 0 },
   ])
-  const [layout, setLayout] = useState<LayoutNode | null>(null)
+  const [layouts, setLayouts] = useState<LayoutNode[]>([])
+  const [activeTab, setActiveTab] = useState(0)
 
   useEffect(() => {
     if (open) {
@@ -57,19 +64,44 @@ export function ShellTemplateModal({
         const mapped =
           template.entries.length > 0
             ? template.entries.map((e) => ({
-                ...e,
-                _key: keyCounter.current++,
-              }))
+              ...e,
+              _key: keyCounter.current++,
+            }))
             : [{ name: 'main', command: '', _key: keyCounter.current++ }]
         setEntries(mapped)
-        setLayout((template.layout as LayoutNode) ?? null)
+        setLayouts((template.layouts as LayoutNode[]) ?? [])
       } else {
         setName('')
         setEntries([{ name: 'main', command: '', _key: keyCounter.current++ }])
-        setLayout(null)
+        setLayouts([])
       }
+      setActiveTab(0)
     }
   }, [open, template])
+
+  // Compute tabs from entries + layouts
+  const allLayoutIds = new Set(layouts.flatMap(getLayoutShellIds))
+  const tabs: Tab[] = []
+
+  for (let i = 0; i < entries.length; i++) {
+    if (!allLayoutIds.has(i)) {
+      tabs.push({ id: i, type: 'standalone' })
+    }
+  }
+  for (let li = 0; li < layouts.length; li++) {
+    const ids = getLayoutShellIds(layouts[li])
+    const firstId = Math.min(...ids)
+    tabs.push({ id: firstId, type: 'layout', layoutIndex: li })
+  }
+  tabs.sort((a, b) => a.id - b.id)
+
+  // Resolve active tab — fall back to nearest if current was removed
+  let currentTab = tabs.find((t) => t.id === activeTab)
+  if (!currentTab && tabs.length > 0) {
+    currentTab = tabs.reduce((best, t) =>
+      Math.abs(t.id - activeTab) < Math.abs(best.id - activeTab) ? t : best,
+    )
+  }
 
   const handleSave = () => {
     const trimmedName = name.trim()
@@ -83,8 +115,9 @@ export function ShellTemplateModal({
         command: e.command.trim(),
       })),
     }
-    if (layout?.type === 'split') {
-      saved.layout = layout
+    const splitLayouts = layouts.filter((n) => n.type === 'split')
+    if (splitLayouts.length > 0) {
+      saved.layouts = splitLayouts
     }
     onSave(saved)
   }
@@ -104,38 +137,70 @@ export function ShellTemplateModal({
     ])
 
     if (splitFromIndex != null && direction) {
-      setLayout((prev) => {
-        if (!prev) {
-          // First split — create tree from source + new
-          return {
-            type: 'split',
+      setLayouts((prev) => {
+        const groupIdx = prev.findIndex((node) =>
+          getLayoutShellIds(node).includes(splitFromIndex),
+        )
+        if (groupIdx >= 0) {
+          return prev.map((node, i) =>
+            i === groupIdx
+              ? splitLeaf(node, splitFromIndex, newIndex, direction)
+              : node,
+          )
+        }
+        return [
+          ...prev,
+          {
+            type: 'split' as const,
             direction,
             children: [
-              { node: { type: 'leaf', shellId: splitFromIndex }, size: 50 },
-              { node: { type: 'leaf', shellId: newIndex }, size: 50 },
+              {
+                node: { type: 'leaf' as const, shellId: splitFromIndex },
+                size: 50,
+              },
+              {
+                node: { type: 'leaf' as const, shellId: newIndex },
+                size: 50,
+              },
             ],
-          }
-        }
-        return splitLeaf(prev, splitFromIndex, newIndex, direction)
+          },
+        ]
       })
+    } else {
+      // Adding standalone shell — switch to it
+      setActiveTab(newIndex)
     }
   }
 
   const removeEntry = (index: number) => {
     setEntries((prev) => prev.filter((_, i) => i !== index))
-    if (layout) {
-      const newLayout = removeLeaf(layout, index)
-      if (!newLayout || newLayout.type === 'leaf') {
-        setLayout(null)
-      } else {
-        // Re-index: shift down all indices above the removed one
-        const reindex: Record<number, number> = {}
-        for (let i = 0; i < entries.length; i++) {
-          if (i < index) reindex[i] = i
-          else if (i > index) reindex[i] = i - 1
-        }
-        setLayout(mapLeafIds(newLayout, reindex))
+
+    setLayouts((prev) => {
+      let updated = prev
+        .map((node) => {
+          if (!getLayoutShellIds(node).includes(index)) return node
+          const newNode = removeLeaf(node, index)
+          if (!newNode || newNode.type === 'leaf') return null
+          return newNode
+        })
+        .filter((n): n is LayoutNode => n !== null)
+
+      const reindex: Record<number, number> = {}
+      for (let i = 0; i < entries.length; i++) {
+        if (i < index) reindex[i] = i
+        else if (i > index) reindex[i] = i - 1
       }
+      updated = updated.map((node) => mapLeafIds(node, reindex))
+      return updated
+    })
+
+    // Adjust activeTab for re-indexing
+    if (activeTab > index) {
+      setActiveTab(activeTab - 1)
+    } else if (activeTab === index) {
+      const tabIdx = tabs.findIndex((t) => t.id === index)
+      const prev = tabs[Math.max(0, tabIdx - 1)]
+      setActiveTab(prev?.id ?? 0)
     }
   }
 
@@ -149,34 +214,47 @@ export function ShellTemplateModal({
     )
   }
 
-  const handleResize = (path: number[], sizes: [number, number]) => {
-    if (layout) {
-      setLayout(updateSizesAtPath(layout, path, sizes))
-    }
+  const handleLayoutResize = (
+    layoutIndex: number,
+    path: number[],
+    sizes: [number, number],
+  ) => {
+    setLayouts((prev) =>
+      prev.map((node, i) =>
+        i === layoutIndex ? updateSizesAtPath(node, path, sizes) : node,
+      ),
+    )
   }
 
   const canSave = name.trim().length > 0
 
+  // Compute content height for current tab
+  let contentHeight = 120
+  if (currentTab?.type === 'layout' && currentTab.layoutIndex != null) {
+    const node = layouts[currentTab.layoutIndex]
+    if (node) {
+      contentHeight = getLayoutDimensions(node).rows * 120
+    }
+  }
+
+  // Compute dialog width from widest layout
+  const maxCols = layouts.reduce((max, node) => {
+    const { columns } = getLayoutDimensions(node)
+    return Math.max(max, columns)
+  }, 0)
+  const dialogStyle =
+    maxCols > 1
+      ? {
+        maxWidth: `min(90vw, ${maxCols * 300}px)`,
+        minWidth: '500px',
+      }
+      : undefined
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
       <DialogContent
-        className={cn(
-          'sm:max-w-md transition-all',
-          layout?.type === 'split' && 'flex flex-col',
-        )}
-        style={
-          layout?.type === 'split'
-            ? (() => {
-                const { columns, rows } = getLayoutDimensions(layout)
-                return {
-                  maxWidth: `min(90vw, ${columns * 300}px)`,
-                  height: `min(90dvh, ${rows * 200 + 200}px)`,
-                  minWidth: '500px',
-                  minHeight: '500px',
-                }
-              })()
-            : undefined
-        }
+        className="sm:max-w-md transition-all max-h-[90vh] flex flex-col"
+        style={dialogStyle}
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -184,12 +262,7 @@ export function ShellTemplateModal({
             {template ? 'Edit Template' : 'New Template'}
           </DialogTitle>
         </DialogHeader>
-        <div
-          className={cn(
-            'space-y-4',
-            layout?.type === 'split' && 'flex-1 min-h-0 flex flex-col',
-          )}
-        >
+        <div className="space-y-4 flex-1 min-h-0 overflow-y-auto">
           <div>
             <label className="text-sm text-muted-foreground mb-1 block">
               Template Name
@@ -205,15 +278,63 @@ export function ShellTemplateModal({
             />
           </div>
 
-          {layout ? (
-            <div className="flex-1 min-h-0 flex flex-col gap-2">
-              <label className="text-sm text-muted-foreground block">
-                Layout
-              </label>
-              <div className="flex-1 min-h-0 rounded-md border border-border overflow-hidden">
+          {/* Terminal-like view */}
+          <div className="flex flex-col rounded-md border border-border overflow-hidden">
+            {/* Tab bar */}
+            <div className="flex items-center bg-black/30 border-b border-border overflow-x-auto">
+              {tabs.map((tab) => {
+                const entry = entries[tab.id]
+                const isActive = currentTab?.id === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={cn(
+                      'group flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border cursor-pointer whitespace-nowrap shrink-0',
+                      isActive
+                        ? 'bg-zinc-900 text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    <span>{entry?.name || 'shell'}</span>
+                    {tab.id !== 0 && (
+                      <span
+                        className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeEntry(tab.id)
+                        }}
+                        onKeyDown={() => { }}
+                      >
+                        <X className="w-3 h-3" />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                className="flex items-center justify-center px-2 py-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => addEntry()}
+                title="Add Shell"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Content area */}
+            <div
+              className="bg-zinc-900"
+              style={{ height: `${contentHeight}px` }}
+            >
+              {currentTab?.type === 'layout' &&
+                currentTab.layoutIndex != null ? (
                 <PaneLayout
-                  key={getLayoutShellIds(layout).join('-')}
-                  node={layout}
+                  key={getLayoutShellIds(layouts[currentTab.layoutIndex]).join(
+                    '-',
+                  )}
+                  node={layouts[currentTab.layoutIndex]}
                   renderLeaf={(entryIndex) => (
                     <TemplateLeaf
                       entry={entries[entryIndex]}
@@ -226,85 +347,24 @@ export function ShellTemplateModal({
                       onSplit={(direction) => addEntry(entryIndex, direction)}
                     />
                   )}
-                  onResize={handleResize}
+                  onResize={(path, sizes) =>
+                    handleLayoutResize(currentTab.layoutIndex!, path, sizes)
+                  }
                 />
-              </div>
+              ) : currentTab ? (
+                <TemplateLeaf
+                  entry={entries[currentTab.id]}
+                  index={currentTab.id}
+                  isMain={currentTab.id === 0}
+                  onUpdate={(field, value) =>
+                    updateEntry(currentTab.id, field, value)
+                  }
+                  onRemove={() => removeEntry(currentTab.id)}
+                  onSplit={(direction) => addEntry(currentTab.id, direction)}
+                />
+              ) : null}
             </div>
-          ) : (
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground block">
-                Shells
-              </label>
-              {entries.map((entry, index) => {
-                const isMain = index === 0
-                return (
-                  <div key={entry._key} className="flex items-center gap-2">
-                    <Input
-                      value={entry.name}
-                      onChange={(e) =>
-                        updateEntry(index, 'name', e.target.value)
-                      }
-                      placeholder="Shell name"
-                      className="w-24 flex-shrink-0"
-                      disabled={isMain}
-                    />
-                    <Input
-                      value={entry.command}
-                      onChange={(e) =>
-                        updateEntry(index, 'command', e.target.value)
-                      }
-                      placeholder="Startup command (optional)"
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && canSave) handleSave()
-                      }}
-                    />
-                    <div className="flex-shrink-0 flex items-center gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground"
-                        title="Split vertical"
-                        onClick={() => addEntry(index, 'horizontal')}
-                      >
-                        <Columns2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground"
-                        title="Split horizontal"
-                        onClick={() => addEntry(index, 'vertical')}
-                      >
-                        <Rows2 className="w-3.5 h-3.5" />
-                      </Button>
-                      {!isMain && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeEntry(index)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-              {!layout && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground"
-                  onClick={() => addEntry()}
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  Add Shell
-                </Button>
-              )}
-            </div>
-          )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onCancel}>
@@ -373,11 +433,11 @@ function TemplateLeaf({
           )}
         </div>
       </div>
-      <Input
+      <textarea
         value={entry.command}
         onChange={(e) => onUpdate('command', e.target.value)}
         placeholder="Command (optional)"
-        className="h-7 text-xs w-full"
+        className="flex-1 max-h-[130px] w-full rounded-md border border-input bg-transparent px-3 py-1.5 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
       />
     </div>
   )

@@ -76,7 +76,7 @@ const shellTemplateSchema = z.object({
   id: z.string(),
   name: z.string(),
   entries: z.array(shellTemplateEntrySchema),
-  layout: z.any().optional(),
+  layouts: z.array(z.any()).optional(),
 })
 
 const mobileKeyboardRowSchema = z.object({

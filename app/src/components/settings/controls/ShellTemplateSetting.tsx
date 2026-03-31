@@ -39,7 +39,7 @@ export function ShellTemplateSetting() {
                 <div className="font-medium">{tmpl.name}</div>
                 <div className="text-xs text-muted-foreground">
                   {tmpl.entries.length} shell{tmpl.entries.length !== 1 && 's'}
-                  {tmpl.layout && ' · split layout'}
+                  {tmpl.layouts && tmpl.layouts.length > 0 && ' · split layout'}
                 </div>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">

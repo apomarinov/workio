@@ -38,6 +38,12 @@
   }
   ```
 
+### Backend architecture
+
+- **DB logic** goes into `db` files or `db/` folders and is reused across the server.
+- **Business logic** goes into mutations/queries.
+- If business logic needs to be reused beyond a single query/mutation, or in other places on the server, extract it into a `service` file or `service/` folder.
+
 ## Types
 
 - **Before defining any type**, check if it already exists in `shared/types.ts` or `src/types.ts`.
