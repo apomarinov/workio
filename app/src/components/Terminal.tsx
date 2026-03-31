@@ -17,6 +17,7 @@ import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useSettings } from '@/hooks/useSettings'
 import { useTerminalSocket } from '@/hooks/useTerminalSocket'
+import { redactText } from '@/lib/redact'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
@@ -100,11 +101,12 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
   }, [isBusy])
 
   const handleData = useCallback((data: string) => {
+    const redacted = redactText(data)
     if (!isVisibleRef.current) {
-      pendingWritesRef.current.push(data)
+      pendingWritesRef.current.push(redacted)
       return
     }
-    terminalRef.current?.write(data)
+    terminalRef.current?.write(redacted)
   }, [])
 
   const handleExit = useCallback((code: number) => {

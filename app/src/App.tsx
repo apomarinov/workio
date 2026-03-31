@@ -36,6 +36,7 @@ import {
   useWorkspaceContext,
   WorkspaceProvider,
 } from './context/WorkspaceContext'
+import { useDomRedaction } from './hooks/useDomRedaction'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useIsMobile } from './hooks/useMediaQuery'
 import { useMountedShells } from './hooks/useMountedShells'
@@ -63,6 +64,7 @@ function AppContent() {
   const mountedShells = useMountedShells()
   const { handleCreateShell, handleRenameShell } = useShellActions()
   const uiState = useUIState()
+  useDomRedaction()
   useNotificationSubscriptions()
   useSleepWakeRevalidation()
 

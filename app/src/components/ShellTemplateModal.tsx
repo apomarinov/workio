@@ -321,7 +321,7 @@ export function ShellTemplateModal({
 
 function TemplateLeaf({
   entry,
-  index,
+  index: _index,
   isMain,
   onUpdate,
   onRemove,
