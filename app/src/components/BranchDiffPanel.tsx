@@ -2,6 +2,7 @@ import type { Commit } from '@domains/git/schema'
 import {
   GitCommitHorizontal,
   Loader2,
+  MoreVertical,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -16,6 +17,11 @@ import {
   useDefaultLayout,
 } from 'react-resizable-panels'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getBranchCommits } from '@/lib/api'
@@ -63,6 +69,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
 
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null)
   const [mobileCommitsOpen, setMobileCommitsOpen] = useState(false)
+  const [commitMenuOpen, setCommitMenuOpen] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<{
     type: 'undo' | 'drop'
     hash: string
@@ -251,7 +258,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
               )}
               <div
                 className={cn(
-                  'flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-zinc-800/50',
+                  'relative flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-zinc-800/50',
                   selectedCommit === commit.hash && 'bg-zinc-700/50',
                 )}
                 onClick={() => {
@@ -279,40 +286,63 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
                   </div>
                 </div>
                 {isAboveMergeBase && (
-                  <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 pt-0.5">
-                    {index === 0 && (
+                  <Popover
+                    open={commitMenuOpen === commit.hash}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        setCommitMenuOpen(commit.hash)
+                      } else {
+                        setTimeout(() => setCommitMenuOpen(null), 200)
+                      }
+                    }}
+                  >
+                    <PopoverTrigger asChild>
                       <button
                         type="button"
-                        className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-orange-400"
-                        title="Undo commit (soft reset)"
+                        className="absolute top-1 cursor-pointer right-1 py-1 px-0.5 rounded bg-zinc-700 text-zinc-400 hover:text-zinc-200 max-sm:flex sm:hidden group-hover:flex data-[state=open]:flex items-center justify-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="size-3.5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      className="w-auto p-1 flex flex-col gap-0.5"
+                    >
+                      {index === 0 && (
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-zinc-700 text-zinc-300 hover:text-orange-400 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setConfirmAction({
+                              type: 'undo',
+                              hash: commit.hash,
+                              message: commit.message,
+                            })
+                          }}
+                        >
+                          <Undo2 className="size-3" />
+                          Undo commit
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-zinc-700 text-zinc-300 hover:text-red-400 cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation()
                           setConfirmAction({
-                            type: 'undo',
+                            type: 'drop',
                             hash: commit.hash,
                             message: commit.message,
                           })
                         }}
                       >
-                        <Undo2 className="size-3" />
+                        <Trash2 className="size-3" />
+                        Drop commit
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-red-400"
-                      title="Drop commit"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setConfirmAction({
-                          type: 'drop',
-                          hash: commit.hash,
-                          message: commit.message,
-                        })
-                      }}
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
               </div>
             </div>
