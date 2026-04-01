@@ -708,7 +708,11 @@ const CommentItem = memo(function CommentItem({
         </div>
         <div
           onClick={() => {
-            setModalOpen(true)
+            if (!expanded) {
+              setExpanded(true)
+            } else {
+              setModalOpen(true)
+            }
             handleMarkRead()
           }}
           className={cn(

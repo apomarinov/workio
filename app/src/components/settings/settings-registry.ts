@@ -283,7 +283,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
         ],
       },
       {
-        name: 'Author Filters',
+        name: 'Filters',
         settings: [
           {
             key: 'hide_gh_authors',
@@ -309,7 +309,7 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
           {
             key: 'hidden_prs',
             label: 'Hidden PRs',
-            description: 'Individually hidden pull requests',
+            description: 'Hide PRs that never get reviewed',
             column: true,
             collapsed: true,
           },
