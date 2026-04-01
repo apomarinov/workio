@@ -1132,6 +1132,60 @@ export function CommandPalette() {
         }, 150)
       },
 
+      resumeSnapshot: async (terminalId, branch) => {
+        const terminal = terminals.find((t) => t.id === terminalId)
+        const snapshot = terminal?.settings?.snapshots?.[branch]
+        if (!snapshot || !terminal) return
+
+        selectTerminal(terminalId)
+
+        const runTemplate = () => {
+          closePalette()
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('shell-template-request', {
+                detail: {
+                  terminalId,
+                  template: {
+                    id: `snapshot-${branch}`,
+                    name: branch,
+                    entries: snapshot.entries,
+                    layouts: snapshot.layouts,
+                  },
+                },
+              }),
+            )
+          }, 150)
+        }
+
+        // Already on the right branch
+        if (terminal.git_branch === branch) {
+          runTemplate()
+          return
+        }
+
+        // Check if dirty
+        const dirty = gitDirtyStatus[terminalId]
+        if (
+          dirty &&
+          (dirty.added > 0 || dirty.removed > 0 || dirty.untracked > 0)
+        ) {
+          toast.error(
+            `Cannot resume PR in "${terminal.name || terminal.cwd}". Commit or stash first.`,
+          )
+          return
+        }
+
+        // Checkout branch first
+        try {
+          await checkoutBranch(terminalId, branch, true)
+          toast.success(`Checked out ${branch}`)
+          runTemplate()
+        } catch (err) {
+          toastError(err, 'Failed to checkout branch')
+        }
+      },
+
       // Terminal paste
       sendToTerminal: (terminalId, text) => {
         window.dispatchEvent(

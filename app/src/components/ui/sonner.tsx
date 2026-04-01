@@ -14,6 +14,7 @@ function Toaster({ ...props }: ToasterProps) {
     <Sonner
       theme="dark"
       position="top-right"
+      expand
       className="toaster group"
       style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
       icons={{

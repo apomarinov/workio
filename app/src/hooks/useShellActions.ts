@@ -456,11 +456,8 @@ export function useShellActions() {
   // ── Save as template ──────────────────────────────────────
 
   const saveCurrentAsTemplate = (terminalId: number) => {
-    // TODO: testing only
-    saveSnapshot(terminalId)
-    return
-    // biome-ignore lint/correctness/noUnreachable: testing only
-    const terminal = terminals.find((t) => t.id === terminalId)!
+    const terminal = terminals.find((t) => t.id === terminalId)
+    if (!terminal) return
 
     const { entries, layouts } = buildSnapshotEntries(terminal)
 

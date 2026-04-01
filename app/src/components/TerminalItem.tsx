@@ -163,9 +163,9 @@ export const TerminalItem = memo(function TerminalItem({
     _setActiveTab((o) => (o === v ? null : v))
   }
   const [sessionsListExpanded, setSessionsListExpanded] = useState(true)
-  const [sessionBranchFilter, setSessionBranchFilter] = useState<
+  const [sessionBranchFilter, setSessionBranchFilter] = useLocalStorage<
     'branch' | 'all'
-  >('branch')
+  >('session-branch-filter', 'branch')
   const [olderSessionsCount, setOlderSessionsCount] = useState(0)
   const isSettingUp =
     terminal.git_repo?.status === 'setup' || terminal.setup?.status === 'setup'

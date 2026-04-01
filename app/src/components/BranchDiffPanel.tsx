@@ -1,5 +1,6 @@
 import type { Commit } from '@domains/git/schema'
 import {
+  ArrowUp,
   GitCommitHorizontal,
   Loader2,
   MoreVertical,
@@ -61,6 +62,30 @@ type BranchDiffPanelProps =
       cacheKey?: undefined
       onNoRemote?: undefined
     }
+
+function CommitBodyFooter({ commit }: { commit: Commit }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div
+      className="group/footer relative border-t border-zinc-700 overflow-y-auto"
+      style={{ height: expanded ? 400 : 150 }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="absolute top-1.5 right-1.5 p-1 rounded text-zinc-500 hover:text-zinc-300 opacity-0 group-hover/footer:opacity-100 bg-zinc-800/70 transition-opacity cursor-pointer"
+      >
+        <ArrowUp className={cn('w-4 h-4', expanded && 'rotate-180')} />
+      </button>
+      <div className="p-2 font-mono text-[11px] text-zinc-500">
+        {commit.hash}
+      </div>
+      <pre className="whitespace-pre-wrap text-[11px] text-zinc-400 p-2 pt-0">
+        <MarkdownContent content={commit.body!} />
+      </pre>
+    </div>
+  )
+}
 
 export function BranchDiffPanel(props: BranchDiffPanelProps) {
   const { terminalId } = props
@@ -526,14 +551,7 @@ export function BranchDiffPanel(props: BranchDiffPanelProps) {
               </div>
               {selectedCommitObj?.body &&
                 selectedCommitObj.body !== selectedCommitObj.message && (
-                  <div className="border-t border-zinc-700 h-[150px] overflow-y-auto">
-                    <div className="p-2 font-mono text-[11px] text-zinc-500">
-                      {selectedCommitObj.hash}
-                    </div>
-                    <pre className="whitespace-pre-wrap text-[11px] text-zinc-400 p-2 pt-0">
-                      <MarkdownContent content={selectedCommitObj.body} />
-                    </pre>
-                  </div>
+                  <CommitBodyFooter commit={selectedCommitObj} />
                 )}
             </div>
           )}

@@ -93,6 +93,7 @@ export type AppActions = {
   // Shell actions
   selectShell: (terminalId: number, shellId: number) => void
   runTemplate: (template: ShellTemplate) => void
+  resumeSnapshot: (terminalId: number, branch: string) => void
 
   // Terminal paste
   sendToTerminal: (terminalId: number, text: string) => void

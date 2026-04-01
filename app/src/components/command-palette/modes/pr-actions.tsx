@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   CircleX,
   CornerDownLeft,
   ExternalLink,
@@ -7,6 +8,7 @@ import {
   GitBranch,
   GitMerge,
   Pencil,
+  Play,
   ScrollText,
 } from 'lucide-react'
 import type {
@@ -52,7 +54,10 @@ export function createPRActionsMode(
   const canMerge =
     isOpen &&
     pr.mergeable === 'MERGEABLE' &&
-    (pr.isApproved || pr.reviewDecision === '')
+    (pr.isApproved ||
+      pr.reviewDecision === '' ||
+      pr.reviewDecision === 'REVIEW_REQUIRED')
+  const needsReview = pr.reviewDecision === 'REVIEW_REQUIRED'
 
   const items: PaletteItem[] = []
 
@@ -79,6 +84,21 @@ export function createPRActionsMode(
       icon: <FileDiff className="h-4 w-4 shrink-0 text-zinc-400" />,
       onSelect: () => {
         actions.openDiffViewer(pr, matchingTerminal.id)
+      },
+    })
+  }
+
+  // Resume snapshot (only if a terminal has a saved snapshot for this branch)
+  const snapshotTerminal = terminals.find(
+    (t) => t.settings?.snapshots?.[pr.branch],
+  )
+  if (snapshotTerminal) {
+    items.push({
+      id: 'action:resume',
+      label: 'Resume',
+      icon: <Play className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => {
+        actions.resumeSnapshot(snapshotTerminal.id, pr.branch)
       },
     })
   }
@@ -125,7 +145,17 @@ export function createPRActionsMode(
   if (isOpen) {
     items.push({
       id: 'action:merge',
-      label: 'Merge',
+      label: needsReview ? (
+        <span className="flex items-center gap-1.5 w-full">
+          Merge
+          <span className="flex items-center gap-1 ml-auto text-xs text-yellow-400/70">
+            <AlertTriangle className="h-3 w-3" />
+            Not approved yet
+          </span>
+        </span>
+      ) : (
+        'Merge'
+      ),
       icon: <GitMerge className="h-4 w-4 shrink-0 text-purple-400" />,
       disabled: !canMerge,
       disabledReason: !canMerge
@@ -133,9 +163,7 @@ export function createPRActionsMode(
           ? 'has conflicts'
           : hasChangesRequested
             ? 'changes requested'
-            : pr.reviewDecision === 'REVIEW_REQUIRED'
-              ? 'review required'
-              : undefined
+            : undefined
         : undefined,
       onSelect: () => {
         if (canMerge) {
