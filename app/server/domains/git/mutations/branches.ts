@@ -11,6 +11,7 @@ import {
   checkAndEmitSingleGitDirty,
   detectGitBranch,
 } from '@domains/git/services/status'
+import serverEvents from '@server/lib/events'
 import { gitExecLogged } from '@server/lib/git'
 import { log } from '@server/logger'
 import { publicProcedure } from '@server/trpc'
@@ -202,6 +203,12 @@ export const renameBranchMutation = publicProcedure
     }
 
     detectGitBranch(input.terminalId)
+
+    serverEvents.emit('git:branch-renamed', {
+      terminalId: input.terminalId,
+      oldName: input.branch,
+      newName: input.newName,
+    })
 
     return { renamedRemote }
   })

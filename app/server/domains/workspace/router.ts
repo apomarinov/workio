@@ -1,4 +1,5 @@
 import { router } from '@server/trpc'
+import './services/branch-rename'
 import * as setupMutations from './mutations/setup'
 import * as shellMutations from './mutations/shells'
 import * as systemMutations from './mutations/system'

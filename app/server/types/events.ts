@@ -34,4 +34,11 @@ export interface ServerEventMap {
     },
   ]
   'settings:server-config-changed': [changed: Partial<ServerConfig>]
+  'git:branch-renamed': [
+    payload: {
+      terminalId: number
+      oldName: string
+      newName: string
+    },
+  ]
 }
