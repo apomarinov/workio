@@ -388,10 +388,13 @@ export async function handleInvolvedPRWebhook(
   // Mentioned in a comment
   if (event === 'issue_comment' || event === 'pull_request_review_comment') {
     const comment = payload.comment
-    if (comment?.body?.includes(`@${ghUsername}`)) {
+    if (
+      comment?.body?.includes(`@${ghUsername}`) &&
+      comment.user?.login !== ghUsername
+    ) {
       const prNumber = prData?.number || payload.issue?.number
-      const prTitle = prData?.title || ''
-      const prUrl = prData?.html_url || ''
+      const prTitle = prData?.title || payload.issue?.title || ''
+      const prUrl = prData?.html_url || payload.issue?.html_url || ''
       const author = comment.user?.login || 'unknown'
       await emitNotification(
         'pr_mentioned',

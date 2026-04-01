@@ -261,6 +261,8 @@ export const webhookPayloadSchema = z.object({
   issue: z
     .object({
       number: z.number(),
+      title: z.string().optional(),
+      html_url: z.string().optional(),
       user: z.object({ login: z.string().optional() }).optional(),
       pull_request: z.object({ url: z.string() }).optional(),
     })

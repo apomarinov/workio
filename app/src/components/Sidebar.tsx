@@ -859,6 +859,9 @@ export function Sidebar() {
                   </div>
                   {!isCollapsed && (
                     <>
+                      <InvolvedPRsList
+                        prs={involvedPRsByRepo.get(repo) ?? []}
+                      />
                       {repoPRs.map((pr) => (
                         <PRStatusGroup
                           key={`${pr.repo}:${pr.prNumber}`}
@@ -906,9 +909,6 @@ export function Sidebar() {
                             </a>
                           )
                         })}
-                      <InvolvedPRsList
-                        prs={involvedPRsByRepo.get(repo) ?? []}
-                      />
                       <OlderMergedPRsList
                         olderPRs={(mergedPRsByRepo.get(repo) ?? []).slice(3)}
                       />
