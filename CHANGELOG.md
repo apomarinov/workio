@@ -1,5 +1,37 @@
 # Changelog
 
+## [v0.10.0](../../compare/v0.9.0...v0.10.0) — 2026-04-01
+
+### Features
+- Add branch snapshot auto-save on new PR detection — tracks client connection time to target the most-connected device, saves shell layout and commands per branch in terminal settings
+- Add PR resume action in command palette — restores saved shell layout, handles branch checkout with dirty-state check
+- Add save-as-template button in shell templates menu — captures current shells, commands, and layouts as a reusable template
+- Add session-aware snapshot commands — shells with active Claude sessions save `claude --resume <id>` instead of raw commands
+- Replace logs modal with bottom panel and add unified source filter
+- Add demo-mode redaction for product videos
+- Add branch filter dropdown to Claude sessions in terminal sidebar (persisted to localStorage)
+- Refactor template editor to tab-based UI with multiple layout support
+- Add split right (Alt+/) and split down (Alt+.) keyboard shortcuts
+- Detect local git repos without remotes and re-detect when remote is added
+
+### Improvements
+- Rename branch references on git branch rename — updates snapshots, session data, and starred branches via event-driven architecture
+- Allow merge in command palette when review is required (with warning indicator) instead of disabling
+- Expand toasts by default instead of stacking behind each other
+- Replace commit hover buttons with popover menu and add expandable commit body footer
+- Expand comment on first click, open modal on second click
+- Use `updateTerminal` from WorkspaceContext in TerminalLayout instead of direct mutation
+- Include PRs from terminal branches in polling and misc UI tweaks
+- Improve diff viewer and PR modal responsiveness
+- Improve settings: group filters by repo, bigger mobile nav, sync external changes
+- Improve keymap settings layout — edge-to-edge rows, remove rounding and section gaps
+- Add loading toast for pull branch in command palette
+- Remove "Pin Latest Claude" palette action and dead terminal-pin logic
+
+### Bug Fixes
+- Fix snapshot trigger firing on server restart by checking PR creation time (1-minute threshold)
+- Fix build: remove stale manual chunk entries and lint formatting
+
 ## [v0.9.0](../../compare/v0.8.0...v0.9.0) — 2026-03-30
 
 ### Features
