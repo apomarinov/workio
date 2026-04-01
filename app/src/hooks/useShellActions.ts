@@ -7,6 +7,7 @@ import type {
 } from '@domains/workspace/schema/terminals'
 import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/sonner'
+import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import {
   getLayoutShellIds,
@@ -17,6 +18,7 @@ import {
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 import { useSettings } from './useSettings'
+import { useSocket } from './useSocket'
 
 /** Return shells in DnD-reordered display order for a terminal */
 export function getSortedShellsFromOrder(
@@ -377,20 +379,35 @@ export function useShellActions() {
     return getSortedShellsFromOrder(terminal, shellOrderRef.current)
   }
 
-  const saveCurrentAsTemplate = (terminalId: number) => {
-    const terminal = terminals.find((t) => t.id === terminalId)
-    if (!terminal) return
+  // ── Snapshot save ────────────────────────────────────────────
 
+  const { sessions } = useSessionContext()
+  const { subscribe } = useSocket()
+  const saveSnapshotMutation =
+    trpc.workspace.terminals.saveSnapshot.useMutation()
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
+
+  const buildSnapshotEntries = (terminal: Terminal) => {
     const mainShell = terminal.shells.find((s) => s.name === 'main')
     const customShells = terminal.shells.filter((s) => s.name !== 'main')
     const orderedShells = mainShell
       ? [mainShell, ...customShells]
       : customShells
 
-    const entries = orderedShells.map((s) => ({
-      name: s.name,
-      command: s.active_cmd ?? '',
-    }))
+    const claudeCmd = terminal.settings?.defaultClaudeCommand || 'claude'
+
+    const entries = orderedShells.map((s) => {
+      // If a non-ended session is on this shell, use claude --resume
+      const session = sessionsRef.current.find(
+        (sess) => sess.shell_id === s.id && sess.status !== 'ended',
+      )
+      const command = session
+        ? `${claudeCmd} --resume ${session.session_id}`
+        : (s.active_cmd ?? '')
+
+      return { name: s.name, command }
+    })
 
     const idToIndex: Record<number, number> = {}
     for (let i = 0; i < orderedShells.length; i++) {
@@ -399,9 +416,49 @@ export function useShellActions() {
 
     const layouts = terminal.settings?.layouts
       ? Object.values(terminal.settings.layouts).map((node) =>
-        mapLeafIds(node, idToIndex),
-      )
+          mapLeafIds(node, idToIndex),
+        )
       : undefined
+
+    return { entries, layouts }
+  }
+
+  const saveSnapshot = (terminalId: number) => {
+    const t = terminalsRef.current.find((t) => t.id === terminalId)
+    if (!t) return
+
+    const { entries, layouts } = buildSnapshotEntries(t)
+
+    saveSnapshotMutation.mutate(
+      {
+        terminalId: t.id,
+        snapshot: { entries, layouts, savedAt: new Date().toISOString() },
+      },
+      { onError: (err) => toastError(err, 'Failed to save snapshot') },
+    )
+  }
+
+  // Server-triggered snapshot (new PR detected)
+  useEffect(() => {
+    return subscribe<{ branch: string }>('snapshot-request', (data) => {
+      const matches = terminalsRef.current.filter(
+        (t) => t.git_branch === data.branch,
+      )
+      const t = matches.find((t) => !t.ssh_host) ?? matches[0]
+      if (t) saveSnapshot(t.id)
+    })
+  }, [subscribe])
+
+  // ── Save as template ──────────────────────────────────────
+
+  const saveCurrentAsTemplate = (terminalId: number) => {
+    // TODO: testing only
+    saveSnapshot(terminalId)
+    return
+    // biome-ignore lint/correctness/noUnreachable: testing only
+    const terminal = terminals.find((t) => t.id === terminalId)!
+
+    const { entries, layouts } = buildSnapshotEntries(terminal)
 
     const now = new Date()
     const name = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`
@@ -421,5 +478,6 @@ export function useShellActions() {
     handleRenameShell,
     getSortedShells,
     saveCurrentAsTemplate,
+    saveSnapshot,
   }
 }
