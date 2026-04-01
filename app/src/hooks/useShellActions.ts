@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/sonner'
 import { useSessionContext } from '@/context/SessionContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import {
+  getAdjacentLeafId,
   getLayoutShellIds,
   mapLeafIds,
   removeLeaf,
@@ -122,19 +123,31 @@ export function useShellActions() {
       )
       const shellsBefore = terminalBefore?.shells ?? []
 
-      // Compute next shell to select using visual tab order before deletion
-      const sortedBefore = terminalBefore
-        ? getSortedShellsFromOrder(terminalBefore, shellOrderRef.current)
-        : shellsBefore
-      const sortedIndex = sortedBefore.findIndex((s) => s.id === shellId)
-      const nextShellId =
-        sortedBefore[sortedIndex + 1]?.id ??
-        sortedBefore[sortedIndex - 1]?.id ??
-        shellsBefore.find((s) => s.name === 'main')?.id ??
-        shellsBefore[0]?.id
-
-      // Update layout tree if this shell is in one
+      // Check if shell is in a layout — prefer selecting sibling within layout
+      let nextShellId: number | undefined
       const layouts = terminalBefore?.settings?.layouts
+      if (layouts) {
+        for (const node of Object.values(layouts)) {
+          const ids = getLayoutShellIds(node)
+          if (ids.includes(shellId)) {
+            nextShellId = getAdjacentLeafId(node, shellId) ?? undefined
+            break
+          }
+        }
+      }
+
+      // Fall back to tab order if not in a layout
+      if (nextShellId == null) {
+        const sortedBefore = terminalBefore
+          ? getSortedShellsFromOrder(terminalBefore, shellOrderRef.current)
+          : shellsBefore
+        const sortedIndex = sortedBefore.findIndex((s) => s.id === shellId)
+        nextShellId =
+          sortedBefore[sortedIndex + 1]?.id ??
+          sortedBefore[sortedIndex - 1]?.id ??
+          shellsBefore.find((s) => s.name === 'main')?.id ??
+          shellsBefore[0]?.id
+      }
       if (layouts) {
         const newLayouts = { ...layouts }
         let changed = false

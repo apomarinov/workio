@@ -87,6 +87,17 @@ export function updateSizesAtPath(
   }
 }
 
+/** Get the adjacent shell ID in DFS order (prefers previous, falls back to next). */
+export function getAdjacentLeafId(
+  node: LayoutNode,
+  shellId: number,
+): number | null {
+  const ids = getLayoutShellIds(node)
+  const idx = ids.indexOf(shellId)
+  if (idx === -1) return null
+  return ids[idx - 1] ?? ids[idx + 1] ?? null
+}
+
 /** Collect all shell IDs referenced in a layout tree. */
 export function getLayoutShellIds(node: LayoutNode): number[] {
   if (node.type === 'leaf') return [node.shellId]
