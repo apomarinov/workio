@@ -44,7 +44,7 @@ export function useShellActions() {
     setMountAllShellsTerminalId,
     updateTerminal,
   } = useWorkspaceContext()
-  const { settings } = useSettings()
+  const { settings, updateSettings } = useSettings()
   const terminalsRef = useRef(terminals)
   terminalsRef.current = terminals
   const shellOrderRef = useRef<Record<number, number[]>>({})
@@ -377,5 +377,49 @@ export function useShellActions() {
     return getSortedShellsFromOrder(terminal, shellOrderRef.current)
   }
 
-  return { handleCreateShell, handleRenameShell, getSortedShells }
+  const saveCurrentAsTemplate = (terminalId: number) => {
+    const terminal = terminals.find((t) => t.id === terminalId)
+    if (!terminal) return
+
+    const mainShell = terminal.shells.find((s) => s.name === 'main')
+    const customShells = terminal.shells.filter((s) => s.name !== 'main')
+    const orderedShells = mainShell
+      ? [mainShell, ...customShells]
+      : customShells
+
+    const entries = orderedShells.map((s) => ({
+      name: s.name,
+      command: s.active_cmd ?? '',
+    }))
+
+    const idToIndex: Record<number, number> = {}
+    for (let i = 0; i < orderedShells.length; i++) {
+      idToIndex[orderedShells[i].id] = i
+    }
+
+    const layouts = terminal.settings?.layouts
+      ? Object.values(terminal.settings.layouts).map((node) =>
+        mapLeafIds(node, idToIndex),
+      )
+      : undefined
+
+    const now = new Date()
+    const name = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`
+
+    const existing = settings?.shell_templates ?? []
+    updateSettings({
+      shell_templates: [
+        ...existing,
+        { id: crypto.randomUUID(), name, entries, layouts },
+      ],
+    })
+    toast.success(`Template "${name}" saved`)
+  }
+
+  return {
+    handleCreateShell,
+    handleRenameShell,
+    getSortedShells,
+    saveCurrentAsTemplate,
+  }
 }

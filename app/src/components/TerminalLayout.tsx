@@ -23,7 +23,6 @@ import {
   swapLeaves,
   updateSizesAtPath,
 } from '@/lib/layout'
-import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { PaneLayout } from './PaneLayout'
 import { Terminal } from './Terminal'
@@ -43,8 +42,7 @@ export function TerminalLayout({
   isVisible,
   mountedShells,
 }: TerminalLayoutProps) {
-  const { activeShells } = useWorkspaceContext()
-  const updateMutation = trpc.workspace.terminals.updateTerminal.useMutation()
+  const { activeShells, updateTerminal } = useWorkspaceContext()
   const [localLayout, setLocalLayout] = useState(layout)
   const layoutRef = useRef(localLayout)
   layoutRef.current = localLayout
@@ -65,8 +63,7 @@ export function TerminalLayout({
   const persistLayout = (newLayout: LayoutNode) => {
     setLocalLayout(newLayout)
     layoutRef.current = newLayout
-    updateMutation.mutate({
-      id: terminal.id,
+    updateTerminal(terminal.id, {
       settings: {
         ...terminal.settings,
         layouts: { ...terminal.settings?.layouts, [rootShellId]: newLayout },

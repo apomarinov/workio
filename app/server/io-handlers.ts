@@ -21,7 +21,7 @@ import { getTerminalById } from '@domains/workspace/db/terminals'
 
 import { Server as SocketIOServer } from 'socket.io'
 import { env } from './env'
-import { setIO } from './io'
+import { setIO, trackClientConnect, trackClientDisconnect } from './io'
 import serverEvents from './lib/events'
 import { log } from './logger'
 import { getServicesStatus } from './status'
@@ -48,6 +48,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
 
   server.on('connection', (socket) => {
     log.info(`Client connected: ${socket.id}`)
+    trackClientConnect(socket)
     emitAllShellClients(socket)
     emitCachedPRChecks(socket)
     refreshPRChecks()
@@ -147,6 +148,7 @@ export function setupSocketIO(httpServer: HttpServer): SocketIOServer {
     })
 
     socket.on('disconnect', () => {
+      trackClientDisconnect(socket)
       log.info(`Client disconnected: ${socket.id}`)
     })
   })

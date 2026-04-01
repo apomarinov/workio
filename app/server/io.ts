@@ -85,6 +85,74 @@ const REFETCH_ROUTES: [string, RefetchGroup][] = [
   ['/api/trpc/sessions.', 'sessions'],
 ]
 
+// ── Client uptime tracking ───────────────────────────────────────
+// Tracks total accumulated connection time per client identity (ip:device).
+// Used to select the most-connected client for snapshot requests.
+
+type ClientUptimeEntry = {
+  totalMs: number
+  connectedAt: number | null
+  socketId: string | null
+  device: string
+  ip: string
+}
+
+const clientUptime = new Map<string, ClientUptimeEntry>()
+
+function clientKey(ip: string, device: string): string {
+  return `${ip}:${device}`
+}
+
+export function trackClientConnect(socket: Socket): void {
+  const { device, ip } = parseSocketMeta(socket)
+  const key = clientKey(ip, device)
+  const entry = clientUptime.get(key)
+  if (entry) {
+    entry.connectedAt = Date.now()
+    entry.socketId = socket.id
+  } else {
+    clientUptime.set(key, {
+      totalMs: 0,
+      connectedAt: Date.now(),
+      socketId: socket.id,
+      device,
+      ip,
+    })
+  }
+}
+
+export function trackClientDisconnect(socket: Socket): void {
+  const { device, ip } = parseSocketMeta(socket)
+  const key = clientKey(ip, device)
+  const entry = clientUptime.get(key)
+  if (!entry || entry.connectedAt === null) return
+  entry.totalMs += Date.now() - entry.connectedAt
+  entry.connectedAt = null
+  entry.socketId = null
+}
+
+/** Returns the socket ID of the client with the most accumulated connection time, or null. */
+export function getMostConnectedSocketId(): string | null {
+  let best: { socketId: string; time: number } | null = null
+  const now = Date.now()
+  for (const entry of clientUptime.values()) {
+    if (entry.connectedAt === null || entry.socketId === null) continue
+    const effective = entry.totalMs + (now - entry.connectedAt)
+    if (!best || effective > best.time) {
+      best = { socketId: entry.socketId, time: effective }
+    }
+  }
+  return best?.socketId ?? null
+}
+
+function parseSocketMeta(socket: Socket): { device: string; ip: string } {
+  const h = socket.handshake
+  const { device } = parseUserAgent(h.headers['user-agent'] ?? '')
+  let ip = h.address
+  if (ip === '::1' || ip === '::ffff:127.0.0.1') ip = '127.0.0.1'
+  return { device, ip }
+}
+
 export function onMutationResponse(
   request: FastifyRequest,
   reply: FastifyReply,

@@ -26,6 +26,7 @@ import {
   Ban,
   Bell,
   BellRing,
+  Camera,
   ChevronDown,
   Columns2,
   FolderOpen,
@@ -75,6 +76,7 @@ interface ShellTabsProps {
   onSelectShell: (shellId: number) => void
   onCreateShell: () => void
   onRenameShell: (shellId: number, name: string) => Promise<void>
+  onSaveAsTemplate?: () => void
   position?: 'top' | 'bottom'
   className?: string
   children?: React.ReactNode
@@ -779,6 +781,7 @@ export function ShellTabs({
   onSelectShell,
   onCreateShell,
   onRenameShell,
+  onSaveAsTemplate,
   position = 'top',
   className,
   children,
@@ -1029,16 +1032,31 @@ export function ShellTabs({
           <span className="text-xs text-muted-foreground font-medium">
             Shell Templates
           </span>
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('open-template-modal'))
-              setMenuOpen(false)
-            }}
-          >
-            <Plus className="w-3 h-3" />
-          </button>
+          <div className="flex items-center gap-1">
+            {!isMobile && onSaveAsTemplate && (
+              <button
+                type="button"
+                title="Save current layout as template"
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => {
+                  onSaveAsTemplate()
+                  setMenuOpen(false)
+                }}
+              >
+                <Camera className="w-3 h-3" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-template-modal'))
+                setMenuOpen(false)
+              }}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
         </div>
         {templates.length === 0 ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground/60">

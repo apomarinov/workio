@@ -2,6 +2,8 @@ import type { PRCheckStatus } from '@domains/github/schema'
 import { emitNotification } from '@domains/notifications/service'
 import { getSettings } from '@domains/settings/db'
 import type { HiddenGHAuthor, HiddenPR } from '@domains/settings/schema'
+import { getIO, getMostConnectedSocketId } from '@server/io'
+import { log } from '@server/logger'
 import {
   checkFailedOnCommit,
   getGhUsername,
@@ -55,6 +57,27 @@ export async function processNewPRData(newPRs: PRCheckStatus[]) {
   for (const pr of newPRs) {
     const key = `${pr.repo}#${pr.prNumber}`
     const prev = lastPRData.get(key)
+
+    // New PR detected — request workspace snapshot from the most-connected client
+    // Only trigger for PRs created in the last minute to avoid firing on
+    // existing PRs rediscovered after a server restart.
+    if (!prev && pr.state === 'OPEN') {
+      const createdAge = Date.now() - new Date(pr.createdAt).getTime()
+      if (createdAge < 60 * 1000) {
+        const socketId = getMostConnectedSocketId()
+        if (socketId) {
+          const io = getIO()
+          const socket = io?.sockets.sockets.get(socketId)
+          if (socket) {
+            log.info(
+              { branch: pr.branch, pr: key, socketId },
+              '[snapshot] New PR detected, requesting snapshot',
+            )
+            socket.emit('snapshot-request', { branch: pr.branch })
+          }
+        }
+      }
+    }
 
     // PR merged
     if (prev && prev.state !== 'MERGED' && pr.state === 'MERGED') {

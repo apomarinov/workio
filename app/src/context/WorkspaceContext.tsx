@@ -3,6 +3,7 @@ import type { SettingsUpdate } from '@domains/settings/schema'
 import type { Shell } from '@domains/workspace/schema/shells'
 import type {
   Terminal,
+  TerminalSettings,
   WorkspacePayload,
 } from '@domains/workspace/schema/terminals'
 import type { ServicesStatus } from '@server/types/status'
@@ -20,6 +21,8 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import { useShellLastActive } from '@/hooks/useShellLastActive'
 import { useSocket } from '@/hooks/useSocket'
+import { mapLeafIds } from '@/lib/layout'
+import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
 
 interface WorkspaceContextValue {
@@ -51,10 +54,7 @@ interface WorkspaceContextValue {
       name?: string
       shell?: string | null
       restartShells?: boolean
-      settings?: {
-        defaultClaudeCommand?: string
-        portMappings?: { port: number; localPort: number }[]
-      } | null
+      settings?: TerminalSettings | null
     },
   ) => Promise<Terminal>
   mapPort: (
@@ -83,6 +83,7 @@ interface WorkspaceContextValue {
   ) => void
   orderedTerminals: Terminal[]
   servicesStatus: ServicesStatus | null
+  saveSnapshot: (terminalId: number) => void
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -488,6 +489,58 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Snapshot save
+  const saveSnapshotMutation =
+    trpc.workspace.terminals.saveSnapshot.useMutation()
+  const saveSnapshot = useCallback(
+    (terminalId: number) => {
+      const t = terminals.find((t) => t.id === terminalId)
+      if (!t) return
+
+      // Build entries: index 0 = main, rest = custom shells
+      const mainShell = t.shells.find((s) => s.name === 'main')
+      const customShells = t.shells.filter((s) => s.name !== 'main')
+      const orderedShells = mainShell
+        ? [mainShell, ...customShells]
+        : customShells
+
+      const entries = orderedShells.map((s) => ({
+        name: s.name,
+        command: s.active_cmd ?? '',
+      }))
+
+      // Map real shell IDs to 0-based indices for layouts
+      const idToIndex: Record<number, number> = {}
+      for (let i = 0; i < orderedShells.length; i++) {
+        idToIndex[orderedShells[i].id] = i
+      }
+
+      const layouts = t.settings?.layouts
+        ? Object.values(t.settings.layouts).map((node) =>
+            mapLeafIds(node, idToIndex),
+          )
+        : undefined
+
+      saveSnapshotMutation.mutate(
+        {
+          terminalId: t.id,
+          snapshot: { entries, layouts, savedAt: new Date().toISOString() },
+        },
+        { onError: (err) => toastError(err, 'Failed to save snapshot') },
+      )
+    },
+    [terminals, saveSnapshotMutation],
+  )
+
+  // Server-triggered snapshot (new PR detected)
+  useEffect(() => {
+    return subscribe<{ branch: string }>('snapshot-request', (data) => {
+      const matches = terminals.filter((t) => t.git_branch === data.branch)
+      const t = matches.find((t) => !t.ssh_host) ?? matches[0]
+      if (t) saveSnapshot(t.id)
+    })
+  }, [subscribe, terminals, saveSnapshot])
+
   const refetch = useCallback(async () => {
     await utils.workspace.terminals.listTerminals.invalidate()
   }, [utils])
@@ -528,6 +581,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setCollapsedProjectRepos,
       orderedTerminals,
       servicesStatus,
+      saveSnapshot,
     }),
     [
       terminals,
@@ -556,6 +610,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setCollapsedProjectRepos,
       orderedTerminals,
       servicesStatus,
+      saveSnapshot,
     ],
   )
 

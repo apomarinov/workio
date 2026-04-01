@@ -34,10 +34,22 @@ export type LayoutSplit = {
 }
 export type LayoutNode = LayoutLeaf | LayoutSplit
 
+export const branchSnapshotSchema = z.object({
+  entries: z.array(
+    z.object({
+      name: z.string(),
+      command: z.string(),
+    }),
+  ),
+  layouts: z.array(z.any()).optional(),
+  savedAt: z.string(),
+})
+
 export const terminalSettingsSchema = z.object({
   defaultClaudeCommand: z.string().optional(),
   portMappings: z.array(portMappingSchema).optional(),
   layouts: z.record(z.string(), z.any()).optional(),
+  snapshots: z.record(z.string(), branchSnapshotSchema).optional(),
 })
 
 // --- Row schemas ---
@@ -92,6 +104,11 @@ export const deleteTerminalInput = terminalSchema
   .pick({ id: true })
   .extend({ deleteDirectory: z.boolean().optional() })
 
+export const saveSnapshotInput = z.object({
+  terminalId: z.number(),
+  snapshot: branchSnapshotSchema,
+})
+
 // --- Socket event types ---
 
 export type WorkspacePayload = {
@@ -107,10 +124,12 @@ export type WorkspacePayload = {
 export type GitRepoStatus = z.infer<typeof gitRepoStatusSchema>
 export type SetupStatus = z.infer<typeof setupStatusSchema>
 export type PortMapping = z.infer<typeof portMappingSchema>
+export type BranchSnapshot = z.infer<typeof branchSnapshotSchema>
 export type TerminalSettings = {
   defaultClaudeCommand?: string
   portMappings?: PortMapping[]
   layouts?: Record<string, LayoutNode>
+  snapshots?: Record<string, BranchSnapshot>
 }
 export type Terminal = z.infer<typeof terminalSchema>
 export type CreateTerminalInput = z.infer<typeof createTerminalInput>

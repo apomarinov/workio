@@ -62,7 +62,8 @@ function AppContent() {
   const [tabsTop] = useLocalStorage('shell-tabs-top', true)
   const isMobile = useIsMobile()
   const mountedShells = useMountedShells()
-  const { handleCreateShell, handleRenameShell } = useShellActions()
+  const { handleCreateShell, handleRenameShell, saveCurrentAsTemplate } =
+    useShellActions()
   const uiState = useUIState()
   useDomRedaction()
   useNotificationSubscriptions()
@@ -162,6 +163,7 @@ function AppContent() {
                 }}
                 onCreateShell={() => handleCreateShell(t.id)}
                 onRenameShell={handleRenameShell}
+                onSaveAsTemplate={() => saveCurrentAsTemplate(t.id)}
                 position={effectiveTabsTop ? 'top' : 'bottom'}
                 className="pr-2 bg-[#1a1a1a]"
               />
