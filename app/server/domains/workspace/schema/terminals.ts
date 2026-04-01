@@ -104,11 +104,6 @@ export const deleteTerminalInput = terminalSchema
   .pick({ id: true })
   .extend({ deleteDirectory: z.boolean().optional() })
 
-export const saveSnapshotInput = z.object({
-  terminalId: z.number(),
-  snapshot: branchSnapshotSchema,
-})
-
 // --- Socket event types ---
 
 export type WorkspacePayload = {

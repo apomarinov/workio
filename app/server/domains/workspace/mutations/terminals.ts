@@ -18,7 +18,6 @@ import {
 import {
   createTerminalInput,
   deleteTerminalInput,
-  saveSnapshotInput,
   updateTerminalInput,
 } from '@domains/workspace/schema/terminals'
 import { autoDetectTerminal } from '@domains/workspace/services/auto-detect'
@@ -378,34 +377,4 @@ export const deleteTerminal = publicProcedure
     await dbDeleteTerminal(id)
     serverEvents.emit('github:refresh-pr-checks')
     return { async: false }
-  })
-
-export const saveSnapshot = publicProcedure
-  .input(saveSnapshotInput)
-  .mutation(async ({ input }) => {
-    const { terminalId, snapshot } = input
-
-    const terminal = await getTerminalById(terminalId)
-    if (!terminal) throw new Error('Terminal not found')
-    if (!terminal.git_branch) throw new Error('Terminal has no branch')
-
-    const settings = terminal.settings ?? {}
-    const snapshots = settings.snapshots ?? {}
-    snapshots[terminal.git_branch] = snapshot
-
-    // Remove snapshots older than 3 weeks
-    const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000
-    for (const [branch, snap] of Object.entries(snapshots)) {
-      if (snap.savedAt && new Date(snap.savedAt).getTime() < threeWeeksAgo) {
-        delete snapshots[branch]
-      }
-    }
-
-    await dbUpdateTerminal(terminalId, {
-      settings: { ...settings, snapshots },
-    })
-
-    log.info({ branch: terminal.git_branch, terminalId }, '[snapshot] Saved')
-
-    return { ok: true }
   })

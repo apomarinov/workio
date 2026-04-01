@@ -383,8 +383,6 @@ export function useShellActions() {
 
   const { sessions } = useSessionContext()
   const { subscribe } = useSocket()
-  const saveSnapshotMutation =
-    trpc.workspace.terminals.saveSnapshot.useMutation()
   const sessionsRef = useRef(sessions)
   sessionsRef.current = sessions
 
@@ -425,17 +423,23 @@ export function useShellActions() {
 
   const saveSnapshot = (terminalId: number) => {
     const t = terminalsRef.current.find((t) => t.id === terminalId)
-    if (!t) return
+    if (!t?.git_branch) return
 
     const { entries, layouts } = buildSnapshotEntries(t)
+    const snapshot = { entries, layouts, savedAt: new Date().toISOString() }
+    const snapshots = { ...t.settings?.snapshots, [t.git_branch]: snapshot }
 
-    saveSnapshotMutation.mutate(
-      {
-        terminalId: t.id,
-        snapshot: { entries, layouts, savedAt: new Date().toISOString() },
-      },
-      { onError: (err) => toastError(err, 'Failed to save snapshot') },
-    )
+    // Remove snapshots older than 3 weeks
+    const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000
+    for (const [branch, snap] of Object.entries(snapshots)) {
+      if (snap.savedAt && new Date(snap.savedAt).getTime() < threeWeeksAgo) {
+        delete snapshots[branch]
+      }
+    }
+
+    updateTerminal(t.id, {
+      settings: { ...t.settings, snapshots },
+    }).catch((err) => toastError(err, 'Failed to save snapshot'))
   }
 
   // Server-triggered snapshot (new PR detected)
