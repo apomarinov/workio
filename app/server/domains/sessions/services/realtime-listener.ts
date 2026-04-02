@@ -33,8 +33,11 @@ export async function initSessionListener(connectionString: string) {
       if (msg.channel === 'hook') {
         io.emit('hook', payload)
 
-        if (payload.hook_type === 'SessionStart') {
-          // Fire-and-forget branch detection
+        if (
+          payload.hook_type === 'SessionStart' ||
+          payload.hook_type === 'Stop'
+        ) {
+          // Fire-and-forget branch detection (on stop too — branch may have changed mid-session)
           detectSessionBranch(
             io,
             payload.session_id,

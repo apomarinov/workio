@@ -21,7 +21,7 @@ import type {
   PaletteLevel,
   PaletteMode,
 } from '@/components/command-palette/types'
-import { RefreshIcon } from '@/components/icons'
+import { ClaudeIcon, RefreshIcon } from '@/components/icons'
 
 export function createPRActionsMode(
   data: AppData,
@@ -206,6 +206,30 @@ export function createPRActionsMode(
       actions.hidePR(pr)
     },
   })
+
+  // Claude Sessions
+  const sessionCount = data.sessions.filter(
+    (s) =>
+      (s.data?.branch === pr.branch && s.data?.repo === pr.repo) ||
+      s.data?.branches?.some(
+        (e) => e.branch === pr.branch && e.repo === pr.repo,
+      ),
+  ).length
+  if (sessionCount > 0) {
+    items.push({
+      id: 'action:claude-sessions',
+      label: `Claude Sessions (${sessionCount})`,
+      icon: <ClaudeIcon className="h-4 w-4 shrink-0 text-zinc-400" />,
+      onSelect: () => {
+        api.close()
+        window.dispatchEvent(
+          new CustomEvent('open-session-search', {
+            detail: { repo: pr.repo, branch: pr.branch },
+          }),
+        )
+      },
+    })
+  }
 
   // View Logs
   const prName = `${pr.repo}#${pr.prNumber}`

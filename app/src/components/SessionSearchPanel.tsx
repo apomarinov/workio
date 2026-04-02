@@ -74,6 +74,9 @@ export function SessionSearchPanel({
     if (initialFilter) {
       setSelectedRepo(initialFilter.repo ?? null)
       setSelectedBranch(initialFilter.branch ?? null)
+      if (initialFilter.repo || initialFilter.branch) {
+        setRecentOnly(false)
+      }
     }
   }, [initialFilter])
 

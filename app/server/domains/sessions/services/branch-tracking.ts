@@ -19,8 +19,13 @@ export async function detectSessionBranch(
 
     const { branch, repo } = result
 
-    // Build unique branches list
+    // Skip if branch and repo haven't changed
     const existing = await getSessionById(sessionId)
+    if (existing?.data?.branch === branch && existing?.data?.repo === repo) {
+      return
+    }
+
+    // Build unique branches list
     let branches = existing?.data?.branches ?? []
 
     // Backfill old branch if it was set before branches tracking existed
