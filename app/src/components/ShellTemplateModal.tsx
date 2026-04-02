@@ -127,10 +127,13 @@ export function ShellTemplateModal({
     direction?: 'horizontal' | 'vertical',
   ) => {
     const newIndex = entries.length
+    const usedNames = new Set(entries.map((e) => e.name))
+    let n = 2
+    while (usedNames.has(`shell-${n}`)) n++
     setEntries((prev) => [
       ...prev,
       {
-        name: `shell-${newIndex + 1}`,
+        name: `shell-${n}`,
         command: '',
         _key: keyCounter.current++,
       },
@@ -226,7 +229,15 @@ export function ShellTemplateModal({
     )
   }
 
-  const canSave = name.trim().length > 0
+  // Track duplicate shell names
+  const nameCounts = new Map<string, number>()
+  for (const e of entries) {
+    const n = e.name.trim().toLowerCase()
+    nameCounts.set(n, (nameCounts.get(n) ?? 0) + 1)
+  }
+  const hasDuplicateNames = [...nameCounts.values()].some((c) => c > 1)
+
+  const canSave = name.trim().length > 0 && !hasDuplicateNames
 
   // Compute content height for current tab
   let contentHeight = 120
@@ -340,6 +351,11 @@ export function ShellTemplateModal({
                       entry={entries[entryIndex]}
                       index={entryIndex}
                       isMain={entryIndex === 0}
+                      isDuplicate={
+                        (nameCounts.get(
+                          entries[entryIndex]?.name.trim().toLowerCase() ?? '',
+                        ) ?? 0) > 1
+                      }
                       onUpdate={(field, value) =>
                         updateEntry(entryIndex, field, value)
                       }
@@ -356,6 +372,11 @@ export function ShellTemplateModal({
                   entry={entries[currentTab.id]}
                   index={currentTab.id}
                   isMain={currentTab.id === 0}
+                  isDuplicate={
+                    (nameCounts.get(
+                      entries[currentTab.id]?.name.trim().toLowerCase() ?? '',
+                    ) ?? 0) > 1
+                  }
                   onUpdate={(field, value) =>
                     updateEntry(currentTab.id, field, value)
                   }
@@ -383,6 +404,7 @@ function TemplateLeaf({
   entry,
   index: _index,
   isMain,
+  isDuplicate,
   onUpdate,
   onRemove,
   onSplit,
@@ -390,6 +412,7 @@ function TemplateLeaf({
   entry: EntryWithKey | undefined
   index: number
   isMain: boolean
+  isDuplicate: boolean
   onUpdate: (field: keyof ShellTemplateEntry, value: string) => void
   onRemove: () => void
   onSplit: (direction: 'horizontal' | 'vertical') => void
@@ -402,7 +425,10 @@ function TemplateLeaf({
           value={entry.name}
           onChange={(e) => onUpdate('name', e.target.value)}
           placeholder="Name"
-          className="h-7 text-xs flex-1"
+          className={cn(
+            'h-7 text-xs flex-1',
+            isDuplicate && 'border-red-500 focus-visible:ring-red-500',
+          )}
           disabled={isMain}
         />
         <div className="flex items-center gap-0.5">
