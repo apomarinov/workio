@@ -160,18 +160,29 @@ export function SessionSearchPanel({
     { enabled: shouldSearch },
   )
 
+  // Default: show 20 most-recently-updated sessions when no filters active
+  const defaultResults: SessionSearchMatch[] = sessions
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )
+    .slice(0, 20)
+    .map((s) => ({
+      session_id: s.session_id,
+      name: s.name,
+      terminal_name: null,
+      project_path: s.project_path,
+      status: s.status,
+      updated_at: s.updated_at,
+      data: s.data,
+      messages: [],
+    }))
+
   const results: SessionSearchMatch[] = shouldSearch
     ? (searchResults ?? [])
-    : []
+    : defaultResults
   const loading = (hasTextQuery || hasFilter) && isFetching
-
-  // Reset selection when search is cleared
-  useEffect(() => {
-    if (!hasTextQuery && !hasFilter) {
-      setSelectedSessionId(null)
-      setSelectedMessageId(null)
-    }
-  }, [hasTextQuery, hasFilter])
 
   // Sort results by terminal name
   const sorted = [...results].sort((a, b) => {
@@ -271,7 +282,7 @@ export function SessionSearchPanel({
   ) : results.length === 0 ? (
     <div className="px-4 py-8 text-sm text-zinc-500 text-center">
       {!hasTextQuery && !hasFilter
-        ? 'Type to search or filter by repo & branch'
+        ? 'No recent sessions'
         : 'No matching sessions found'}
     </div>
   ) : (

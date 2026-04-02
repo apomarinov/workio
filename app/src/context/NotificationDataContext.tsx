@@ -334,6 +334,7 @@ export function NotificationDataProvider({
             }
           : prev,
       )
+      utils.notifications.prUnread.invalidate()
     } catch (err) {
       toastError(err, 'Failed to delete notification')
     }
