@@ -28,6 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { toast } from '@/components/ui/sonner'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useSettings } from '@/hooks/useSettings'
 import { toastError } from '@/lib/toastError'
 import { trpc } from '@/lib/trpc'
@@ -71,20 +72,27 @@ export function DirectoryBrowser({
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [newFolderName, setNewFolderName] = useState<string | null>(null)
   const [creatingFolder, setCreatingFolder] = useState(false)
+  const [lastPaths, setLastPaths] = useLocalStorage<Record<string, string>>(
+    'directory-browser-last-path',
+    {},
+  )
 
   const defaultRoot = '~'
+  const hostKey = sshHost ?? 'local'
 
   // Initialize columns when dialog opens
 
   useEffect(() => {
     if (!open) return
-    if (value) {
-      navigateToPath(value)
-    } else {
-      setColumns([{ path: defaultRoot, selectedDir: null }])
-      setInputPath(defaultRoot)
-    }
+    const startPath = lastPaths[hostKey] || value || defaultRoot
+    navigateToPath(startPath)
   }, [open])
+
+  // Persist last browsed path per host
+  useEffect(() => {
+    if (!open || !inputPath) return
+    setLastPaths((prev) => ({ ...prev, [hostKey]: inputPath }))
+  }, [inputPath])
 
   useEffect(() => {
     setHiddenVersion((v) => v + 1)
@@ -242,13 +250,13 @@ export function DirectoryBrowser({
   }
 
   const handleSave = () => {
+    const pathToSave = inputPath.trim() || defaultRoot
     if (mode === 'file' && onSelectPaths) {
       onSelectPaths(Array.from(selectedPaths))
       onOpenChange(false)
       return
     }
-    const selected = inputPath.trim() || defaultRoot
-    onSelect(selected)
+    onSelect(pathToSave)
     onOpenChange(false)
   }
 
@@ -256,7 +264,6 @@ export function DirectoryBrowser({
     onOpenChange(false)
   }
 
-  const hostKey = sshHost ?? 'local'
   const favorites = settings.favorite_folders ?? []
   const isFavorite = favorites.some(
     (f) => f.host === hostKey && f.path === inputPath,
