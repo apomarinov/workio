@@ -578,7 +578,7 @@ export const TerminalItem = memo(function TerminalItem({
                           On Branch
                         </SelectItem>
                         <SelectItem value="all" className="text-xs">
-                          All
+                          In Project
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -589,11 +589,9 @@ export const TerminalItem = memo(function TerminalItem({
                     const filtered =
                       sessionBranchFilter === 'branch' && terminal.git_branch
                         ? allSessions.filter((s) => {
-                            const isTerminalSession =
-                              s.terminal_id === terminal.id
                             const d = s.data
                             const repo = terminal.git_repo?.repo
-                            const isOnBranch =
+                            return (
                               (d?.branch === terminal.git_branch &&
                                 d?.repo === repo) ||
                               (d?.branches?.some(
@@ -602,7 +600,7 @@ export const TerminalItem = memo(function TerminalItem({
                                   b.repo === repo,
                               ) ??
                                 false)
-                            return isTerminalSession || isOnBranch
+                            )
                           })
                         : sessions
                     const activeSessions = filtered.filter(

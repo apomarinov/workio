@@ -19,7 +19,7 @@ export function createPRCheckoutMode(
   _api: PaletteAPI,
 ): PaletteMode {
   const { pr, loadingStates = {} } = level
-  const { terminals, gitDirtyStatus } = data
+  const { terminals, sessions, gitDirtyStatus } = data
 
   if (!pr) {
     return {
@@ -45,12 +45,30 @@ export function createPRCheckoutMode(
 
   const isLoading = !!loadingStates.checkingOut
 
+  // Count sessions per terminal that match the PR branch
+  const sessionCountByTerminal = new Map<number, number>()
+  for (const s of sessions) {
+    if (!s.terminal_id) continue
+    const d = s.data
+    const matchesBranch =
+      (d?.branch === pr.branch && d?.repo === pr.repo) ||
+      (d?.branches?.some((b) => b.branch === pr.branch && b.repo === pr.repo) ??
+        false)
+    if (matchesBranch) {
+      sessionCountByTerminal.set(
+        s.terminal_id,
+        (sessionCountByTerminal.get(s.terminal_id) ?? 0) + 1,
+      )
+    }
+  }
+
   const items: PaletteItem[] = matchingTerminals.map((terminal) => {
     const dirtyStatus = gitDirtyStatus[terminal.id]
     const isDirty =
       !!dirtyStatus && (dirtyStatus.added > 0 || dirtyStatus.removed > 0)
     const isOnBranch = terminal.git_branch === pr.branch
     const canCheckout = !isOnBranch && !isLoading
+    const branchSessionCount = sessionCountByTerminal.get(terminal.id) ?? 0
 
     return {
       id: `terminal:${terminal.id}`,
@@ -67,6 +85,12 @@ export function createPRCheckoutMode(
           )}
         </span>
       ) : undefined,
+      rightSlot:
+        branchSessionCount > 0 ? (
+          <span className="text-xs text-muted-foreground">
+            {branchSessionCount} session{branchSessionCount !== 1 ? 's' : ''}
+          </span>
+        ) : undefined,
       icon: <TerminalIcon2 className="h-4 w-4 shrink-0 fill-zinc-400" />,
       disabled: !canCheckout,
       disabledReason: isOnBranch ? 'already on this branch' : undefined,
