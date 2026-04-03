@@ -18,6 +18,7 @@ export interface CommandLog {
   pr_id: string | null
   exit_code: number
   category: string
+  service: string | null
   data: CommandLogData
   created_at: string
 }
@@ -35,6 +36,7 @@ export const listInput = z.object({
   deleted: z.boolean().optional(),
   prName: z.string().optional(),
   category: z.string().optional(),
+  service: z.string().optional(),
   failed: z.boolean().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -52,6 +54,7 @@ export const infiniteListInput = z
     system: z.boolean().optional(),
     prName: z.string().optional(),
     category: z.string().optional(),
+    service: z.string().optional(),
     failed: z.boolean().optional(),
     search: z.string().optional(),
     cursor: z.number().optional(),

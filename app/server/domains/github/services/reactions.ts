@@ -80,6 +80,7 @@ async function graphqlReactionLogged(
     logCommand({
       prId: logOpts.prId,
       category: 'github',
+      service: 'github-graphql',
       command: logOpts.cmd,
       stdout: 'ok',
     })
@@ -88,6 +89,7 @@ async function graphqlReactionLogged(
     logCommand({
       prId: logOpts.prId,
       category: 'github',
+      service: 'github-graphql',
       command: logOpts.cmd,
       stderr: message,
       failed: true,

@@ -628,6 +628,7 @@ export async function fetchAllPRsViaGraphQL(
     const result = await fetchPRsViaRESTAndGraphQL(repos, trackedBranches)
     logCommand({
       category: 'github',
+      service: 'github-rest',
       command: `gh api (fetch PRs for ${repos.length} repo(s))`,
       dedupeKey: 'github:fetch-prs',
     })
@@ -636,6 +637,7 @@ export async function fetchAllPRsViaGraphQL(
     log.error({ err }, '[github] Failed to fetch PRs')
     logCommand({
       category: 'github',
+      service: 'github-rest',
       command: `gh api (fetch PRs for ${repos.length} repo(s))`,
       stderr: err instanceof Error ? err.message : String(err),
       failed: true,

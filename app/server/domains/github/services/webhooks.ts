@@ -327,6 +327,7 @@ async function validateStoredWebhooks() {
       }
       logCommand({
         category: 'github',
+        service: 'github-webhooks',
         command: validateCmd,
         dedupeKey: `webhook:validate:${repo}`,
       })
@@ -336,6 +337,7 @@ async function validateStoredWebhooks() {
     if (result === 'error') {
       logCommand({
         category: 'github',
+        service: 'github-webhooks',
         command: validateCmd,
         stderr: 'Transient error checking webhook',
         failed: true,
@@ -360,6 +362,7 @@ async function validateStoredWebhooks() {
 
     logCommand({
       category: 'github',
+      service: 'github-webhooks',
       command: validateCmd,
       dedupeKey: `webhook:validate:${repo}`,
       ...(result === 'missing' && {

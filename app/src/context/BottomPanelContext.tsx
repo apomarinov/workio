@@ -11,6 +11,9 @@ import type { BottomPanelTab } from '@/components/bottom-panel/BottomPanel'
 export interface LogsInitialFilter {
   terminalId?: number
   prName?: string
+  service?: string
+  category?: string
+  failed?: boolean
 }
 
 interface BottomPanelContextValue {
@@ -55,7 +58,7 @@ export function BottomPanelProvider({ children }: { children: ReactNode }) {
       setLoaded(true)
       setVisible(true)
       setTab('logs')
-      if (detail?.terminalId || detail?.prName) {
+      if (detail) {
         setLogsFilter(detail)
       }
     }

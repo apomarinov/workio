@@ -11,6 +11,7 @@ import {
   CircleHelp,
   Globe,
   HeartPulse,
+  ScrollText,
   ServerOff,
   Settings,
 } from 'lucide-react'
@@ -107,6 +108,36 @@ const SETTINGS_PATH: Record<string, string[]> = {
   ngrok: ['Remote Access', 'ngrok'],
 }
 
+const SERVICE_LOG_KEY: Record<string, string> = {
+  'GitHub REST': 'github-rest',
+  'GitHub GraphQL': 'github-graphql',
+  'GitHub Webhooks': 'github-webhooks',
+}
+
+function openServiceLogs(label: string) {
+  const service = SERVICE_LOG_KEY[label]
+  if (!service) return
+  window.dispatchEvent(
+    new CustomEvent('open-logs', {
+      detail: { service, category: 'github' },
+    }),
+  )
+}
+
+function LogsButton({ label }: { label: string }) {
+  if (!SERVICE_LOG_KEY[label]) return null
+  return (
+    <button
+      type="button"
+      className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
+      onClick={() => openServiceLogs(label)}
+      title="View logs"
+    >
+      <ScrollText className="w-3 h-3" />
+    </button>
+  )
+}
+
 function InfoButton({ label }: { label: string }) {
   const [open, setOpen] = useState(false)
   const uiState = useUIState()
@@ -189,7 +220,10 @@ function GitHubApiSection({
           <StatusDot status={api.status} />
           <span className="text-xs font-medium">{label}</span>
         </div>
-        <InfoButton label={label} />
+        <div className="flex items-center gap-1">
+          <LogsButton label={label} />
+          <InfoButton label={label} />
+        </div>
       </div>
       <div className="pl-3 mt-0.5 space-y-0">
         {api.remaining !== null && api.limit !== null && (
@@ -248,7 +282,10 @@ function WebhooksRow({
           <StatusDot status={webhookStatus} />
           <span className="text-xs font-medium">GitHub Webhooks</span>
         </div>
-        <InfoButton label="GitHub Webhooks" />
+        <div className="flex items-center gap-1">
+          <LogsButton label="GitHub Webhooks" />
+          <InfoButton label="GitHub Webhooks" />
+        </div>
       </div>
       {hasIssues && (
         <div className="pl-3 mt-0.5 space-y-0">

@@ -1,4 +1,5 @@
 import {
+  CircleX,
   Github,
   Search,
   Terminal as TerminalIcon,
@@ -36,22 +37,39 @@ const CATEGORY_OPTIONS: { value: string; label: string; color: string }[] = [
   },
 ]
 
+const SERVICE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'github-rest', label: 'GitHub REST' },
+  { value: 'github-graphql', label: 'GitHub GraphQL' },
+  { value: 'github-webhooks', label: 'GitHub Webhooks' },
+]
+
 const triggerClass =
-  '!h-5 !bg-transparent text-muted-foreground hover:text-white hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-1'
+  '!h-5 !bg-transparent text-muted-foreground hover:text-white hover:!bg-input/30 text-[10px] border-none shadow-none px-1.5 gap-0.5'
 
 export function LogsHeaderActions() {
-  const { filters, setSearch, setSource, setCategory, deleteFiltered } =
-    useLogsContext()
+  const {
+    filters,
+    setSearch,
+    setSource,
+    setCategory,
+    setService,
+    setFailed,
+    deleteFiltered,
+  } = useLogsContext()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const hasFilters =
     filters.search !== '' ||
     filters.source !== 'project' ||
-    filters.category !== undefined
+    filters.category !== undefined ||
+    filters.service !== undefined ||
+    filters.failed !== undefined
 
   const resetFilters = () => {
     setSearch('')
     setSource('project')
     setCategory(undefined)
+    setService(undefined)
+    setFailed(undefined)
   }
 
   const { data: terminalsData } = trpc.logs.terminals.useQuery()
@@ -78,9 +96,9 @@ export function LogsHeaderActions() {
     const bHasTitle = prTitleMap.has(b) ? 0 : 1
     return aHasTitle - bHasTitle
   })
-
+  console.log(filters.source, filters.source?.startsWith('pr:'))
   return (
-    <div className="flex items-center gap-1 mr-1">
+    <div className="flex flex-wrap items-center gap-1 mr-1">
       {hasFilters && (
         <button
           type="button"
@@ -101,13 +119,19 @@ export function LogsHeaderActions() {
         />
       </div>
 
-      {/* Source filter (scope + terminal + PR) */}
-      <Select value={filters.source} onValueChange={setSource}>
+      {/* Source filter (scope + terminal + PR) — locked to System when a service is selected */}
+      <Select
+        value={filters.service ? 'system' : filters.source}
+        onValueChange={setSource}
+        disabled={!!filters.service}
+      >
         <SelectTrigger
           size="sm"
           className={cn(
             triggerClass,
-            'max-w-[200px] truncate line-clamp-1 px-2 pt-0.5',
+            'max-w-[320px] truncate px-2',
+            filters.service && 'opacity-50',
+            filters.source?.startsWith?.('pr:') && 'line-clamp-1 pt-0.5',
           )}
         >
           <SelectValue />
@@ -182,7 +206,13 @@ export function LogsHeaderActions() {
       {/* Category filter */}
       <Select
         value={filters.category ?? 'all'}
-        onValueChange={(v) => setCategory(v === 'all' ? undefined : v)}
+        onValueChange={(v) => {
+          setCategory(v === 'all' ? undefined : v)
+          // Clear service filter when switching away from github category
+          if (v !== 'github' && v !== 'all' && filters.service) {
+            setService(undefined)
+          }
+        }}
       >
         <SelectTrigger size="sm" className={triggerClass}>
           <SelectValue />
@@ -205,6 +235,47 @@ export function LogsHeaderActions() {
           ))}
         </SelectContent>
       </Select>
+
+      {/* Service filter */}
+      <Select
+        value={filters.service ?? 'all'}
+        onValueChange={(v) => {
+          const svc = v === 'all' ? undefined : v
+          setService(svc)
+          if (svc) {
+            // Auto-set category to github and scope to system
+            if (filters.category !== 'github') setCategory('github')
+            setSource('system')
+          }
+        }}
+      >
+        <SelectTrigger size="sm" className={triggerClass}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all" className="text-xs">
+            All Services
+          </SelectItem>
+          {SERVICE_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Failed toggle */}
+      <button
+        type="button"
+        onClick={() => setFailed(filters.failed ? undefined : true)}
+        className={cn(
+          'flex items-center justify-center w-5 h-5 transition-colors cursor-pointer rounded hover:bg-zinc-700/50',
+          filters.failed ? 'text-red-400' : 'text-zinc-400 hover:text-zinc-200',
+        )}
+        title={filters.failed ? 'Show all logs' : 'Show only errors'}
+      >
+        <CircleX className="w-3 h-3" />
+      </button>
 
       <button
         type="button"

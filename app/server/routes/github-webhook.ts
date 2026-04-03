@@ -25,6 +25,7 @@ export default async function githubWebhookRoute(fastify: FastifyInstance) {
       if (!signature) {
         logCommand({
           category: 'github',
+          service: 'github-webhooks',
           command: `webhook ${event}`,
           stderr: 'Missing signature',
           failed: true,
@@ -41,6 +42,7 @@ export default async function githubWebhookRoute(fastify: FastifyInstance) {
       if (!verifyWebhookSignature(rawPayload, signature, secret)) {
         logCommand({
           category: 'github',
+          service: 'github-webhooks',
           command: `webhook ${event}`,
           stderr: 'Invalid signature',
           failed: true,
@@ -52,6 +54,7 @@ export default async function githubWebhookRoute(fastify: FastifyInstance) {
       if (!parsed.success) {
         logCommand({
           category: 'github',
+          service: 'github-webhooks',
           command: `webhook ${event}`,
           stderr: `Invalid payload: ${parsed.error.message}`,
           failed: true,
@@ -63,6 +66,7 @@ export default async function githubWebhookRoute(fastify: FastifyInstance) {
       logCommand({
         prId: repo,
         category: 'github',
+        service: 'github-webhooks',
         command: `webhook ${event}`,
         stdout: repo ? `${event} for ${repo}` : event,
       })

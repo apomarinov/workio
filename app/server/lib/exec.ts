@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { logCommand } from '@domains/logs/db'
+import { updateGithubGraphql, updateGithubRest } from '@server/status'
 
 export const execFileAsync = promisify(execFile)
 
@@ -11,6 +12,8 @@ export function getExecStderr(err: unknown): string {
   }
   return ''
 }
+
+type GithubService = 'github-rest' | 'github-graphql' | 'github-webhooks'
 
 interface ExecFileLoggedOptions {
   timeout?: number
@@ -28,6 +31,17 @@ interface ExecFileLoggedOptions {
   dedupeKey?: string
   /** When true, only log if the command fails (skip success logging). */
   errorOnly?: boolean
+  /** Explicit service for logging. Auto-detected from args when category is 'github'. */
+  service?: GithubService
+}
+
+/** Infer github service from gh CLI args. */
+function inferGithubService(args: string[]): GithubService | undefined {
+  if (args.includes('graphql')) return 'github-graphql'
+  if (args[0] === 'api' || args.includes('api')) return 'github-rest'
+  // gh pr view, gh pr comment, gh pr ready -> REST
+  if (args[0] === 'pr') return 'github-rest'
+  return undefined
 }
 
 /**
@@ -46,9 +60,13 @@ export async function execFileAsyncLogged(
     prId,
     dedupeKey,
     errorOnly,
+    service: explicitService,
     ...execOpts
   } = opts
   const command = logCmd ?? `${cmd} ${args.join(' ')}`
+  const service =
+    explicitService ??
+    (category === 'github' ? inferGithubService(args) : undefined)
   try {
     const result = await execFileAsync(cmd, args, execOpts)
     if (!errorOnly) {
@@ -56,6 +74,7 @@ export async function execFileAsyncLogged(
         terminalId,
         prId,
         category,
+        service,
         command,
         stdout: result.stdout,
         stderr: result.stderr,
@@ -70,11 +89,24 @@ export async function execFileAsyncLogged(
       terminalId,
       prId,
       category,
+      service,
       command,
       stderr: stderr || message,
       failed: true,
       dedupeKey,
     })
+    // Update service health status on github API failures
+    if (service === 'github-rest') {
+      updateGithubRest({
+        status: 'error',
+        error: (stderr || message).substring(0, 200),
+      })
+    } else if (service === 'github-graphql') {
+      updateGithubGraphql({
+        status: 'error',
+        error: (stderr || message).substring(0, 200),
+      })
+    }
     throw new Error(stderr || message)
   }
 }

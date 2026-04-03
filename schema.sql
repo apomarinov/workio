@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS command_logs (
     pr_id VARCHAR(100),    -- "owner/repo#prNumber" format
     exit_code INTEGER,
     category VARCHAR(32),  -- 'git', 'workspace', 'github'
+    service VARCHAR(32),   -- 'github-rest', 'github-graphql', 'github-webhooks' (nullable for non-service logs)
     data JSONB,            -- { command: string, stdout?: string, stderr?: string }
     dedupe_key VARCHAR(200), -- Non-null for deduped logs; upsert skips if state unchanged
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -185,6 +186,7 @@ CREATE INDEX IF NOT EXISTS idx_command_logs_terminal_id ON command_logs(terminal
 CREATE INDEX IF NOT EXISTS idx_command_logs_pr_id ON command_logs(pr_id);
 CREATE INDEX IF NOT EXISTS idx_command_logs_created_at ON command_logs(created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_command_logs_dedupe_key ON command_logs(dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_command_logs_service ON command_logs(service, exit_code, created_at DESC) WHERE service IS NOT NULL;
 
 -- Insert default settings row if not present
 INSERT INTO settings (id, config) VALUES (1, '{}')

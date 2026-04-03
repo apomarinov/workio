@@ -13,6 +13,7 @@ interface LogCommandOptions {
   terminalId?: number
   prId?: string // "owner/repo#123" format
   category: 'git' | 'workspace' | 'github'
+  service?: 'github-rest' | 'github-graphql' | 'github-webhooks'
   command: string
   stdout?: string
   stderr?: string
@@ -54,21 +55,24 @@ export async function logCommand(opts: LogCommandOptions) {
 
     let row: CommandLog | undefined
 
+    const service = opts.service ?? null
+
     if (opts.dedupeKey) {
       // Upsert: insert first time, then only update when exit_code changes
       const result = await pool.query<CommandLog>(
-        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data, dedupe_key)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, service, data, dedupe_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL
          DO UPDATE SET exit_code = EXCLUDED.exit_code, data = EXCLUDED.data,
-                       terminal_id = EXCLUDED.terminal_id, created_at = NOW()
+                       terminal_id = EXCLUDED.terminal_id, service = EXCLUDED.service, created_at = NOW()
          WHERE command_logs.exit_code != EXCLUDED.exit_code
-         RETURNING id, terminal_id, (SELECT name FROM terminals WHERE id = terminal_id) as terminal_name, pr_id, exit_code, category, data, created_at`,
+         RETURNING id, terminal_id, (SELECT name FROM terminals WHERE id = terminal_id) as terminal_name, pr_id, exit_code, category, service, data, created_at`,
         [
           opts.terminalId ?? null,
           opts.prId ?? null,
           exitCode,
           opts.category,
+          service,
           data,
           opts.dedupeKey,
         ],
@@ -76,14 +80,15 @@ export async function logCommand(opts: LogCommandOptions) {
       row = result.rows[0]
     } else {
       const result = await pool.query<CommandLog>(
-        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, data)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, terminal_id, (SELECT name FROM terminals WHERE id = terminal_id) as terminal_name, pr_id, exit_code, category, data, created_at`,
+        `INSERT INTO command_logs (terminal_id, pr_id, exit_code, category, service, data)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, terminal_id, (SELECT name FROM terminals WHERE id = terminal_id) as terminal_name, pr_id, exit_code, category, service, data, created_at`,
         [
           opts.terminalId ?? null,
           opts.prId ?? null,
           exitCode,
           opts.category,
+          service,
           data,
         ],
       )
@@ -127,6 +132,11 @@ export async function getCommandLogs(input: ListInput) {
     values.push(input.category)
   }
 
+  if (input.service) {
+    conditions.push(`service = $${paramIdx++}`)
+    values.push(input.service)
+  }
+
   if (input.failed) {
     conditions.push('exit_code = 1')
   }
@@ -155,7 +165,7 @@ export async function getCommandLogs(input: ListInput) {
   const total = Number.parseInt(countResult.rows[0].count, 10)
 
   const { rows } = await pool.query<CommandLog>(
-    `SELECT id, terminal_id, pr_id, exit_code, category, data, created_at
+    `SELECT id, terminal_id, pr_id, exit_code, category, service, data, created_at
      FROM command_logs
      ${whereClause}
      ORDER BY created_at DESC
@@ -204,6 +214,11 @@ function buildLogFilters(input: InfiniteListInput, alias = '') {
     values.push(input.category)
   }
 
+  if (input.service) {
+    conditions.push(`${p}service = $${paramIdx++}`)
+    values.push(input.service)
+  }
+
   if (input.failed) {
     conditions.push(`${p}exit_code = 1`)
   }
@@ -230,7 +245,7 @@ export async function getCommandLogsInfinite(input: InfiniteListInput) {
   // Fetch limit+1 to determine if there are more items
   const fetchLimit = input.limit + 1
   const { rows } = await pool.query<CommandLog>(
-    `SELECT cl.id, cl.terminal_id, t.name as terminal_name, cl.pr_id, cl.exit_code, cl.category, cl.data, cl.created_at
+    `SELECT cl.id, cl.terminal_id, t.name as terminal_name, cl.pr_id, cl.exit_code, cl.category, cl.service, cl.data, cl.created_at
      FROM command_logs cl
      LEFT JOIN terminals t ON t.id = cl.terminal_id
      ${whereClause}

@@ -13,6 +13,8 @@ interface LogsFilters {
   search: string
   source: string
   category: string | undefined
+  service: string | undefined
+  failed: boolean | undefined
 }
 
 interface LogsContextValue {
@@ -25,6 +27,8 @@ interface LogsContextValue {
   setSearch: (search: string) => void
   setSource: (source: string) => void
   setCategory: (category: string | undefined) => void
+  setService: (service: string | undefined) => void
+  setFailed: (failed: boolean | undefined) => void
   deleteFiltered: () => Promise<void>
 }
 
@@ -58,6 +62,8 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [source, setSource] = useState('project')
   const [category, setCategory] = useState<string | undefined>()
+  const [service, setService] = useState<string | undefined>()
+  const [failed, setFailed] = useState<boolean | undefined>()
 
   // Apply initial filter from open-logs event
   useEffect(() => {
@@ -66,7 +72,13 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
         setSource(`terminal:${logsFilter.terminalId}`)
       } else if (logsFilter.prName) {
         setSource(`pr:${logsFilter.prName}`)
+      } else if (logsFilter.service) {
+        // Service logs are system-level (no terminalId)
+        setSource('system')
       }
+      if (logsFilter.category !== undefined) setCategory(logsFilter.category)
+      if (logsFilter.service !== undefined) setService(logsFilter.service)
+      if (logsFilter.failed !== undefined) setFailed(logsFilter.failed)
       clearLogsFilter()
     }
   }, [logsFilter, clearLogsFilter])
@@ -83,6 +95,8 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
     limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
     category,
+    service,
+    failed: failed || undefined,
     ...sourceFilter,
   }
 
@@ -100,6 +114,8 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
     if (
       prev.search !== queryInput.search ||
       prev.category !== queryInput.category ||
+      prev.service !== queryInput.service ||
+      prev.failed !== queryInput.failed ||
       prev.system !== queryInput.system ||
       prev.terminalId !== queryInput.terminalId ||
       prev.prName !== queryInput.prName
@@ -144,10 +160,12 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
         fetchNextPage: () => fetchNextPage(),
         hasNextPage,
         isFetchingNextPage,
-        filters: { search, source, category },
+        filters: { search, source, category, service, failed },
         setSearch,
         setSource,
         setCategory,
+        setService,
+        setFailed,
         deleteFiltered,
       }}
     >
@@ -161,12 +179,16 @@ function matchesFilters(
   filters: {
     search?: string
     category?: string
+    service?: string
+    failed?: boolean
     system?: boolean
     terminalId?: number
     prName?: string
   },
 ): boolean {
   if (filters.category && log.category !== filters.category) return false
+  if (filters.service && log.service !== filters.service) return false
+  if (filters.failed && log.exit_code !== 1) return false
   if (filters.system && log.terminal_id !== null) return false
   if (filters.terminalId && log.terminal_id !== filters.terminalId) return false
   if (filters.prName && log.pr_id !== filters.prName) return false

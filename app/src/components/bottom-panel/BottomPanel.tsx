@@ -113,8 +113,8 @@ function DesktopPanel({
   const toggleMaximize = () =>
     panel.setMode((m) => (m === 'maximized' ? 'normal' : 'maximized'))
 
-  const contentRef = usePanelFocus((focused) => {
-    console.log('focused 1', focused)
+  const contentRef = usePanelFocus((_focused) => {
+    // console.log('focused 1', _focused)
   })
 
   return (
