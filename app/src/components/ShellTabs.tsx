@@ -1421,7 +1421,7 @@ export function ShellTabs({
             >
               <span className="font-medium shrink-0">{entry.name}</span>
               {entry.command ? (
-                <code className="text-muted-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded truncate">
+                <code className="text-muted-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded break-all">
                   {entry.command}
                 </code>
               ) : (

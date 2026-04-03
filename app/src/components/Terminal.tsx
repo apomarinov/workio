@@ -329,8 +329,10 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
     ) => {
       if (e.detail.terminalId !== terminalId) return
       if (e.detail.shellId != null && e.detail.shellId !== shellId) return
-      if (!isVisibleRef.current) return
+      // Record target before visibility check so the isVisible effect can
+      // focus the correct pane when multiple layout terminals appear at once.
       lastFocusedShell = { terminalId, shellId }
+      if (!isVisibleRef.current) return
       terminalRef.current?.focus()
     }
     window.addEventListener('terminal-focus', handler as EventListener)
@@ -1216,7 +1218,15 @@ export function Terminal({ terminalId, shellId, isVisible }: TerminalProps) {
         setDimensions({ cols, rows })
         sendResizeRef.current(cols, rows)
       }
-      terminalRef.current.focus()
+      // In layouts, multiple terminals become visible simultaneously.
+      // Only focus if this shell is the intended target (or no target yet).
+      if (
+        !lastFocusedShell ||
+        (lastFocusedShell.terminalId === terminalId &&
+          lastFocusedShell.shellId === shellId)
+      ) {
+        terminalRef.current.focus()
+      }
     }
   }, [isVisible])
 
