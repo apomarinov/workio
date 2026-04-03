@@ -27,6 +27,7 @@ interface SessionItemProps {
   defaultCollapsed?: boolean
   terminalName?: string | null
   popoverContainer?: HTMLElement | null
+  openFromTerminalId?: number | null
   onClick?: () => void
 }
 
@@ -36,6 +37,7 @@ export const SessionItem = memo(function SessionItem({
   defaultCollapsed,
   showGitBranch,
   popoverContainer,
+  openFromTerminalId,
   onClick,
 }: SessionItemProps) {
   const { activeSessionId, selectSession } = useSessionContext()
@@ -88,7 +90,11 @@ export const SessionItem = memo(function SessionItem({
     e.stopPropagation()
     window.dispatchEvent(
       new CustomEvent('open-item-actions', {
-        detail: { terminalId: null, sessionId: session.session_id },
+        detail: {
+          terminalId: null,
+          sessionId: session.session_id,
+          openFromTerminalId: openFromTerminalId ?? null,
+        },
       }),
     )
   }

@@ -73,7 +73,7 @@ export const TerminalItem = memo(function TerminalItem({
       onError: (err) => toastError(err, 'Failed to clear error'),
     })
   const { terminals, activeTerminal, selectTerminal } = useWorkspaceContext()
-  const { clearSession } = useSessionContext()
+  const { clearSession, sessions: allSessions } = useSessionContext()
   const { isGoToTabModifierHeld, modifierIcons } = useModifiersHeld()
   const shortcutIndex =
     shortcutIndexProp ?? terminals.findIndex((t) => t.id === terminal.id) + 1
@@ -588,15 +588,21 @@ export const TerminalItem = memo(function TerminalItem({
                   (() => {
                     const filtered =
                       sessionBranchFilter === 'branch' && terminal.git_branch
-                        ? sessions.filter((s) => {
+                        ? allSessions.filter((s) => {
+                            const isTerminalSession =
+                              s.terminal_id === terminal.id
                             const d = s.data
-                            if (!d) return false
-                            if (d.branch === terminal.git_branch) return true
-                            return (
-                              d.branches?.some(
-                                (b) => b.branch === terminal.git_branch,
-                              ) ?? false
-                            )
+                            const repo = terminal.git_repo?.repo
+                            const isOnBranch =
+                              (d?.branch === terminal.git_branch &&
+                                d?.repo === repo) ||
+                              (d?.branches?.some(
+                                (b) =>
+                                  b.branch === terminal.git_branch &&
+                                  b.repo === repo,
+                              ) ??
+                                false)
+                            return isTerminalSession || isOnBranch
                           })
                         : sessions
                     const activeSessions = filtered.filter(
@@ -620,6 +626,7 @@ export const TerminalItem = memo(function TerminalItem({
                             defaultCollapsed={idx > 0}
                             key={session.session_id}
                             session={session}
+                            openFromTerminalId={terminal.id}
                           />
                         ))}
                         {olderSessionsCount > 0 && (
@@ -637,6 +644,7 @@ export const TerminalItem = memo(function TerminalItem({
                             defaultCollapsed
                             key={session.session_id}
                             session={session}
+                            openFromTerminalId={terminal.id}
                           />
                         ))}
                         {remainingCount > 0 && (

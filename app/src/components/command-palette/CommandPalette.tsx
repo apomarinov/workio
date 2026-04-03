@@ -95,6 +95,13 @@ export function CommandPalette() {
     branch: string
     hasRemote: boolean
   } | null>(null)
+  const [resumeConfirm, setResumeConfirm] = useState<{
+    session: SessionWithProject
+    terminal: Terminal
+  } | null>(null)
+  const [openFromTerminalId, setOpenFromTerminalId] = useState<number | null>(
+    null,
+  )
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false)
   const [checkoutConfirm, setCheckoutConfirm] = useState<{
     name: string
@@ -262,6 +269,7 @@ export function CommandPalette() {
       e: CustomEvent<{
         terminalId: number | null
         sessionId: string | null
+        openFromTerminalId?: number | null
         prNumber?: number
         prRepo?: string
       }>,
@@ -288,6 +296,7 @@ export function CommandPalette() {
         const terminal = terminals.find((t) => t.id === terminalId)
         if (session) {
           const sessionName = terminal?.name ?? session.name ?? 'Untitled'
+          setOpenFromTerminalId(e.detail.openFromTerminalId ?? null)
           setStack([
             initialLevel,
             {
@@ -617,6 +626,21 @@ export function CommandPalette() {
     }
   }
 
+  const executeResume = (session: SessionWithProject, terminal: Terminal) => {
+    const cmd =
+      (terminal.settings as { defaultClaudeCommand?: string } | null)
+        ?.defaultClaudeCommand || 'claude'
+    const fullCommand = `${cmd} --resume ${session.session_id}`
+    const label = session.name || session.session_id
+
+    const explicitShellId =
+      session.shell_id && terminal.shells.find((s) => s.id === session.shell_id)
+        ? session.shell_id
+        : undefined
+
+    requestRunInShell(session.terminal_id!, fullCommand, label, explicitShellId)
+  }
+
   // App actions
   const appActions: AppActions = useMemo(
     () => ({
@@ -714,26 +738,16 @@ export function CommandPalette() {
         const terminal = terminals.find((t) => t.id === session.terminal_id)
         if (!terminal) return
 
-        // Build command client-side
-        const cmd =
-          (terminal.settings as { defaultClaudeCommand?: string } | null)
-            ?.defaultClaudeCommand || 'claude'
-        const fullCommand = `${cmd} --resume ${session.session_id}`
-        const label = session.name || session.session_id
+        // If opened from a different terminal, confirm first
+        if (
+          openFromTerminalId != null &&
+          openFromTerminalId !== session.terminal_id
+        ) {
+          setTimeout(() => setResumeConfirm({ session, terminal }), 150)
+          return
+        }
 
-        // Resolve target shell: prefer session's shell_id if it still exists
-        const explicitShellId =
-          session.shell_id &&
-          terminal.shells.find((s) => s.id === session.shell_id)
-            ? session.shell_id
-            : undefined
-
-        requestRunInShell(
-          session.terminal_id,
-          fullCommand,
-          label,
-          explicitShellId,
-        )
+        executeResume(session, terminal)
       },
       openRenameModal: (session) => {
         closePalette()
@@ -1398,6 +1412,21 @@ export function CommandPalette() {
             setDeleteSessionTarget(null)
           }}
           onCancel={() => setDeleteSessionTarget(null)}
+        />
+      )}
+
+      {resumeConfirm && (
+        <ConfirmModal
+          open={!!resumeConfirm}
+          title="Resume Session"
+          message={`This session belongs to "${resumeConfirm.terminal.name || resumeConfirm.terminal.cwd}" and will be resumed there. To resume in a different terminal, use "Move to Project" first.`}
+          confirmLabel="Resume"
+          onConfirm={() => {
+            const { session, terminal } = resumeConfirm
+            setResumeConfirm(null)
+            executeResume(session, terminal)
+          }}
+          onCancel={() => setResumeConfirm(null)}
         />
       )}
 
