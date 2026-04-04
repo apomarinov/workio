@@ -27,7 +27,9 @@ import { PaneLayout } from './PaneLayout'
 
 interface ShellTemplateModalProps {
   open: boolean
+  mode?: 'edit' | 'run'
   template?: ShellTemplate
+  terminalName?: string
   onSave: (template: ShellTemplate) => void
   onCancel: () => void
 }
@@ -44,10 +46,13 @@ type Tab = {
 
 export function ShellTemplateModal({
   open,
+  mode = 'edit',
   template,
+  terminalName,
   onSave,
   onCancel,
 }: ShellTemplateModalProps) {
+  const isRun = mode === 'run'
   const [name, setName] = useState('')
   const keyCounter = useRef(0)
   const [entries, setEntries] = useState<EntryWithKey[]>([
@@ -105,11 +110,11 @@ export function ShellTemplateModal({
 
   const handleSave = () => {
     const trimmedName = name.trim()
-    if (!trimmedName) return
+    if (!isRun && !trimmedName) return
 
     const saved: ShellTemplate = {
       id: template?.id ?? crypto.randomUUID(),
-      name: trimmedName,
+      name: trimmedName || template?.name || '',
       entries: entries.map((e) => ({
         name: e.name.trim() || 'main',
         command: e.command.trim(),
@@ -237,7 +242,7 @@ export function ShellTemplateModal({
   }
   const hasDuplicateNames = [...nameCounts.values()].some((c) => c > 1)
 
-  const canSave = name.trim().length > 0 && !hasDuplicateNames
+  const canSave = (isRun || name.trim().length > 0) && !hasDuplicateNames
 
   // Compute content height for current tab
   let contentHeight = 120
@@ -270,24 +275,49 @@ export function ShellTemplateModal({
       >
         <DialogHeader>
           <DialogTitle>
-            {template ? 'Edit Template' : 'New Template'}
+            {isRun
+              ? `Run "${template?.name}"`
+              : template
+                ? 'Edit Template'
+                : 'New Template'}
           </DialogTitle>
+          {isRun && (
+            <p className="text-sm text-muted-foreground">
+              {terminalName && (
+                <>
+                  In{' '}
+                  <span className="font-medium text-foreground">
+                    {terminalName}
+                  </span>
+                  , {'this will '}
+                </>
+              )}
+              {!terminalName && 'This will '}
+              <span className="mx-1 px-1.5 py-0.5 rounded-md border border-red-400/80 text-red-400/80">
+                kill all
+              </span>{' '}
+              shells and create{' '}
+              {`${entries.length} new shell${entries.length !== 1 ? 's' : ''}`}:
+            </p>
+          )}
         </DialogHeader>
         <div className="space-y-4 flex-1 min-h-0 overflow-y-auto">
-          <div>
-            <label className="text-sm text-muted-foreground mb-1 block">
-              Template Name
-            </label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Dev Server"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && canSave) handleSave()
-              }}
-            />
-          </div>
+          {!isRun && (
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">
+                Template Name
+              </label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Dev Server"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && canSave) handleSave()
+                }}
+              />
+            </div>
+          )}
 
           {/* Terminal-like view */}
           <div className="flex flex-col rounded-md border border-border overflow-hidden">
@@ -392,7 +422,7 @@ export function ShellTemplateModal({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={!canSave}>
-            Save
+            {isRun ? 'Run' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

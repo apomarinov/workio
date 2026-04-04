@@ -1166,6 +1166,7 @@ export function CommandPalette() {
                     entries: snapshot.entries,
                     layouts: snapshot.layouts,
                   },
+                  forceConfirm: true,
                 },
               }),
             )

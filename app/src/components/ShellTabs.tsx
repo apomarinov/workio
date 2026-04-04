@@ -68,6 +68,7 @@ import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
 import { RenameModal } from './EditSessionModal'
+import { ShellTemplateModal } from './ShellTemplateModal'
 
 interface ShellTabsProps {
   terminal: Terminal
@@ -958,9 +959,12 @@ export function ShellTabs({
     )
   }
 
-  const handleRunTemplate = (template: ShellTemplate) => {
+  const handleRunTemplate = (
+    template: ShellTemplate,
+    forceConfirm?: boolean,
+  ) => {
     setMenuOpen(false)
-    if (terminalHasProcesses) {
+    if (terminalHasProcesses || forceConfirm) {
       setRunTemplateTarget(template)
     } else {
       runTemplate(template)
@@ -970,10 +974,14 @@ export function ShellTabs({
   // Listen for external template-run requests (e.g. from command palette)
   useEffect(() => {
     const handler = (
-      e: CustomEvent<{ terminalId: number; template: ShellTemplate }>,
+      e: CustomEvent<{
+        terminalId: number
+        template: ShellTemplate
+        forceConfirm?: boolean
+      }>,
     ) => {
       if (e.detail.terminalId !== terminal.id) return
-      handleRunTemplate(e.detail.template)
+      handleRunTemplate(e.detail.template, e.detail.forceConfirm)
     }
     window.addEventListener('shell-template-request', handler as EventListener)
     return () =>
@@ -983,11 +991,9 @@ export function ShellTabs({
       )
   })
 
-  const confirmRunTemplate = () => {
-    if (runTemplateTarget) {
-      runTemplate(runTemplateTarget)
-      setRunTemplateTarget(null)
-    }
+  const confirmRunTemplate = (template: ShellTemplate) => {
+    runTemplate(template)
+    setRunTemplateTarget(null)
   }
 
   const menuButton = (
@@ -1395,44 +1401,14 @@ export function ShellTabs({
         }}
         onCancel={() => setDeleteTemplateTarget(null)}
       />
-      <ConfirmModal
+      <ShellTemplateModal
         open={runTemplateTarget !== null}
-        title={`Run "${runTemplateTarget?.name}"`}
-        message={
-          <div>
-            This will{' '}
-            <span className="mx-1 px-1.5 py-0.5 rounded-md border-[1px] border-red-400/80 text-red-400/80">
-              kill all
-            </span>{' '}
-            shells and create{' '}
-            {`${runTemplateTarget?.entries.length ?? 0} new shell${(runTemplateTarget?.entries.length ?? 0) !== 1 ? 's' : ''}`}
-            :
-          </div>
-        }
-        confirmLabel="Run"
-        onConfirm={confirmRunTemplate}
+        mode="run"
+        template={runTemplateTarget ?? undefined}
+        terminalName={terminal.name || terminal.cwd}
+        onSave={confirmRunTemplate}
         onCancel={() => setRunTemplateTarget(null)}
-      >
-        <div className="space-y-1.5 px-1">
-          {runTemplateTarget?.entries.map((entry) => (
-            <div
-              key={entry.name}
-              className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
-            >
-              <span className="font-medium shrink-0">{entry.name}</span>
-              {entry.command ? (
-                <code className="text-muted-foreground font-mono text-xs bg-muted px-1.5 py-0.5 rounded break-all">
-                  {entry.command}
-                </code>
-              ) : (
-                <span className="text-muted-foreground/60 text-xs italic">
-                  no command
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </ConfirmModal>
+      />
     </>
   )
 }
