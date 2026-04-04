@@ -7,6 +7,7 @@ import {
   Folder,
   Loader2,
   RefreshCw,
+  Search,
   Undo2,
 } from 'lucide-react'
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -149,6 +150,7 @@ export function FileListPanel({
   const [selectedFiles, setSelectedFilesRaw] = useState<Set<string>>(new Set())
   const [groupByFolder, setGroupByFolder] = useState(true)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [fileSearch, setFileSearch] = useState('')
 
   const setSelectedFiles = (next: Set<string>) => {
     setSelectedFilesRaw(next)
@@ -185,8 +187,15 @@ export function FileListPanel({
     }
   }
 
+  // Filter files by search
+  const filteredFiles = fileSearch
+    ? changedFiles.filter((f) =>
+        f.path.toLowerCase().includes(fileSearch.toLowerCase()),
+      )
+    : changedFiles
+
   // Build recursive folder tree
-  const tree = buildFolderTree(changedFiles)
+  const tree = buildFolderTree(filteredFiles)
   const allFolderPaths = tree.children.flatMap((c) => getNodeAllPaths(c))
 
   // Auto-expand all folders when files change
@@ -456,7 +465,19 @@ export function FileListPanel({
           </>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto border-t border-zinc-700">
+      {changedFiles.length > 0 && (
+        <div className="relative px-2 py-1.5 border-t border-zinc-700">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500" />
+          <input
+            type="text"
+            value={fileSearch}
+            onChange={(e) => setFileSearch(e.target.value)}
+            placeholder="Search..."
+            className="w-full bg-zinc-800 border border-zinc-700 rounded px-1.5 pl-6 py-0.5 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+          />
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto">
         {loadingFiles ? (
           <div className="flex items-center justify-center py-4 text-sm text-zinc-500">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -469,7 +490,7 @@ export function FileListPanel({
         ) : groupByFolder ? (
           renderFolderTree(tree, 0)
         ) : (
-          changedFiles.map((file) => (
+          filteredFiles.map((file) => (
             <div
               key={file.path}
               className={cn(

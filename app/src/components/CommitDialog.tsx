@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/components/ui/sonner'
+import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { getChangedFiles, getHeadMessage } from '@/lib/api'
 import { toastError } from '@/lib/toastError'
@@ -47,6 +48,8 @@ export function CommitDialog({
 }: CommitDialogProps) {
   const viewOnly = !!pr
   const base = pr ? `origin/${pr.baseBranch}...origin/${pr.branch}` : undefined
+  const { terminals } = useWorkspaceContext()
+  const branch = terminals.find((t) => t.id === terminalId)?.git_branch
   const [message, setMessage] = useState('')
   const [amend, setAmend] = useState(false)
   const [noVerify, setNoVerify] = useState(false)
@@ -359,9 +362,16 @@ export function CommitDialog({
             )}
           >
             <GitCommitHorizontal className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-            <span className="text-sm font-medium text-zinc-200 truncate">
-              {viewOnly && pr ? `${pr.prTitle} #${pr.prNumber}` : ''}
-            </span>
+            {!viewOnly && branch && (
+              <span className="text-sm font-medium text-zinc-200 truncate">
+                {branch}
+              </span>
+            )}
+            {viewOnly && pr && (
+              <span className="text-sm font-medium text-zinc-200 truncate">
+                {`${pr.prTitle} #${pr.prNumber}`}
+              </span>
+            )}
             {fileCount > 0 && (
               <span className="text-xs text-zinc-500 ml-1 flex-shrink-0">
                 {fileCount} file{fileCount !== 1 ? 's' : ''}
