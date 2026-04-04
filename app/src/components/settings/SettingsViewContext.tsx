@@ -163,6 +163,15 @@ export function SettingsViewProvider({
     }
     setActivePath(path)
     if (isMobile) setSidebarOpen(false)
+
+    const targetPath = path.join(' > ')
+    const firstSetting = flattenSettings().find((s) =>
+      s.path.startsWith(targetPath),
+    )
+    if (firstSetting) {
+      setFlashKey(firstSetting.key)
+      setTimeout(() => setFlashKey(null), 2000)
+    }
   }
 
   const getFormValue = (path: string): unknown => {
