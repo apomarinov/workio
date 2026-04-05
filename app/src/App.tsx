@@ -87,6 +87,17 @@ function AppContent() {
     }
   }, [loading, terminals.length, sessions, activeSessionId, selectSession])
 
+  // Unfocus settings when the bottom panel (logs) is opened
+  useEffect(() => {
+    const handler = () => uiState.settings.unfocus()
+    window.addEventListener('toggle-bottom-panel', handler)
+    window.addEventListener('open-logs', handler)
+    return () => {
+      window.removeEventListener('toggle-bottom-panel', handler)
+      window.removeEventListener('open-logs', handler)
+    }
+  }, [uiState.settings.unfocus])
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-zinc-950 text-white">

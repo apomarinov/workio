@@ -185,7 +185,7 @@ function ErrorText({ error, label }: { error: string; label: string }) {
     <>
       <button
         type="button"
-        className="text-[10px] text-red-400 truncate max-w-full text-left cursor-pointer hover:underline"
+        className="text-[11px] text-red-400 max-w-[350px] text-left cursor-pointer hover:underline"
         onClick={() => setOpen(true)}
       >
         {error}

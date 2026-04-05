@@ -96,7 +96,7 @@ export function LogsHeaderActions() {
     const bHasTitle = prTitleMap.has(b) ? 0 : 1
     return aHasTitle - bHasTitle
   })
-  console.log(filters.source, filters.source?.startsWith('pr:'))
+
   return (
     <div className="flex flex-wrap items-center gap-1 mr-1">
       {hasFilters && (
