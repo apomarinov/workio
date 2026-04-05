@@ -12,8 +12,7 @@
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "check": "biome check src server && npm run typecheck",
-    "lint:fix": "biome check --write src server",
-    "certs": "bash server/scripts/generate-certs.sh"
+    "lint:fix": "biome check --write src server"
   },
   "keywords": [],
   "author": "",

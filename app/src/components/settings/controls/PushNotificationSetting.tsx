@@ -1,6 +1,7 @@
 import { pushSubscribeInput } from '@domains/notifications/schema'
 import type { PushSubscriptionRecord } from '@domains/settings/schema'
 import {
+  AlertTriangle,
   Bell,
   BellOff,
   ChevronDown,
@@ -9,9 +10,11 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import type { SettingControlProps } from '@/components/settings/settings-registry'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { useNotifications } from '@/context/NotificationContext'
+import { useCertWarning } from '@/hooks/useCertWarning'
 import { useSettings } from '@/hooks/useSettings'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
@@ -44,7 +47,7 @@ function parseUserAgent(ua?: string): string {
   return 'Browser'
 }
 
-export function PushNotificationSetting() {
+export function PushNotificationSetting({ onWarning }: SettingControlProps) {
   const { settings, refetch } = useSettings()
   const { requestPermission } = useNotifications()
   const [enabling, setEnabling] = useState(false)
@@ -53,8 +56,16 @@ export function PushNotificationSetting() {
   const [dismissing, setDismissing] = useState(false)
   const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   const { data: vapidData } = trpc.notifications.vapidKey.useQuery()
+  const { hasWarning: certWarning, certData } = useCertWarning()
+  const generateCertsMutation = trpc.settings.generateCerts.useMutation()
+  const certUtils = trpc.useUtils()
+
+  useEffect(() => {
+    onWarning?.(certWarning)
+  }, [certWarning, onWarning])
   const subscribeMutation = trpc.notifications.pushSubscribe.useMutation()
   const unsubscribeMutation = trpc.notifications.pushUnsubscribe.useMutation()
   const testMutation = trpc.notifications.pushTest.useMutation()
@@ -183,6 +194,27 @@ export function PushNotificationSetting() {
         </div>
       )}
 
+      {certData && !certData.hasCert && (
+        <div className="flex items-center gap-2 text-amber-500 text-sm bg-amber-500/10 px-3 py-1.5 rounded-lg">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>
+            No HTTPS certificate found. Mobile devices require HTTPS for push
+            notifications and PWA icons.
+          </span>
+        </div>
+      )}
+
+      {certData?.hasCert && !certData.match && (
+        <div className="flex items-center gap-2 text-amber-500 text-sm bg-amber-500/10 px-3 py-1.5 rounded-lg">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>
+            Certificate IP mismatch — cert has {certData.certIps.join(', ')} but
+            your current IP is {certData.localIp}. Regenerate certs in the guide
+            below and reinstall the PWA on your phone.
+          </span>
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground">
         Receive push notifications even when the app is closed. Works with the
         PWA on iPhone, Android, and desktop browsers.
@@ -302,13 +334,48 @@ export function PushNotificationSetting() {
             </div>
             <div>
               <h4 className="font-medium text-xs">2. Generate certificates</h4>
-              <code className="block mt-1 px-3 py-2 rounded-lg bg-[#1a1a1a] text-xs">
-                cd app && npm run certs
-              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1"
+                disabled={generating}
+                onClick={async () => {
+                  setGenerating(true)
+                  try {
+                    await generateCertsMutation.mutateAsync()
+                    await certUtils.settings.validateCertIp.invalidate()
+                    toast.success(
+                      'Certificates generated — restart the dev server',
+                    )
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : 'Failed to generate certificates',
+                    )
+                  } finally {
+                    setGenerating(false)
+                  }
+                }}
+              >
+                {generating
+                  ? 'Generating...'
+                  : certData?.hasCert
+                    ? 'Regenerate Certificates'
+                    : 'Generate Certificates'}
+              </Button>
             </div>
             <div>
-              <h4 className="font-medium text-xs">3. Trust the CA on iPhone</h4>
+              <h4 className="font-medium text-xs">
+                3. Install root CA on iPhone
+              </h4>
               <ul className="text-[11px] text-muted-foreground mt-1 ml-4 list-disc space-y-1">
+                <li>
+                  AirDrop or email the root CA file to your phone:{' '}
+                  <code className="text-[10px]">
+                    ~/Library/Application Support/mkcert/rootCA.pem
+                  </code>
+                </li>
                 <li>
                   <strong>
                     Settings &gt; General &gt; VPN & Device Management
@@ -320,9 +387,13 @@ export function PushNotificationSetting() {
                     Settings &gt; General &gt; About &gt; Certificate Trust
                     Settings
                   </strong>{' '}
-                  — enable full trust
+                  — enable full trust for mkcert
                 </li>
               </ul>
+              <p className="text-[10px] text-muted-foreground/70 mt-1 ml-4">
+                This is a one-time step. The root CA trusts all future certs, so
+                you won't need to reinstall when regenerating.
+              </p>
             </div>
             <div>
               <h4 className="font-medium text-xs">4. Restart the dev server</h4>
@@ -336,8 +407,9 @@ export function PushNotificationSetting() {
                 5. Open on iPhone & enable
               </h4>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Navigate to <code>https://&lt;your-lan-ip&gt;:5175</code> in
-                Safari. Add to Home Screen, then enable push above.
+                Navigate to{' '}
+                <code>https://{certData?.localIp || '<your-lan-ip>'}:5175</code>{' '}
+                in Safari. Add to Home Screen, then enable push above.
               </p>
             </div>
           </div>

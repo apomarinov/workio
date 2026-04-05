@@ -1,10 +1,16 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { env } from '@server/env'
 import serverEvents from '@server/lib/events'
-import { execFileAsyncLogged } from '@server/lib/exec'
+import { execFileAsync, execFileAsyncLogged } from '@server/lib/exec'
+import { getLocalIp } from '@server/lib/network'
 import { publicProcedure } from '@server/trpc'
 import { getSettings, updateSettings } from './db'
 import { updateSettingsInput } from './schema'
 import { applyServerConfig } from './server-config'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export const update = publicProcedure
   .input(updateSettingsInput)
@@ -52,3 +58,52 @@ export const update = publicProcedure
 
     return settings
   })
+
+export const generateCerts = publicProcedure.mutation(async () => {
+  // Check mkcert is installed
+  try {
+    await execFileAsync('which', ['mkcert'], { timeout: 5000 })
+  } catch {
+    throw new Error(
+      'mkcert is not installed. Install it with: brew install mkcert',
+    )
+  }
+
+  const localIp = await getLocalIp()
+  const certsDir = path.join(__dirname, '../../../../certs')
+
+  fs.mkdirSync(certsDir, { recursive: true })
+
+  const certPath = path.join(certsDir, 'cert.pem')
+  const keyPath = path.join(certsDir, 'key.pem')
+
+  // Install root CA if needed
+  await execFileAsync('mkcert', ['-install'], { timeout: 30000 })
+
+  // Generate certificate
+  await execFileAsync(
+    'mkcert',
+    [
+      '-cert-file',
+      certPath,
+      '-key-file',
+      keyPath,
+      'localhost',
+      '127.0.0.1',
+      localIp,
+    ],
+    { timeout: 30000 },
+  )
+
+  // Get CA root path for iPhone instructions
+  const { stdout: caRoot } = await execFileAsync('mkcert', ['-CAROOT'], {
+    timeout: 5000,
+  })
+
+  return {
+    certPath,
+    keyPath,
+    localIp,
+    caRootPath: path.join(caRoot.trim(), 'rootCA.pem'),
+  }
+})

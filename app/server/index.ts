@@ -179,7 +179,7 @@ const start = async () => {
       log.info(`[server] HTTPS enabled (certs from ${certsDir})`)
     } else {
       log.info(
-        '[server] No certs found, running HTTP. Run `npm run certs` to enable HTTPS.',
+        '[server] No certs found, running HTTP. Generate certs from Settings > Notifications.',
       )
     }
     await fastify.listen({ port, host: '0.0.0.0' })

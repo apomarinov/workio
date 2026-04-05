@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/popover'
 import { useUIState } from '@/context/UIStateContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
+import { useCertWarning } from '@/hooks/useCertWarning'
 import { cn } from '@/lib/utils'
 import { useWebhookWarning } from './GitHubModal'
 import { ClaudeIcon } from './icons'
@@ -45,6 +46,7 @@ function worstStatus(statuses: ServiceStatus[]): ServiceStatus {
 function overallStatus(
   status: ServicesStatus,
   webhookWarning: { missingCount: number; orphanedCount: number },
+  certWarning: boolean,
 ): ServiceStatus {
   const all: ServiceStatus[] = [
     status.githubRest.status,
@@ -57,6 +59,7 @@ function overallStatus(
   ]
   if (webhookWarning.missingCount > 0) all.push('error')
   else if (webhookWarning.orphanedCount > 0) all.push('degraded')
+  if (certWarning) all.push('degraded')
   return worstStatus(all)
 }
 
@@ -305,6 +308,38 @@ function WebhooksRow({
   )
 }
 
+function CertRow({ hasWarning }: { hasWarning: boolean }) {
+  const uiState = useUIState()
+  return (
+    <div className="py-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <StatusDot status={hasWarning ? 'degraded' : 'healthy'} />
+          <span className="text-xs font-medium">HTTPS Certificate</span>
+        </div>
+        <button
+          type="button"
+          className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
+          onClick={() =>
+            uiState.settings.open([
+              'General',
+              'Notifications',
+              'Mobile Notifications',
+            ])
+          }
+        >
+          <Settings className="w-3 h-3" />
+        </button>
+      </div>
+      {hasWarning && (
+        <div className="pl-3 mt-0.5">
+          <div className="text-[10px] text-amber-500">IP mismatch</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SubStatusRow({ label, sub }: { label: string; sub: ClaudeSubStatus }) {
   if (sub.status === 'inactive') return null
   return (
@@ -370,10 +405,15 @@ function TunnelRow({
 export function ServiceStatusIndicator({ className }: { className?: string }) {
   const { servicesStatus } = useWorkspaceContext()
   const { missingCount, orphanedCount } = useWebhookWarning()
+  const { hasWarning: certWarning } = useCertWarning()
 
   if (!servicesStatus) return null
 
-  const status = overallStatus(servicesStatus, { missingCount, orphanedCount })
+  const status = overallStatus(
+    servicesStatus,
+    { missingCount, orphanedCount },
+    certWarning,
+  )
   const tunnelEntries = Object.entries(servicesStatus.claudeTunnels)
   const hasWebhookConfig =
     missingCount > 0 ||
@@ -425,6 +465,7 @@ export function ServiceStatusIndicator({ className }: { className?: string }) {
             />
           )}
           <NgrokSection ngrok={servicesStatus.ngrok} />
+          {certWarning && <CertRow hasWarning={certWarning} />}
         </div>
 
         {tunnelEntries.length > 0 && (

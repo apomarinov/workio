@@ -1,4 +1,12 @@
+import { X509Certificate } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { getLocalIp } from '@server/lib/network'
 import { publicProcedure } from '@server/trpc'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 import { getSettings } from './db'
 import { DEFAULT_CONFIG } from './schema'
 
@@ -47,4 +55,28 @@ export const get = publicProcedure.query(async () => {
   return Object.keys(patches).length > 0
     ? { ...settings, ...patches }
     : settings
+})
+
+export const validateCertIp = publicProcedure.query(async () => {
+  const certsDir = path.join(__dirname, '../../../../certs')
+  const certPath = path.join(certsDir, 'cert.pem')
+
+  if (!fs.existsSync(certPath)) {
+    return { hasCert: false, certIps: [], localIp: '', match: false }
+  }
+
+  const certPem = fs.readFileSync(certPath, 'utf-8')
+  const cert = new X509Certificate(certPem)
+
+  const san = cert.subjectAltName || ''
+  const certIps = san
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.startsWith('IP Address:'))
+    .map((s) => s.replace('IP Address:', ''))
+
+  const localIp = await getLocalIp()
+  const match = certIps.includes(localIp)
+
+  return { hasCert: true, certIps, localIp, match }
 })
