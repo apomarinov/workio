@@ -367,6 +367,64 @@ export const SETTINGS_REGISTRY: SettingsSection[] = [
   },
 ]
 
+// --- Navigation path constants ---
+// Use these instead of inline string arrays when calling uiState.settings.open().
+// Validated against SETTINGS_REGISTRY at module load time — if a section is renamed,
+// the app throws immediately instead of silently breaking the deep-link.
+
+export const SP = {
+  generalApplication: ['General', 'Application'],
+  generalNotifications: ['General', 'Notifications'],
+  generalNotificationsMobile: [
+    'General',
+    'Notifications',
+    'Mobile Notifications',
+  ],
+  generalSecurity: ['General', 'Security'],
+  terminalGeneral: ['Terminal', 'General'],
+  terminalDisplay: ['Terminal', 'Display'],
+  terminalScrollback: ['Terminal', 'Scrollback'],
+  terminalPty: ['Terminal', 'PTY'],
+  terminalMobileKeyboard: ['Terminal', 'Mobile Keyboard'],
+  terminalCustomCommands: ['Terminal', 'Custom Commands'],
+  claudeDisplay: ['Claude', 'Display'],
+  claudeSessions: ['Claude', 'Sessions'],
+  keymap: ['Keymap'],
+  githubPRData: ['GitHub', 'PR Data'],
+  githubWebhooks: ['GitHub', 'Webhooks'],
+  githubQueryLimits: ['GitHub', 'Query Limits'],
+  githubFilters: ['GitHub', 'Filters'],
+  remoteNgrok: ['Remote Access', 'ngrok'],
+  remoteSSH: ['Remote Access', 'SSH'],
+} as const
+
+export type SettingsPath = (typeof SP)[keyof typeof SP]
+
+// Validate all SP entries resolve to real sections/settings in the registry
+for (const [key, path] of Object.entries(SP) as [string, readonly string[]][]) {
+  let sections: SettingsSection[] = SETTINGS_REGISTRY
+  let lastSection: SettingsSection | undefined
+  for (let i = 0; i < path.length; i++) {
+    const segment = path[i]
+    const found = sections.find((s) => s.name === segment)
+    if (found) {
+      lastSection = found
+      sections = found.children ?? []
+      continue
+    }
+    // Last segment can be a setting label (deep-link to a specific control)
+    if (
+      i === path.length - 1 &&
+      lastSection?.settings?.some((s) => s.label === segment)
+    ) {
+      continue
+    }
+    throw new Error(
+      `Invalid settings path SP.${key}: "${segment}" not found in [${path.join(' > ')}]`,
+    )
+  }
+}
+
 // --- Search helpers ---
 
 /** Flat list of all settings with their full ancestor path for search */

@@ -30,6 +30,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { SP } from '@/components/settings/settings-registry'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -384,7 +385,7 @@ export function Sidebar() {
 
   // Redirect open-create-custom-action to settings > Custom Commands
   useEffect(() => {
-    const handler = () => uiState.settings.open(['Terminal', 'Custom Commands'])
+    const handler = () => uiState.settings.open(SP.terminalCustomCommands)
     window.addEventListener('open-create-custom-action', handler)
     return () =>
       window.removeEventListener('open-create-custom-action', handler)
@@ -842,7 +843,7 @@ export function Sidebar() {
                         <button
                           type="button"
                           onClick={() =>
-                            uiState.settings.open(['GitHub', 'Author Filters'])
+                            uiState.settings.open(SP.githubFilters)
                           }
                           className={cn(
                             'text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-pointer',

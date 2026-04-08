@@ -586,12 +586,28 @@ export const TerminalItem = memo(function TerminalItem({
                 </div>
                 {sessionsListExpanded &&
                   (() => {
+                    const isMainBranch =
+                      terminal.git_branch === 'main' ||
+                      terminal.git_branch === 'master'
+                    const nonMainTerminalBranches = isMainBranch
+                      ? terminals
+                          .filter(
+                            (t) =>
+                              t.git_branch &&
+                              t.git_branch !== 'main' &&
+                              t.git_branch !== 'master',
+                          )
+                          .map((t) => ({
+                            branch: t.git_branch!,
+                            repo: t.git_repo?.repo,
+                          }))
+                      : []
                     const filtered =
                       sessionBranchFilter === 'branch' && terminal.git_branch
                         ? allSessions.filter((s) => {
                             const d = s.data
                             const repo = terminal.git_repo?.repo
-                            return (
+                            const matchesBranch =
                               (d?.branch === terminal.git_branch &&
                                 d?.repo === repo) ||
                               (d?.branches?.some(
@@ -600,7 +616,23 @@ export const TerminalItem = memo(function TerminalItem({
                                   b.repo === repo,
                               ) ??
                                 false)
-                            )
+                            if (!matchesBranch) return false
+                            // On main/master, hide sessions that match a non-main terminal's branch
+                            if (isMainBranch) {
+                              const matchesNonMain =
+                                nonMainTerminalBranches.some(
+                                  ({ branch, repo: tRepo }) =>
+                                    (d?.branch === branch &&
+                                      d?.repo === tRepo) ||
+                                    (d?.branches?.some(
+                                      (b) =>
+                                        b.branch === branch && b.repo === tRepo,
+                                    ) ??
+                                      false),
+                                )
+                              if (matchesNonMain) return false
+                            }
+                            return true
                           })
                         : sessions
                     const activeSessions = filtered.filter(

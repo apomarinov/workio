@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react'
+import type { SettingsPath } from '@/components/settings/settings-registry'
 
 type SettingsMode = 'open' | 'focused'
 
@@ -12,7 +13,7 @@ interface SettingsContextValue {
   isOpen: boolean
   isFocused: boolean
   target: string[] | null
-  open: (target?: string[]) => void
+  open: (target?: SettingsPath) => void
   focus: () => void
   unfocus: () => void
   close: () => void
@@ -38,8 +39,8 @@ export function UIStateProvider({ children }: { children: React.ReactNode }) {
     isOpen: state.mode != null,
     isFocused: state.mode === 'focused',
     target: state.target,
-    open: (target?: string[]) => {
-      setState({ mode: 'focused', target: target ?? null })
+    open: (target?: SettingsPath) => {
+      setState({ mode: 'focused', target: target ? [...target] : null })
       window.dispatchEvent(new Event('settings-open'))
     },
     focus: () => setState((prev) => ({ ...prev, mode: 'focused' })),

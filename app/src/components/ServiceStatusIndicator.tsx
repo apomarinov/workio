@@ -16,6 +16,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { useState } from 'react'
+import { type SettingsPath, SP } from '@/components/settings/settings-registry'
 import {
   Dialog,
   DialogContent,
@@ -104,11 +105,11 @@ const SERVICE_INFO: Record<string, string> = {
     'Claude tunnels connect remote SSH hosts back to your local WorkIO server via SSH reverse tunnels. Bootstrap sets up the forwarder script and hooks on the remote host. The tunnel keeps the connection alive so Claude hooks on remote machines can forward events back to WorkIO.',
 }
 
-const SETTINGS_PATH: Record<string, string[]> = {
-  'GitHub REST': ['GitHub', 'PR Data'],
-  'GitHub GraphQL': ['GitHub', 'Query Limits'],
-  'GitHub Webhooks': ['GitHub', 'Webhooks'],
-  ngrok: ['Remote Access', 'ngrok'],
+const SETTINGS_PATH: Partial<Record<string, SettingsPath>> = {
+  'GitHub REST': SP.githubPRData,
+  'GitHub GraphQL': SP.githubQueryLimits,
+  'GitHub Webhooks': SP.githubWebhooks,
+  ngrok: SP.remoteNgrok,
 }
 
 const SERVICE_LOG_KEY: Record<string, string> = {
@@ -320,13 +321,7 @@ function CertRow({ hasWarning }: { hasWarning: boolean }) {
         <button
           type="button"
           className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
-          onClick={() =>
-            uiState.settings.open([
-              'General',
-              'Notifications',
-              'Mobile Notifications',
-            ])
-          }
+          onClick={() => uiState.settings.open(SP.generalNotificationsMobile)}
         >
           <Settings className="w-3 h-3" />
         </button>
