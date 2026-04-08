@@ -217,7 +217,8 @@ export function PushNotificationSetting({ onWarning }: SettingControlProps) {
 
       <p className="text-xs text-muted-foreground">
         Receive push notifications even when the app is closed. Works with the
-        PWA on iPhone, Android, and desktop browsers.
+        PWA on iPhone, Android. Intended for mobile PWA, desktop doesn't require
+        this.
       </p>
 
       <div className="flex gap-2 flex-wrap">
@@ -317,7 +318,7 @@ export function PushNotificationSetting({ onWarning }: SettingControlProps) {
               !showGuide && '-rotate-90',
             )}
           />
-          iPhone HTTPS Setup Guide
+          HTTPS Setup Guide & iPhone Setup
         </button>
 
         {showGuide && (

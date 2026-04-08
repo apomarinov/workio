@@ -11,6 +11,8 @@ import {
   CircleHelp,
   Globe,
   HeartPulse,
+  MoreHorizontal,
+  RefreshCw,
   ScrollText,
   ServerOff,
   Settings,
@@ -31,6 +33,8 @@ import {
 import { useUIState } from '@/context/UIStateContext'
 import { useWorkspaceContext } from '@/context/WorkspaceContext'
 import { useCertWarning } from '@/hooks/useCertWarning'
+import { toastError } from '@/lib/toastError'
+import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
 import { useWebhookWarning } from './GitHubModal'
 import { ClaudeIcon } from './icons'
@@ -110,6 +114,7 @@ const SETTINGS_PATH: Partial<Record<string, SettingsPath>> = {
   'GitHub GraphQL': SP.githubQueryLimits,
   'GitHub Webhooks': SP.githubWebhooks,
   ngrok: SP.remoteNgrok,
+  'HTTPS Certificate': SP.generalNotificationsMobile,
 }
 
 const SERVICE_LOG_KEY: Record<string, string> = {
@@ -128,55 +133,100 @@ function openServiceLogs(label: string) {
   )
 }
 
-function LogsButton({ label }: { label: string }) {
-  if (!SERVICE_LOG_KEY[label]) return null
-  return (
-    <button
-      type="button"
-      className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
-      onClick={() => openServiceLogs(label)}
-      title="View logs"
-    >
-      <ScrollText className="w-3 h-3" />
-    </button>
-  )
-}
-
-function InfoButton({ label }: { label: string }) {
-  const [open, setOpen] = useState(false)
+function ServiceMenu({
+  label,
+  showRefresh,
+}: {
+  label: string
+  showRefresh?: boolean
+}) {
+  const [infoOpen, setInfoOpen] = useState(false)
   const uiState = useUIState()
   const info = SERVICE_INFO[label]
   const settingsPath = SETTINGS_PATH[label]
-  if (!info) return null
+  const hasLogs = !!SERVICE_LOG_KEY[label]
+  const refreshMutation = trpc.github.refreshChecks.useMutation({
+    onError: (err) => toastError(err, 'Failed to refresh'),
+  })
+
+  if (!info && !settingsPath && !hasLogs && !showRefresh) return null
+
   return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
-        onClick={() => setOpen(true)}
-      >
-        <CircleHelp className="w-3 h-3" />
-      </button>
-      {settingsPath && (
-        <button
-          type="button"
-          className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
-          onClick={() => uiState.settings.open(settingsPath)}
+    <>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="bottom"
+          align="end"
+          className="w-auto p-1 flex flex-col gap-0"
         >
-          <Settings className="w-3 h-3" />
-        </button>
+          {showRefresh && (
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded cursor-pointer"
+              onClick={() => refreshMutation.mutate()}
+            >
+              <RefreshCw
+                className={cn(
+                  'w-3 h-3',
+                  refreshMutation.isPending && 'animate-spin',
+                )}
+              />
+              Refresh
+            </button>
+          )}
+          {hasLogs && (
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded cursor-pointer"
+              onClick={() => openServiceLogs(label)}
+            >
+              <ScrollText className="w-3 h-3" />
+              View Logs
+            </button>
+          )}
+          {info && (
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded cursor-pointer"
+              onClick={() => setInfoOpen(true)}
+            >
+              <CircleHelp className="w-3 h-3" />
+              Info
+            </button>
+          )}
+          {settingsPath && (
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded cursor-pointer"
+              onClick={() => uiState.settings.open(settingsPath)}
+            >
+              <Settings className="w-3 h-3" />
+              Settings
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
+      {info && (
+        <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">{label}</DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {info}
+            </p>
+          </DialogContent>
+        </Dialog>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm">{label}</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {info}
-          </p>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </>
   )
 }
 
@@ -224,10 +274,7 @@ function GitHubApiSection({
           <StatusDot status={api.status} />
           <span className="text-xs font-medium">{label}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <LogsButton label={label} />
-          <InfoButton label={label} />
-        </div>
+        <ServiceMenu label={label} showRefresh />
       </div>
       <div className="pl-3 mt-0.5 space-y-0">
         {api.remaining !== null && api.limit !== null && (
@@ -254,7 +301,7 @@ function NgrokSection({ ngrok }: { ngrok: NgrokStatus }) {
           <StatusDot status={ngrok.status} />
           <span className="text-xs font-medium">ngrok</span>
         </div>
-        <InfoButton label="ngrok" />
+        <ServiceMenu label="ngrok" />
       </div>
       <div className="pl-3 mt-0.5 space-y-0">
         {ngrok.url && (
@@ -286,10 +333,7 @@ function WebhooksRow({
           <StatusDot status={webhookStatus} />
           <span className="text-xs font-medium">GitHub Webhooks</span>
         </div>
-        <div className="flex items-center gap-1">
-          <LogsButton label="GitHub Webhooks" />
-          <InfoButton label="GitHub Webhooks" />
-        </div>
+        <ServiceMenu label="GitHub Webhooks" />
       </div>
       {hasIssues && (
         <div className="pl-3 mt-0.5 space-y-0">
@@ -310,7 +354,6 @@ function WebhooksRow({
 }
 
 function CertRow({ hasWarning }: { hasWarning: boolean }) {
-  const uiState = useUIState()
   return (
     <div className="py-1">
       <div className="flex items-center justify-between">
@@ -318,13 +361,7 @@ function CertRow({ hasWarning }: { hasWarning: boolean }) {
           <StatusDot status={hasWarning ? 'degraded' : 'healthy'} />
           <span className="text-xs font-medium">HTTPS Certificate</span>
         </div>
-        <button
-          type="button"
-          className="text-muted-foreground/50 hover:text-muted-foreground cursor-pointer"
-          onClick={() => uiState.settings.open(SP.generalNotificationsMobile)}
-        >
-          <Settings className="w-3 h-3" />
-        </button>
+        <ServiceMenu label="HTTPS Certificate" />
       </div>
       {hasWarning && (
         <div className="pl-3 mt-0.5">
@@ -471,7 +508,7 @@ export function ServiceStatusIndicator({ className }: { className?: string }) {
                 <ClaudeIcon className="w-3 h-3" />
                 Claude Tunnels
               </span>
-              <InfoButton label="Claude Tunnels" />
+              <ServiceMenu label="Claude Tunnels" />
             </div>
             <div className="mt-1.5 space-y-0.5">
               {tunnelEntries.map(([id, tunnel]) => (

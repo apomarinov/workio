@@ -345,7 +345,12 @@ export function FileListPanel({
       style={{ maxWidth: fileListWidth }}
     >
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-zinc-700">
+      <div
+        className={cn(
+          'flex items-center gap-1 px-2 py-1.5 border-zinc-700',
+          loadingFiles && 'border-b',
+        )}
+      >
         {!readOnly && (
           <>
             <Tooltip>

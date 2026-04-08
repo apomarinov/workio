@@ -268,3 +268,7 @@ export const testWebhookMutation = publicProcedure
   .mutation(async ({ input }) => {
     await testWebhook(`${input.owner}/${input.repo}`)
   })
+
+export const refreshChecks = publicProcedure.mutation(async () => {
+  await refreshPRChecks(true)
+})
