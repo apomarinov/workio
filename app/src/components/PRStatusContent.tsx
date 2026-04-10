@@ -1084,6 +1084,14 @@ function DiscussionTimeline({
       if (item.type === 'comment') {
         return !hiddenAuthorsSet.has(item.comment.author)
       }
+      if (item.type === 'review') {
+        return !hiddenAuthorsSet.has(item.review.author)
+      }
+      if (item.type === 'thread') {
+        return !item.thread.comments.every((c) =>
+          hiddenAuthorsSet.has(c.author),
+        )
+      }
       return true
     })
   }, [discussion, hiddenAuthorsSet, displayMode])
@@ -1371,6 +1379,14 @@ export function PRStatusContent({
       pr.discussion.some((item) => {
         if (item.type === 'comment') {
           return !hiddenAuthorsSet.has(item.comment.author)
+        }
+        if (item.type === 'review') {
+          return !hiddenAuthorsSet.has(item.review.author)
+        }
+        if (item.type === 'thread') {
+          return !item.thread.comments.every((c) =>
+            hiddenAuthorsSet.has(c.author),
+          )
         }
         return true
       }),

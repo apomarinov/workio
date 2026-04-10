@@ -348,7 +348,8 @@ export function FileListPanel({
       <div
         className={cn(
           'flex items-center gap-1 px-2 py-1.5 border-zinc-700',
-          loadingFiles && 'border-b',
+          (loadingFiles || (changedFiles && changedFiles.length === 0)) &&
+            'border-b',
         )}
       >
         {!readOnly && (

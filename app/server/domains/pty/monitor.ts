@@ -688,9 +688,13 @@ function handleWorkerCommandEvent(
       break
 
     case 'command_end': {
+      // Deduplicate: skip if already cleared (e.g. multiple shell integrations
+      // like iterm2 + workio both emitting OSC 133 D in the same precmd cycle)
+      if (!session.currentCommand) break
       log.info(
         `[pty] t=${terminalId} s=${shellId} Command end: "${session.currentCommand}"`,
       )
+      session.currentCommand = null
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
       monitor.clearProcessPollTimeout()
 

@@ -66,9 +66,9 @@ export function HideAuthorDialog({
         <div className="space-y-3 py-2">
           <label className="flex items-center justify-between gap-3 cursor-pointer">
             <div>
-              <p className="text-sm font-medium">Hide comments</p>
+              <p className="text-sm font-medium">Hide comments/reviews</p>
               <p className="text-xs text-muted-foreground">
-                Hides comments and suppresses notifications
+                Hides comments/reviews and suppresses notifications
               </p>
             </div>
             <Switch

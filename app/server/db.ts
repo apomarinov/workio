@@ -13,6 +13,12 @@ const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
 })
 
+// Required: handle idle client errors (e.g. after macOS sleep kills TCP connections)
+// Without this, unhandled pool errors crash the process.
+pool.on('error', (err) => {
+  log.error({ err }, '[db] Idle pool client error')
+})
+
 // Initialize database from schema.sql
 export async function initDb() {
   if (!fs.existsSync(SCHEMA_PATH)) {
