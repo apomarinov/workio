@@ -21,7 +21,7 @@ import Fastify, { type FastifyBaseLogger } from 'fastify'
 import pino from 'pino'
 import { createAuthHook } from './auth'
 import { startDaemon, stopDaemon } from './claude-hook-daemon'
-import { initDb } from './db'
+import pool, { initDb } from './db'
 import { env } from './env'
 import { onMutationResponse } from './io'
 import { setupSocketIO } from './io-handlers'
@@ -166,6 +166,7 @@ function shutdown() {
   shutdownAllTunnels()
   stopNgrok()
   stopDaemon()
+  pool.end().catch(() => {})
   process.exit(0)
 }
 process.on('SIGTERM', shutdown)

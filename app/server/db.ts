@@ -11,6 +11,8 @@ const SCHEMA_PATH = path.join(__dirname, '../../schema.sql')
 
 const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 30_000,
 })
 
 // Required: handle idle client errors (e.g. after macOS sleep kills TCP connections)
