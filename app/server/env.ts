@@ -4,6 +4,18 @@ import dotenv from 'dotenv'
 import { z } from 'zod'
 import { log } from './logger'
 
+// Snapshot the user's original env before dotenv injects server vars
+// (DATABASE_URL, SERVER_PORT, etc.). Also strip NODE_ENV (set by the
+// npm start script) and npm_* vars (injected by npm). This clean
+// snapshot is used as the base env for PTY shells so server-specific
+// vars don't leak into user terminals.
+const userEnvSnapshot: Record<string, string> = {}
+for (const [key, value] of Object.entries(process.env)) {
+  if (key === 'NODE_ENV' || key.startsWith('npm_')) continue
+  if (value !== undefined) userEnvSnapshot[key] = value
+}
+export { userEnvSnapshot }
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '../..')
 

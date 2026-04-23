@@ -30,6 +30,7 @@ import {
   updateTerminal,
 } from '@domains/workspace/db/terminals'
 import type { Shell } from '@domains/workspace/schema/shells'
+import { userEnvSnapshot } from '@server/env'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
 import { sanitizeName, shellEscape } from '@server/lib/strings'
@@ -532,12 +533,12 @@ export async function createSession(
     config.cwd = terminal.cwd
     config.shell = shell
     config.env = {
-      ...process.env,
+      ...userEnvSnapshot,
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       WORKIO_TERMINAL_ID: String(terminalId),
       WORKIO_SHELL_ID: String(shellId),
-    } as Record<string, string>
+    }
 
     // Determine shell integration script
     const shellName = path.basename(shell)
