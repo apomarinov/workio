@@ -392,16 +392,17 @@ def main():
     server = ThreadedUnixServer(str(SOCKET_PATH), HookHandler)
 
     def shutdown_handler(signum, frame):
+        # server.shutdown() blocks until all handler threads finish, which can
+        # deadlock here (signal delivered to the same thread serving forever).
+        # Skip the graceful drain: unlink the socket so the next daemon can
+        # bind, then terminate immediately. Workers we've already spawned run
+        # independently; the DB connection is reaped by Postgres on close.
         print("Shutting down daemon...", file=sys.stderr)
-        server.shutdown()
-        cleanup()
-        global _db_conn
-        if _db_conn:
-            try:
-                _db_conn.close()
-            except Exception:
-                pass
-        sys.exit(0)
+        try:
+            SOCKET_PATH.unlink(missing_ok=True)
+        except Exception:
+            pass
+        os._exit(0)
 
     signal.signal(signal.SIGTERM, shutdown_handler)
     signal.signal(signal.SIGINT, shutdown_handler)

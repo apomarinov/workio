@@ -6,6 +6,7 @@ __pycache__/
 locks/
 debounce/
 daemon.sock
+daemon.pid
 data.db*
 .pytest_cache/
 certs/
