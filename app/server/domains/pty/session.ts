@@ -71,6 +71,10 @@ export class PtySession {
   isIdle = true
   currentCommand: string | null = null
   staleScanCount = 0
+  // Set on command_end so the next poll tick still scans this session
+  // once (to clear processes/ports/resourceUsage) even though it no
+  // longer has an active command. Cleared by scanSessions after use.
+  needsFinalScan = false
   sessionName: string
   cols: number
   rows: number

@@ -25,6 +25,7 @@ import pool, { initDb } from './db'
 import { env } from './env'
 import { onMutationResponse } from './io'
 import { setupSocketIO } from './io-handlers'
+import { initToolPaths } from './lib/tool-paths'
 import { createLogStream, log, setLogger } from './logger'
 import { initNgrok, stopNgrok } from './ngrok'
 import { appRouter } from './router'
@@ -112,6 +113,10 @@ if (authHook) fastify.addHook('onRequest', authHook)
 
 // Initialize database
 await initDb()
+
+// Resolve absolute paths for shelled-out tools (ps/lsof/pgrep/...) so
+// execFile doesn't trigger a $PATH walk on every poll tick.
+await initToolPaths()
 
 // Load server config into memory
 await loadServerConfig()

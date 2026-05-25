@@ -351,6 +351,11 @@ async function scanSessions(sessionList: PtySession[]) {
 
   await Promise.all(
     sessionList.map(async (s) => {
+      // Skip the heavy process/port detection (zellij server lookups,
+      // recursive pgrep) for idle shells. Resource usage below runs for
+      // every session so per-shell CPU/RAM bars stay live.
+      const isActive = s.currentCommand != null || s.needsFinalScan
+      if (isActive) s.needsFinalScan = false
       const session: ProcessScanSession = {
         currentCommand: s.currentCommand,
         pty: { pid: s.ptyPid },
@@ -360,20 +365,24 @@ async function scanSessions(sessionList: PtySession[]) {
       }
       const hostProcs = s.sshHost ? remoteProcesses.get(s.sshHost) : undefined
       const hostPorts = s.sshHost ? remotePortsMap.get(s.sshHost) : undefined
-      const [procs, shellPortList] = await Promise.all([
-        getProcessesForTerminal(s.terminalId, session, hostProcs),
-        getPortsForTerminal(session, systemPorts, hostProcs, hostPorts),
-      ])
-      allProcesses.push(...procs)
+      const procs: ActiveProcess[] = []
+      if (isActive) {
+        const [activeProcs, shellPortList] = await Promise.all([
+          getProcessesForTerminal(s.terminalId, session, hostProcs),
+          getPortsForTerminal(session, systemPorts, hostProcs, hostPorts),
+        ])
+        procs.push(...activeProcs)
+        allProcesses.push(...activeProcs)
 
-      if (shellPortList.length > 0) {
-        const existing = ports[s.terminalId] || []
-        ports[s.terminalId] = [
-          ...new Set([...existing, ...shellPortList]),
-        ].sort((a, b) => a - b)
-        shellPorts[s.shell.id] = [...new Set(shellPortList)].sort(
-          (a, b) => a - b,
-        )
+        if (shellPortList.length > 0) {
+          const existing = ports[s.terminalId] || []
+          ports[s.terminalId] = [
+            ...new Set([...existing, ...shellPortList]),
+          ].sort((a, b) => a - b)
+          shellPorts[s.shell.id] = [...new Set(shellPortList)].sort(
+            (a, b) => a - b,
+          )
+        }
       }
 
       // Compute resource usage for this shell
@@ -695,6 +704,7 @@ function handleWorkerCommandEvent(
         `[pty] t=${terminalId} s=${shellId} Command end: "${session.currentCommand}"`,
       )
       session.currentCommand = null
+      session.needsFinalScan = true
       emitShellUpdate(terminalId, shellId, { active_cmd: null })
       monitor.clearProcessPollTimeout()
 

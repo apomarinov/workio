@@ -122,7 +122,7 @@ const statusBarSectionSchema = z.object({
 })
 
 const serverConfigSchema = z.object({
-  session_timeout_ms: z.number().min(60_000).default(1_800_000),
+  session_timeout_ms: z.number().min(60_000).default(300_000),
   max_buffer_lines: z.number().min(500).default(5000),
   auth_max_failures: z.number().min(1).default(5),
   auth_lockout_ms: z.number().min(60_000).default(600_000),

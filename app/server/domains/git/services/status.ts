@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import type {
   GitDiffStat,
   GitLastCommit,
@@ -15,6 +14,7 @@ import {
 import { emitWorkspace } from '@domains/workspace/services/emit'
 import { getIO } from '@server/io'
 import serverEvents from '@server/lib/events'
+import { execFile } from '@server/lib/exec'
 import { log } from '@server/logger'
 import { execSSHCommand } from '@server/ssh/exec'
 

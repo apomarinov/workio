@@ -1,9 +1,26 @@
-import { execFile } from 'node:child_process'
+import { execFile as execFileNode } from 'node:child_process'
 import { promisify } from 'node:util'
 import { logCommand } from '@domains/logs/db'
+import { resolveTool } from '@server/lib/tool-paths'
 import { updateGithubGraphql, updateGithubRest } from '@server/status'
 
-export const execFileAsync = promisify(execFile)
+const execFileAsyncRaw = promisify(execFileNode)
+
+// Resolve bare command names to absolute paths before spawning so
+// execFile doesn't trigger a kernel-level $PATH walk on every call
+// (see KERNEL_PANIC_INVESTIGATION.md). Use these wrappers instead of
+// importing from 'node:child_process' for anything that runs in a poll
+// loop.
+export const execFileAsync = ((file: string, ...rest: unknown[]) =>
+  // biome-ignore lint/suspicious/noExplicitAny: forward all overloads of promisified execFile
+  (execFileAsyncRaw as any)(
+    resolveTool(file),
+    ...rest,
+  )) as typeof execFileAsyncRaw
+
+export const execFile = ((file: string, ...rest: unknown[]) =>
+  // biome-ignore lint/suspicious/noExplicitAny: forward all overloads of execFile
+  (execFileNode as any)(resolveTool(file), ...rest)) as typeof execFileNode
 
 /** Extract stderr from an execFile rejection error. */
 export function getExecStderr(err: unknown): string {
