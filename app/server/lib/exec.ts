@@ -13,6 +13,28 @@ export function getExecStderr(err: unknown): string {
   return ''
 }
 
+/**
+ * Build a human-readable failure description for a rejected execFile error.
+ * Prefers stderr, then falls back to `<message> (exit <code>[, signal <signal>])`
+ * so we don't end up logging the bare "Command failed: ..." message with no
+ * diagnostic info when the child exits non-zero without writing stderr.
+ */
+export function getExecFailure(err: unknown): string {
+  const stderrText = getExecStderr(err)
+  if (stderrText) return stderrText
+  const message = err instanceof Error ? err.message : String(err)
+  const obj = (err && typeof err === 'object' ? err : {}) as Record<
+    string,
+    unknown
+  >
+  const code = obj.code
+  const signal = obj.signal
+  const parts: string[] = []
+  if (code !== undefined && code !== null) parts.push(`exit ${String(code)}`)
+  if (signal) parts.push(`signal ${String(signal)}`)
+  return parts.length > 0 ? `${message} (${parts.join(', ')})` : message
+}
+
 type GithubService = 'github-rest' | 'github-graphql' | 'github-webhooks'
 
 interface ExecFileLoggedOptions {
@@ -83,15 +105,14 @@ export async function execFileAsyncLogged(
     }
     return result
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    const stderr = getExecStderr(err)
+    const failure = getExecFailure(err)
     logCommand({
       terminalId,
       prId,
       category,
       service,
       command,
-      stderr: stderr || message,
+      stderr: failure,
       failed: true,
       dedupeKey,
     })
@@ -99,14 +120,14 @@ export async function execFileAsyncLogged(
     if (service === 'github-rest') {
       updateGithubRest({
         status: 'error',
-        error: (stderr || message).substring(0, 200),
+        error: failure.substring(0, 200),
       })
     } else if (service === 'github-graphql') {
       updateGithubGraphql({
         status: 'error',
-        error: (stderr || message).substring(0, 200),
+        error: failure.substring(0, 200),
       })
     }
-    throw new Error(stderr || message)
+    throw new Error(failure)
   }
 }

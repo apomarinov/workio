@@ -255,6 +255,12 @@ wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     rows: 0,
     fontSize: 0,
     activeShellId: null,
+    isAlive: true,
+  })
+
+  ws.on('pong', () => {
+    const info = wsInfo.get(ws)
+    if (info) info.isAlive = true
   })
 
   let shellId: number | null = null
@@ -670,5 +676,30 @@ export function handleUpgrade(
     wss.emit('connection', ws, request)
   })
 }
+
+// ── Heartbeat ──────────────────────────────────────────────────────
+//
+// Detect zombie WebSockets (laptop sleep, network blip, killed tab) that
+// still read as readyState=OPEN on the server. Without this, a stale ws
+// blocks new connections via the same-IP duplicate check in the 'init'
+// handler, surfacing as "This shell is already open on your device".
+const HEARTBEAT_INTERVAL_MS = 5000
+
+const heartbeatInterval = setInterval(() => {
+  for (const ws of wss.clients) {
+    const info = wsInfo.get(ws)
+    if (!info) {
+      ws.terminate()
+      continue
+    }
+    if (!info.isAlive) {
+      ws.terminate()
+      continue
+    }
+    info.isAlive = false
+    ws.ping()
+  }
+}, HEARTBEAT_INTERVAL_MS)
+heartbeatInterval.unref?.()
 
 export { wss }

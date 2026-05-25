@@ -186,7 +186,10 @@ export function useTerminalSocket({
 
       ws.onopen = () => {
         if (!mountedRef.current || wsRef.current !== ws) return
-        reconnectAttemptRef.current = 0
+        // reconnectAttemptRef is reset on 'ready' (true success). The TCP/WS
+        // handshake succeeding isn't enough — the server may still reject the
+        // init with `already_connected`, and resetting here would let that
+        // case loop forever.
         ws.send(
           JSON.stringify({
             type: 'init',
@@ -209,6 +212,7 @@ export function useTerminalSocket({
                 clearTimeout(connectTimeoutRef.current)
                 connectTimeoutRef.current = null
               }
+              reconnectAttemptRef.current = 0
               isConnectingRef.current = false
               initializedRef.current = true
               setStatus('connected')
@@ -252,12 +256,10 @@ export function useTerminalSocket({
                   clearTimeout(connectTimeoutRef.current)
                   connectTimeoutRef.current = null
                 }
-                if (reconnectTimeoutRef.current) {
-                  clearTimeout(reconnectTimeoutRef.current)
-                  reconnectTimeoutRef.current = null
-                }
                 isConnectingRef.current = false
-                // Server will close the WS; no need to call ws.close()
+                // Server closes the WS — onclose will schedule a delayed
+                // retry so the heartbeat has time to evict any zombie that
+                // owns this device slot.
               } else {
                 console.error('[ws] Server error:', message.message)
                 setStatus('error')
@@ -281,25 +283,33 @@ export function useTerminalSocket({
         isConnectingRef.current = false
         initializedRef.current = false
 
-        // Don't reconnect or change status if rejected as duplicate
-        if (alreadyOpenRef.current) return
+        const wasAlreadyOpen = alreadyOpenRef.current
 
-        setStatus('disconnected')
+        // Keep the 'already_open' status visible across the wait so the user
+        // sees a stable message instead of flicker to 'disconnected'.
+        if (!wasAlreadyOpen) {
+          setStatus('disconnected')
+        }
 
-        // Schedule reconnect with exponential backoff
+        // Schedule reconnect with exponential backoff. For already_open
+        // rejections, wait at least 5s so the server-side heartbeat (5s
+        // interval) has a chance to evict the zombie WS that owns the slot.
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
-          const delay =
+          const baseDelay =
             RECONNECT_DELAYS[
               Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)
             ]
+          const delay = wasAlreadyOpen ? Math.max(baseDelay, 5_000) : baseDelay
           reconnectAttemptRef.current++
 
           reconnectTimeoutRef.current = setTimeout(() => {
+            alreadyOpenRef.current = false
             if (mountedRef.current) {
               connect()
             }
           }, delay)
         } else {
+          alreadyOpenRef.current = false
           setStatus('error')
         }
       }

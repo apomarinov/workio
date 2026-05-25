@@ -140,9 +140,7 @@ export function ghExec(
     ...options,
     category: 'github',
     errorOnly: true,
-  })
-    .then(({ stdout }) => stdout)
-    .catch(() => '')
+  }).then(({ stdout }) => stdout)
 }
 
 export async function checkGhAvailable() {

@@ -249,4 +249,5 @@ export type WsClientInfo = {
   rows: number
   fontSize: number
   activeShellId: number | null
+  isAlive: boolean
 }
